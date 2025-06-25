@@ -3,9 +3,10 @@ import * as styles from './Main.module.scss';
 import {UseLoadConnections} from "@/shared/hooks/UseLoadConnections";
 import {useWorkSpaces} from "@/shared/hooks/UseWorkSpaces";
 import {Connection} from "@/types/typesConnection";
-import {CreateWorkspaceForm} from "@/components/сreateWorkspaceForm/CreateWorkspaceForm";
-import {CreateConnectionForm} from "@/components/createConnectionsForm/CreateConnectionsForm";
 import Header from "@/components/header/Header";
+import {SelectedConnectionList} from "@/components/selectedConnectionList/SelectedConnectionList";
+import {ModalAddWorkspace} from "@/components/modals/modalAddWorkspace/ModalAddWorkspace";
+import {ModalAddConnection} from "@/components/modals/modalAddConnection/ModalAddConnection";
 
 const Main = () => {
 
@@ -18,7 +19,10 @@ const Main = () => {
     const handleWorkspaceClick = (connectionId: number) => {
         const conn = connections.find(c => c.id === connectionId);
         if (conn) setSelectedConnection(conn);
+        setShowCreateForm(false);
     };
+
+
 
     useEffect(() => {
         loadConnections();
@@ -26,51 +30,47 @@ const Main = () => {
     useEffect(() => {
         loadWorkSpaces()
     }, [loadConnections]);
+    useEffect(() => {
+        if (connections.length && !selectedConnection) {
+            setSelectedConnection(connections[0]);
+        }
+    }, [connections, selectedConnection]);
 
     /* 4. Состояния загрузки / ошибки */
     if (loading) return <p>Загрузка…</p>;
     if (error) return <p style={{color: 'red'}}>{error}</p>;
-
+    const onAddClickWorkspace = () => {
+        setShowCreateForm(true)
+        setOpen(false);
+    }
 
     return (
         <div className={styles.container}>
-            <Header open={open} setOpen={setOpen} workSpaces={workSpaces} selectedConnection={selectedConnection}
+            <Header open={open} setOpen={setOpen} workSpaces={workSpaces}
                     handleWorkspaceClick={(connectionId: number) => handleWorkspaceClick(connectionId)}
-                    onAddClick={() => setShowCreateForm(true)}/>
-            {selectedConnection && (
-                <div>
-
-                    <h4>{selectedConnection.name}</h4>
-                    <p><strong>ID:</strong> {selectedConnection.id}</p>
-                    <p><strong>Описание:</strong> {selectedConnection.description}</p>
-                    <p><strong>Тип:</strong> {selectedConnection.conn_type}</p>
-                    <p><strong>Строка подключения:</strong><br /><code>{selectedConnection.conn_str}</code></p>
-                </div>
-            )}
-
+                    onAddClickWorkspace={onAddClickWorkspace}/>
             <div>
+                <SelectedConnectionList selectedConnection={selectedConnection}/>
                 {showConnForm && (
+                    <ModalAddConnection onSuccess={() => {
+                        setShowConnForm(false);
+                        loadConnections();        // обновляем список
+                    }}
+                                        onCancel={() => setShowConnForm(false)}/>
 
-                    <CreateConnectionForm
-                        onSuccess={() => {
-                            setShowConnForm(false);
-                            loadConnections();        // обновляем список
-                        }}
-                        onCancel={() => setShowConnForm(false)}
-                    />
                 )}
 
                 {showCreateForm && (
-                    <CreateWorkspaceForm
-                        setShowConnForm={setShowConnForm}
-                        connections={connections}
-                        onSuccess={() => {
-                            setShowCreateForm(false);
-                            loadWorkSpaces();
-                        }}
-                        onCancel={() => setShowCreateForm(false)}
-                    />
+                    <ModalAddWorkspace setShowConnForm={setShowConnForm}
+                                       connections={connections}
+                                       onSuccess={() => {
+                                           setShowCreateForm(false);
+                                           loadWorkSpaces();
+                                       }}
+                                       onCancel={() => setShowCreateForm(false)}/>
+
                 )}
+
             </div>
 
         </div>

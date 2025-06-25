@@ -2,13 +2,14 @@
 import { useState } from 'react';
 import { api } from '@/services/api';
 import { CreateConnectionDto } from '@/types/typesCreateConnections';
+import * as styles from './ModalAddConnection.module.scss'
 
 interface Props {
     onSuccess: () => void;
     onCancel:  () => void;
 }
 
-export const CreateConnectionForm = ({ onSuccess, onCancel }: Props) => {
+export const ModalAddConnection = ({ onSuccess, onCancel }: Props) => {
     const [form, setForm] = useState<CreateConnectionDto>({
         url: {
             drivername: '',
@@ -52,12 +53,13 @@ export const CreateConnectionForm = ({ onSuccess, onCancel }: Props) => {
     };
 
     return (
-        <form onSubmit={handleSubmit}
+        <div className={styles.containerModalCn}>
+        <div className={styles.modalCn} onSubmit={handleSubmit}
               style={{ border: '1px solid #aaa', padding: 16, marginTop: 16, maxWidth: 500 }}>
             <h4>Создать Connection (sqlalchemy)</h4>
 
             {/* --- url.* --------------------------------------------------------- */}
-            <fieldset>
+            <fieldset style={{padding:10, marginBottom:10, border: '2px solid grey',borderRadius:10}}>
                 <legend>URL-параметры</legend>
 
                 <input name="url.drivername" placeholder="drivername"
@@ -80,7 +82,7 @@ export const CreateConnectionForm = ({ onSuccess, onCancel }: Props) => {
             </fieldset>
 
             {/* --- connection.* -------------------------------------------------- */}
-            <fieldset>
+            <fieldset style={{padding:10, marginBottom:10, border: '2px solid grey',borderRadius:10}}>
                 <legend>Метаданные</legend>
 
                 <input name="connection.name" placeholder="name"
@@ -97,6 +99,7 @@ export const CreateConnectionForm = ({ onSuccess, onCancel }: Props) => {
             <button type="button" onClick={onCancel}>Отмена</button>
 
             {error && <p style={{ color: 'red' }}>{error}</p>}
-        </form>
+        </div>
+        </div>
     );
 };

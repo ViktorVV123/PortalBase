@@ -1,0 +1,55 @@
+.containerModal {
+  position: fixed;
+  inset: 0;
+  background: rgba(35, 35, 35, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+
+  input {
+    background-color: #2f2f2f;
+    border-radius: 5px;
+    border: none;
+    font-size: 18px;
+    color: #fff;
+
+  }
+}
+.select {
+  width: 100%;
+  background: #2f2f2f;
+  color: #fff;
+  font-size: 12px;
+  border: 1px solid #333;
+  border-radius: 6px;
+  padding: 8px 12px;
+}
+
+.option {
+  background: #2f2f2f; /* чтобы выпадающие пункты тоже тёмные */
+  color: #fff;
+}
+.modal {
+  background: var(--color-modal);
+  padding: 20px;
+  border-radius: 6px;
+  width: 25%;
+  position: relative;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+.btwAddContent {
+  cursor: pointer;
+  border: 1px solid white;
+  padding: 5px;
+  border-radius: 10px;
+  display: flex;
+  justify-content: center;
+  margin-bottom: 20px;
+  margin-top: 10px;
+
+  &:hover {
+    background-color: #2f3030;
+  }
+}

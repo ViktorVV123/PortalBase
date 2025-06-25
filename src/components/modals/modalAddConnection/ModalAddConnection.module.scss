@@ -1,0 +1,29 @@
+.containerModalCn {
+  position: fixed;
+  inset: 0;
+  background: rgba(35, 35, 35, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+
+  input {
+    background-color: #2f2f2f;
+    border-radius: 5px;
+    border: none;
+    width: 98%;
+    font-size: 18px;
+    color: #fff;
+    padding: 5px
+
+  }
+}
+.modalCn{
+  background: var(--color-modal);
+  padding: 20px;
+  border-radius: 6px;
+  width: 25%;
+  position: relative;
+  max-height: 80vh;
+  overflow-y: auto;
+}
