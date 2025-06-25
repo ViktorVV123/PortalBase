@@ -11,7 +11,7 @@ import {ModalAddConnection} from "@/components/modals/modalAddConnection/ModalAd
 const Main = () => {
 
     const {loadConnections, connections, loading, error,} = UseLoadConnections();
-    const {loadWorkSpaces, workSpaces} = useWorkSpaces()
+    const {loadWorkSpaces, workSpaces,deleteWorkspace,updateWorkspace} = useWorkSpaces()
     const [selectedConnection, setSelectedConnection] = useState<Connection | null>(null);
     const [showCreateForm, setShowCreateForm] = useState(false);
     const [showConnForm, setShowConnForm] = useState(false);
@@ -46,9 +46,9 @@ const Main = () => {
 
     return (
         <div className={styles.container}>
-            <Header open={open} setOpen={setOpen} workSpaces={workSpaces}
+            <Header updateWorkspace={updateWorkspace} deleteWorkspace={deleteWorkspace} open={open} setOpen={setOpen} workSpaces={workSpaces}
                     handleWorkspaceClick={(connectionId: number) => handleWorkspaceClick(connectionId)}
-                    onAddClickWorkspace={onAddClickWorkspace}/>
+                    onAddClickWorkspace={onAddClickWorkspace} />
             <div>
                 <SelectedConnectionList selectedConnection={selectedConnection}/>
                 {showConnForm && (

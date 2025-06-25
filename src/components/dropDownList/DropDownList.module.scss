@@ -33,7 +33,7 @@
   padding: 6px 10px;
   border: none;
   border-radius: 6px;
-  font-size: 14px;
+  font-size: 16px;
   cursor: pointer;
   transition: background 0.2s ease;
 
@@ -49,9 +49,10 @@
 }
 
 .item {
+  display: flex;
+  justify-content: space-between;
   padding: 8px 12px;
   border-radius: 4px;
-
   cursor: pointer;
   transition: background 0.2s ease;
 

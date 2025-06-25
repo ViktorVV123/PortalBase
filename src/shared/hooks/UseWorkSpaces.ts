@@ -18,5 +18,36 @@ export const useWorkSpaces = () => {
             setLoading(false);
         }
     },[])
-    return {loadWorkSpaces,workSpaces,loading,error}
+
+
+    const deleteWorkspace = useCallback(
+        async (wsId: number) => {
+            try {
+                await api.delete(`/workspaces/${wsId}`);
+                setWorkSpaces(prev => prev.filter(w => w.id !== wsId));
+            } catch {
+                setError('Ошибка при удалении workspace');
+            }
+        },
+        []          // ← обязательный второй аргумент – массив deps
+    );
+
+
+    /* ─ обновление ─ */
+    const updateWorkspace = useCallback(
+        async (wsId: number, patch: Partial<Omit<WorkSpaceTypes, 'id'>>) => {
+            try {
+                const { data } = await api.patch<WorkSpaceTypes>(`/workspaces/${wsId}`, patch);
+                /* заменяем элемент в состоянии */
+                setWorkSpaces(prev =>
+                    prev.map(w => (w.id === wsId ? { ...w, ...data } : w)),
+                );
+            } catch {
+                setError('Ошибка при обновлении workspace');
+            }
+        },
+        [],
+    );
+
+    return {loadWorkSpaces,workSpaces,loading,error,deleteWorkspace,updateWorkspace}
 }

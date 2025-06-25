@@ -6,10 +6,11 @@ import DropDownList from '@/components/dropDownList/DropDownList';
 
 type HeaderProps = {
     workSpaces: WorkSpaceTypes[];
-
+    deleteWorkspace:(wsId: number) => void
     handleWorkspaceClick: (connectionId: number) => void; // открывает детали
     onAddClickWorkspace: () => void;                               // показать форму создания WS
     open: boolean;
+    updateWorkspace: (id: number, patch: Partial<Omit<WorkSpaceTypes, 'id'>>) => void;
     setOpen: React.Dispatch<React.SetStateAction<boolean>>;
 };
 
@@ -19,6 +20,8 @@ const Header = ({
                     onAddClickWorkspace,
                     open,
                     setOpen,
+                    deleteWorkspace,
+                    updateWorkspace
                 }: HeaderProps) => {
     /** выбранный workspace (по умолчанию первый, если есть) */
     const [selected, setSelected] = useState<WorkSpaceTypes | null>(
@@ -64,10 +67,11 @@ const Header = ({
           ▼
         </span>
             </div>
-
             {open && (
                 <div className={styles.dropdown}>
                     <DropDownList
+                        updateWorkspace={updateWorkspace}
+                        deleteWorkspace={deleteWorkspace}
                         workSpaces={workSpaces}
                         onSelect={selectWorkspace}
                         onAddClickWorkspace={onAddClickWorkspace}
