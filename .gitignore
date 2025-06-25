@@ -1,0 +1,17 @@
+cat > .gitignore <<'EOF'
+# macOS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+
+# Сборка
+build/
+dist/
+
+# Node
+node_modules/
+*.log
+*.tsbuildinfo
+EOF

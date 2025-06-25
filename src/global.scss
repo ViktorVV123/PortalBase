@@ -1,0 +1,26 @@
+@use '@/assets/color/color' as color;
+
+
+@font-face {
+    font-family: 'Inter';
+    font-weight: 400;
+    font-style: normal;
+}
+
+/* Если хотите подключить также наклонную версию (italic) с тем же весом 400 */
+@font-face {
+    font-family: 'Inter';
+    font-weight: 400;
+    font-style: italic;
+}
+
+
+body {
+
+    background-color: var(--primary-color);
+    color: var(--color-text);
+    font-family: 'Inter', sans-serif;
+    font-weight: 400;
+    margin: 0;
+
+}
