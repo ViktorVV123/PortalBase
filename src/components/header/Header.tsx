@@ -13,6 +13,7 @@ type HeaderProps = {
     open: boolean;
 };
 
+
 const Header = ({
                     workSpaces,
                     selectedConnection,
