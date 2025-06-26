@@ -12,12 +12,14 @@ export const SelectedConnectionList = ({selectedConnection}:SelectedConnectionLi
             {selectedConnection && (
                 <div className={styles.container}>
 
-                   {/* <h4>{selectedConnection.name}</h4>
+                    {/* <h4>{selectedConnection.name}</h4>
                     <p><strong>ID:</strong> {selectedConnection.id}</p>*/}
-                    <p>
+                    {/* <p>
                         <strong>Описание:</strong> {selectedConnection.description}</p>
-                    <p><strong>Тип:</strong> {selectedConnection.conn_type}</p>
-                    <p style={{display:'flex', alignItems:'center'}}><strong>Строка подключения:</strong><br /><code>{selectedConnection.conn_str}</code></p>
+                    <p><strong>Тип:</strong> {selectedConnection.conn_type}</p>*/}
+                    <div>{selectedConnection.name}</div>
+                    <p style={{display: 'flex', alignItems: 'center'}}><strong>Строка
+                        подключения:</strong><br/><code>{selectedConnection.conn_str}</code></p>
                 </div>
             )}
         </>

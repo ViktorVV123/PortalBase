@@ -7,16 +7,17 @@ import DeleteImg from '@/assets/image/DeleteIcon.svg'
 
 type DropDownListProps = {
     workSpaces: WorkSpaceTypes[];
-    onSelect: (ws: WorkSpaceTypes) => void;
+    selectWorkspace: (ws: WorkSpaceTypes) => void;
     onAddClickWorkspace: () => void;
     selectedId?: number; // чтобы подсветить активный пункт (необязательно)
     deleteWorkspace: (wsId: number) => void
     updateWorkspace: (id: number, patch: Partial<Omit<WorkSpaceTypes, 'id'>>) => void;
+
 };
 
 const DropDownList = ({
                           workSpaces,
-                          onSelect,
+                          selectWorkspace,
                           onAddClickWorkspace,
                           selectedId,
                           deleteWorkspace, updateWorkspace
@@ -25,10 +26,6 @@ const DropDownList = ({
 
 
     const [editingId, setEditingId] = useState<number | null>(null);
-    const [form, setForm] = useState({
-        name: '',
-
-    });
 
     const [value, setValue]         = useState('');
 
@@ -55,7 +52,7 @@ const DropDownList = ({
             <ul className={styles.list}>
                 {workSpaces.map((ws) => (
                     <li
-                        
+
                         key={ws.id}
                         className={`${styles.item} ${
                             ws.id === selectedId ? styles.itemActive : ''
@@ -72,7 +69,7 @@ const DropDownList = ({
                                 }}
                             />
                         ) : (
-                            <span onClick={() => onSelect(ws)}>{ws.name}</span>
+                            <span onClick={() => selectWorkspace(ws)}>{ws.name}</span>
                         )}
                         <div style={{display: 'flex', alignItems: 'center', gap: 10}}>
                             <span onClick={() => startEdit(ws)}><EditImg/></span>

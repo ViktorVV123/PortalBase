@@ -3,6 +3,7 @@ import * as styles from './Header.module.scss';
 import { WorkSpaceTypes } from '@/types/typesWorkSpaces';
 import { Connection } from '@/types/typesConnection';
 import DropDownList from '@/components/dropDownList/DropDownList';
+import {SelectedConnectionList} from "@/components/selectedConnectionList/SelectedConnectionList";
 
 type HeaderProps = {
     workSpaces: WorkSpaceTypes[];
@@ -12,10 +13,20 @@ type HeaderProps = {
     open: boolean;
     updateWorkspace: (id: number, patch: Partial<Omit<WorkSpaceTypes, 'id'>>) => void;
     setOpen: React.Dispatch<React.SetStateAction<boolean>>;
+    selectWorkspace:any
+    selected:any
+    setSelected:any
+    wrapperRef:any
+    selectedConnection: Connection | null;
 };
 
 const Header = ({
                     workSpaces,
+                    selectWorkspace,
+                    selected,
+                    wrapperRef,
+                    selectedConnection,
+                    setSelected,
                     handleWorkspaceClick,
                     onAddClickWorkspace,
                     open,
@@ -24,36 +35,16 @@ const Header = ({
                     updateWorkspace
                 }: HeaderProps) => {
     /** выбранный workspace (по умолчанию первый, если есть) */
-    const [selected, setSelected] = useState<WorkSpaceTypes | null>(
-        workSpaces[0] ?? null
-    );
+
 
     /** если список workSpaces обновился (после загрузки) — взять первый */
-    useEffect(() => {
-        if (workSpaces.length && !selected) setSelected(workSpaces[0]);
-    }, [workSpaces, selected]);
+
 
     /** клик вне блока закрывает выпадашку */
-    const wrapperRef = useRef<HTMLDivElement>(null);
-    useEffect(() => {
-        const handleOutside = (e: MouseEvent) => {
-            if (
-                wrapperRef.current &&
-                !wrapperRef.current.contains(e.target as Node)
-            ) {
-                setOpen(false);
-            }
-        };
-        document.addEventListener('mousedown', handleOutside);
-        return () => document.removeEventListener('mousedown', handleOutside);
-    }, [setOpen]);
+
 
     /** выбор workspace в списке */
-    const selectWorkspace = (ws: WorkSpaceTypes) => {
-        setSelected(ws);
-        setOpen(false);
-        handleWorkspaceClick(ws.connection_id); // connection_id нужен Main-у
-    };
+
 
     return (
         <div className={styles.container} ref={wrapperRef}>
@@ -73,12 +64,13 @@ const Header = ({
                         updateWorkspace={updateWorkspace}
                         deleteWorkspace={deleteWorkspace}
                         workSpaces={workSpaces}
-                        onSelect={selectWorkspace}
+                        selectWorkspace={selectWorkspace}
                         onAddClickWorkspace={onAddClickWorkspace}
                         selectedId={selected?.id}
                     />
                 </div>
             )}
+            <SelectedConnectionList selectedConnection={selectedConnection}/>
         </div>
     );
 };
