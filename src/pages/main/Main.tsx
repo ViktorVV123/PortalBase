@@ -4,7 +4,6 @@ import {UseLoadConnections} from "@/shared/hooks/UseLoadConnections";
 import {useWorkSpaces} from "@/shared/hooks/UseWorkSpaces";
 import {Connection} from "@/types/typesConnection";
 import Header from "@/components/header/Header";
-import {SelectedConnectionList} from "@/components/selectedConnectionList/SelectedConnectionList";
 import {ModalAddWorkspace} from "@/components/modals/modalAddWorkspace/ModalAddWorkspace";
 import {ModalAddConnection} from "@/components/modals/modalAddConnection/ModalAddConnection";
 import {TablesRow} from "@/components/TablesRow/TablesRow";
@@ -17,8 +16,6 @@ const Main = () => {
     const [selectedConnection, setSelectedConnection] = useState<Connection | null>(null);
     const [showCreateForm, setShowCreateForm] = useState(false);
     const [showConnForm, setShowConnForm] = useState(false);
-
-
     const [open, setOpen] = useState(false);
     const handleWorkspaceClick = (connectionId: number) => {
         const conn = connections.find(c => c.id === connectionId);
@@ -39,7 +36,6 @@ const Main = () => {
             handleWorkspaceClick(workSpaces[0].connection_id);
         }
     }, [workSpaces, selectedId]);
-
 
     useEffect(() => {
         loadConnections();
