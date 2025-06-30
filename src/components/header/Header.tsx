@@ -1,23 +1,24 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React from 'react';
 import * as styles from './Header.module.scss';
 import { WorkSpaceTypes } from '@/types/typesWorkSpaces';
 import { Connection } from '@/types/typesConnection';
 import DropDownList from '@/components/dropDownList/DropDownList';
 import {SelectedConnectionList} from "@/components/selectedConnectionList/SelectedConnectionList";
 
+
 type HeaderProps = {
     workSpaces: WorkSpaceTypes[];
     deleteWorkspace:(wsId: number) => void
-    handleWorkspaceClick: (connectionId: number) => void; // открывает детали
     onAddClickWorkspace: () => void;                               // показать форму создания WS
     open: boolean;
     updateWorkspace: (id: number, patch: Partial<Omit<WorkSpaceTypes, 'id'>>) => void;
     setOpen: React.Dispatch<React.SetStateAction<boolean>>;
     selectWorkspace:any
     selected:any
-    setSelected:any
     wrapperRef:any
     selectedConnection: Connection | null;
+
+
 };
 
 const Header = ({
@@ -26,24 +27,13 @@ const Header = ({
                     selected,
                     wrapperRef,
                     selectedConnection,
-                    setSelected,
-                    handleWorkspaceClick,
                     onAddClickWorkspace,
                     open,
                     setOpen,
                     deleteWorkspace,
-                    updateWorkspace
+                    updateWorkspace,
+
                 }: HeaderProps) => {
-    /** выбранный workspace (по умолчанию первый, если есть) */
-
-
-    /** если список workSpaces обновился (после загрузки) — взять первый */
-
-
-    /** клик вне блока закрывает выпадашку */
-
-
-    /** выбор workspace в списке */
 
 
     return (
@@ -71,6 +61,7 @@ const Header = ({
                 </div>
             )}
             <SelectedConnectionList selectedConnection={selectedConnection}/>
+
         </div>
     );
 };

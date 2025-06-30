@@ -62,11 +62,12 @@ export const useWorkSpaces = () => {
 
 
     const loadTables = useCallback(async (wsId: number|null, published?: boolean) => {
-        if (wsId == null) return;
+        if (wsId == null) { setTables([]); return; }
+
         const { data } = await api.get('/tables', {
             params: { workspace_id: wsId, published },
         });
-        setTables(data);
+        setTables(data);               // data будет [] если у WS нет таблиц
     }, []);
 
     return {loadWorkSpaces,workSpaces,loading,error,deleteWorkspace,updateWorkspace, tables,loadTables}

@@ -21,6 +21,7 @@ export const useTableColumns = () => {
     const [columns, setColumns] = useState<Column[]>([]);
     const [loading, setLoading] = useState(false);
     const [error,   setError]   = useState<string | null>(null);
+    const reset = () => setColumns([]);
 
     const loadColumns = useCallback(async (tableId: number) => {
         setLoading(true);
@@ -71,5 +72,5 @@ export const useTableColumns = () => {
         [],
     );
 
-    return { columns, loading, error, loadColumns, updateColumn,deleteColumn };
+    return { columns, loading, error, loadColumns, updateColumn,deleteColumn,reset };
 };

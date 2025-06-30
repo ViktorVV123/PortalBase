@@ -44,7 +44,7 @@ export const ModalAddWorkspace = ({connections, onSuccess, onCancel, setShowConn
 
     return (
         <div className={styles.containerModal}>
-            <div onSubmit={handleSubmit} className={styles.modal}>
+            <div onClick={handleSubmit} className={styles.modal}>
                 <h4>Создать Workspace</h4>
 
                 <label>Подключение:</label><br/>
