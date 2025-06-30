@@ -31,17 +31,19 @@ export const useWorkspaceTables = ({
 
     /* таблицы текущего workspace */
     const visibleTables = useMemo(
-        () => tables.filter(t => t.workspace_id === workspaceId),
+        () => tables.filter(t => t.workspace_id === workspaceId), // не t.id
         [tables, workspaceId],
     );
+
 
     /* выбранная таблица */
     const [selectedId, setSelectedId] = useState<number | null>(null);
 
     useEffect(() => {
         if (!visibleTables.length) setSelectedId(null);
-        else if (!visibleTables.some(t => t.workspace_id === selectedId))
+        else if (!visibleTables.some(t => t.id === selectedId)) {
             setSelectedId(visibleTables[0].id);
+        }
     }, [visibleTables, selectedId]);
 
     return {
