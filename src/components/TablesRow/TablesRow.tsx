@@ -57,14 +57,14 @@ export const TablesRow = ({workspaceId, tables, loadTables,onTableSelect}: Props
                         {t.name}
                     </div>
                 ))}
-                <label className={s.switcher}>
+                {/*<label className={s.switcher}>
                     <input
                         type="checkbox"
                         checked={published === 'only'}
                         onChange={togglePublished}
                     />
                     published
-                </label>
+                </label>*/}
             </div>
 
 
