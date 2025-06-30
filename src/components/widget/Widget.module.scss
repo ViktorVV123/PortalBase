@@ -1,0 +1,92 @@
+/* базовые переменные совпадают с TableRow */
+$border: 1px solid #b0b1b3;
+$header-bg: #9d9d9f;;
+
+/* ------ layout ------ */
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.list {
+
+  min-width: 220px;
+  display: flex;
+
+  gap: 8px;
+}
+
+.item {
+  padding: 6px 10px;
+  border: $border;
+  border-radius: 6px;
+  cursor: pointer;
+
+}
+
+.active {
+  background: #656567;
+
+}
+
+.empty {
+  padding: 4px 0;
+  color: #6b7280;
+}
+
+.columns {
+  flex: 1;
+}
+
+/* ------ таблица (копия из TableRow) ------ */
+.tableWrapper {
+  max-height: 90%;
+  overflow: auto;
+  border-radius: 0.5rem;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+.table thead th {
+  top: 0;
+
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  font-weight: 600;
+  border-bottom: $border;
+  white-space: nowrap;
+}
+
+.table td {
+  padding: 0.45rem 0.75rem;
+  border-bottom: $border;
+}
+
+.table tbody tr:nth-child(odd) {
+  background: #1f1f1f;
+}
+
+.code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.ellipsis {
+  max-width: 260px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wide {
+  width: 35%;
+}
+
+.error {
+  color: #dc2626;
+}

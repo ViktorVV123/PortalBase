@@ -140,7 +140,7 @@ export const Main = () => {
                 }}
             />
 
-            <MenuTableWidget
+            <MenuTableWidget view={view}
                 setSwapTableWidget={v => setView(v === 0 ? 'table' : 'widget')}
             />
 

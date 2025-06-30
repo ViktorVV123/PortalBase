@@ -30,7 +30,7 @@
   @apply cursor-pointer rounded-lg px-3 py-2 hover:bg-gray-200;
 }
 .active {
-  @apply bg-blue-200 font-semibold;
+  background: #656567;
 }
 .columns {
   @apply mt-4;
@@ -70,7 +70,7 @@ $zebra: #9d9d9f;
 .table thead th {
 
   top: 0;
-  background: $header-bg;
+
   padding: 0.5rem 0.75rem;
   text-align: left;
   font-weight: 600;
