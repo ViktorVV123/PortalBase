@@ -49,6 +49,7 @@ export const Main = () => {
         error: widgetError,
         loadWidgetsForTable,
         loadColumns,
+        reset
     } = useWidget();
 
     /* ---------- local state ---------- */
@@ -59,6 +60,7 @@ export const Main = () => {
 
     const [showCreateForm, setShowCreateForm] = useState(false);
     const [showConnForm, setShowConnForm] = useState(false);
+
 
     /* выбранный workspace / connection */
     const selectedWs = useMemo(
@@ -102,7 +104,8 @@ export const Main = () => {
     const handleTableSelect = useCallback(
         (tableId: number) => {
             setSelectedWidgetId(null);
-            loadWidgetsForTable(tableId);
+            if (tableId != null) loadWidgetsForTable(tableId);
+                else reset();
         },
         [loadWidgetsForTable],
     );
