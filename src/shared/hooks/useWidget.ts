@@ -28,7 +28,7 @@ export const useWidget = () => {
     const [columns, setColumns]           = useState<WidgetColumn[]>([]);
     const [loading, setLoading]           = useState(false);
     const [error,   setError]             = useState<string | null>(null);
-    const reset = () => { setWidgets([]); setColumns([]); };
+    const reset = useCallback(() => setWidgets([]), []);
     /** GET /widgets?table_id=X */
     const loadWidgetsForTable = useCallback(async (tableId: number) => {
         setLoading(true); setError(null);

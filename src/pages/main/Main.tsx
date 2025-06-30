@@ -102,12 +102,16 @@ export const Main = () => {
     /* ---------- callbacks ---------- */
     /* таблица → список widgets (НЕ меняем view) */
     const handleTableSelect = useCallback(
-        (tableId: number) => {
+        (tableId: number | null) => {
             setSelectedWidgetId(null);
-            if (tableId != null) loadWidgetsForTable(tableId);
-                else reset();
+
+            if (tableId != null) {
+                loadWidgetsForTable(tableId);
+            } else {
+                reset();              // reset уже стабильный
+            }
         },
-        [loadWidgetsForTable],
+        [loadWidgetsForTable],     // ← reset убрали
     );
 
     /* widget → его столбцы */
@@ -115,6 +119,11 @@ export const Main = () => {
         setSelectedWidgetId(id);
         loadColumns(id);
     };
+    // 2. выносим переключение view, чтобы не пересоздавалось каждую отрисовку
+    const swapTableWidget = useCallback(
+        (v: number) => setView(v === 0 ? 'table' : 'widget'),
+        [],
+    );
 
     /* ---------- early states ---------- */
     if (connLoading || wsLoading) return <p>Загрузка…</p>;
@@ -143,8 +152,9 @@ export const Main = () => {
                 }}
             />
 
-            <MenuTableWidget view={view}
-                setSwapTableWidget={v => setView(v === 0 ? 'table' : 'widget')}
+            <MenuTableWidget
+                view={view}
+                setSwapTableWidget={swapTableWidget}
             />
 
             {view === 'table' ? (

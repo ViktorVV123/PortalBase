@@ -40,10 +40,9 @@ export const TablesRow = ({workspaceId, tables, loadTables,onTableSelect}: Props
 
     /* 2. сообщаем Main, КОГДА selectedId изменился */
     useEffect(() => {
-        if (selectedId != null) onTableSelect?.(selectedId);
-        onTableSelect?.(selectedId);
-    }, [selectedId, onTableSelect]);            // 🔑 нет column в deps!
-
+        // вызываем колбэк ВСЕГДА, даже если selectedId === null
+        onTableSelect(selectedId);
+    }, [selectedId, onTableSelect]);
     /* ---------- UI ---------- */
     return (
         <>
