@@ -15,9 +15,6 @@ export const useWorkspaceTables = ({
                                        loadTables,
                                    }: Params) => {
     const [published, setPublished] = useState<PublishedMode>('all');
-    const togglePublished = () =>
-        setPublished(p => (p === 'only' ? 'hide' : 'only'));
-
 
     /* загрузка при смене workspace или флага */
     useEffect(() => {
@@ -47,8 +44,7 @@ export const useWorkspaceTables = ({
     }, [visibleTables, selectedId]);
 
     return {
-        published,
-        togglePublished,
+
         visibleTables,
         selectedId,
         setSelectedId,

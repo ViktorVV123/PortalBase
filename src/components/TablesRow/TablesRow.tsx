@@ -1,4 +1,4 @@
-import React, {useEffect} from 'react';
+import React, {useEffect, useRef} from 'react';
 import * as s from './TablesRow.module.scss';
 import EditIcon from '@/assets/image/EditIcon.svg';
 import DeleteIcon from '@/assets/image/DeleteIcon.svg';
@@ -16,28 +16,47 @@ interface Props {
     workspaceId: number | null;
     tables: Table[];
     loadTables: (wsId: number | null, published?: boolean) => void;
-    onTableSelect:any
+    onTableSelect: any
 
 
 }
 
-export const TablesRow = ({workspaceId, tables, loadTables,onTableSelect}: Props) => {
+export const TablesRow = ({workspaceId, tables, loadTables, onTableSelect}: Props) => {
     /* --- таблицы --- */
-    const { published, togglePublished, visibleTables, selectedId, setSelectedId } =
-        useWorkspaceTables({ workspaceId, tables, loadTables });
+    const {visibleTables, selectedId, setSelectedId} =
+        useWorkspaceTables({workspaceId, tables, loadTables});
 
     const column = useColumnEdit(selectedId);
 
     /* 1. следим за изменением списка таблиц */
+    /* ---------- эффект №1: управляем selectedId ---------- */
     useEffect(() => {
-        if (!visibleTables.length) {
-            setSelectedId(null);
-            column.reset();            // очищаем колонки
+        /** если таблиц нет — сбрасываем выбор ОДИН раз */
+        if (visibleTables.length === 0) {
+            if (selectedId !== null) setSelectedId(null);          // вызываем только при смене
         } else if (!visibleTables.some(t => t.id === selectedId)) {
-            setSelectedId(visibleTables[0].id);   // авто-выбор первой
+            /** авто-выбор первой появившейся таблицы */
+            setSelectedId(visibleTables[0].id);
         }
-    }, [visibleTables, selectedId, column.reset]);   // column.reset стабильна
+    }, [visibleTables, selectedId]);
 
+    /* ---------- эффект №2: очищаем колонки, когда таблицы пропали ---------- */
+    /** вспомогательный хук, чтобы знать предыдущее значение */
+    function usePrevious<T>(value: T) {
+        const ref = useRef(value);
+        useEffect(() => {
+            ref.current = value;
+        }, [value]);
+        return ref.current;
+    }
+
+    const prevCount = usePrevious(visibleTables.length);
+
+    useEffect(() => {
+        if (prevCount > 0 && visibleTables.length === 0) {
+            column.reset();                      // вызываем ровно ОДИН раз при переходе →0
+        }
+    }, [visibleTables.length, prevCount, column.reset]);
     /* 2. сообщаем Main, КОГДА selectedId изменился */
     useEffect(() => {
         // вызываем колбэк ВСЕГДА, даже если selectedId === null
