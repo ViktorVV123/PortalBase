@@ -16,33 +16,32 @@ interface Props {
     workspaceId: number | null;
     tables: Table[];
     loadTables: (wsId: number | null, published?: boolean) => void;
-    onTableSelect?: (tableId: number) => void;   // ← новый проп
-    handleTableSelect:any
+    onTableSelect:any
+
 
 }
 
-export const TablesRow = ({workspaceId, tables, loadTables,onTableSelect,handleTableSelect}: Props) => {
+export const TablesRow = ({workspaceId, tables, loadTables,onTableSelect}: Props) => {
     /* --- таблицы --- */
-    const {
-        published,
-        togglePublished,
-        visibleTables,
-        selectedId,
-        setSelectedId,
-    } = useWorkspaceTables({workspaceId, tables, loadTables});
+    const { published, togglePublished, visibleTables, selectedId, setSelectedId } =
+        useWorkspaceTables({ workspaceId, tables, loadTables });
 
-    /* --- столбцы + редактирование --- */
     const column = useColumnEdit(selectedId);
 
+    /* 1. следим за изменением списка таблиц */
     useEffect(() => {
         if (!visibleTables.length) {
-            setSelectedId(null);   // таблиц нет → ничего не выбрано
-            column.reset();        // очищаем список колонок
+            setSelectedId(null);
+            column.reset();            // очищаем колонки
         } else if (!visibleTables.some(t => t.id === selectedId)) {
-            setSelectedId(visibleTables[0].id);  // авто-выбор первой таблицы
+            setSelectedId(visibleTables[0].id);   // авто-выбор первой
         }
-    }, [visibleTables, selectedId, column]);
+    }, [visibleTables, selectedId, column.reset]);   // column.reset стабильна
 
+    /* 2. сообщаем Main, КОГДА selectedId изменился */
+    useEffect(() => {
+        if (selectedId != null) onTableSelect?.(selectedId);
+    }, [selectedId, onTableSelect]);            // 🔑 нет column в deps!
 
     /* ---------- UI ---------- */
     return (
@@ -58,7 +57,6 @@ export const TablesRow = ({workspaceId, tables, loadTables,onTableSelect,handleT
                         {t.name}
                     </div>
                 ))}
-
                 <label className={s.switcher}>
                     <input
                         type="checkbox"
@@ -68,6 +66,7 @@ export const TablesRow = ({workspaceId, tables, loadTables,onTableSelect,handleT
                     published
                 </label>
             </div>
+
 
             {/* таблица колонок */}
             <div className={s.columns}>
