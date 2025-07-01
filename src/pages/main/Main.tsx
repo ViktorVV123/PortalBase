@@ -57,7 +57,6 @@ export const Main = () => {
     const [selectedWidgetId, setSelectedWidgetId] = useState<number | null>(null);
     const [view, setView] = useState<'table' | 'widget'>('table');   // ← переключатель
     const [openDropdown, setOpenDropdown] = useState(false);
-
     const [showCreateForm, setShowCreateForm] = useState(false);
     const [showConnForm, setShowConnForm] = useState(false);
 

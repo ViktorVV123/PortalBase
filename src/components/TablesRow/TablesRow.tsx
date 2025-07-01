@@ -1,9 +1,13 @@
-import React, {useEffect, useRef} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import * as s from './TablesRow.module.scss';
 import EditIcon from '@/assets/image/EditIcon.svg';
 import DeleteIcon from '@/assets/image/DeleteIcon.svg';
 import {useWorkspaceTables} from "@/shared/hooks/useWorkspaceTables";
 import {useColumnEdit} from "@/shared/hooks/useColumnEdit";
+import AddIcon from "@/assets/image/AddIcon.svg";
+import {useTableCrud} from "@/shared/hooks/useTableCrud";
+import {NewTableModal} from "@/components/modals/newTableModal/NewTableModal";
+import {TableDraft} from "@/types/tableDraft";
 
 
 export interface Table {
@@ -27,6 +31,18 @@ export const TablesRow = ({workspaceId, tables, loadTables, onTableSelect}: Prop
         useWorkspaceTables({workspaceId, tables, loadTables});
 
     const column = useColumnEdit(selectedId);
+    const { createTable } = useTableCrud(tables, loadTables);
+    const [showModal, setShowModal] = useState(false);
+
+    const handleCreate = useCallback(
+        async (payload: TableDraft) => {
+            if (workspaceId == null) return;
+            const newId = await createTable(workspaceId, payload);
+            setSelectedId(newId);      // instant select
+            onTableSelect(newId);
+        },
+        [workspaceId, createTable, setSelectedId, onTableSelect],
+    );
 
     /* 1. следим за изменением списка таблиц */
     /* ---------- эффект №1: управляем selectedId ---------- */
@@ -84,6 +100,15 @@ export const TablesRow = ({workspaceId, tables, loadTables, onTableSelect}: Prop
                     />
                     published
                 </label>*/}
+
+                <AddIcon onClick={() => setShowModal(true)} />
+
+                <NewTableModal
+                    open={showModal}
+                    onClose={() => setShowModal(false)}
+                    onSubmit={handleCreate}
+                />
+
             </div>
 
 

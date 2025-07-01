@@ -1,0 +1,91 @@
+/* ui/ModalBase.module.scss */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+.modal {
+  width: min(640px, 90%);
+  max-height: 90vh;
+  overflow-y: auto;
+
+  background: #2f2f2f;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0 0 0 / 25%);
+
+  padding: 24px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+h3,
+h4 {
+  margin: 0 0 4px;
+  font-size: 20px;
+  line-height: 1.3;
+  font-weight: 600;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+}
+
+input,
+textarea,
+select {
+  padding: 8px 10px;
+  border: 1px solid #d0d0d0;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 14px;
+  resize: vertical;
+  background-color: #2f2f2f;
+  color: #EEEEEE;
+
+  &:focus {
+    outline: none;
+    border-color: #939393;
+    box-shadow: 0 0 0 2px rgba(130, 131, 131, 0.25);
+  }
+}
+
+textarea { min-height: 64px; }
+select   { appearance: none; cursor: pointer; }
+
+.actions {
+  margin-top: 8px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+
+  button {
+    padding: 8px 18px;
+    font-size: 14px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color .15s;
+
+    &:disabled {
+      opacity: .55; cursor: not-allowed;
+    }
+
+    &:first-of-type {         /* «Отмена» по умолчанию */
+      background: #f3f3f3;
+      &:hover:not(:disabled) { background:#e4e4e4; }
+    }
+    &:last-of-type {          /* «Создать»/«Сохранить» */
+      color:#fff; background:#2787f5;
+      &:hover:not(:disabled) { background:#1f6ed1; }
+    }
+  }
+}

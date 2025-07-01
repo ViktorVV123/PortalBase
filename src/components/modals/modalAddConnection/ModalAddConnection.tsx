@@ -54,7 +54,7 @@ export const ModalAddConnection = ({ onSuccess, onCancel }: Props) => {
 
     return (
         <div className={styles.containerModalCn}>
-        <div className={styles.modalCn} onClick={handleSubmit}
+        <form className={styles.modalCn} onSubmit={handleSubmit}
               style={{ border: '1px solid #aaa', padding: 16, marginTop: 16, maxWidth: 500 }}>
             <h4>Создать Connection (sqlalchemy)</h4>
 
@@ -99,7 +99,7 @@ export const ModalAddConnection = ({ onSuccess, onCancel }: Props) => {
             <button type="button" onClick={onCancel}>Отмена</button>
 
             {error && <p style={{ color: 'red' }}>{error}</p>}
-        </div>
+        </form>
         </div>
     );
 };
