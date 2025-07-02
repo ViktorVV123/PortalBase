@@ -7,20 +7,21 @@ import React, {
     useState,
 } from 'react';
 import * as styles from './Main.module.scss';
-import { UseLoadConnections } from '@/shared/hooks/UseLoadConnections';
-import { useWorkSpaces } from '@/shared/hooks/UseWorkSpaces';
-import { useWidget } from '@/shared/hooks/useWidget';
-import { useOutsideClick } from '@/shared/hooks/useOutsideClick';
-import { useDefaultWorkspace } from '@/shared/hooks/useDefaultWorkspace';
+import {UseLoadConnections} from '@/shared/hooks/UseLoadConnections';
+import {useWorkSpaces} from '@/shared/hooks/UseWorkSpaces';
+import {useWidget} from '@/shared/hooks/useWidget';
+import {useOutsideClick} from '@/shared/hooks/useOutsideClick';
+import {useDefaultWorkspace} from '@/shared/hooks/useDefaultWorkspace';
 
 import Header from '@/components/header/Header';
-import { TablesRow } from '@/components/TablesRow/TablesRow';
+import {TablesRow} from '@/components/TablesRow/TablesRow';
 import Widget from '@/components/widget/Widget';
-import { MenuTableWidget } from '@/components/menuTableWidget/MenuTableWidget';
-import { ModalAddWorkspace } from '@/components/modals/modalAddWorkspace/ModalAddWorkspace';
-import { ModalAddConnection } from '@/components/modals/modalAddConnection/ModalAddConnection';
-import { Connection } from '@/types/typesConnection';
-import { WorkSpaceTypes } from '@/types/typesWorkSpaces';
+import {MenuTableWidget} from '@/components/menuTableWidget/MenuTableWidget';
+import {ModalAddWorkspace} from '@/components/modals/modalAddWorkspace/ModalAddWorkspace';
+import {ModalAddConnection} from '@/components/modals/modalAddConnection/ModalAddConnection';
+import {Connection} from '@/types/typesConnection';
+import {WorkSpaceTypes} from '@/types/typesWorkSpaces';
+import {SideNav} from "@/components/SideNav/SideNav";
 
 export const Main = () => {
     /* ---------- data hooks ---------- */
@@ -59,7 +60,7 @@ export const Main = () => {
     const [openDropdown, setOpenDropdown] = useState(false);
     const [showCreateForm, setShowCreateForm] = useState(false);
     const [showConnForm, setShowConnForm] = useState(false);
-
+    const [navOpen, setNavOpen] = useState(false);
 
     /* выбранный workspace / connection */
     const selectedWs = useMemo(
@@ -80,7 +81,8 @@ export const Main = () => {
         workSpaces,
         selectedWsId,
         id => setSelectedWsId(id),
-        () => {},
+        () => {
+        },
     );
 
     /* ---------- effects ---------- */
@@ -126,76 +128,82 @@ export const Main = () => {
 
     /* ---------- early states ---------- */
     if (connLoading || wsLoading) return <p>Загрузка…</p>;
-    if (connError || wsError)     return <p style={{ color: 'red' }}>{connError || wsError}</p>;
+    if (connError || wsError) return <p style={{color: 'red'}}>{connError || wsError}</p>;
 
     /* ---------- UI ---------- */
     return (
-        <div className={styles.container}>
-            <Header
-                wrapperRef={wrapperRef}
-                open={openDropdown}
-                setOpen={setOpenDropdown}
-                workSpaces={workSpaces}
-                selectWorkspace={(ws: WorkSpaceTypes) => {
-                    setSelectedWsId(ws.id);
-                    setOpenDropdown(false);
-                    setView('table');              // показываем таблицы нового WS
-                }}
-                selected={selectedWs}
-                deleteWorkspace={deleteWorkspace}
-                updateWorkspace={updateWorkspace}
-                selectedConnection={selectedConn}
-                onAddClickWorkspace={() => {
-                    setShowCreateForm(true);
-                    setOpenDropdown(false);
-                }}
-            />
+        <div className={styles.layout}>
 
-            <MenuTableWidget
-                view={view}
-                setSwapTableWidget={swapTableWidget}
-            />
-
-            {view === 'table' ? (
-                <TablesRow
-                    workspaceId={selectedWsId}
-                    tables={tables}
-                    loadTables={loadTables}
-                    onTableSelect={handleTableSelect}
-                />
-            ) : (
-                <Widget
-                    widgets={widgets}
-                    selectedWidgetId={selectedWidgetId}
-                    onSelectWidget={handleWidgetSelect}
-                    columns={widgetColumns}
-                    loading={widgetLoading}
-                    error={widgetError}
-                />
-            )}
-
-            {/* ---------- modals ---------- */}
-            {showConnForm && (
-                <ModalAddConnection
-                    onSuccess={() => {
-                        setShowConnForm(false);
-                        loadConnections();
+            <SideNav open={navOpen} toggle={() => setNavOpen(o => !o)}/>
+            <div className={styles.container}>
+                <Header
+                    wrapperRef={wrapperRef}
+                    open={openDropdown}
+                    setOpen={setOpenDropdown}
+                    workSpaces={workSpaces}
+                    selectWorkspace={(ws: WorkSpaceTypes) => {
+                        setSelectedWsId(ws.id);
+                        setOpenDropdown(false);
+                        setView('table');              // показываем таблицы нового WS
                     }}
-                    onCancel={() => setShowConnForm(false)}
-                />
-            )}
-
-            {showCreateForm && (
-                <ModalAddWorkspace
-                    setShowConnForm={setShowConnForm}
-                    connections={connections}
-                    onSuccess={() => {
-                        setShowCreateForm(false);
-                        loadWorkSpaces();
+                    selected={selectedWs}
+                    deleteWorkspace={deleteWorkspace}
+                    updateWorkspace={updateWorkspace}
+                    selectedConnection={selectedConn}
+                    onAddClickWorkspace={() => {
+                        setShowCreateForm(true);
+                        setOpenDropdown(false);
                     }}
-                    onCancel={() => setShowCreateForm(false)}
                 />
-            )}
+
+                <div style={{padding: '15px'}}>
+                    <MenuTableWidget
+                        view={view}
+                        setSwapTableWidget={swapTableWidget}
+                    />
+
+                    {view === 'table' ? (
+                        <TablesRow
+                            workspaceId={selectedWsId}
+                            tables={tables}
+                            loadTables={loadTables}
+                            onTableSelect={handleTableSelect}
+                        />
+                    ) : (
+                        <Widget
+                            widgets={widgets}
+                            selectedWidgetId={selectedWidgetId}
+                            onSelectWidget={handleWidgetSelect}
+                            columns={widgetColumns}
+                            loading={widgetLoading}
+                            error={widgetError}
+                        />
+                    )}
+
+                    {/* ---------- modals ---------- */}
+                    {showConnForm && (
+                        <ModalAddConnection
+                            onSuccess={() => {
+                                setShowConnForm(false);
+                                loadConnections();
+                            }}
+                            onCancel={() => setShowConnForm(false)}
+                        />
+                    )}
+
+                    {showCreateForm && (
+                        <ModalAddWorkspace
+                            setShowConnForm={setShowConnForm}
+                            connections={connections}
+                            onSuccess={() => {
+                                setShowCreateForm(false);
+                                loadWorkSpaces();
+                            }}
+                            onCancel={() => setShowCreateForm(false)}
+                        />
+                    )}
+                </div>
+            </div>
         </div>
     );
 };

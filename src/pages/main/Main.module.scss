@@ -1,4 +1,14 @@
-.container {
+
+  .container {
+    flex: 1 1 auto;       /* прежние стили контейнера */
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+
+  }
+
+
+.layout {
   display: flex;
-  flex-direction: column;
+  height: 100vh;        /* меню тянется на всю высоту */
 }
