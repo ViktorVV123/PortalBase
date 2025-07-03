@@ -73,5 +73,23 @@ export const useWidget = () => {
         }
     }, []);
 
-    return {widgets, columns, loading, error, loadWidgetsForTable, loadColumns, reset};
+
+      /** POST /widgets/tables/references/{widget_col_id}/{table_column_id} */
+          const addReference = useCallback(
+            async (
+                  widgetColId: number,
+              tblColId: number,
+              payload: { width: number; visible: boolean; primary: boolean },
+        ) => {
+              await api.post(
+                    `/widgets/tables/references/${widgetColId}/${tblColId}`,
+                    payload,
+                  );
+            },
+        [],
+          );
+
+
+
+    return {widgets, columns, loading, error, loadWidgetsForTable, loadColumns, reset,addReference};
 };

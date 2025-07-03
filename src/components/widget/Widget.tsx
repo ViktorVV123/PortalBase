@@ -10,6 +10,8 @@ interface Props {
     columns: WidgetColumn[];
     loading: boolean;
     error: string | null;
+    addReference:any
+    loadColumns:any
 }
 
 const Widget = ({
@@ -19,6 +21,8 @@ const Widget = ({
                     columns,
                     loading,
                     error,
+                    loadColumns,
+                    addReference
                 }: Props) => {
     /* ────────── авто-выбор ────────── */
     useEffect(() => {
@@ -44,6 +48,31 @@ const Widget = ({
     };
 
     if (!columns.length) return <p>References нет</p>;
+
+    const handleMerge = async (wColId: number) => {
+        if (selectedWidgetId == null) return;
+
+        /* спрашиваем у пользователя ID колонки таблицы */
+        const input = prompt('Введите tbl_col ID, который нужно привязать:');
+        const tblId = Number(input);
+        if (!tblId) return;
+
+        try {
+            await addReference(wColId, tblId, {
+                width: 33,
+                visible: false,
+                primary: false,
+            });
+
+            /* подтянуть обновлённые колонки */
+            await loadColumns(selectedWidgetId);
+        } catch (e) {
+            alert('Не удалось добавить reference');
+            console.error(e);
+        }
+    };
+
+
 
     /** расплющиваем reference-массивы всех колонок *+/** для каждой widget-колонки собираем агрегаты */
         const rows = columns.map(col => {
@@ -91,26 +120,28 @@ const Widget = ({
                         <th>increment</th>
                         <th>datetime</th>
                         <th>required</th>
+                        <th>объединить</th>
            {/*             <th>width</th>*/}
                      {/*   <th>visible</th>*/}
                     </tr>
                     </thead>
                     <tbody>
                     {rows.map(r => (
-                          <tr key={r.colId}>
-                                <td>{r.colId}</td>
-                                <td>{r.ids}</td>
-                                <td>{r.names}</td>
-                                <td>{r.descr}</td>
-                                <td>{r.dtypes}</td>
-                                <td>{r.lengths}</td>
-                                <td>{r.precs}</td>
-                                {/*<td>primary — если нужно, аналогично ↑</td>*/}
-                                <td>{r.incr}</td>
-                                <td>{r.dt}</td>
-                                <td>{r.req}</td>
-                              </tr>
-                        ))}
+                        <tr key={r.colId}>
+                            <td>{r.colId}</td>
+                            <td>{r.ids}</td>
+                            <td>{r.names}</td>
+                            <td>{r.descr}</td>
+                            <td>{r.dtypes}</td>
+                            <td>{r.lengths}</td>
+                            <td>{r.precs}</td>
+                            {/*<td>primary — если нужно, аналогично ↑</td>*/}
+                            <td>{r.incr}</td>
+                            <td>{r.dt}</td>
+                            <td>{r.req}</td>
+                            <td> <button onClick={() => handleMerge(r.colId)}>+</button></td>
+                        </tr>
+                    ))}
                     </tbody>
                 </table>
             </div>

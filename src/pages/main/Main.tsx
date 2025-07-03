@@ -50,7 +50,8 @@ export const Main = () => {
         error: widgetError,
         loadWidgetsForTable,
         loadColumns,
-        reset
+        reset,
+        addReference
     } = useWidget();
 
     /* ---------- local state ---------- */
@@ -171,6 +172,8 @@ export const Main = () => {
                         />
                     ) : (
                         <Widget
+                            loadColumns={loadColumns}
+                            addReference={addReference}
                             widgets={widgets}
                             selectedWidgetId={selectedWidgetId}
                             onSelectWidget={handleWidgetSelect}
