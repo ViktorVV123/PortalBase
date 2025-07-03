@@ -45,16 +45,27 @@ const Widget = ({
 
     if (!columns.length) return <p>References нет</p>;
 
-    /** расплющиваем reference-массивы всех колонок */
-    const refs = columns.flatMap(c =>
-        c.reference.map(r => ({
-            columnId: c.id,
-            width: r.width,
-            primary: r.primary,
-            visible: r.visible,
-            tc: r.table_column,
-        })),
-    );
+    /** расплющиваем reference-массивы всех колонок *+/** для каждой widget-колонки собираем агрегаты */
+        const rows = columns.map(col => {
+          const refs = col.reference;
+
+              const join = <T,>(arr: T[], sep = ', ') =>
+                arr.map(v => (v ?? '—') as string).join(sep);
+
+              return {
+                colId: col.id,
+                ids:       join(refs.map(r => r.table_column.id)),
+                names:     join(refs.map(r => r.table_column.name)),
+                descr:     join(refs.map(r => r.table_column.description ?? '—'), ' | '),
+                dtypes:    join(refs.map(r => r.table_column.datatype)),
+                lengths:   join(refs.map(r => r.table_column.length ?? '—')),
+                precs:     join(refs.map(r => r.table_column.precision ?? '—')),
+                incr:      refs.some(r => r.table_column.increment) ? '✔︎' : '',
+                dt:        refs.some(r => r.table_column.datetime)  ? '✔︎' : '',
+                req:       refs.some(r => r.table_column.required)  ? '✔︎' : '',
+              };
+        });
+
 
     /* ────────── таблица колонок ────────── */
     const renderColumns = () => {
@@ -76,32 +87,30 @@ const Widget = ({
                         <th>datatype</th>
                         <th>length</th>
                         <th>precision</th>
-                        <th>primary</th>
+                      {/*  <th>primary</th>*/}
                         <th>increment</th>
                         <th>datetime</th>
                         <th>required</th>
-                        <th>width</th>
-                        <th>visible</th>
+           {/*             <th>width</th>*/}
+                     {/*   <th>visible</th>*/}
                     </tr>
                     </thead>
                     <tbody>
-                    {refs.map(r => (
-                        <tr key={`${r.columnId}-${r.tc.id}`}>
-                            <td>{r.columnId}</td>
-                            <td>{r.tc.id}</td>
-                            <td>{r.tc.name}</td>
-                            <td>{r.tc.description ?? '—'}</td>
-                            <td>{r.tc.datatype}</td>
-                            <td>{r.tc.length ?? '—'}</td>
-                            <td>{r.tc.precision ?? '—'}</td>
-                            <td>{r.tc.primary ? '✔︎' : ''}</td>
-                            <td>{r.tc.increment ? '✔︎' : ''}</td>
-                            <td>{r.tc.datetime ? '✔︎' : ''}</td>
-                            <td>{r.tc.required ? '✔︎' : ''}</td>
-                            <td>{r.width}</td>
-                            <td>{r.visible ? '👁' : ''}</td>
-                        </tr>
-                    ))}
+                    {rows.map(r => (
+                          <tr key={r.colId}>
+                                <td>{r.colId}</td>
+                                <td>{r.ids}</td>
+                                <td>{r.names}</td>
+                                <td>{r.descr}</td>
+                                <td>{r.dtypes}</td>
+                                <td>{r.lengths}</td>
+                                <td>{r.precs}</td>
+                                {/*<td>primary — если нужно, аналогично ↑</td>*/}
+                                <td>{r.incr}</td>
+                                <td>{r.dt}</td>
+                                <td>{r.req}</td>
+                              </tr>
+                        ))}
                     </tbody>
                 </table>
             </div>
