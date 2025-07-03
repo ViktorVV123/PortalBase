@@ -1,21 +1,9 @@
 // hooks/useTableColumns.ts
 import { useState, useCallback } from 'react';
 import { api } from '@/services/api';
+import {Column} from "@/types/tableColumn";
 
-export interface Column {
-    id: number;
-    table_id: number;
-    name: string;
-    description:string | null
-    datatype: string;
-    required: boolean;
-    length: number | null | string;
-    precision: number | null | string;
-    primary: boolean;
-    increment:boolean;
-    datetime: number | null | string;
-    // остальные поля по желанию
-}
+
 
 export const useTableColumns = () => {
     const [columns, setColumns] = useState<Column[]>([]);

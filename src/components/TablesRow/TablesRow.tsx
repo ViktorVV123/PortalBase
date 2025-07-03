@@ -14,6 +14,7 @@ export interface Table {
     id: number;
     workspace_id: number;
     name: string; /* … */
+    published: boolean
 }
 
 interface Props {
@@ -27,12 +28,18 @@ interface Props {
 
 export const TablesRow = ({workspaceId, tables, loadTables, onTableSelect}: Props) => {
     /* --- таблицы --- */
-    const {visibleTables, selectedId, setSelectedId} =
+    const {
+        visibleTables, selectedId, setSelectedId,
+        togglePublished, showOnlyPublished,
+    } =
         useWorkspaceTables({workspaceId, tables, loadTables});
 
     const column = useColumnEdit(selectedId);
-    const { createTable } = useTableCrud(tables, loadTables);
+
+
+    const {createTable, publishTable} = useTableCrud(loadTables);
     const [showModal, setShowModal] = useState(false);
+    const selectedTable = tables.find(t => t.id === selectedId) ?? null;
 
     const handleCreate = useCallback(
         async (payload: TableDraft) => {
@@ -79,6 +86,17 @@ export const TablesRow = ({workspaceId, tables, loadTables, onTableSelect}: Prop
         onTableSelect(selectedId);
     }, [selectedId, onTableSelect]);
     /* ---------- UI ---------- */
+
+    const handlePublish = async () => {
+        if (!selectedTable) return;
+
+        const {ok, msg} = await publishTable(selectedTable.id, workspaceId);
+        if (!ok && msg) {
+            alert(msg);        // можно заменить на toast / snackbar по вкусу
+        }
+    };
+
+
     return (
         <>
             {/* переключатель таблиц */}
@@ -92,16 +110,16 @@ export const TablesRow = ({workspaceId, tables, loadTables, onTableSelect}: Prop
                         {t.name}
                     </div>
                 ))}
-                {/*<label className={s.switcher}>
+                <label className={s.switcher}>
                     <input
                         type="checkbox"
-                        checked={published === 'only'}
+                        checked={showOnlyPublished}
                         onChange={togglePublished}
                     />
                     published
-                </label>*/}
+                </label>
 
-                <AddIcon onClick={() => setShowModal(true)} />
+                <AddIcon onClick={() => setShowModal(true)}/>
 
                 <NewTableModal
                     open={showModal}
@@ -252,6 +270,12 @@ export const TablesRow = ({workspaceId, tables, loadTables, onTableSelect}: Prop
                             })}
                             </tbody>
                         </table>
+
+                        {selectedTable && !selectedTable.published && (
+                            <button onClick={handlePublish}>
+                                Опубликовать
+                            </button>
+                        )}
                     </div>
                 )}
             </div>

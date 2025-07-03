@@ -1,39 +1,47 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Table } from '@/components/TablesRow/TablesRow';
 
-export type PublishedMode = 'all' | 'only' | 'hide';
-
 interface Params {
     workspaceId: number | null;
     tables: Table[];
     loadTables: (wsId: number | null, published?: boolean) => void;
 }
 
+/**
+ * – чек-бокс ☑ → показываем ТОЛЬКО published и шлём published=true
+ * – чек-бокс ⬜ → показываем ТОЛЬКО черновики и шлём published=false
+ */
 export const useWorkspaceTables = ({
                                        workspaceId,
                                        tables,
                                        loadTables,
                                    }: Params) => {
-    const [published, setPublished] = useState<PublishedMode>('all');
-
-    /* загрузка при смене workspace или флага */
-    useEffect(() => {
-        if (workspaceId != null) {
-            loadTables(
-                workspaceId,
-                published === 'all' ? undefined : published === 'only',
-            );
-        }
-    }, [workspaceId, published, loadTables]);
-
-    /* таблицы текущего workspace */
-    const visibleTables = useMemo(
-        () => tables.filter(t => t.workspace_id === workspaceId), // не t.id
-        [tables, workspaceId],
+    /** true → показываем published, false → черновики */
+    const [showOnlyPublished, setShowOnlyPublished] = useState(false);
+    const togglePublished = useCallback(
+        () => setShowOnlyPublished(p => !p),
+        [],
     );
 
+    /* ───── загрузка таблиц при смене флага / workspace ───── */
+    useEffect(() => {
+        if (workspaceId != null) {
+            loadTables(workspaceId, showOnlyPublished); // ← один вызов
+        }
+    }, [workspaceId, showOnlyPublished, loadTables]);
 
-    /* выбранная таблица */
+    /* ───── локальная фильтрация + сортировка ───── */
+    const visibleTables = useMemo(() => {
+        return tables
+            .filter(
+                t =>
+                    t.workspace_id === workspaceId &&
+                    (showOnlyPublished ? t.published : !t.published),
+            )
+            .sort((a, b) => Number(b.published) - Number(a.published));
+    }, [tables, workspaceId, showOnlyPublished]);
+
+    /* ───── выбор активной таблицы ───── */
     const [selectedId, setSelectedId] = useState<number | null>(null);
 
     useEffect(() => {
@@ -44,9 +52,10 @@ export const useWorkspaceTables = ({
     }, [visibleTables, selectedId]);
 
     return {
-
         visibleTables,
         selectedId,
         setSelectedId,
+        showOnlyPublished,
+        togglePublished,
     };
 };
