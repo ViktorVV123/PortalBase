@@ -1,5 +1,5 @@
-import { useState, useCallback } from 'react';
-import { api } from '@/services/api';
+import {useState, useCallback} from 'react';
+import {api} from '@/services/api';
 
 export type Widget = {
     id: number;
@@ -16,43 +16,62 @@ export type WidgetColumn = {
     promt: string | null;
     published: boolean;
     reference: {
-        visible: boolean;
-        table_column_id: number;
         width: number;
         primary: boolean;
+        visible: boolean;
+        table_column: {
+            table_id: number;
+            id: number;
+            name: string;
+            description: string | null;
+            datatype: string;
+            length: number | null;
+            precision: number | null;
+            primary: boolean;
+            increment: boolean;
+            datetime: boolean;
+            required: boolean;
+        };
     }[];
-}
+};
+
 
 export const useWidget = () => {
-    const [widgets, setWidgets]           = useState<Widget[]>([]);
-    const [columns, setColumns]           = useState<WidgetColumn[]>([]);
-    const [loading, setLoading]           = useState(false);
-    const [error,   setError]             = useState<string | null>(null);
+    const [widgets, setWidgets] = useState<Widget[]>([]);
+    const [columns, setColumns] = useState<WidgetColumn[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
     const reset = useCallback(() => setWidgets([]), []);
     /** GET /widgets?table_id=X */
     const loadWidgetsForTable = useCallback(async (tableId: number) => {
-        setLoading(true); setError(null);
+        setLoading(true);
+        setError(null);
         try {
-            const { data } = await api.get<Widget[]>('/widgets', {
-                params: { table_id: tableId },
+            const {data} = await api.get<Widget[]>('/widgets', {
+                params: {table_id: tableId},
             });
             setWidgets(data);
             setColumns([]);               // очистить прошлые столбцы
         } catch {
             setError('Не удалось загрузить widgets');
-        } finally { setLoading(false); }
+        } finally {
+            setLoading(false);
+        }
     }, []);
 
     /** GET /widgets/{id}/columns */
     const loadColumns = useCallback(async (widgetId: number) => {
-        setLoading(true); setError(null);
+        setLoading(true);
+        setError(null);
         try {
-            const { data } = await api.get<WidgetColumn[]>(`/widgets/${widgetId}/columns`);
+            const {data} = await api.get<WidgetColumn[]>(`/widgets/${widgetId}/columns`);
             setColumns(data);
         } catch {
             setError('Не удалось загрузить столбцы виджета');
-        } finally { setLoading(false); }
+        } finally {
+            setLoading(false);
+        }
     }, []);
 
-    return { widgets, columns, loading, error, loadWidgetsForTable, loadColumns,reset };
+    return {widgets, columns, loading, error, loadWidgetsForTable, loadColumns, reset};
 };

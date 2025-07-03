@@ -17,7 +17,7 @@ export const useWorkspaceTables = ({
                                        loadTables,
                                    }: Params) => {
     /** true → показываем published, false → черновики */
-    const [showOnlyPublished, setShowOnlyPublished] = useState(false);
+    const [showOnlyPublished, setShowOnlyPublished] = useState(true);
     const togglePublished = useCallback(
         () => setShowOnlyPublished(p => !p),
         [],

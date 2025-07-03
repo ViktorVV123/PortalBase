@@ -1,4 +1,4 @@
-// components/sideNav/SideNav.tsx
+// components/sideNav/sideNav.tsx
 import React from 'react';
 import * as s from './SideNav.module.scss';
 

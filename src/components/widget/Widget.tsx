@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, {useEffect} from 'react';
 import * as s from './Widget.module.scss';
 import {WidgetColumn, Widget} from "@/shared/hooks/useWidget";
 
@@ -43,42 +43,63 @@ const Widget = ({
         ));
     };
 
+    if (!columns.length) return <p>References нет</p>;
+
+    /** расплющиваем reference-массивы всех колонок */
+    const refs = columns.flatMap(c =>
+        c.reference.map(r => ({
+            columnId: c.id,
+            width: r.width,
+            primary: r.primary,
+            visible: r.visible,
+            tc: r.table_column,
+        })),
+    );
+
     /* ────────── таблица колонок ────────── */
     const renderColumns = () => {
-        if (loading)  return <p>Загрузка…</p>;
-        if (error)    return <p className={s.error}>{error}</p>;
+        if (loading) return <p>Загрузка…</p>;
+        if (error) return <p className={s.error}>{error}</p>;
         if (!widgets.length) return null;
         if (selectedWidgetId === null) return <p>Выберите widget…</p>;
-        if (!columns.length)   return <p>Столбцов нет</p>;
+        if (!columns.length) return <p>Столбцов нет</p>;
 
         return (
             <div className={s.tableWrapper}>
                 <table className={s.table}>
                     <thead>
                     <tr>
-                        <th>ID</th><th>alias</th><th>default</th><th>prompt</th>
-                        <th>published</th><th>refs</th>
+                        <th>w_col&nbsp;ID</th>
+                        <th>tbl_col&nbsp;ID</th>
+                        <th>name</th>
+                        <th>description</th>
+                        <th>datatype</th>
+                        <th>length</th>
+                        <th>precision</th>
+                        <th>primary</th>
+                        <th>increment</th>
+                        <th>datetime</th>
+                        <th>required</th>
+                        <th>width</th>
+                        <th>visible</th>
                     </tr>
                     </thead>
                     <tbody>
-                    {columns.map(c => (
-                        <tr key={c.id}>
-                            <td>{c.id}</td>
-                            <td>{c.alias ?? '—'}</td>
-                            <td>{c.default ?? '—'}</td>
-                            <td>{c.promt ?? '—'}</td>
-                            <td>{c.published ? '✔︎' : ''}</td>
-                            <td>
-                                {c.reference.length
-                                    ? c.reference.map((r, i) => (
-                                        <span key={i}>
-                          {r.primary && <b>*</b>}
-                                            {r.table_column_id}
-                                            {i < c.reference.length - 1 && ', '}
-                        </span>
-                                    ))
-                                    : '—'}
-                            </td>
+                    {refs.map(r => (
+                        <tr key={`${r.columnId}-${r.tc.id}`}>
+                            <td>{r.columnId}</td>
+                            <td>{r.tc.id}</td>
+                            <td>{r.tc.name}</td>
+                            <td>{r.tc.description ?? '—'}</td>
+                            <td>{r.tc.datatype}</td>
+                            <td>{r.tc.length ?? '—'}</td>
+                            <td>{r.tc.precision ?? '—'}</td>
+                            <td>{r.tc.primary ? '✔︎' : ''}</td>
+                            <td>{r.tc.increment ? '✔︎' : ''}</td>
+                            <td>{r.tc.datetime ? '✔︎' : ''}</td>
+                            <td>{r.tc.required ? '✔︎' : ''}</td>
+                            <td>{r.width}</td>
+                            <td>{r.visible ? '👁' : ''}</td>
                         </tr>
                     ))}
                     </tbody>

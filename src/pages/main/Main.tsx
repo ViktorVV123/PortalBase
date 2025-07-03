@@ -21,7 +21,7 @@ import {ModalAddWorkspace} from '@/components/modals/modalAddWorkspace/ModalAddW
 import {ModalAddConnection} from '@/components/modals/modalAddConnection/ModalAddConnection';
 import {Connection} from '@/types/typesConnection';
 import {WorkSpaceTypes} from '@/types/typesWorkSpaces';
-import {SideNav} from "@/components/SideNav/SideNav";
+import {SideNav} from "@/components/sideNav/SideNav";
 
 export const Main = () => {
     /* ---------- data hooks ---------- */
