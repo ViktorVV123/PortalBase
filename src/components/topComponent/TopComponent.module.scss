@@ -1,8 +1,8 @@
 /* цветовая палитра */
-$black: #111;       // фон header
-$white: #fff;       // текст header
-$gray-90: #494848;  // hover списков
-$gray-60: #e5e5e5;  // бордер + разделители
+$black: #111; // фон header
+$white: #fff; // текст header
+$gray-90: #494848; // hover списков
+$gray-60: #e5e5e5; // бордер + разделители
 
 
 .bar {
@@ -23,19 +23,24 @@ $gray-60: #e5e5e5;  // бордер + разделители
 }
 
 /* обёртка нужна, чтобы позиционировать UL относительно кнопки */
-.menuWrapper { position: relative; }
+.menuWrapper {
+  position: relative
+}
 
 /* кнопка-триггер */
 .trigger {
   background: transparent;
-  border: none;
+  border: 1px solid #EEEEEE;
   color: inherit;
   font: inherit;
   cursor: pointer;
   padding: 6px 10px;
   border-radius: 4px;
+  margin-left: 10px;
 
-  &:hover { background: var(--hover-color); }
+  &:hover {
+    background: var(--hover-color);
+  }
 }
 
 /* базовые стили обоих списков */
@@ -44,7 +49,7 @@ $gray-60: #e5e5e5;  // бордер + разделители
   margin: 0;
   padding: 6px 0;
   background: var(--header-color);
-  box-shadow: 0 8px 16px rgba(0,0,0,.12);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, .12);
 
   font-size: 14px;
   z-index: 5;
@@ -62,7 +67,11 @@ $gray-60: #e5e5e5;  // бордер + разделители
     white-space: nowrap;
     cursor: default;
 
-    &:hover { background: $gray-90; }     /* ← уже был */
+    &:hover {
+      background: $gray-90;
+    }
+
+    /* ← уже был */
   }
 }
 
@@ -77,8 +86,14 @@ $gray-60: #e5e5e5;  // бордер + разделители
     padding: 8px 16px;
     cursor: default;
 
-    &:hover { background: $gray-90; }     /* ← добавили подсветку */
+    &:hover {
+      background: $gray-90;
+    }
+
+    /* ← добавили подсветку */
   }
 }
 
-.empty { color: #999; }
+.empty {
+  color: #999;
+}
