@@ -18,6 +18,7 @@ type Props = {
     wColsLoading: boolean;
     wColsError: string | null;
     handleSelectWidget: (w: Widget) => void;
+    selectedWidget : Widget|null;
 
 };
 
@@ -28,7 +29,8 @@ export const TableColumn: React.FC<Props> = ({
                                                  widgetColumns,
                                                  wColsLoading,
                                                  wColsError,
-                                                 handleSelectWidget
+                                                 handleSelectWidget,
+                                                 selectedWidget
                                              }) => {
     if (!tableName) return <p className={s.placeholder}>Выберите таблицу…</p>;
     if (loading) return <p>Загрузка столбцов…</p>;
@@ -49,40 +51,46 @@ export const TableColumn: React.FC<Props> = ({
                 />
             </div>
 
+            {selectedWidget ? ( <TableWidget widgetColumns={widgetColumns} handleSelectWidget={handleSelectWidget} wColsError={wColsError}
+                wColsLoading={wColsLoading}/>)
+            :
 
-            {columns.length === 0
-                ? <p>Столбцы не найдены.</p>
-                : (
-                    <table className={s.tbl}>
-                        <thead>
-                        <tr>
-                            <th>name</th>
-                            <th>datatype</th>
-                            <th>length</th>
-                            <th>precision</th>
-                            <th>primary</th>
-                            <th>required</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        {columns.map(c => (
-                            <tr key={c.id}>
-                                <td>{c.name}</td>
-                                <td>{c.datatype}</td>
-                                <td>{c.length ?? '—'}</td>
-                                <td>{c.precision ?? '—'}</td>
-                                <td>{c.primary ? '✔︎' : ''}</td>
-                                <td>{c.required ? '✔︎' : ''}</td>
-                            </tr>
-                        ))}
-                        </tbody>
-                    </table>
-                )}
+                (   columns.length === 0
+                        ? <p>Столбцы не найдены.</p>
+                        : (
+                            <table className={s.tbl}>
+                                <thead>
+                                <tr>
+                                    <th>name</th>
+                                    <th>datatype</th>
+                                    <th>length</th>
+                                    <th>precision</th>
+                                    <th>primary</th>
+                                    <th>required</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                {columns.map(c => (
+                                    <tr key={c.id}>
+                                        <td>{c.name}</td>
+                                        <td>{c.datatype}</td>
+                                        <td>{c.length ?? '—'}</td>
+                                        <td>{c.precision ?? '—'}</td>
+                                        <td>{c.primary ? '✔︎' : ''}</td>
+                                        <td>{c.required ? '✔︎' : ''}</td>
+                                    </tr>
+                                ))}
+                                </tbody>
+                            </table>
+                    ) )})
+
+
+
+
 
 
             {/* ────────── таблица для виджета ────────── */}
-            <TableWidget widgetColumns={widgetColumns} handleSelectWidget={handleSelectWidget} wColsError={wColsError}
-                         wColsLoading={wColsLoading}/>
+
         </div>
     );
 };

@@ -9,6 +9,7 @@ import {TableColumn} from "@/components/tableColumn/TableColumn";
 export const Main = () => {
 
     const [navOpen, setNavOpen] = useState(false);
+    const [selectedWidget, setSelectedWidget] = useState<Widget|null>(null);
 
     const {
         loadWorkSpaces,
@@ -41,14 +42,16 @@ export const Main = () => {
 
 
     const handleSelectTable = (table: DTable) => {
-        loadColumns(table);              // столбцы
-        loadWidgetsForTable(table.id);   // виджеты этой таблицы
-    };
+          setSelectedWidget(null);            // сбрасываем прежний виджет
+          loadColumns(table);                 // столбцы таблицы
+          loadWidgetsForTable(table.id);      // список виджетов
+        };
 
-    /* --- выбор Widget --- */
-    const handleSelectWidget = (w: Widget) => {
-        loadColumnsWidget(w.id);
-    };
+        const handleSelectWidget = (w: Widget) => {
+          setSelectedWidget(w);
+          loadColumnsWidget(w.id);            // столбцы виджета
+        };
+
 
 
     if (loading) return <p>Загрузка…</p>;
@@ -72,6 +75,7 @@ export const Main = () => {
                              wColsLoading={wColsLoading}
                              wColsError={wColsError}
                              handleSelectWidget={handleSelectWidget}
+                             selectedWidget={selectedWidget}
 
                 />
             </div>
