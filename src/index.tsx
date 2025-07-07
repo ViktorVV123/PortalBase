@@ -2,11 +2,10 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
-
-
 import './global.scss';
-
 import {App} from "@/components/App";
+
+
 
 const root = document.getElementById('root');
 if (!root) {
@@ -16,8 +15,8 @@ if (!root) {
 const router = createBrowserRouter([
     {
         path: '/',
-        element: <App/>,
-    },
+        element: <App />,
+    }
 ]);
 
 createRoot(root).render(

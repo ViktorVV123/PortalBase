@@ -25,7 +25,7 @@ export default (env: EnvVaribles) => {
     }
 
     const config: webpack.Configuration = buildWebpack({
-            port: env.port ?? 3005,
+            port: env.port ?? 3007,
             mode: env.mode ?? "development",
             paths,
             analyzer: isAnalyzer,

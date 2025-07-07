@@ -23,21 +23,20 @@ const items: Item[] = [
 interface Props {
     open: boolean;
     toggle: () => void;
-    page: number
-    setPage: (value: number) => void;
+
 }
 
-export const SideNav = ({open, page, toggle, setPage}: Props) => (
+export const SideNav = ({open, toggle}: Props) => (
     <aside className={`${s.nav} ${open ? s.open : ''}`}>
 
         <button className={s.toggle} onClick={toggle}>☰</button>
 
 
-        <div onClick={() => setPage(0)} className={page === 0 ? `${s.active} ${s.item}` : `${s.item}`}>
+        <div className={s.item}>
             <HomeIcon className={s.icon}/>
             {open && <span>Visible</span>}
         </div>
-        <div onClick={() => setPage(1)} className={page === 1 ? `${s.active} ${s.item} ` : `${s.item}`}>
+        <div className={s.item}>
             <HomeIcon className={s.icon}/>
             {open && <span>NotVisible</span>}
         </div>

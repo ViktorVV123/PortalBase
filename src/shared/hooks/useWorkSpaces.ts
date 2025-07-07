@@ -1,6 +1,7 @@
 import {useCallback, useState} from "react";
 import {api} from "@/services/api";
 import {WorkSpaceTypes} from "@/types/typesWorkSpaces";
+import {WidgetColumn} from "@/shared/hooks/useWidget";
 
 
 export interface DTable {
@@ -11,64 +12,140 @@ export interface DTable {
     published: boolean;
 }
 
+export interface Column {
+    id: number;
+    table_id: number;
+    name: string;
+    description: string | null
+    datatype: string;
+    required: boolean;
+    length: number | null | string;
+    precision: number | null | string;
+    primary: boolean;
+    increment: boolean;
+    datetime: number | null | string;
+    // остальные поля по желанию
+}
+
+export type Widget = {
+    id: number;
+    table_id: number;
+    name: string;
+    description: string | null;
+}
+
+// shared/hooks/useWorkSpaces.ts
 export const useWorkSpaces = () => {
-
     const [workSpaces, setWorkSpaces] = useState<WorkSpaceTypes[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [tablesByWs, setTablesByWs] = useState<Record<number, DTable[]>>({});
+    const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [tables, setTables] = useState<DTable[]>([]);
+    const [columns, setColumns] = useState<Column[]>([]);
+    const [selectedTable, setSelTable] = useState<DTable | null>(null);
 
-
+    /* — список WS — */
     const loadWorkSpaces = useCallback(async () => {
-        try{
+        setLoading(true);
+        try {
             const {data} = await api.get<WorkSpaceTypes[]>('/workspaces');
             setWorkSpaces(data);
-        }catch {
-            setError('Не удалось загрузить список соединений');
-        }finally {
+        } catch {
+            setError('Не удалось загрузить рабочие пространства');
+        } finally {
             setLoading(false);
         }
-    },[])
+    }, []);
 
-
-    const deleteWorkspace = useCallback(
+    /* — таблицы конкретного WS — */
+    const loadTables = useCallback(
         async (wsId: number) => {
-            try {
-                await api.delete(`/workspaces/${wsId}`);
-                setWorkSpaces(prev => prev.filter(w => w.id !== wsId));
-            } catch {
-                setError('Ошибка при удалении workspace');
-            }
+            // если уже загружали — просто вернём из стейта
+            if (tablesByWs[wsId]) return tablesByWs[wsId];
+
+            const {data} = await api.get<DTable[]>('/tables', {
+                params: {workspace_id: wsId},
+            });
+            setTablesByWs(prev => ({...prev, [wsId]: data}));
+            return data;
         },
-        []          // ← обязательный второй аргумент – массив deps
+        [tablesByWs],
     );
 
-
-    /* ─ обновление ─ */
-    const updateWorkspace = useCallback(
-        async (wsId: number, patch: Partial<Omit<WorkSpaceTypes, 'id'>>) => {
+    const loadColumns = useCallback(
+        async (table: DTable) => {
+            setLoading(true);
+            setError(null);
+            setSelTable(table);             // сохраняем выбрано-е имя
             try {
-                const { data } = await api.patch<WorkSpaceTypes>(`/workspaces/${wsId}`, patch);
-                /* заменяем элемент в состоянии */
-                setWorkSpaces(prev =>
-                    prev.map(w => (w.id === wsId ? { ...w, ...data } : w)),
-                );
+                const {data} = await api.get<Column[]>(`/tables/${table.id}/columns`);
+                setColumns(data.sort((a, b) => a.id - b.id));
             } catch {
-                setError('Ошибка при обновлении workspace');
+                setError('Не удалось загрузить столбцы');
+            } finally {
+                setLoading(false);
             }
         },
         [],
     );
 
+    const [widgetsByTable, setWidgetsByTable] = useState<Record<number, Widget[]>>({});
+    const [widgetsLoading, setWidgetsLoading] = useState(false);
+    const [widgetsError, setWidgetsError] = useState<string | null>(null);
 
-    const loadTables = useCallback(async (wsId: number|null, published?: boolean) => {
-        if (wsId == null) { setTables([]); return; }
+    const [widgetColumns, setWidgetColumns] = useState<WidgetColumn[]>([]);
+    const [wColsLoading, setWColsLoading] = useState(false);
+    const [wColsError, setWColsError] = useState<string | null>(null);
 
-        const { data } = await api.get('/tables', {
-            params: { workspace_id: wsId, published },
-        });
-        setTables(data);               // data будет [] если у WS нет таблиц
+    /* — Загрузка виджетов конкретной таблицы — */
+    const loadWidgetsForTable = useCallback(async (tableId: number) => {
+        setWidgetsLoading(true);
+        setWidgetsError(null);
+
+        if (widgetsByTable[tableId]) {
+            setWidgetsLoading(false);
+            return;
+        }
+
+        try {
+            const {data} = await api.get<Widget[]>('/widgets', {params: {table_id: tableId}});
+            setWidgetsByTable(prev => ({...prev, [tableId]: data}));
+        } catch {
+            setWidgetsError('Не удалось загрузить widgets');
+        } finally {
+            setWidgetsLoading(false);
+        }
+    }, [widgetsByTable]);
+
+
+    /** GET /widgets/{id}/columns */
+    const loadColumnsWidget = useCallback(async (widgetId: number) => {
+        setWColsLoading(true);
+        setWColsError(null);
+        try {
+            const {data} = await api.get<WidgetColumn[]>(`/widgets/${widgetId}/columns`);
+            setWidgetColumns(data);
+        } catch {
+            setWColsError('Не удалось загрузить столбцы виджета');
+        } finally {
+            setWColsLoading(false);
+        }
     }, []);
 
-    return {loadWorkSpaces,workSpaces,loading,error,deleteWorkspace,updateWorkspace, tables,loadTables}
-}
+
+    return {
+        workSpaces,
+        loadWorkSpaces,
+        tablesByWs,      // <-- таблицы сгруппированы по WS
+        loadTables,
+        loading,
+        error,
+        columns,
+        loadColumns,
+        selectedTable,
+        loadWidgetsForTable,
+        widgetsByTable,
+        widgetsLoading,
+        widgetsError,
+        widgetColumns, wColsLoading, wColsError, loadColumnsWidget,
+    };
+};

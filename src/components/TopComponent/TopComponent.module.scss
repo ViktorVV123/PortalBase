@@ -1,0 +1,84 @@
+/* цветовая палитра */
+$black: #111;       // фон header
+$white: #fff;       // текст header
+$gray-90: #494848;  // hover списков
+$gray-60: #e5e5e5;  // бордер + разделители
+
+
+.bar {
+  display: flex;
+  align-items: center;
+  background: var(--header-color);
+  color: $white;
+  height: 56px;
+  padding: 0 24px;
+  position: relative;
+  font-size: 15px;
+}
+
+.logo {
+  font-weight: 600;
+  font-size: 18px;
+
+}
+
+/* обёртка нужна, чтобы позиционировать UL относительно кнопки */
+.menuWrapper { position: relative; }
+
+/* кнопка-триггер */
+.trigger {
+  background: transparent;
+  border: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: 4px;
+
+  &:hover { background: var(--hover-color); }
+}
+
+/* базовые стили обоих списков */
+.menuLv2, .menuLv3 {
+  list-style: none;
+  margin: 0;
+  padding: 6px 0;
+  background: var(--header-color);
+  box-shadow: 0 8px 16px rgba(0,0,0,.12);
+
+  font-size: 14px;
+  z-index: 5;
+}
+
+/* меню-2: выпадает под кнопкой */
+.menuLv2 {
+  position: absolute;
+  top: 100%;
+  left: 0;
+
+  > li {
+    position: relative;
+    padding: 8px 16px;
+    white-space: nowrap;
+    cursor: default;
+
+    &:hover { background: $gray-90; }     /* ← уже был */
+  }
+}
+
+/* меню-3: таблицы выбранного WS */
+.menuLv3 {
+  position: absolute;
+  top: 0;
+  left: 100%;
+  border-left: none;
+
+  > li {
+    padding: 8px 16px;
+    cursor: default;
+
+    &:hover { background: $gray-90; }     /* ← добавили подсветку */
+  }
+}
+
+.empty { color: #999; }

@@ -91,5 +91,9 @@ export const useWidget = () => {
 
 
 
+
+
+
+
     return {widgets, columns, loading, error, loadWidgetsForTable, loadColumns, reset,addReference};
 };

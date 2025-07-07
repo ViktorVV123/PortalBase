@@ -1,0 +1,61 @@
+/* --- палитра / переменные --- */
+$border  : #e5e5e5;
+$gray-95 : #fafafa;
+$gray-90 : #f3f3f3;
+$error   : #d33;
+
+/* --- обёртка и заголовок --- */
+.wrapper {
+  padding: 24px;
+}
+.breadcrumb {
+
+  font-size: 18px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.arrow {
+  font-size: 16px;
+  opacity: .6;
+}
+
+h2 {
+  margin: 0 0 16px;
+  font-size: 20px;
+  font-weight: 600;
+}
+.headRow {
+  display: flex;
+margin-bottom: 15px;
+  align-items: center;
+  gap: 16px;
+
+}
+
+/* --- placeholder / error --- */
+.placeholder { color: #888; padding: 24px 0; }
+.error      { color: $error; padding: 16px 0; }
+
+/* --- таблица со столбцами --- */
+.tbl {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+
+  th, td {
+    border: 1px solid $border;
+    padding: 6px 10px;
+    text-align: left;
+    white-space: nowrap;
+  }
+
+  th {
+    background: var(--header-color);
+    font-weight: 500;
+  }
+
+  tbody tr:hover { background: var(--hover-color) }
+}
