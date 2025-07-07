@@ -1,5 +1,5 @@
 // components/TableColumns/TableColumns.tsx
-import React from 'react';
+import React, {useState} from 'react';
 import * as s from './TableColumn.module.scss';
 import {Column, DTable, Widget, WidgetColumn} from '@/shared/hooks/useWorkSpaces';
 import {WidgetSelect} from "@/components/widgetSelect/WidgetSelect";
@@ -18,7 +18,9 @@ type Props = {
     wColsLoading: boolean;
     wColsError: string | null;
     handleSelectWidget: (w: Widget) => void;
-    selectedWidget : Widget|null;
+    selectedWidget: Widget | null;
+    setSelectedWidget: (w: Widget | null) => void;
+    handleClearWidget: () => void;
 
 };
 
@@ -30,8 +32,12 @@ export const TableColumn: React.FC<Props> = ({
                                                  wColsLoading,
                                                  wColsError,
                                                  handleSelectWidget,
-                                                 selectedWidget
+                                                 selectedWidget,
+                                                 handleClearWidget,
+                                                 setSelectedWidget
                                              }) => {
+
+
     if (!tableName) return <p className={s.placeholder}>Выберите таблицу…</p>;
     if (loading) return <p>Загрузка столбцов…</p>;
     if (error) return <p className={s.error}>{error}</p>;
@@ -40,56 +46,59 @@ export const TableColumn: React.FC<Props> = ({
         <div className={s.wrapper}>
             <div className={s.headRow}>
                 <div className={s.breadcrumb}>
-                    {workspaceName} <span className={s.arrow}>→</span> {tableName}
+                    {workspaceName} <span className={s.arrow}>→</span>
+                    {selectedWidget
+                        ? (
+                            <span className={s.link} onClick={handleClearWidget}>
+ {tableName}
+                                        </span>
+                        )
+                        :<span>{tableName} </span>  }
                 </div>
                 {/* выпадающий список виджетов */}
-                <WidgetSelect
+                <WidgetSelect selectedWidget={selectedWidget}  setSelectedWidget={setSelectedWidget}
                     widgets={widgets}
                     loading={widgetsLoading}
                     error={widgetsError}
                     handleSelectWidget={handleSelectWidget}
+
                 />
             </div>
-
-            {selectedWidget ? ( <TableWidget widgetColumns={widgetColumns} handleSelectWidget={handleSelectWidget} wColsError={wColsError}
-                wColsLoading={wColsLoading}/>)
-            :
-
-                (   columns.length === 0
-                        ? <p>Столбцы не найдены.</p>
-                        : (
-                            <table className={s.tbl}>
-                                <thead>
-                                <tr>
-                                    <th>name</th>
-                                    <th>datatype</th>
-                                    <th>length</th>
-                                    <th>precision</th>
-                                    <th>primary</th>
-                                    <th>required</th>
-                                </tr>
-                                </thead>
-                                <tbody>
-                                {columns.map(c => (
-                                    <tr key={c.id}>
-                                        <td>{c.name}</td>
-                                        <td>{c.datatype}</td>
-                                        <td>{c.length ?? '—'}</td>
-                                        <td>{c.precision ?? '—'}</td>
-                                        <td>{c.primary ? '✔︎' : ''}</td>
-                                        <td>{c.required ? '✔︎' : ''}</td>
-                                    </tr>
-                                ))}
-                                </tbody>
-                            </table>
-                    ) )})
-
-
-
-
-
-
             {/* ────────── таблица для виджета ────────── */}
+            {selectedWidget ? (<TableWidget widgetColumns={widgetColumns} handleSelectWidget={handleSelectWidget}
+                                            wColsError={wColsError}
+                                            wColsLoading={wColsLoading}/>)
+                :
+
+                (columns.length === 0
+                    ? <p>Столбцы не найдены.</p>
+                    : (
+                        <table className={s.tbl}>
+                            <thead>
+                            <tr>
+                                <th>name</th>
+                                <th>datatype</th>
+                                <th>length</th>
+                                <th>precision</th>
+                                <th>primary</th>
+                                <th>required</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {columns.map(c => (
+                                <tr key={c.id}>
+                                    <td>{c.name}</td>
+                                    <td>{c.datatype}</td>
+                                    <td>{c.length ?? '—'}</td>
+                                    <td>{c.precision ?? '—'}</td>
+                                    <td>{c.primary ? '✔︎' : ''}</td>
+                                    <td>{c.required ? '✔︎' : ''}</td>
+                                </tr>
+                            ))}
+                            </tbody>
+                        </table>
+                    ))}
+
 
         </div>
     );

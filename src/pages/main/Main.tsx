@@ -9,7 +9,7 @@ import {TableColumn} from "@/components/tableColumn/TableColumn";
 export const Main = () => {
 
     const [navOpen, setNavOpen] = useState(false);
-    const [selectedWidget, setSelectedWidget] = useState<Widget|null>(null);
+    const [selectedWidget, setSelectedWidget] = useState<Widget | null>(null);
 
     const {
         loadWorkSpaces,
@@ -40,18 +40,21 @@ export const Main = () => {
         : null;
 
 
-
     const handleSelectTable = (table: DTable) => {
-          setSelectedWidget(null);            // сбрасываем прежний виджет
-          loadColumns(table);                 // столбцы таблицы
-          loadWidgetsForTable(table.id);      // список виджетов
-        };
+        setSelectedWidget(null);            // сбрасываем прежний виджет
+        loadColumns(table);                 // столбцы таблицы
+        loadWidgetsForTable(table.id);      // список виджетов
+    };
 
-        const handleSelectWidget = (w: Widget) => {
-          setSelectedWidget(w);
-          loadColumnsWidget(w.id);            // столбцы виджета
-        };
+    const handleSelectWidget = (w: Widget) => {
+        setSelectedWidget(w);
+        loadColumnsWidget(w.id);            // столбцы виджета
+    };
+//для того чтобы вернуться к таблице после выбора widget
+    const handleClearWidget = () => {
+        setSelectedWidget(null);          // возврат к таблице
 
+    };
 
 
     if (loading) return <p>Загрузка…</p>;
@@ -76,6 +79,8 @@ export const Main = () => {
                              wColsError={wColsError}
                              handleSelectWidget={handleSelectWidget}
                              selectedWidget={selectedWidget}
+                             handleClearWidget={handleClearWidget}
+                             setSelectedWidget={setSelectedWidget}
 
                 />
             </div>

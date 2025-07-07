@@ -60,3 +60,9 @@ margin-bottom: 15px;
 
   tbody tr:hover { background: var(--hover-color) }
 }
+
+.link {
+  text-decoration: underline;
+  cursor: pointer;
+  &:hover { color: rgba(189, 189, 189, 0.93); }
+}

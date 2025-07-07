@@ -16,7 +16,7 @@ export const TableWidget = ({wColsLoading,wColsError,widgetColumns}:TableWidgetP
             {wColsError && <p className={s.error}>{wColsError}</p>}
             {!wColsLoading && !wColsError && widgetColumns.length > 0 && (
                 <div>
-             <span>Widget</span>
+
                 <table className={s.tbl}>
                     <thead>
                     <tr>

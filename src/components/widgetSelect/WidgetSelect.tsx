@@ -10,12 +10,13 @@ type Props = {
     loading : boolean;
     error   : string|null;
     handleSelectWidget: (w: Widget)=>void;
-
+    selectedWidget:Widget | null;
+    setSelectedWidget: (w: Widget | null) => void;
 };
 
-export const WidgetSelect: React.FC<Props> = ({ widgets, loading, error,handleSelectWidget }) => {
+export const WidgetSelect: React.FC<Props> = ({ widgets, loading, error,handleSelectWidget,selectedWidget,setSelectedWidget }) => {
     const [open, setOpen]             = useState(false);
-    const [selected, setSelected]     = useState<Widget|null>(null);
+
 
     return (
         <div className={s.wrapper}>
@@ -24,7 +25,7 @@ export const WidgetSelect: React.FC<Props> = ({ widgets, loading, error,handleSe
                 disabled={loading || !!error}
                 onClick={() => setOpen(o => !o)}
             >
-                {selected ? selected.name : 'Виджеты'} ▾
+                {selectedWidget ? selectedWidget.name : 'Виджеты'} ▾
             </button>
 
             {open && (
@@ -37,7 +38,7 @@ export const WidgetSelect: React.FC<Props> = ({ widgets, loading, error,handleSe
                     {widgets.map(w => (
                         <li
                             key={w.id}
-                            onClick={() => { setSelected(w); setOpen(false); handleSelectWidget(w); }}
+                            onClick={() => { setSelectedWidget(w); setOpen(false); handleSelectWidget(w); }}
                         >
                             {w.name}
                         </li>
