@@ -2,7 +2,7 @@ import {useCallback, useState} from "react";
 import {Connection} from "@/types/typesConnection";
 import {api} from "@/services/api";
 
-export const UseLoadConnections = () => {
+export const useLoadConnections = () => {
 
 
     const [connections, setConnections] = useState<Connection[]>([]);

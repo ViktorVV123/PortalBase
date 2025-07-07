@@ -2,7 +2,7 @@
 .container {
   position: relative;
 
-  background: linear-gradient(90deg, #444 0%, #2f2f2f 100%);
+  background: var(--header-color);
   color: #fff;
   padding: 12px 24px;
   font-family: "Segoe UI", Helvetica, Arial, sans-serif;

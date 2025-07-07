@@ -16,8 +16,8 @@ if (!root) {
 const router = createBrowserRouter([
     {
         path: '/',
-        element: <App />,
-    }
+        element: <App/>,
+    },
 ]);
 
 createRoot(root).render(

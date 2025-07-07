@@ -1,27 +1,19 @@
-// Main.tsx
+// src/pages/main/Main.tsx
 import React, {
-    useCallback,
-    useEffect,
-    useMemo,
-    useRef,
-    useState,
+    useCallback, useEffect, useRef, useState,
 } from 'react';
-import * as styles from './Main.module.scss';
-import {UseLoadConnections} from '@/shared/hooks/UseLoadConnections';
-import {useWorkSpaces} from '@/shared/hooks/UseWorkSpaces';
-import {useWidget} from '@/shared/hooks/useWidget';
-import {useOutsideClick} from '@/shared/hooks/useOutsideClick';
-import {useDefaultWorkspace} from '@/shared/hooks/useDefaultWorkspace';
+import * as styles      from './Main.module.scss';
+import {useLoadConnections} from '@/shared/hooks/useLoadConnections';
+import { useWidget }          from '@/shared/hooks/useWidget';
+import { useOutsideClick }    from '@/shared/hooks/useOutsideClick';
+import Header                 from '@/components/header/Header';
+import { SideNav }            from '@/components/sideNav/SideNav';
+import { PageNotVisible }     from '@/pages/pageNotVisible/PageNotVisible';
+import { PageIsVisible }      from '@/pages/pageIsVisible/PageIsVisible';
+import {useWorkspaceContext} from "@/shared/context/WorkspaceContext";
+import {useForm} from "@/shared/hooks/useForm";
 
-import Header from '@/components/header/Header';
-import {TablesRow} from '@/components/TablesRow/TablesRow';
-import Widget from '@/components/widget/Widget';
-import {MenuTableWidget} from '@/components/menuTableWidget/MenuTableWidget';
-import {ModalAddWorkspace} from '@/components/modals/modalAddWorkspace/ModalAddWorkspace';
-import {ModalAddConnection} from '@/components/modals/modalAddConnection/ModalAddConnection';
-import {Connection} from '@/types/typesConnection';
-import {WorkSpaceTypes} from '@/types/typesWorkSpaces';
-import {SideNav} from "@/components/sideNav/SideNav";
+
 
 export const Main = () => {
     /* ---------- data hooks ---------- */
@@ -29,181 +21,141 @@ export const Main = () => {
         loadConnections,
         connections,
         loading: connLoading,
-        error: connError,
-    } = UseLoadConnections();
-
-    const {
-        loadWorkSpaces,
-        workSpaces,
-        deleteWorkspace,
-        updateWorkspace,
-        tables,
-        loadTables,
-        loading: wsLoading,
-        error: wsError,
-    } = useWorkSpaces();
+        error  : connError,
+    } = useLoadConnections();
 
     const {
         widgets,
-        columns: widgetColumns,
-        loading: widgetLoading,
-        error: widgetError,
+        columns        : widgetColumns,
+        loading        : widgetLoading,
+        error          : widgetError,
         loadWidgetsForTable,
         loadColumns,
         reset,
-        addReference
+        addReference,
     } = useWidget();
 
-    /* ---------- local state ---------- */
-    const [selectedWsId, setSelectedWsId] = useState<number | null>(null);
+    /* ---------- context ---------- */
+    const {
+        workSpaces,
+        selectedWs,
+        selectWorkspace,
+        tables,
+        updateWorkspace,
+        deleteWorkspace,
+    } = useWorkspaceContext();
+
+    /* ---------- local ui state ---------- */
     const [selectedWidgetId, setSelectedWidgetId] = useState<number | null>(null);
-    const [view, setView] = useState<'table' | 'widget'>('table');   // ← переключатель
-    const [openDropdown, setOpenDropdown] = useState(false);
+    const [view          , setView          ] = useState<'table' | 'widget'>('table');
+    const [openDropdown  , setOpenDropdown  ] = useState(false);
     const [showCreateForm, setShowCreateForm] = useState(false);
-    const [showConnForm, setShowConnForm] = useState(false);
-    const [navOpen, setNavOpen] = useState(false);
+    const [showConnForm  , setShowConnForm  ] = useState(false);
+    const [navOpen       , setNavOpen       ] = useState(false);
+    const [page          , setPage          ] = useState(1);
 
-    /* выбранный workspace / connection */
-    const selectedWs = useMemo(
-        () => workSpaces.find(w => w.id === selectedWsId) ?? null,
-        [workSpaces, selectedWsId],
-    );
-    const selectedConn: Connection | null = useMemo(() => {
-        if (!selectedWs) return null;
-        return connections.find(c => c.id === selectedWs.connection_id) ?? null;
-    }, [selectedWs, connections]);
 
-    /* ---------- refs / helpers ---------- */
+
+    /* -------- refs / helpers -------- */
     const wrapperRef = useRef<HTMLDivElement>(null);
     useOutsideClick(wrapperRef, () => setOpenDropdown(false));
 
-    /* авто-выбор первого workspace */
-    useDefaultWorkspace(
-        workSpaces,
-        selectedWsId,
-        id => setSelectedWsId(id),
-        () => {
-        },
-    );
-
     /* ---------- effects ---------- */
-    useEffect(() => {
-        loadConnections();      // вызываем, но НЕ возвращаем промис
-    }, [loadConnections]);
+    useEffect(loadConnections, [loadConnections]);   // единственный effect
 
-    /* загрузка workspaces */
-    useEffect(() => {
-        loadWorkSpaces();
-    }, [loadWorkSpaces]);
+    const formId = selectedWs?.id ?? null;
+    const {
+        loadForm,
+        loadDisplayMain,
+        selectedForm,
+        columns,
+        rows,
+        loading,
+        error,
+    } = useForm(formId);
 
-    /* при смене WS — подтягиваем таблицы */
     useEffect(() => {
-        if (selectedWsId != null) loadTables(selectedWsId);
-    }, [selectedWsId, loadTables]);
+        loadForm();          // загружаем список форм
+        loadDisplayMain();   // загружаем таблицу
+    }, [loadForm, loadDisplayMain]);
+
+
 
     /* ---------- callbacks ---------- */
-    /* таблица → список widgets (НЕ меняем view) */
-    const handleTableSelect = useCallback(
-        (tableId: number | null) => {
-            setSelectedWidgetId(null);
+    const handleTableSelect = useCallback((tableId: number | null) => {
+        setSelectedWidgetId(null);
+        if (tableId != null) loadWidgetsForTable(tableId);
+        else reset();
+    }, [loadWidgetsForTable, reset]);
 
-            if (tableId != null) {
-                loadWidgetsForTable(tableId);
-            } else {
-                reset();              // reset уже стабильный
-            }
-        },
-        [loadWidgetsForTable],     // ← reset убрали
-    );
-
-    /* widget → его столбцы */
     const handleWidgetSelect = (id: number) => {
         setSelectedWidgetId(id);
         loadColumns(id);
     };
-    // 2. выносим переключение view, чтобы не пересоздавалось каждую отрисовку
+
     const swapTableWidget = useCallback(
         (v: number) => setView(v === 0 ? 'table' : 'widget'),
         [],
     );
 
     /* ---------- early states ---------- */
-    if (connLoading || wsLoading) return <p>Загрузка…</p>;
-    if (connError || wsError) return <p style={{color: 'red'}}>{connError || wsError}</p>;
+    if (connLoading) return <p>Загрузка…</p>;
+    if (connError)   return <p style={{ color: 'red' }}>{connError}</p>;
+
 
     /* ---------- UI ---------- */
     return (
         <div className={styles.layout}>
+            <SideNav page={page} setPage={setPage}  open={navOpen} toggle={() => setNavOpen(o => !o)} />
 
-            <SideNav open={navOpen} toggle={() => setNavOpen(o => !o)}/>
             <div className={styles.container}>
                 <Header
                     wrapperRef={wrapperRef}
                     open={openDropdown}
                     setOpen={setOpenDropdown}
                     workSpaces={workSpaces}
-                    selectWorkspace={(ws: WorkSpaceTypes) => {
-                        setSelectedWsId(ws.id);
-                        setOpenDropdown(false);
-                        setView('table');              // показываем таблицы нового WS
-                    }}
                     selected={selectedWs}
+                    selectWorkspace={ws => {
+                        selectWorkspace(ws.id);
+                        setOpenDropdown(false);
+                        setView('table');
+                    }}
                     deleteWorkspace={deleteWorkspace}
                     updateWorkspace={updateWorkspace}
-                    selectedConnection={selectedConn}
+                    selectedConnection={
+                        selectedWs
+                            ? connections.find(c => c.id === selectedWs.connection_id) ?? null
+                            : null
+                    }
                     onAddClickWorkspace={() => {
                         setShowCreateForm(true);
                         setOpenDropdown(false);
                     }}
                 />
 
-                <div style={{padding: '15px'}}>
-                    <MenuTableWidget
-                        view={view}
-                        setSwapTableWidget={swapTableWidget}
-                    />
-
-                    {view === 'table' ? (
-                        <TablesRow
-                            workspaceId={selectedWsId}
-                            tables={tables}
-                            loadTables={loadTables}
-                            onTableSelect={handleTableSelect}
-                        />
-                    ) : (
-                        <Widget
-                            loadColumns={loadColumns}
+                <div style={{ padding: 15 }}>
+                    {page === 1 ? (
+                        <PageNotVisible
+                            view={view}
+                            swapTableWidget={swapTableWidget}
                             addReference={addReference}
                             widgets={widgets}
                             selectedWidgetId={selectedWidgetId}
-                            onSelectWidget={handleWidgetSelect}
-                            columns={widgetColumns}
-                            loading={widgetLoading}
-                            error={widgetError}
-                        />
-                    )}
-
-                    {/* ---------- modals ---------- */}
-                    {showConnForm && (
-                        <ModalAddConnection
-                            onSuccess={() => {
-                                setShowConnForm(false);
-                                loadConnections();
-                            }}
-                            onCancel={() => setShowConnForm(false)}
-                        />
-                    )}
-
-                    {showCreateForm && (
-                        <ModalAddWorkspace
+                            handleWidgetSelect={handleWidgetSelect}
+                            handleTableSelect={handleTableSelect}
+                            loadColumns={loadColumns}
+                            loadConnections={loadConnections}
                             setShowConnForm={setShowConnForm}
+                            showConnForm={showConnForm}
+                            setShowCreateForm={setShowCreateForm}
+                            showCreateForm={showCreateForm}
+                            widgetColumns={widgetColumns}
+                            widgetError={widgetError}
+                            widgetLoading={widgetLoading}
                             connections={connections}
-                            onSuccess={() => {
-                                setShowCreateForm(false);
-                                loadWorkSpaces();
-                            }}
-                            onCancel={() => setShowCreateForm(false)}
                         />
+                    ) : (
+                        <PageIsVisible formId={formId} columns={columns} selectedForm={selectedForm} rows={rows}  />
                     )}
                 </div>
             </div>
