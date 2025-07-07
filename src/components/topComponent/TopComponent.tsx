@@ -1,4 +1,4 @@
-// components/headerComponent/TopComponent.tsx
+// components/headerComponent/topComponent.tsx
 import React, {useState} from 'react';
 import * as s from './TopComponent.module.scss'
 import {WorkSpaceTypes} from '@/types/typesWorkSpaces';
@@ -8,14 +8,14 @@ type Props = {
     workSpaces: WorkSpaceTypes[];
     tablesByWs: Record<number, DTable[]>;
     loadTables: (wsId: number) => void;
-    onSelectTable: (table: DTable) => void;        // ← стало
+    handleSelectTable: (table: DTable) => void;        // ← стало
 };
 
 export const TopComponent = ({
                                  workSpaces,
                                  tablesByWs,
                                  loadTables,
-                                 onSelectTable
+                                 handleSelectTable
                              }: Props) => {
     const [open, setOpen] = useState(false);
     const [hoverId, setHoverId] = useState<number | null>(null);
@@ -48,7 +48,7 @@ export const TopComponent = ({
                                             <li className={s.empty}>— таблиц нет —</li>
                                         )}
                                         {tablesByWs[ws.id].map(t => (
-                                            <li onClick={() => onSelectTable(t)}   key={t.id}>
+                                            <li onClick={() => handleSelectTable(t)}   key={t.id}>
                                                 <strong>Таблица: </strong>
                                                 {t.name}
 

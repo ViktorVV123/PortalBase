@@ -1,9 +1,9 @@
 import React, {useEffect, useState} from 'react';
-import {DTable, useWorkSpaces} from '@/shared/hooks/useWorkSpaces';
-import {TopComponent} from "@/components/TopComponent/TopComponent";
+import {DTable, useWorkSpaces, Widget} from '@/shared/hooks/useWorkSpaces';
+import {TopComponent} from "@/components/topComponent/TopComponent";
 import * as styles from './Main.module.scss'
 import {SideNav} from "@/components/sideNav/SideNav";
-import {TableColumn} from "@/components/TableColumn/TableColumn";
+import {TableColumn} from "@/components/tableColumn/TableColumn";
 
 
 export const Main = () => {
@@ -39,10 +39,17 @@ export const Main = () => {
         : null;
 
 
+
     const handleSelectTable = (table: DTable) => {
         loadColumns(table);              // столбцы
         loadWidgetsForTable(table.id);   // виджеты этой таблицы
     };
+
+    /* --- выбор Widget --- */
+    const handleSelectWidget = (w: Widget) => {
+        loadColumnsWidget(w.id);
+    };
+
 
     if (loading) return <p>Загрузка…</p>;
     if (error) return <p style={{color: 'red'}}>{error}</p>;
@@ -51,7 +58,7 @@ export const Main = () => {
         <div className={styles.layout}>
             <SideNav open={navOpen} toggle={() => setNavOpen(o => !o)}/>
             <div className={styles.container}>
-                <TopComponent onSelectTable={handleSelectTable} workSpaces={workSpaces} tablesByWs={tablesByWs}
+                <TopComponent handleSelectTable={handleSelectTable} workSpaces={workSpaces} tablesByWs={tablesByWs}
                               loadTables={loadTables}/>
                 <TableColumn columns={columns}
                              widgets={selectedTable ? widgetsByTable[selectedTable.id] ?? [] : []}
@@ -60,7 +67,13 @@ export const Main = () => {
                              tableName={selectedTable?.name ?? ''}
                              loading={loading}
                              workspaceName={selectedWs?.name ?? ''}
-                             error={error}/>
+                             error={error}
+                             widgetColumns={widgetColumns}
+                             wColsLoading={wColsLoading}
+                             wColsError={wColsError}
+                             handleSelectWidget={handleSelectWidget}
+
+                />
             </div>
 
 

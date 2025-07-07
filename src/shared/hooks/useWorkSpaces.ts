@@ -1,7 +1,6 @@
 import {useCallback, useState} from "react";
 import {api} from "@/services/api";
 import {WorkSpaceTypes} from "@/types/typesWorkSpaces";
-import {WidgetColumn} from "@/shared/hooks/useWidget";
 
 
 export interface DTable {
@@ -33,6 +32,35 @@ export type Widget = {
     name: string;
     description: string | null;
 }
+
+
+export type WidgetColumn = {
+    id: number;
+    widget_id: number;
+    alias: string | null;
+    default: string | null;
+    promt: string | null;
+    published: boolean;
+    reference: {
+        width: number;
+        primary: boolean;
+        visible: boolean;
+        table_column: {
+            table_id: number;
+            id: number;
+            name: string;
+            description: string | null;
+            datatype: string;
+            length: number | null;
+            precision: number | null;
+            primary: boolean;
+            increment: boolean;
+            datetime: boolean;
+            required: boolean;
+        };
+    }[];
+};
+
 
 // shared/hooks/useWorkSpaces.ts
 export const useWorkSpaces = () => {

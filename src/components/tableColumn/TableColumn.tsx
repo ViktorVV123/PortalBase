@@ -1,8 +1,9 @@
 // components/TableColumns/TableColumns.tsx
 import React from 'react';
 import * as s from './TableColumn.module.scss';
-import {Column, DTable, Widget} from '@/shared/hooks/useWorkSpaces';
+import {Column, DTable, Widget, WidgetColumn} from '@/shared/hooks/useWorkSpaces';
 import {WidgetSelect} from "@/components/widgetSelect/WidgetSelect";
+import {TableWidget} from "@/components/tableWidget/TableWidget";
 
 type Props = {
     columns: Column[];
@@ -13,14 +14,21 @@ type Props = {
     widgets: Widget[];
     widgetsLoading: boolean;
     widgetsError: string | null;
+    widgetColumns: WidgetColumn[];
+    wColsLoading: boolean;
+    wColsError: string | null;
+    handleSelectWidget: (w: Widget) => void;
 
 };
 
 export const TableColumn: React.FC<Props> = ({
                                                  columns, tableName, loading, error, workspaceName, widgets,
-
                                                  widgetsLoading,
-                                                 widgetsError
+                                                 widgetsError,
+                                                 widgetColumns,
+                                                 wColsLoading,
+                                                 wColsError,
+                                                 handleSelectWidget
                                              }) => {
     if (!tableName) return <p className={s.placeholder}>Выберите таблицу…</p>;
     if (loading) return <p>Загрузка столбцов…</p>;
@@ -37,6 +45,7 @@ export const TableColumn: React.FC<Props> = ({
                     widgets={widgets}
                     loading={widgetsLoading}
                     error={widgetsError}
+                    handleSelectWidget={handleSelectWidget}
                 />
             </div>
 
@@ -69,6 +78,11 @@ export const TableColumn: React.FC<Props> = ({
                         </tbody>
                     </table>
                 )}
+
+
+            {/* ────────── таблица для виджета ────────── */}
+            <TableWidget widgetColumns={widgetColumns} handleSelectWidget={handleSelectWidget} wColsError={wColsError}
+                         wColsLoading={wColsLoading}/>
         </div>
     );
 };

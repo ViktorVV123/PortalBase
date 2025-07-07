@@ -9,10 +9,11 @@ type Props = {
     widgets : Widget[];
     loading : boolean;
     error   : string|null;
+    handleSelectWidget: (w: Widget)=>void;
 
 };
 
-export const WidgetSelect: React.FC<Props> = ({ widgets, loading, error }) => {
+export const WidgetSelect: React.FC<Props> = ({ widgets, loading, error,handleSelectWidget }) => {
     const [open, setOpen]             = useState(false);
     const [selected, setSelected]     = useState<Widget|null>(null);
 
@@ -36,10 +37,7 @@ export const WidgetSelect: React.FC<Props> = ({ widgets, loading, error }) => {
                     {widgets.map(w => (
                         <li
                             key={w.id}
-                            onClick={() => {
-                                setSelected(w);
-                                setOpen(false);
-                            }}
+                            onClick={() => { setSelected(w); setOpen(false); handleSelectWidget(w); }}
                         >
                             {w.name}
                         </li>
