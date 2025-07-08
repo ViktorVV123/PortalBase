@@ -43,56 +43,45 @@ $gray-60: #e5e5e5; // бордер + разделители
   }
 }
 
-/* базовые стили обоих списков */
+//* ───────── базовое: оба списка ───────── */
 .menuLv2, .menuLv3 {
   list-style: none;
   margin: 0;
   padding: 6px 0;
   background: var(--header-color);
   box-shadow: 0 8px 16px rgba(0, 0, 0, .12);
-
   font-size: 14px;
   z-index: 5;
 }
 
-/* меню-2: выпадает под кнопкой */
+/* ───────── пункты служат якорем для своих подменю ───────── */
+.menuLv2 > li,
+.menuLv3 > li {          // ← ДОБАВИЛИ
+  position: relative;    //   «якорь» для абсолютных подменю
+  padding: 8px 16px;
+  white-space: nowrap;
+  cursor: default;
+
+  &:hover { background: $gray-90; }
+}
+
+/* ───────── меню-2 (WS) ───────── */
 .menuLv2 {
   position: absolute;
   top: 100%;
   left: 0;
-
-  > li {
-    position: relative;
-    padding: 8px 16px;
-    white-space: nowrap;
-    cursor: default;
-
-    &:hover {
-      background: $gray-90;
-    }
-
-    /* ← уже был */
-  }
 }
 
-/* меню-3: таблицы выбранного WS */
-.menuLv3 {
+/* ───────── общее правило для любых подменю ───────── */
+/* (и для таблиц, и для виджетов, и для форм)         */
+.menuLv2 > li > .menuLv3,   // таблицы выбранного WS
+.menuLv3 > li > .menuLv3 {  // виджеты / формы
   position: absolute;
-  top: 0;
-  left: 100%;
+  top: 0;          // начало на уровне наведённого li
+  left: 100%;      // стрелка вправо от родителя
   border-left: none;
-
-  > li {
-    padding: 8px 16px;
-    cursor: default;
-
-    &:hover {
-      background: $gray-90;
-    }
-
-    /* ← добавили подсветку */
-  }
 }
+
 
 .empty {
   color: #999;
