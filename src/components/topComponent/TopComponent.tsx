@@ -53,34 +53,43 @@ export const TopComponent = ({
 
                                 {wsHover === ws.id && tablesByWs[ws.id] && (
                                     <ul className={s.menuLv3}>
-                                        {tablesByWs[ws.id].length === 0 && (
-                                            <li>— таблиц нет —</li>
-                                        )}
-
-                                        {tablesByWs[ws.id].map(t => {
-                                            const hasWidgets = widgetsByTable[t.id]?.length > 0;
-                                            return(
+                                        {tablesByWs[ws.id].map(t => (
                                             <li
                                                 key={t.id}
-                                                onMouseEnter={async () => { setTblHover(t.id); await loadWidgetsForTable(t.id); }}
-                                                onClick={() => handleSelectTable(t)}
+                                                onMouseEnter={async () => {
+                                                    setTblHover(t.id);
+                                                    if (!widgetsByTable[t.id]) await loadWidgetsForTable(t.id);
+                                                }}
+                                                onClick={async e => {
+                                                    // если виджеты для этой таблицы ещё не загружены —
+                                                    // сначала подгружаем и НИЧЕГО больше не делаем
+                                                    if (!widgetsByTable[t.id]) {
+                                                        await loadWidgetsForTable(t.id);
+                                                        setTblHover(t.id);         // чтобы сразу показать подпункт
+                                                        return;                    // выходим, таблицу НЕ выбираем
+                                                    }
+                                                    // если уже загружены — обычный выбор таблицы
+                                                    handleSelectTable(t);
+                                                    setOpen(false);
+                                                }}
                                             >
                                                 {t.name}
 
-                                                {tblHover === t.id && widgetsByTable[t.id] && (
+                                                {tblHover === t.id && (
                                                     <ul className={s.menuLv3}>
-                                                        {widgetsByTable[t.id].length === 0 && (
-                                                            <li className={hasWidgets ? '' : s.disabled}   >— нет виджетов —</li>
+                                                        {(!widgetsByTable[t.id] || widgetsByTable[t.id].length === 0) && (
+                                                            <li >нет виджетов</li>
                                                         )}
 
-                                                        {widgetsByTable[t.id].map(w => (
+                                                        {widgetsByTable[t.id]?.map(w => (
                                                             <li
                                                                 key={w.id}
                                                                 onClick={e => {
-                                                                         e.stopPropagation();      // ← блокируем всплытие к <li> таблицы
-                                                                         handleSelectWidget(w);
-                                                                         setOpen(false);
-                                                                       }}
+                                                                    e.stopPropagation();          // не пробрасываем к <li> таблицы
+                                                                         handleSelectTable(t);         // ← сначала выбираем таблицу
+                                                                         handleSelectWidget(w);        // затем виджет
+                                                                    setOpen(false);               // закрываем меню
+                                                                }}
                                                             >
                                                                 {w.name}
                                                             </li>
@@ -88,7 +97,7 @@ export const TopComponent = ({
                                                     </ul>
                                                 )}
                                             </li>
-                                        )})}
+                                        ))}
                                     </ul>
                                 )}
                             </li>
