@@ -63,6 +63,13 @@ export type WidgetColumn = {
 
 export type WidgetForm = { main_widget_id: number; name: string };
 
+export interface FormDisplay {
+    displayed_widget : { name:string; description:string|null };
+    columns          : { column_name:string }[];
+    data             : { values:string[] }[];
+}
+
+
 
 // shared/hooks/useWorkSpaces.ts
 export const useWorkSpaces = () => {
@@ -165,23 +172,35 @@ export const useWorkSpaces = () => {
     }, []);
 
     const [formsByWidget, setFormsByWidget] = useState<Record<number,string>>({});
-    const [formsLoaded,   setFormsLoaded]   = useState(false);
-    const [formsError,    setFormsError]    = useState<string|null>(null);
 
     /* ─ загружаем все формы один раз ─ */
     const loadWidgetForms = useCallback(async () => {
-        if (formsLoaded) return;
-        try {
-            const { data } = await api.get<WidgetForm[]>('/forms');
-            const map: Record<number,string> = {};
-            data.forEach(f => { map[f.main_widget_id] = f.name; });
-            setFormsByWidget(map);
-            setFormsLoaded(true);
-        } catch {
-            setFormsError('Не удалось загрузить формы виджетов');
-        }
-    }, [formsLoaded]);
+        if (Object.keys(formsByWidget).length) return;      // уже загружено
+        const { data } = await api.get<WidgetForm[]>('/forms');
+        const map: Record<number, WidgetForm> = {};
+        data.forEach(f => { map[f.main_widget_id] = f; });       // сохраняем OBJECT
+        setFormsByWidget(map);
+    }, [formsByWidget]);
 
+
+    /* --- новое состояние --- */
+    const [formDisplay, setFormDisplay] = useState<FormDisplay|null>(null);
+    const [formLoading, setFormLoading] = useState(false);
+    const [formError,   setFormError]   = useState<string|null>(null);
+
+    /* --- загрузка таблицы формы --- */
+    const loadFormDisplay = useCallback(async (formId: number) => {
+        setFormLoading(true);
+        setFormError(null);
+        try {
+            const { data } = await api.post<FormDisplay>(`/display/${formId}/main`);
+            setFormDisplay(data);
+        } catch {
+            setFormError('Не удалось загрузить данные формы');
+        } finally {
+            setFormLoading(false);
+        }
+    }, []);
 
     return {
         workSpaces,
@@ -199,6 +218,6 @@ export const useWorkSpaces = () => {
         widgetsError,
         formsByWidget,
         loadWidgetForms,
-        widgetColumns, wColsLoading, wColsError, loadColumnsWidget,
+        widgetColumns, wColsLoading, wColsError, loadColumnsWidget,loadFormDisplay,formDisplay,formLoading,formError
     };
 };

@@ -10,6 +10,7 @@ export const Main = () => {
 
     const [navOpen, setNavOpen] = useState(false);
     const [selectedWidget, setSelectedWidget] = useState<Widget | null>(null);
+    const [selectedFormId, setSelectedFormId] = useState<number | null>(null);
     const [wsHover, setWsHover] = useState<number | null>(null);
     const [tblHover, setTblHover] = useState<number | null>(null);
 
@@ -29,6 +30,7 @@ export const Main = () => {
         widgetsError,
         widgetColumns, wColsLoading, wColsError, loadColumnsWidget, formsByWidget,
         loadWidgetForms,
+        loadFormDisplay, formDisplay, formError, formLoading
     } = useWorkSpaces();
 
 
@@ -42,6 +44,7 @@ export const Main = () => {
         },
         [loadWidgetForms]);
 
+
 //показываем путь до таблицы workspace => table
     const selectedWs = selectedTable
         ? workSpaces.find(w => w.id === selectedTable.workspace_id) ?? null
@@ -50,19 +53,35 @@ export const Main = () => {
 
     const handleSelectTable = (table: DTable) => {
         setSelectedWidget(null);            // сбрасываем прежний виджет
-        loadColumns(table);                 // столбцы таблицы
+        loadColumns(table);
+        setSelectedFormId(null);// столбцы таблицы
         loadWidgetsForTable(table.id);      // список виджетов
     };
 
     const handleSelectWidget = (w: Widget) => {
         setSelectedWidget(w);
+        setSelectedFormId(null);
         loadColumnsWidget(w.id);            // столбцы виджета
     };
 //для того чтобы вернуться к таблице после выбора widget
     const handleClearWidget = () => {
-        setSelectedWidget(null);          // возврат к таблице
+        setSelectedWidget(null);
+        setSelectedFormId(null);   // возврат к таблице
 
     };
+
+
+    const handleSelectForm = (formId: number) => {
+        setSelectedFormId(formId);
+        loadFormDisplay(formId);
+    };
+
+    // имя формы, если выбраны и widget, и form
+    const formName =
+        selectedWidget && selectedFormId
+            ? formsByWidget[selectedWidget.id]?.name ?? ''
+            : '';
+
 
 
     if (loading) return <p>Загрузка…</p>;
@@ -72,11 +91,16 @@ export const Main = () => {
         <div className={styles.layout}>
             <SideNav open={navOpen} toggle={() => setNavOpen(o => !o)}/>
             <div className={styles.container}>
-                <TopComponent formsByWidget={formsByWidget} setWsHover={setWsHover} tblHover={tblHover} setTblHover={setTblHover} wsHover={wsHover}
+                <TopComponent formsByWidget={formsByWidget} setWsHover={setWsHover} tblHover={tblHover}
+                              setTblHover={setTblHover} wsHover={wsHover}
                               handleSelectTable={handleSelectTable} widgetsByTable={widgetsByTable}
                               handleSelectWidget={handleSelectWidget} workSpaces={workSpaces} tablesByWs={tablesByWs}
-                              loadTables={loadTables} loadWidgetsForTable={loadWidgetsForTable}/>
+                              loadTables={loadTables} loadWidgetsForTable={loadWidgetsForTable}
+                              handleSelectForm={handleSelectForm}
+
+                />
                 <TableColumn columns={columns}
+                             formDisplay={formDisplay}
                              tableName={selectedTable?.name ?? ''}
                              loading={loading}
                              workspaceName={selectedWs?.name ?? ''}
@@ -87,7 +111,10 @@ export const Main = () => {
                              handleSelectWidget={handleSelectWidget}
                              selectedWidget={selectedWidget}
                              handleClearWidget={handleClearWidget}
-
+                             selectedFormId={selectedFormId}
+                             formLoading={formLoading}
+                             formError={formError}
+                             formName={formName}
 
                 />
             </div>

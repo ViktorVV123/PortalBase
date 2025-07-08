@@ -17,6 +17,7 @@ type Props = {
     setWsHover:(value:number | null) => void;
     setTblHover:(value:number | null) => void;
     formsByWidget:any;
+    handleSelectForm:(formId:number) => void;
 
 
 }
@@ -28,7 +29,7 @@ export const TopComponent = ({
                                  handleSelectTable,
                                  handleSelectWidget,
                                  widgetsByTable,
-                                 loadWidgetsForTable,wsHover,tblHover,setWsHover,setTblHover,formsByWidget
+                                 loadWidgetsForTable,wsHover,tblHover,setWsHover,setTblHover,formsByWidget,handleSelectForm
 
                              }: Props) => {
     const [open, setOpen] = useState(false);
@@ -79,14 +80,15 @@ export const TopComponent = ({
                                                 {tblHover === t.id && (
                                                     <ul className={s.menuLv3}>
                                                         {(!widgetsByTable[t.id] || widgetsByTable[t.id].length === 0) && (
-                                                            <li >нет виджетов</li>
+                                                            <li className={s.disabled} >нет виджетов</li>
                                                         )}
 
                                                         {widgetsByTable[t.id]?.map(w => {
                                                             const formEntry = formsByWidget[w.id];
+                                                            const formObj  = formsByWidget[w.id];
                                                             const formName  =
                                                                 formEntry ? (typeof formEntry === 'string' ? formEntry : formEntry.name)
-                                                                    : 'нет формы';
+                                                                    : <span >нет формы</span>;
 
                                                             return (
                                                                 <li
@@ -105,7 +107,24 @@ export const TopComponent = ({
                                                                     {/* ───────── меню-5: формы ───────── */}
                                                                     {wHover === w.id && (
                                                                         <ul className={s.menuLv3}>
-                                                                            <li>{formName}</li>
+                                                                            <li
+                                                                                className={formObj ? '' : s.disabled}
+                                                                                onClick={e => {
+                                                                                    e.stopPropagation();          // не всплываем к widget-LI
+                                                                                    if (!formObj) return;         // если формы нет — выходим
+
+                                                                                    /* 1. выбираем таблицу и виджет */
+                                                                                    handleSelectTable(t);         // выставляет selectedTable + columns
+                                                                                    handleSelectWidget(w);        // выставляет selectedWidget + widgetColumns
+
+                                                                                    /* 2. загружаем и показываем форму */
+                                                                                    handleSelectForm(formObj.form_id);
+
+                                                                                    setOpen(false);               // закрываем всё меню
+                                                                                }}
+                                                                            >
+                                                                                {formName}
+                                                                            </li>
                                                                         </ul>
                                                                     )}
                                                                 </li>
