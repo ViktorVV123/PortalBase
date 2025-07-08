@@ -71,13 +71,19 @@ export interface SubWidget {
 }
 
 /** Объект формы, связанной с «главным» виджетом */
-export interface WidgetForm {
-    main_widget_id: number;             // id основного (parent) виджета
-    name          : string;             // читаемое имя формы
-    description   : string | null;      // описание (nullable)
-    form_id       : number;             // id формы, нужен для /display/{id}/main
-    sub_widgets   : SubWidget[];        // массив под-виджетов
-}
+type WidgetForm = {
+    main_widget_id: number;
+    name          : string;
+    description   : string | null;
+    form_id       : number;
+    sub_widgets   : {
+        widget_order     : number;
+        sub_widget_id    : number;
+        form_id          : number;
+        where_conditional: string | null;
+    }[];
+};
+
 
 
 
@@ -113,6 +119,36 @@ export interface FormDisplay {
     displayed_widget: DisplayedWidget;
     columns         : FormColumn[];
     data            : FormRow[];
+}
+
+
+export interface SubDisplayedWidget {
+    widget_order: number;
+    name        : string;
+    description : string | null;
+}
+
+export interface SubFormColumn {
+    column_order: number;
+    column_name : string;
+    placeholder : string | null;
+    type        : string | null;
+    default     : string | null;
+    published   : boolean;
+    required    : boolean;
+    width       : number;
+}
+
+export interface SubFormRow {
+    primary_keys: Record<string, number | string>;
+    values      : (number | string | null)[];
+}
+
+export interface SubDisplay {
+    sub_widgets     : SubDisplayedWidget[];  // список заголовков
+    displayed_widget: SubDisplayedWidget;    // активный
+    columns         : SubFormColumn[];
+    data            : SubFormRow[];
 }
 
 
@@ -216,7 +252,8 @@ export const useWorkSpaces = () => {
         }
     }, []);
 
-    const [formsByWidget, setFormsByWidget] = useState<Record<number,string>>({});
+    const [formsByWidget, setFormsByWidget] = useState<Record<number, WidgetForm>>({});
+
 
     /* ─ загружаем все формы один раз ─ */
     const loadWidgetForms = useCallback(async () => {
@@ -233,6 +270,7 @@ export const useWorkSpaces = () => {
     const [formLoading, setFormLoading] = useState(false);
     const [formError,   setFormError]   = useState<string|null>(null);
 
+
     /* --- загрузка таблицы формы --- */
     const loadFormDisplay = useCallback(async (formId: number) => {
         setFormLoading(true);
@@ -246,6 +284,33 @@ export const useWorkSpaces = () => {
             setFormLoading(false);
         }
     }, []);
+
+
+    /* --- sub-display state --- */
+    const [subDisplay , setSubDisplay ] = useState<SubDisplay|null>(null);
+    const [subLoading , setSubLoading ] = useState(false);
+    const [subError   , setSubError   ] = useState<string|null>(null);
+
+    /* --- загрузка таблицы sub-виджета --- */
+    const loadSubDisplay = useCallback(
+        async (formId: number, subOrder: number, primary: Record<string, unknown>) => {
+            setSubLoading(true);
+            setSubError(null);
+            try {
+                const { data } = await api.post<SubDisplay>(
+                    `/display/${formId}/sub`,
+                    { primary_keys: primary },
+                    { params: { sub_widget_order: subOrder } }
+                );
+                setSubDisplay(data);
+            } catch {
+                setSubError('Не удалось загрузить данные sub-виджета');
+            } finally {
+                setSubLoading(false);
+            }
+        },
+        []
+    );
 
     return {
         workSpaces,
@@ -263,6 +328,7 @@ export const useWorkSpaces = () => {
         widgetsError,
         formsByWidget,
         loadWidgetForms,
-        widgetColumns, wColsLoading, wColsError, loadColumnsWidget,loadFormDisplay,formDisplay,formLoading,formError
+        widgetColumns, wColsLoading, wColsError, loadColumnsWidget,loadFormDisplay,formDisplay,formLoading,formError,
+        loadSubDisplay,subDisplay,subLoading,subError
     };
 };

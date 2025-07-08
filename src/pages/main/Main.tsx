@@ -30,7 +30,8 @@ export const Main = () => {
         widgetsError,
         widgetColumns, wColsLoading, wColsError, loadColumnsWidget, formsByWidget,
         loadWidgetForms,
-        loadFormDisplay, formDisplay, formError, formLoading
+        loadFormDisplay, formDisplay, formError, formLoading,
+        loadSubDisplay,subDisplay,subLoading,subError
     } = useWorkSpaces();
 
 
@@ -114,7 +115,14 @@ export const Main = () => {
                              selectedFormId={selectedFormId}
                              formLoading={formLoading}
                              formError={formError}
-                             formName={formName}
+                             formName={formName} formsByWidget={formsByWidget}
+
+
+                             loadSubDisplay={loadSubDisplay}
+                             subDisplay={subDisplay}
+                             subLoading={subLoading}
+                             subError={subError}
+                             formByWidget={formsByWidget}
 
                 />
             </div>

@@ -1,6 +1,6 @@
 import React from 'react';
 import * as s from './TableColumn.module.scss';
-import {Column, FormDisplay, Widget, WidgetColumn} from '@/shared/hooks/useWorkSpaces';
+import {Column, FormDisplay, SubDisplay, Widget, WidgetColumn, WidgetForm} from '@/shared/hooks/useWorkSpaces';
 import {FormTable} from "@/components/formTable/FormTable";
 
 type Props = {
@@ -23,6 +23,16 @@ type Props = {
     formLoading: boolean;
     formError: string | null;
     formName: string;
+
+    loadSubDisplay: (
+        formId: number,
+        subOrder: number,
+        primary: Record<string, unknown>
+    ) => void;
+    subDisplay: SubDisplay | null;
+    subLoading: boolean;
+    subError: string | null;
+    formsByWidget: Record<number, WidgetForm>;   // нужен order
 };
 
 export const TableColumn: React.FC<Props> = ({
@@ -44,6 +54,11 @@ export const TableColumn: React.FC<Props> = ({
                                                  formLoading,
                                                  formError,
                                                  formName,
+                                                 subDisplay,
+                                                 subLoading,
+                                                 subError,
+                                                 formsByWidget,
+                                                 loadSubDisplay
                                              }) => {
     if (!tableName) return <p className={s.placeholder}>Выберите таблицу…</p>;
     if (loading) return <p>Загрузка…</p>;
@@ -90,7 +105,8 @@ export const TableColumn: React.FC<Props> = ({
                     ) : formError ? (
                         <p className={s.error}>{formError}</p>
                     ) : formDisplay ? (
-                        <FormTable formDisplay={formDisplay} />
+                        <FormTable subDisplay={subDisplay} subError={subError} subLoading={subLoading} selectedWidget={selectedWidget} formsByWidget={formsByWidget}
+                                   loadSubDisplay={loadSubDisplay} formDisplay={formDisplay}/>
                     ) : null
                 )
 
@@ -166,6 +182,10 @@ export const TableColumn: React.FC<Props> = ({
                                 </table>
                             )
                     )}
+
+
+
+
         </div>
     );
 };
