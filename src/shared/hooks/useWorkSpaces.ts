@@ -61,14 +61,59 @@ export type WidgetColumn = {
     }[];
 };
 
-export type WidgetForm = { main_widget_id: number; name: string };
 
-export interface FormDisplay {
-    displayed_widget : { name:string; description:string|null };
-    columns          : { column_name:string }[];
-    data             : { values:string[] }[];
+/** Под-виджеты, которые входят в форму */
+export interface SubWidget {
+    widget_order     : number;          // порядок отображения
+    sub_widget_id    : number;          // id виджета-детали
+    form_id          : number;          // id той же формы
+    where_conditional: string | null;   // SQL-условие, может быть null
 }
 
+/** Объект формы, связанной с «главным» виджетом */
+export interface WidgetForm {
+    main_widget_id: number;             // id основного (parent) виджета
+    name          : string;             // читаемое имя формы
+    description   : string | null;      // описание (nullable)
+    form_id       : number;             // id формы, нужен для /display/{id}/main
+    sub_widgets   : SubWidget[];        // массив под-виджетов
+}
+
+
+
+//типизация формы MAIN
+
+export interface FormColumn {
+    column_order : number;
+    column_name  : string;
+    placeholder  : string | null;
+    type         : string | null;
+    default      : string | null;
+    published    : boolean;
+    required     : boolean;
+    width        : number;
+}
+
+/** Одна строка данных */
+export interface FormRow {
+    /** первичные ключи приходят объектом вида { person_id: 3, … } */
+    primary_keys: Record<string, number | string>;
+    /** значения идут в том же порядке, что и columns */
+    values      : (string | number | null)[];
+}
+
+/** Заголовок блока “displayed_widget” */
+export interface DisplayedWidget {
+    name       : string;
+    description: string | null;
+}
+
+/** Итоговый объект ответа */
+export interface FormDisplay {
+    displayed_widget: DisplayedWidget;
+    columns         : FormColumn[];
+    data            : FormRow[];
+}
 
 
 // shared/hooks/useWorkSpaces.ts

@@ -1,6 +1,7 @@
 import React from 'react';
 import * as s from './TableColumn.module.scss';
 import {Column, FormDisplay, Widget, WidgetColumn} from '@/shared/hooks/useWorkSpaces';
+import {FormTable} from "@/components/formTable/FormTable";
 
 type Props = {
     columns: Column[];
@@ -89,16 +90,7 @@ export const TableColumn: React.FC<Props> = ({
                     ) : formError ? (
                         <p className={s.error}>{formError}</p>
                     ) : formDisplay ? (
-                        <table className={s.tbl}>
-                            <thead>
-                            <tr>{formDisplay.columns.map(c => <th key={c.column_name}>{c.column_name}</th>)}</tr>
-                            </thead>
-                            <tbody>
-                            {formDisplay.data.map((r, i) => (
-                                <tr key={i}>{r.values.map((v, j) => <td key={j}>{v}</td>)}</tr>
-                            ))}
-                            </tbody>
-                        </table>
+                        <FormTable formDisplay={formDisplay} />
                     ) : null
                 )
 
