@@ -61,6 +61,8 @@ export type WidgetColumn = {
     }[];
 };
 
+export type WidgetForm = { main_widget_id: number; name: string };
+
 
 // shared/hooks/useWorkSpaces.ts
 export const useWorkSpaces = () => {
@@ -116,6 +118,9 @@ export const useWorkSpaces = () => {
         [],
     );
 
+
+
+
     const [widgetsByTable, setWidgetsByTable] = useState<Record<number, Widget[]>>({});
     const [widgetsLoading, setWidgetsLoading] = useState(false);
     const [widgetsError, setWidgetsError] = useState<string | null>(null);
@@ -159,6 +164,24 @@ export const useWorkSpaces = () => {
         }
     }, []);
 
+    const [formsByWidget, setFormsByWidget] = useState<Record<number,string>>({});
+    const [formsLoaded,   setFormsLoaded]   = useState(false);
+    const [formsError,    setFormsError]    = useState<string|null>(null);
+
+    /* ─ загружаем все формы один раз ─ */
+    const loadWidgetForms = useCallback(async () => {
+        if (formsLoaded) return;
+        try {
+            const { data } = await api.get<WidgetForm[]>('/forms');
+            const map: Record<number,string> = {};
+            data.forEach(f => { map[f.main_widget_id] = f.name; });
+            setFormsByWidget(map);
+            setFormsLoaded(true);
+        } catch {
+            setFormsError('Не удалось загрузить формы виджетов');
+        }
+    }, [formsLoaded]);
+
 
     return {
         workSpaces,
@@ -174,6 +197,8 @@ export const useWorkSpaces = () => {
         widgetsByTable,
         widgetsLoading,
         widgetsError,
+        formsByWidget,
+        loadWidgetForms,
         widgetColumns, wColsLoading, wColsError, loadColumnsWidget,
     };
 };

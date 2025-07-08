@@ -103,3 +103,22 @@ $gray-60: #e5e5e5; // бордер + разделители
   cursor: default;
   pointer-events: none;   /* клики и ховер-эффект отключены */
 }
+
+/* пункт виджета */
+.widgetItem {
+  position: relative;
+  padding-right: 12px;         /* чтобы курсор не закрывал подпись */
+}
+
+/* подпись формы – скрыта, пока не наведёмся */
+.formName {
+  display: none;
+  margin-left: 6px;
+  color: #778;
+  font-style: italic;
+  white-space: nowrap;
+}
+
+.widgetItem:hover > .formName {
+  display: inline;
+}

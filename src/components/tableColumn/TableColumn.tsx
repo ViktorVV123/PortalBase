@@ -11,30 +11,23 @@ type Props = {
     loading: boolean;
     error: string | null;
     workspaceName: string;
-    widgets: Widget[];
-    widgetsLoading: boolean;
-    widgetsError: string | null;
     widgetColumns: WidgetColumn[];
     wColsLoading: boolean;
     wColsError: string | null;
     handleSelectWidget: (w: Widget) => void;
     selectedWidget: Widget | null;
-    setSelectedWidget: (w: Widget | null) => void;
     handleClearWidget: () => void;
 
 };
 
 export const TableColumn: React.FC<Props> = ({
-                                                 columns, tableName, loading, error, workspaceName, widgets,
-                                                 widgetsLoading,
-                                                 widgetsError,
+                                                 columns, tableName, loading, error, workspaceName,
                                                  widgetColumns,
                                                  wColsLoading,
                                                  wColsError,
                                                  handleSelectWidget,
                                                  selectedWidget,
                                                  handleClearWidget,
-                                                 setSelectedWidget
                                              }) => {
 
 

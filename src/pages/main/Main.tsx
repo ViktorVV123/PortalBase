@@ -10,8 +10,8 @@ export const Main = () => {
 
     const [navOpen, setNavOpen] = useState(false);
     const [selectedWidget, setSelectedWidget] = useState<Widget | null>(null);
-    const [wsHover,  setWsHover]  = useState<number|null>(null);
-    const [tblHover, setTblHover] = useState<number|null>(null);
+    const [wsHover, setWsHover] = useState<number | null>(null);
+    const [tblHover, setTblHover] = useState<number | null>(null);
 
     const {
         loadWorkSpaces,
@@ -27,7 +27,8 @@ export const Main = () => {
         widgetsByTable,
         widgetsLoading,
         widgetsError,
-        widgetColumns, wColsLoading, wColsError, loadColumnsWidget,
+        widgetColumns, wColsLoading, wColsError, loadColumnsWidget, formsByWidget,
+        loadWidgetForms,
     } = useWorkSpaces();
 
 
@@ -35,6 +36,11 @@ export const Main = () => {
             loadWorkSpaces()
         },
         [loadWorkSpaces]);
+
+    useEffect(() => {
+            loadWidgetForms()
+        },
+        [loadWidgetForms]);
 
 //показываем путь до таблицы workspace => table
     const selectedWs = selectedTable
@@ -66,14 +72,11 @@ export const Main = () => {
         <div className={styles.layout}>
             <SideNav open={navOpen} toggle={() => setNavOpen(o => !o)}/>
             <div className={styles.container}>
-                <TopComponent setWsHover={setWsHover} tblHover={tblHover} setTblHover={setTblHover} wsHover={wsHover}
+                <TopComponent formsByWidget={formsByWidget} setWsHover={setWsHover} tblHover={tblHover} setTblHover={setTblHover} wsHover={wsHover}
                               handleSelectTable={handleSelectTable} widgetsByTable={widgetsByTable}
                               handleSelectWidget={handleSelectWidget} workSpaces={workSpaces} tablesByWs={tablesByWs}
                               loadTables={loadTables} loadWidgetsForTable={loadWidgetsForTable}/>
                 <TableColumn columns={columns}
-                             widgets={selectedTable ? widgetsByTable[selectedTable.id] ?? [] : []}
-                             widgetsLoading={widgetsLoading}
-                             widgetsError={widgetsError}
                              tableName={selectedTable?.name ?? ''}
                              loading={loading}
                              workspaceName={selectedWs?.name ?? ''}
@@ -84,7 +87,7 @@ export const Main = () => {
                              handleSelectWidget={handleSelectWidget}
                              selectedWidget={selectedWidget}
                              handleClearWidget={handleClearWidget}
-                             setSelectedWidget={setSelectedWidget}
+
 
                 />
             </div>

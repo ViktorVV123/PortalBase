@@ -6,6 +6,7 @@ import HomeIcon from '@/assets/image/EditIcon.svg';
 import LayersIcon from '@/assets/image/EditIcon.svg';
 import PlugIcon from '@/assets/image/EditIcon.svg';
 import SettingsIcon from '@/assets/image/EditIcon.svg';
+import AddIcon from '@/assets/image/AddIcon.svg';
 
 interface Item {
     id: string;
@@ -33,8 +34,12 @@ export const SideNav = ({open, toggle}: Props) => (
 
 
         <div className={s.item}>
+            <AddIcon className={s.icon}/>
+            {open && <span>Создать workspace</span>}
+        </div>
+        <div className={s.item}>
             <HomeIcon className={s.icon}/>
-            {open && <span>Workspace</span>}
+            {open && <span>test</span>}
         </div>
         <div className={s.item}>
             <HomeIcon className={s.icon}/>

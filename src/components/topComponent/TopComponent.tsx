@@ -2,7 +2,7 @@
 import React, {useState} from 'react';
 import * as s from './TopComponent.module.scss'
 import {WorkSpaceTypes} from '@/types/typesWorkSpaces';
-import {DTable, Widget} from '@/shared/hooks/useWorkSpaces';
+import {DTable, Widget, WidgetForm} from '@/shared/hooks/useWorkSpaces';
 
 type Props = {
     workSpaces: WorkSpaceTypes[];
@@ -16,6 +16,7 @@ type Props = {
     tblHover: number | null;
     setWsHover:(value:number | null) => void;
     setTblHover:(value:number | null) => void;
+    formsByWidget:any;
 
 
 }
@@ -27,11 +28,11 @@ export const TopComponent = ({
                                  handleSelectTable,
                                  handleSelectWidget,
                                  widgetsByTable,
-                                 loadWidgetsForTable,wsHover,tblHover,setWsHover,setTblHover
+                                 loadWidgetsForTable,wsHover,tblHover,setWsHover,setTblHover,formsByWidget
 
                              }: Props) => {
     const [open, setOpen] = useState(false);
-
+    const [wHover,   setWHover]   = useState<number|null>(null);   // ← новый: hover-widget
 
     return (
         <div className={s.bar}>
@@ -81,19 +82,35 @@ export const TopComponent = ({
                                                             <li >нет виджетов</li>
                                                         )}
 
-                                                        {widgetsByTable[t.id]?.map(w => (
-                                                            <li
-                                                                key={w.id}
-                                                                onClick={e => {
-                                                                    e.stopPropagation();          // не пробрасываем к <li> таблицы
-                                                                         handleSelectTable(t);         // ← сначала выбираем таблицу
-                                                                         handleSelectWidget(w);        // затем виджет
-                                                                    setOpen(false);               // закрываем меню
-                                                                }}
-                                                            >
-                                                                {w.name}
-                                                            </li>
-                                                        ))}
+                                                        {widgetsByTable[t.id]?.map(w => {
+                                                            const formEntry = formsByWidget[w.id];
+                                                            const formName  =
+                                                                formEntry ? (typeof formEntry === 'string' ? formEntry : formEntry.name)
+                                                                    : 'нет формы';
+
+                                                            return (
+                                                                <li
+                                                                    key={w.id}
+                                                                    onMouseEnter={() => setWHover(w.id)}
+                                                                    onMouseLeave={() => setWHover(null)}
+                                                                    onClick={e => {
+                                                                        e.stopPropagation();
+                                                                        handleSelectTable(t);
+                                                                        handleSelectWidget(w);
+                                                                        setOpen(false);
+                                                                    }}
+                                                                >
+                                                                    {w.name}
+
+                                                                    {/* ───────── меню-5: формы ───────── */}
+                                                                    {wHover === w.id && (
+                                                                        <ul className={s.menuLv3}>
+                                                                            <li>{formName}</li>
+                                                                        </ul>
+                                                                    )}
+                                                                </li>
+                                                            );
+                                                        })}
                                                     </ul>
                                                 )}
                                             </li>
