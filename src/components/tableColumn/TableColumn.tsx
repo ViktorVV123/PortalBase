@@ -47,22 +47,21 @@ export const TableColumn: React.FC<Props> = ({
             <div className={s.headRow}>
                 <div className={s.breadcrumb}>
                     {workspaceName} <span className={s.arrow}>→</span>
-                    {selectedWidget
-                        ? (
+                    {selectedWidget ? (
+                        <>
+                            {/* кликаем — возвращаемся к таблице */}
                             <span className={s.link} onClick={handleClearWidget}>
- {tableName}
-                                        </span>
-                        )
-                        :<span>{tableName} </span>  }
-                </div>
-                {/* выпадающий список виджетов */}
-                <WidgetSelect selectedWidget={selectedWidget}  setSelectedWidget={setSelectedWidget}
-                    widgets={widgets}
-                    loading={widgetsLoading}
-                    error={widgetsError}
-                    handleSelectWidget={handleSelectWidget}
+                {tableName}
+              </span>
 
-                />
+                            <span className={s.arrow}>→</span>
+                            {/* имя выбранного widget */}
+                            <span>{selectedWidget.name}</span>
+                        </>
+                    ) : (
+                        <span>{tableName}</span>
+                    )}
+                </div>
             </div>
             {/* ────────── таблица для виджета ────────── */}
             {selectedWidget ? (<TableWidget widgetColumns={widgetColumns} handleSelectWidget={handleSelectWidget}

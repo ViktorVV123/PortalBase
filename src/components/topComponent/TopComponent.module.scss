@@ -97,3 +97,9 @@ $gray-60: #e5e5e5; // бордер + разделители
 .empty {
   color: #999;
 }
+
+.disabled {
+  color: #999;
+  cursor: default;
+  pointer-events: none;   /* клики и ховер-эффект отключены */
+}

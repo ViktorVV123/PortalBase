@@ -34,7 +34,7 @@ export const SideNav = ({open, toggle}: Props) => (
 
         <div className={s.item}>
             <HomeIcon className={s.icon}/>
-            {open && <span>Visible</span>}
+            {open && <span>Workspace</span>}
         </div>
         <div className={s.item}>
             <HomeIcon className={s.icon}/>

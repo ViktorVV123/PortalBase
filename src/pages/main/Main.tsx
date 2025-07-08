@@ -10,6 +10,8 @@ export const Main = () => {
 
     const [navOpen, setNavOpen] = useState(false);
     const [selectedWidget, setSelectedWidget] = useState<Widget | null>(null);
+    const [wsHover,  setWsHover]  = useState<number|null>(null);
+    const [tblHover, setTblHover] = useState<number|null>(null);
 
     const {
         loadWorkSpaces,
@@ -64,8 +66,10 @@ export const Main = () => {
         <div className={styles.layout}>
             <SideNav open={navOpen} toggle={() => setNavOpen(o => !o)}/>
             <div className={styles.container}>
-                <TopComponent handleSelectTable={handleSelectTable} workSpaces={workSpaces} tablesByWs={tablesByWs}
-                              loadTables={loadTables}/>
+                <TopComponent setWsHover={setWsHover} tblHover={tblHover} setTblHover={setTblHover} wsHover={wsHover}
+                              handleSelectTable={handleSelectTable} widgetsByTable={widgetsByTable}
+                              handleSelectWidget={handleSelectWidget} workSpaces={workSpaces} tablesByWs={tablesByWs}
+                              loadTables={loadTables} loadWidgetsForTable={loadWidgetsForTable}/>
                 <TableColumn columns={columns}
                              widgets={selectedTable ? widgetsByTable[selectedTable.id] ?? [] : []}
                              widgetsLoading={widgetsLoading}

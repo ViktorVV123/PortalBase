@@ -2,23 +2,36 @@
 import React, {useState} from 'react';
 import * as s from './TopComponent.module.scss'
 import {WorkSpaceTypes} from '@/types/typesWorkSpaces';
-import {DTable} from '@/shared/hooks/useWorkSpaces';
+import {DTable, Widget} from '@/shared/hooks/useWorkSpaces';
 
 type Props = {
     workSpaces: WorkSpaceTypes[];
     tablesByWs: Record<number, DTable[]>;
     loadTables: (wsId: number) => void;
-    handleSelectTable: (table: DTable) => void;        // ← стало
-};
+    handleSelectTable: (table: DTable) => void;
+    handleSelectWidget: (w: Widget) => void;
+    widgetsByTable: Record<number, Widget[]>;
+    loadWidgetsForTable: (tableId: number) => void;
+    wsHover: number | null;
+    tblHover: number | null;
+    setWsHover:(value:number | null) => void;
+    setTblHover:(value:number | null) => void;
+
+
+}
 
 export const TopComponent = ({
                                  workSpaces,
                                  tablesByWs,
                                  loadTables,
-                                 handleSelectTable
+                                 handleSelectTable,
+                                 handleSelectWidget,
+                                 widgetsByTable,
+                                 loadWidgetsForTable,wsHover,tblHover,setWsHover,setTblHover
+
                              }: Props) => {
     const [open, setOpen] = useState(false);
-    const [hoverId, setHoverId] = useState<number | null>(null);
+
 
     return (
         <div className={s.bar}>
@@ -34,26 +47,48 @@ export const TopComponent = ({
                         {workSpaces.map(ws => (
                             <li
                                 key={ws.id}
-                                onMouseEnter={async () => {
-                                    setHoverId(ws.id);
-                                    await loadTables(ws.id);
-                                }}
-                                onMouseLeave={() => setHoverId(null)}
+                                onMouseEnter={async () => { setWsHover(ws.id); await loadTables(ws.id); }}
                             >
                                 {ws.name}
 
-                                {hoverId === ws.id && tablesByWs[ws.id] && (
+                                {wsHover === ws.id && tablesByWs[ws.id] && (
                                     <ul className={s.menuLv3}>
                                         {tablesByWs[ws.id].length === 0 && (
-                                            <li className={s.empty}>— таблиц нет —</li>
+                                            <li>— таблиц нет —</li>
                                         )}
-                                        {tablesByWs[ws.id].map(t => (
-                                            <li onClick={() => handleSelectTable(t)}   key={t.id}>
-                                                <strong>Таблица: </strong>
+
+                                        {tablesByWs[ws.id].map(t => {
+                                            const hasWidgets = widgetsByTable[t.id]?.length > 0;
+                                            return(
+                                            <li
+                                                key={t.id}
+                                                onMouseEnter={async () => { setTblHover(t.id); await loadWidgetsForTable(t.id); }}
+                                                onClick={() => handleSelectTable(t)}
+                                            >
                                                 {t.name}
 
+                                                {tblHover === t.id && widgetsByTable[t.id] && (
+                                                    <ul className={s.menuLv3}>
+                                                        {widgetsByTable[t.id].length === 0 && (
+                                                            <li className={hasWidgets ? '' : s.disabled}   >— нет виджетов —</li>
+                                                        )}
+
+                                                        {widgetsByTable[t.id].map(w => (
+                                                            <li
+                                                                key={w.id}
+                                                                onClick={e => {
+                                                                         e.stopPropagation();      // ← блокируем всплытие к <li> таблицы
+                                                                         handleSelectWidget(w);
+                                                                         setOpen(false);
+                                                                       }}
+                                                            >
+                                                                {w.name}
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                )}
                                             </li>
-                                        ))}
+                                        )})}
                                     </ul>
                                 )}
                             </li>
