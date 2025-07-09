@@ -22,5 +22,6 @@ body {
     font-family: 'Inter', sans-serif;
     font-weight: 400;
     margin: 0;
+    font-size: clamp(16px, 0.9vw + 0.2rem, 16px);
 
 }

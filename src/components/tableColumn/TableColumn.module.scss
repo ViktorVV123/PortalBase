@@ -58,7 +58,7 @@ margin-bottom: 15px;
     font-weight: 500;
   }
 
-  tbody tr:hover { background: var(--hover-color) }
+  tbody tr:hover { background: var(--hover-color); }
 }
 
 .link {
@@ -71,5 +71,5 @@ margin-bottom: 15px;
 
 
 /* TableColumn.module.scss  (или FormTable.module.scss) */
-.selectedRow   { background: #8a8989; }      /* светло-синий фон */
+.selectedRow   { background:  var(--hover-color) }      /* светло-синий фон */
 .selectedRow td { font-weight: 600; }        /* опционально жирнее */

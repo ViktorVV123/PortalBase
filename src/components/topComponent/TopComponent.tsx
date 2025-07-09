@@ -117,7 +117,7 @@ export const TopComponent = ({
                                                     }
                                                     // если уже загружены — обычный выбор таблицы
                                                     handleSelectTable(t);
-                                                    setOpen(false);
+                                                    closeMenu()
                                                 }}
                                             >
                                                 <div style={{display: 'flex', alignItems: 'center', gap: 4}}>
@@ -147,7 +147,7 @@ export const TopComponent = ({
                                                                         e.stopPropagation();
                                                                         handleSelectTable(t);
                                                                         handleSelectWidget(w);
-                                                                        setOpen(false);
+                                                                        closeMenu()
                                                                     }}
                                                                 >
                                                                     <div style={{
@@ -174,7 +174,7 @@ export const TopComponent = ({
                                                                                     /* 2. загружаем и показываем форму */
                                                                                     handleSelectForm(formObj.form_id);
 
-                                                                                    setOpen(false);               // закрываем всё меню
+                                                                                    closeMenu()             // закрываем всё меню
                                                                                 }}
                                                                             >
                                                                                 <div style={{

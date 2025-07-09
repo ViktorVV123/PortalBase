@@ -1,9 +1,10 @@
 import React, {useEffect, useState} from 'react';
 import {DTable, useWorkSpaces, Widget} from '@/shared/hooks/useWorkSpaces';
-import {TopComponent} from "@/components/topComponent/TopComponent";
+
 import * as styles from './Main.module.scss'
 import {SideNav} from "@/components/sideNav/SideNav";
 import {TableColumn} from "@/components/tableColumn/TableColumn";
+import {TopComponent} from "@/components/topComponent/TopComponent";
 
 
 export const Main = () => {

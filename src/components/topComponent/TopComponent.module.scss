@@ -1,113 +1,126 @@
-/* цветовая палитра */
-$black: #111; // фон header
-$white: #fff; // текст header
-$gray-90: #494848; // hover списков
-$gray-60: #e5e5e5; // бордер + разделители
+/* ——— палитра / тень ——— */
+$surface: #27272a;
+$surface-hover: rgba(#7aa7ff, .14);
+$text: #f1f1f1;
+$text-muted: #9b9ba0;
+$radius: 4px;
 
-
+/* ——— контейнер header ——— */
 .bar {
   display: flex;
   align-items: center;
-  background: var(--header-color);
-  color: $white;
   height: 56px;
   padding: 0 24px;
-  position: relative;
-  font-size: 15px;
+  background: var(--header-color);
+  gap: 10px;
 }
 
 .logo {
   font-weight: 600;
   font-size: 18px;
-
 }
 
-/* обёртка нужна, чтобы позиционировать UL относительно кнопки */
-.menuWrapper {
-  position: relative
-}
-
-/* кнопка-триггер */
+/* ——— кнопка ——— */
 .trigger {
   background: transparent;
-  border: 1px solid #EEEEEE;
+  border: 1px solid #444;
   color: inherit;
-  font: inherit;
+  padding: 6px 12px;
+  border-radius: $radius;
   cursor: pointer;
-  padding: 6px 10px;
-  border-radius: 4px;
-  margin-left: 10px;
+  min-width: 220px;
+  &:hover {
+    background: var(--header-color);
+  }
+}
+
+/* ——— базовые списки ——— */
+.menuLv2, .menuLv3 {
+  list-style: none;
+  margin: 0;
+  padding: 6px 0;
+  background: var(--header-color);
+  color: $text;
+  border-radius: $radius;
+  min-width: 220px;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, .35);
+  animation: fadeSlide .16s ease-out;
+  max-height: 440px;
+  position: absolute;
+  z-index: 10000;
+}
+
+@keyframes fadeSlide {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* позиционируем уровни */
+.menuLv2 {
+  top: 100%;
+  left: 0;
+}
+
+.menuLv2 > li > .menuLv3,
+.menuLv3 > li > .menuLv3 {
+  top: 0;
+  left: 100%;
+}
+
+/* ——— пункты ——— */
+.menuLv2 > li, .menuLv3 > li {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 18px;
+  cursor: default;
 
   &:hover {
     background: var(--hover-color);
   }
 }
 
-//* ───────── базовое: оба списка ───────── */
-.menuLv2, .menuLv3 {
-  list-style: none;
-  margin: 0;
-  padding: 6px 0;
-  background: var(--header-color);
-  box-shadow: 0 8px 16px rgba(0, 0, 0, .12);
-  font-size: 14px;
-  z-index: 5;
-}
-
-/* ───────── пункты служат якорем для своих подменю ───────── */
-.menuLv2 > li,
-.menuLv3 > li {          // ← ДОБАВИЛИ
-  position: relative;    //   «якорь» для абсолютных подменю
-  padding: 8px 16px;
-  white-space: nowrap;
-  cursor: default;
-
-  &:hover { background: $gray-90; }
-}
-
-/* ───────── меню-2 (WS) ───────── */
-.menuLv2 {
+/* индикатор подменю */
+.menuLv2 > li::after, .menuLv3 > li::after {
+  content: '›';
+  font-size: 12px;
   position: absolute;
-  top: 100%;
-  left: 0;
+  right: 10px;
+  opacity: .4;
 }
 
-/* ───────── общее правило для любых подменю ───────── */
-/* (и для таблиц, и для виджетов, и для форм)         */
-.menuLv2 > li > .menuLv3,   // таблицы выбранного WS
-.menuLv3 > li > .menuLv3 {  // виджеты / формы
-  position: absolute;
-  top: 0;          // начало на уровне наведённого li
-  left: 100%;      // стрелка вправо от родителя
-  border-left: none;
+.menuLv2 > li:not(:has(> .menuLv3))::after,
+.menuLv3 > li:not(:has(> .menuLv3))::after {
+  content: '';
 }
 
-
-.empty {
-  color: #999;
-}
-
+/* «нет данных / загрузка…» */
 .disabled {
-  color: #999;
+  color: $text-muted;
   cursor: default;
-  pointer-events: none;   /* клики и ховер-эффект отключены */
+  user-select: none;
 }
 
-/* пункт виджета */
-.widgetItem {
+/* ——— scrollbar (webkit) ——— */
+.menuLv2::-webkit-scrollbar,
+.menuLv3::-webkit-scrollbar {
+  width: 6px;
+}
+
+.menuLv2::-webkit-scrollbar-thumb,
+.menuLv3::-webkit-scrollbar-thumb {
+  background: rgba(#999, .35);
+  border-radius: 3px;
+}
+
+/* wrapper нужен для relative-позиционирования */
+.menuWrapper {
   position: relative;
-  padding-right: 12px;         /* чтобы курсор не закрывал подпись */
-}
-
-/* подпись формы – скрыта, пока не наведёмся */
-.formName {
-  display: none;
-  margin-left: 6px;
-  color: #778;
-  font-style: italic;
-  white-space: nowrap;
-}
-
-.widgetItem:hover > .formName {
-  display: inline;
 }
