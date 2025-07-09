@@ -71,7 +71,7 @@ export interface SubWidget {
 }
 
 /** Объект формы, связанной с «главным» виджетом */
-type WidgetForm = {
+export type WidgetForm = {
     main_widget_id: number;
     name          : string;
     description   : string | null;

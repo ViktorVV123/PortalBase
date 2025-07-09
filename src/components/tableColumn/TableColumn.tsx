@@ -16,7 +16,7 @@ type Props = {
     wColsError: string | null;
     selectedWidget: Widget | null;
     handleClearWidget: () => void;
-
+    handleSelectWidget: (widget: Widget | null) => void;   // ← добавили
     /* form */
     selectedFormId: number | null;
     formDisplay: FormDisplay | null;

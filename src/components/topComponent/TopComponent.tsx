@@ -2,7 +2,7 @@
 import React, {useEffect, useRef, useState} from 'react';
 import * as s from './TopComponent.module.scss'
 import {WorkSpaceTypes} from '@/types/typesWorkSpaces';
-import {DTable, Widget, WidgetForm} from '@/shared/hooks/useWorkSpaces';
+import {DTable, Widget} from '@/shared/hooks/useWorkSpaces';
 import FormIcon from '@/assets/image/FormaIcon.svg'
 import TableIcon from '@/assets/image/TableIcon.svg'
 import WorkspacesIcon from '@/assets/image/WorkspacesIcon.svg'

@@ -27,8 +27,6 @@ export const Main = () => {
         error,
         loadWidgetsForTable,
         widgetsByTable,
-        widgetsLoading,
-        widgetsError,
         widgetColumns, wColsLoading, wColsError, loadColumnsWidget, formsByWidget,
         loadWidgetForms,
         loadFormDisplay, formDisplay, formError, formLoading,
@@ -116,14 +114,12 @@ export const Main = () => {
                              selectedFormId={selectedFormId}
                              formLoading={formLoading}
                              formError={formError}
-                             formName={formName} formsByWidget={formsByWidget}
-
-
+                             formName={formName}
                              loadSubDisplay={loadSubDisplay}
                              subDisplay={subDisplay}
                              subLoading={subLoading}
                              subError={subError}
-                             formByWidget={formsByWidget}
+                             formsByWidget={formsByWidget}
 
                 />
             </div>
