@@ -1,23 +1,61 @@
-import { useState } from 'react';
-import { api } from '@/services/api';
-import { Connection } from '@/types/typesConnection';
-import AddIcon from '@/assets/image/AddIcon.svg';
-import * as s from './ModalAddWorkspace.module.scss';
-import * as base from '@/assets/color/ModalBase.module.scss';        // базовые стили
+/* ModalAddWorkspace.tsx */
+import {ChangeEvent, useState} from 'react';
+import {
+    Dialog, DialogTitle, DialogContent, DialogActions,
+    TextField, Button, IconButton,
+    FormControl, InputLabel, Select, MenuItem, Stack,
+    CircularProgress, ThemeProvider, CssBaseline, createTheme, SelectChangeEvent,
+} from '@mui/material';
 
-interface Props {
+import AddIcon from '@/assets/image/AddIcon.svg';   // ← ваш SVG-компонент
+import {api} from '@/services/api';
+import {Connection} from '@/types/typesConnection';
+
+const dark = createTheme({
+    palette: {
+        mode: 'dark',
+        primary: {main: '#ffffff'},  // ← чтобы все focus-ring были белые
+    },
+    components: {
+        /* белый бордер при фокусе */
+        MuiOutlinedInput: {
+            styleOverrides: {
+                root: {
+                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                        borderColor: '#ffffff',
+                    },
+                },
+            },
+        },
+        /* белая подпись (label) в фокусе */
+        MuiInputLabel: {
+            styleOverrides: {
+                root: {
+                    '&.Mui-focused': {color: '#ffffff'},
+                },
+            },
+        },
+        /* белая стрелочка у Select */
+        MuiSelect: {
+            styleOverrides: {icon: {color: '#ffffff'}},
+        },
+    },
+});
+type Props = {
     connections: Connection[];
     onSuccess: () => void;
     onCancel: () => void;
     setShowConnForm: (v: boolean) => void;
-}
+    open: boolean;             // ✔ лучше управлять диалогом снаружи
+};
 
 export const ModalAddWorkspace = ({
-                                      connections, onSuccess, onCancel, setShowConnForm,
+                                      connections, onSuccess, onCancel, setShowConnForm, open,
                                   }: Props) => {
 
+    /* ----- local state ----- */
     const [form, setForm] = useState({
-        connection_id: connections[0]?.id ?? 0,
+        connection_id: connections[0]?.id ?? '',
         group: '',
         name: '',
         description: '',
@@ -25,8 +63,16 @@ export const ModalAddWorkspace = ({
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const handle = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
-        setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
+    const handle =
+        (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+            setForm(prev => ({...prev, [e.target.name]: e.target.value}));
+
+    const handleSelect = (e: SelectChangeEvent) => {
+        setForm(prev => ({
+            ...prev,
+            connection_id: Number(e.target.value),   // строку → число
+        }));
+    };
 
     const submit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -41,74 +87,94 @@ export const ModalAddWorkspace = ({
         }
     };
 
+    /* ----- render ----- */
     return (
-        <div className={base.backdrop}>
-            <form onSubmit={submit} className={base.modal}>
-                <h4>Создать Workspace</h4>
+        <ThemeProvider theme={dark}>
 
-                {/* SELECT подключения */}
-                <label>
-                    Подключение
-                    <span
-                        className={s.addConnBtn}
-                        onClick={() => setShowConnForm(true)}
-                    >
-                     <AddIcon/>
-             добавить коннектор
-          </span>
-                    <select
-                        name="connection_id"
-                        value={form.connection_id}
-                        onChange={handle}
-                        required
-                    >
-                        {connections.map(c => (
-                            <option key={c.id} value={c.id}>
-                                {c.name} (id:{c.id})
-                            </option>
-                        ))}
-                    </select>
-                </label>
+            <CssBaseline/>
+            <Dialog open={open} onClose={onCancel} fullWidth maxWidth="sm">
+                <DialogTitle>Создать workspace</DialogTitle>
 
-                <label>
-                    Группа
-                    <input
-                        name="group"
-                        value={form.group}
-                        onChange={handle}
-                        required
-                    />
-                </label>
+                <form onSubmit={submit}>
+                    <DialogContent dividers>
+                        <Stack spacing={2}>
+                            {/* SELECT подключения */}
+                            <FormControl fullWidth size="small">
+                                <InputLabel id="conn-label">Подключение</InputLabel>
+                                <Select
+                                    labelId="conn-label"
+                                    name="connection_id"
+                                    label="Подключение"
+                                    value={form.connection_id}
+                                    onChange={handleSelect}
+                                    required
+                                >
+                                    {connections.map(c => (
+                                        <MenuItem key={c.id} value={c.id}>
+                                            {c.name} (id:{c.id})
+                                        </MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
 
-                <label>
-                    Название
-                    <input
-                        name="name"
-                        value={form.name}
-                        onChange={handle}
-                        required
-                    />
-                </label>
+                            {/* кнопка «добавить коннектор» справа от селекта */}
+                            <IconButton
+                                size="small"
+                                sx={{alignSelf: 'flex-end', mt: -1.5}}   /* прижимаем к селекту */
+                                onClick={() => setShowConnForm(true)}
+                            >
+                                <AddIcon width={18} height={18}/>
+                            </IconButton>
 
-                <label>
-                    Описание
-                    <textarea
-                        name="description"
-                        value={form.description}
-                        onChange={handle}
-                        required
-                    />
-                </label>
+                            <TextField
+                                label="Группа"
+                                name="group"
+                                size="small"
+                                fullWidth
+                                value={form.group}
+                                onChange={handle}
+                                required
+                            />
 
-                {error && <p style={{ color: '#e00', margin: '4px 0' }}>{error}</p>}
+                            <TextField
+                                label="Название"
+                                name="name"
+                                size="small"
+                                fullWidth
+                                value={form.name}
+                                onChange={handle}
+                                required
+                            />
 
-                <div className={base.actions}>
-                    <button type="button" onClick={onCancel}>Отмена</button>
-                    <button type="submit" disabled={loading || !form.name.trim()}>
-                        {loading ? 'Создаю…' : 'Создать'}
-                    </button>
-                </div>
-            </form>
-        </div>
-    );
+                            <TextField
+                                label="Описание"
+                                name="description"
+                                size="small"
+                                fullWidth
+                                multiline rows={3}
+                                value={form.description}
+                                onChange={handle}
+                                required
+                            />
+
+                            {error && <span style={{color: '#d33'}}>{error}</span>}
+                        </Stack>
+                    </DialogContent>
+
+                    <DialogActions sx={{pr: 3, pb: 2}}>
+                        <Button onClick={onCancel}>Отмена</Button>
+                        <Button
+                            variant="contained"
+                            type="submit"
+                            disabled={loading || !form.name.trim()}
+                            startIcon={loading && <CircularProgress size={16}/>}
+                        >
+                            {loading ? 'Создаю…' : 'Создать'}
+                        </Button>
+                    </DialogActions>
+                </form>
+            </Dialog>
+        </ThemeProvider>
+    )
+        ;
 };

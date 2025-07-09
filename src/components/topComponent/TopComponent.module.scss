@@ -9,7 +9,7 @@ $radius: 4px;
 .bar {
   display: flex;
   align-items: center;
-  height: 56px;
+  min-height: 56px;
   padding: 0 24px;
   background: var(--header-color);
   gap: 10px;
@@ -17,17 +17,18 @@ $radius: 4px;
 
 .logo {
   font-weight: 600;
-  font-size: 18px;
+  font-size: 20px;
 }
 
 /* ——— кнопка ——— */
 .trigger {
   background: transparent;
-  border: 1px solid #444;
+  border: 2px solid #444;
   color: inherit;
   padding: 6px 12px;
   border-radius: $radius;
   cursor: pointer;
+  font-size: 16px;
   min-width: 220px;
   &:hover {
     background: var(--header-color);

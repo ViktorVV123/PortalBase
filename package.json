@@ -9,7 +9,6 @@
     "build:mobile": "webpack --env mode=production --env platform=mobile",
     "build:descktop": "webpack --env mode=production --env platform=desktop"
   },
-
   "keywords": [],
   "author": "",
   "license": "ISC",
@@ -41,6 +40,10 @@
     "webpack-dev-server": "^5.2.0"
   },
   "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@mui/icons-material": "^7.2.0",
+    "@mui/material": "^7.2.0",
     "apexcharts": "^4.5.0",
     "axios": "^1.8.3",
     "chart.js": "^4.4.8",

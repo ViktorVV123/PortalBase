@@ -24,16 +24,17 @@ const items: Item[] = [
 interface Props {
     open: boolean;
     toggle: () => void;
+    changeStatusModal:any
 
 }
 
-export const SideNav = ({open, toggle}: Props) => (
+export const SideNav = ({open, toggle,changeStatusModal}: Props) => (
     <aside className={`${s.nav} ${open ? s.open : ''}`}>
 
         <button className={s.toggle} onClick={toggle}>☰</button>
 
 
-        <div className={s.item}>
+        <div onClick={changeStatusModal} className={s.item}>
             <AddIcon className={s.icon}/>
             {open && <span>Создать workspace</span>}
         </div>

@@ -5,6 +5,9 @@ import * as styles from './Main.module.scss'
 import {SideNav} from "@/components/sideNav/SideNav";
 import {TableColumn} from "@/components/tableColumn/TableColumn";
 import {TopComponent} from "@/components/topComponent/TopComponent";
+import {ModalAddWorkspace} from "@/components/modals/modalAddWorkspace/ModalAddWorkspace";
+import {useLoadConnections} from "@/shared/hooks/useLoadConnections";
+import {ModalAddConnection} from "@/components/modals/modalAddConnection/ModalAddConnection";
 
 
 export const Main = () => {
@@ -14,6 +17,8 @@ export const Main = () => {
     const [selectedFormId, setSelectedFormId] = useState<number | null>(null);
     const [wsHover, setWsHover] = useState<number | null>(null);
     const [tblHover, setTblHover] = useState<number | null>(null);
+    const [showConnForm , setShowConnForm ] = useState(false);
+    const [showCreateForm, setShowCreateForm] = useState(false);
 
     const {
         loadWorkSpaces,
@@ -33,6 +38,8 @@ export const Main = () => {
         loadSubDisplay,subDisplay,subLoading,subError
     } = useWorkSpaces();
 
+    const {connections,loadConnections} = useLoadConnections()
+
 
     useEffect(() => {
             loadWorkSpaces()
@@ -43,6 +50,11 @@ export const Main = () => {
             loadWidgetForms()
         },
         [loadWidgetForms]);
+
+    useEffect(() => {
+            loadConnections()
+        },
+        [loadConnections]);
 
 
 //показываем путь до таблицы workspace => table
@@ -89,7 +101,7 @@ export const Main = () => {
 
     return (
         <div className={styles.layout}>
-            <SideNav open={navOpen} toggle={() => setNavOpen(o => !o)}/>
+            <SideNav open={navOpen} toggle={() => setNavOpen(o => !o)} changeStatusModal={()=>setShowCreateForm(true)} />
             <div className={styles.container}>
                 <TopComponent formsByWidget={formsByWidget} setWsHover={setWsHover} tblHover={tblHover}
                               setTblHover={setTblHover} wsHover={wsHover}
@@ -123,6 +135,26 @@ export const Main = () => {
 
                 />
             </div>
+
+            {showConnForm && (
+                <ModalAddConnection open={showConnForm}
+                    /* ← добавили */
+                    onSuccess={() => { setShowConnForm(false); loadConnections(); }}
+                    onCancel ={() =>  setShowConnForm(false)}
+                />
+            )}
+
+            {/* ——— WORKSPACE ——— */}
+            {showCreateForm && (
+                <ModalAddWorkspace
+                    open={showCreateForm}                  /* ✔ правильный флаг */
+                    setShowConnForm={setShowConnForm}
+                    connections={connections}
+                    onSuccess={() => { setShowCreateForm(false); loadWorkSpaces(); }}
+                    onCancel ={() =>  setShowCreateForm(false)}
+                />
+            )}
+
 
 
         </div>
