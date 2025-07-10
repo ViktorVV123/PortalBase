@@ -9,6 +9,7 @@ import TableIcon from '@/assets/image/TableIcon.svg';
 import WidgetsIcon from '@/assets/image/WidgetsIcon.svg';
 import FormIcon from '@/assets/image/FormaIcon.svg';
 import AddIcon from '@/assets/image/AddIcon.svg';
+import DeleteIcon from '@/assets/image/DeleteIcon.svg';
 
 type Props = {
     workSpaces: WorkSpaceTypes[];
@@ -35,15 +36,29 @@ type Props = {
     setCreateTblWs: (ws: WorkSpaceTypes) => void;
     setShowCreateWidget: (v: boolean) => void;
     setCreateWidgetTable: (t: DTable) => void;
+    deleteTable: (t: DTable) => void;
+    deleteWorkspace: (id: number) => void;
 };
 
 export const TopComponent: React.FC<Props> = ({
-                                                  workSpaces, tablesByWs, loadTables,
-                                                  handleSelectTable, handleSelectWidget, handleSelectForm,
-                                                  widgetsByTable, loadWidgetsForTable,
-                                                  wsHover, setWsHover, tblHover, setTblHover,
+                                                  workSpaces,
+                                                  tablesByWs,
+                                                  loadTables,
+                                                  handleSelectTable,
+                                                  handleSelectWidget,
+                                                  handleSelectForm,
+                                                  widgetsByTable,
+                                                  loadWidgetsForTable,
+                                                  wsHover,
+                                                  setWsHover,
+                                                  tblHover,
+                                                  setTblHover,
                                                   formsByWidget,
-                                                  setShowCreateTable, setCreateTblWs,setShowCreateWidget,setCreateWidgetTable
+                                                  setShowCreateTable,
+                                                  setCreateTblWs,
+                                                  setShowCreateWidget,
+                                                  setCreateWidgetTable,
+                                                  deleteWorkspace,deleteTable,
                                               }) => {
 
     const [open, setOpen] = useState(false);
@@ -103,7 +118,24 @@ export const TopComponent: React.FC<Props> = ({
                                 >
                                     <div className={s.spaceWN}>
                                         <WorkspacesIcon width={16} height={16}/>
-                                        {ws.name}
+
+                                        {/* текст — отдельный элемент, чтобы управлять flex-свойствами */}
+                                        <span className={s.wsName}>{ws.name}</span>
+
+                                        <div>
+                                            <DeleteIcon
+                                                className={s.trash}
+                                                width={16}
+                                                height={16}
+                                                onClick={e => {
+                                                    e.stopPropagation();                   // не выбирать WS
+                                                    if (confirm(`Удалить workspace «${ws.name}»?`)) {
+                                                        deleteWorkspace(ws.id);
+                                                    }
+                                                }}
+                                            />
+                                        </div>
+
                                     </div>
 
                                     {/* ───── LVL-3 : TABLES ───── */}
@@ -111,7 +143,7 @@ export const TopComponent: React.FC<Props> = ({
                                         <ul className={s.menuLv3}>
                                             <span className={s.spanName}>Таблицы</span>
                                             {/* — пункт «создать», когда таблиц нет — */}
-                                            {!hasTables && (
+
                                                 <li
                                                     className={s.disabled}
                                                     onClick={(e) => {
@@ -123,7 +155,6 @@ export const TopComponent: React.FC<Props> = ({
                                                 >
                                                     <AddIcon width={16} height={16}/> создать
                                                 </li>
-                                            )}
 
                                             {/* — сами таблицы — */}
                                             {tables?.map(t => (
@@ -147,7 +178,20 @@ export const TopComponent: React.FC<Props> = ({
                                                 >
                                                     <div className={s.spaceWN}>
                                                         <TableIcon width={16} height={16}/>
-                                                        {t.name}
+                                                        <span className={s.wsName}>{t.name}</span>
+                                                        <div>
+                                                            <DeleteIcon
+
+                                                                onClick={e => {
+                                                                    e.stopPropagation();                       // не выбирать таблицу
+                                                                    if (confirm(`Удалить таблицу «${t.name}»?`))
+                                                                        deleteTable(t);
+                                                                }}
+                                                                className={s.trash}
+                                                                width={16}
+                                                                height={16}
+                                                            />
+                                                        </div>
                                                     </div>
 
                                                     {/* ───── LVL-4 : WIDGETS ───── */}
@@ -155,7 +199,7 @@ export const TopComponent: React.FC<Props> = ({
                                                         <ul className={s.menuLv3}>
                                                             <span className={s.spanName}>Виджеты</span>
                                                             {/* — если виджетов нет → «создать» — */}
-                                                            {(!widgetsByTable[t.id] || widgetsByTable[t.id].length === 0) && (
+
                                                                 <li
                                                                     className={s.disabled}
                                                                     onClick={(e) => {
@@ -168,7 +212,7 @@ export const TopComponent: React.FC<Props> = ({
                                                                 >
                                                                     <AddIcon width={16} height={16}/> создать
                                                                 </li>
-                                                            )}
+
 
                                                             {widgetsByTable[t.id]?.map(w => {
                                                                 const formObj = formsByWidget[w.id];
@@ -190,13 +234,19 @@ export const TopComponent: React.FC<Props> = ({
                                                                     >
                                                                         <div className={s.spaceWN}>
                                                                             <WidgetsIcon width={16} height={16}/>
-                                                                            {w.name}
+                                                                            <span className={s.wsName}>{w.name}</span>
+                                                                            <DeleteIcon
+                                                                                className={s.trash}
+                                                                                width={16}
+                                                                                height={16}
+                                                                            />
                                                                         </div>
 
                                                                         {/* ───── LVL-5 : FORM ───── */}
                                                                         {wHover === w.id && (
                                                                             <ul className={s.menuLv3}>
-                                                                                <span className={s.spanName}>Формы</span>
+                                                                                <span
+                                                                                    className={s.spanName}>Формы</span>
                                                                                 <li
                                                                                     className={formObj ? '' : s.disabled}
                                                                                     onClick={e => {

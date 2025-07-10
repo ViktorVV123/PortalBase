@@ -19,7 +19,7 @@ type Props = {
     handleSelectWidget: (widget: Widget | null) => void;   // ← добавили
     /* form */
     selectedFormId: number | null;
-    formDisplay: FormDisplay | null;
+    formDisplay: FormDisplay
     formLoading: boolean;
     formError: string | null;
     formName: string;

@@ -135,5 +135,21 @@ $radius: 4px;
 .spaceWN {
   display: flex;
   align-items: center;
-  gap: 10px
+  justify-content: space-between;
+  width: 100%;
+  gap: 10px;          // одинаковый интервал между иконками и текстом
+}
+
+.wsName {
+  flex: 1 1 ;     // занимает всё оставшееся пространство
+  text-align: start;  // «влево», но внутри своей ячейки
+  white-space: nowrap;
+}
+
+.trash {
+  cursor: pointer;
+  flex-shrink: 0;     // не сжимается
+  opacity: .7;
+
+  &:hover { opacity: 1; }
 }

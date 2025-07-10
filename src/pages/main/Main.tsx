@@ -8,7 +8,6 @@ import {TopComponent} from "@/components/topComponent/TopComponent";
 import {ModalAddWorkspace} from "@/components/modals/modalAddWorkspace/ModalAddWorkspace";
 import {useLoadConnections} from "@/shared/hooks/useLoadConnections";
 import {ModalAddConnection} from "@/components/modals/modalAddConnection/ModalAddConnection";
-import AddIcon from '@/assets/image/AddIcon.svg'
 import {WorkSpaceTypes} from "@/types/typesWorkSpaces";
 import {ModalAddTable} from "@/components/modals/modalAddNewTable/ModalAddNewTable";
 import {ModalAddWidget} from "@/components/modals/modalAddWidget/ModalAddWidget";
@@ -44,7 +43,7 @@ export const Main = () => {
         widgetColumns, wColsLoading, wColsError, loadColumnsWidget, formsByWidget,
         loadWidgetForms,
         loadFormDisplay, formDisplay, formError, formLoading,
-        loadSubDisplay,subDisplay,subLoading,subError
+        loadSubDisplay,subDisplay,subLoading,subError,deleteWorkspace,deleteTable
     } = useWorkSpaces();
 
     const {connections,loadConnections} = useLoadConnections()
@@ -112,7 +111,7 @@ export const Main = () => {
         <div className={styles.layout}>
             <SideNav open={navOpen} toggle={() => setNavOpen(o => !o)} changeStatusModal={()=>setShowCreateForm(true)} />
             <div className={styles.container}>
-                <TopComponent formsByWidget={formsByWidget} setWsHover={setWsHover} tblHover={tblHover}
+                <TopComponent deleteWorkspace={deleteWorkspace} formsByWidget={formsByWidget} setWsHover={setWsHover} tblHover={tblHover}
                               setTblHover={setTblHover} wsHover={wsHover}
                               handleSelectTable={handleSelectTable} widgetsByTable={widgetsByTable}
                               handleSelectWidget={handleSelectWidget} workSpaces={workSpaces} tablesByWs={tablesByWs}
@@ -122,6 +121,7 @@ export const Main = () => {
                               setCreateTblWs={setCreateTblWs}
                               setShowCreateWidget={setShowCreateWidget}
                               setCreateWidgetTable={setCreateWidgetTable}
+                              deleteTable={deleteTable}
                 />
 
                 <TableColumn columns={columns}
