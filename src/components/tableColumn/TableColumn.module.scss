@@ -73,3 +73,41 @@ margin-bottom: 15px;
 /* TableColumn.module.scss  (или FormTable.module.scss) */
 .selectedRow   { background:  var(--hover-color) }      /* светло-синий фон */
 .selectedRow td { font-weight: 600; }        /* опционально жирнее */
+
+
+
+/* --- таб-бар --- */
+.tabs {
+  display: flex;
+  list-style: none;
+  padding: 0;
+  margin: 0 0 4px 0;        /* небольшой отступ вниз */
+  gap: 2px;                 /* узкая щель между ушками */
+}
+
+/* --- базовая вкладка --- */
+.tab,
+.tabActive {
+
+  padding: 4px 14px 6px;    /* ↑ чуть короче, ↓ чуть длиннее — эффект «выдвинута» */
+  border: 1px solid #666;
+  border-bottom: none;      /* чтоб «сливалась» с таблицей */
+  border-radius: 6px 6px 0 0;
+  background: #3a3a3a;
+  color: #eee;
+  font-size: 16px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .15s;
+}
+
+.tab:hover { background:#505050; }
+
+/* --- активная вкладка --- */
+.tabActive {
+  background: #656464;
+font-size: 16px;
+  font-weight: 600;
+  position: relative;
+  z-index: 1;               /* чтобы выступала выше соседних */
+}

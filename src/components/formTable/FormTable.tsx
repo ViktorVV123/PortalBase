@@ -3,15 +3,15 @@ import * as s from '@/components/tableColumn/TableColumn.module.scss';
 import {FormDisplay, SubDisplay, WidgetForm} from '@/shared/hooks/useWorkSpaces';
 
 type Props = {
-    formDisplay: FormDisplay;                     // ← nullable больше не нужен
+    formDisplay: FormDisplay;
     loadSubDisplay: (
         formId: number,
         subOrder: number,
-        primary?: Record<string, unknown>,          // primary опционален
+        primary?: Record<string, unknown>,
     ) => void;
 
-    formsByWidget   : Record<number, WidgetForm>;
-    selectedWidget  : any;
+    formsByWidget  : Record<number, WidgetForm>;
+    selectedWidget : any;
 
     subDisplay: SubDisplay | null;
     subLoading: boolean;
@@ -24,56 +24,85 @@ export const FormTable: React.FC<Props> = ({
                                                formsByWidget, loadSubDisplay,
                                            }) => {
 
-    /* ───────── 1. первый запрос: без фильтра ───────── */
+    /* — последняя выбранная PK и subOrder — */
+    const [lastPrimary,   setLastPrimary]   = useState<Record<string, unknown>>({});
+    const [activeSubOrder, setActiveSubOrder] = useState<number>(0);
+
+    /* — первая загрузка sub: без фильтра и order=0 — */
     useEffect(() => {
         if (!selectedWidget) return;
 
         const widgetForm = formsByWidget[selectedWidget.id];
         if (!widgetForm) return;
 
-        const order = widgetForm.sub_widgets[0]?.widget_order ?? 0;
-        loadSubDisplay(widgetForm.form_id, order, {});     // ⬅️ пустой фильтр
+        const order0 = widgetForm.sub_widgets[0]?.widget_order ?? 0;
+
+        setActiveSubOrder(order0);
+        loadSubDisplay(widgetForm.form_id, order0, {});   // вся таблица
     }, [selectedWidget, formsByWidget, loadSubDisplay]);
 
-    /* ───────── 2. активная строка ───────── */
-    const [activePk, setActivePk] = useState<string>('');
+    /* — клик по строке main-grid — */
+    const handleRowClick = (rowPk: Record<string, unknown>) => {
+        const widgetForm = formsByWidget[selectedWidget!.id];
+        if (!widgetForm) return;
 
+        setLastPrimary(rowPk);                           // сохраняем фильтр
+        loadSubDisplay(widgetForm.form_id, activeSubOrder, rowPk);
+    };
+
+    /* — клик по табу sub-виджета — */
+    const handleTabClick = (order: number) => {
+        if (order === activeSubOrder) return;            // уже открыт
+        const widgetForm = formsByWidget[selectedWidget!.id];
+        if (!widgetForm) return;
+
+        setActiveSubOrder(order);
+        loadSubDisplay(widgetForm.form_id, order, lastPrimary);
+    };
+
+    /* ──────────────────────────────────────────────── */
     return (
-        <div style={{display: 'flex', flexDirection: 'column', gap: 20}}>
+        <div style={{display:'flex', flexDirection:'column', gap:20}}>
+
             {/* ——— MAIN GRID ——— */}
             <table className={s.tbl}>
                 <thead>
                 <tr>{formDisplay.columns.map(c => <th key={c.column_name}>{c.column_name}</th>)}</tr>
                 </thead>
-
                 <tbody>
-                {formDisplay.data.map((row, i) => {
-                    const pkStr = JSON.stringify(row.primary_keys);
-
+                {formDisplay.data.map((row,i) => {
+                    const pkObj = Object.fromEntries(
+                        Object.entries(row.primary_keys).map(([k,v]) => [k, String(v)])
+                    );
                     return (
-                        <tr
-                            key={i}
-                            className={pkStr === activePk ? s.selectedRow : undefined}
-                            onClick={() => {
-                                const widgetForm = formsByWidget[selectedWidget!.id];
-                                if (!widgetForm) return;
-
-                                const order = widgetForm.sub_widgets[0]?.widget_order ?? 0;
-                                const pkObj = Object.fromEntries(
-                                    Object.entries(row.primary_keys)
-                                        .map(([k, v]) => [k, String(v)]),
-                                );
-
-                                setActivePk(pkStr);
-                                loadSubDisplay(widgetForm.form_id, order, pkObj);  // ⬅️ фильтр
-                            }}
-                        >
-                            {row.values.map((v, j) => <td key={j}>{v}</td>)}
+                        <tr key={i} onClick={() => handleRowClick(pkObj)}>
+                            {row.values.map((v,j) => <td key={j}>{v}</td>)}
                         </tr>
                     );
                 })}
                 </tbody>
             </table>
+
+            {/* ——— SUB-TABS (если несколько) ——— */}
+            {subDisplay?.sub_widgets.length > 1 && (
+                <ul className={s.tabs}>
+                    {subDisplay.sub_widgets.map(sw => {
+                        const isActive =
+                            sw.widget_order === subDisplay.displayed_widget.widget_order;
+
+                        return (
+                            <li key={sw.widget_order}>
+                                <button
+                                    className={isActive ? s.tabActive : s.tab}
+                                    onClick={() => handleTabClick(sw.widget_order)}
+                                >
+                                    {sw.name}
+                                </button>
+                            </li>
+                        );
+                    })}
+                </ul>
+            )}
 
             {/* ——— SUB GRID ——— */}
             {subDisplay && (
@@ -87,8 +116,8 @@ export const FormTable: React.FC<Props> = ({
                         <tr>{subDisplay.columns.map(c => <th key={c.column_name}>{c.column_name}</th>)}</tr>
                         </thead>
                         <tbody>
-                        {subDisplay.data.map((r, i) => (
-                            <tr key={i}>{r.values.map((v, j) => <td key={j}>{v}</td>)}</tr>
+                        {subDisplay.data.map((r,i) => (
+                            <tr key={i}>{r.values.map((v,j) => <td key={j}>{v}</td>)}</tr>
                         ))}
                         </tbody>
                     </table>
