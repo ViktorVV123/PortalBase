@@ -176,9 +176,9 @@ export const useWorkSpaces = () => {
 
     /* — таблицы конкретного WS — */
     const loadTables = useCallback(
-        async (wsId: number) => {
-            // если уже загружали — просто вернём из стейта
-            if (tablesByWs[wsId]) return tablesByWs[wsId];
+        /** force = true → игнорируем кэш и перезапрашиваем */
+        async (wsId: number, force = false): Promise<DTable[]> => {
+            if (!force && tablesByWs[wsId]) return tablesByWs[wsId];
 
             const {data} = await api.get<DTable[]>('/tables', {
                 params: {workspace_id: wsId},
@@ -218,24 +218,33 @@ export const useWorkSpaces = () => {
     const [wColsError, setWColsError] = useState<string | null>(null);
 
     /* — Загрузка виджетов конкретной таблицы — */
-    const loadWidgetsForTable = useCallback(async (tableId: number) => {
-        setWidgetsLoading(true);
-        setWidgetsError(null);
+    const loadWidgetsForTable = useCallback(
+        /** force=true — игнорируем кэш */
+        async (tableId: number, force = false): Promise<Widget[]> => {
+            setWidgetsLoading(true);
+            setWidgetsError(null);
 
-        if (widgetsByTable[tableId]) {
-            setWidgetsLoading(false);
-            return;
-        }
+            if (!force && widgetsByTable[tableId]) {
+                setWidgetsLoading(false);
+                return widgetsByTable[tableId];
+            }
 
-        try {
-            const {data} = await api.get<Widget[]>('/widgets', {params: {table_id: tableId}});
-            setWidgetsByTable(prev => ({...prev, [tableId]: data}));
-        } catch {
-            setWidgetsError('Не удалось загрузить widgets');
-        } finally {
-            setWidgetsLoading(false);
-        }
-    }, [widgetsByTable]);
+            try {
+                const {data} = await api.get<Widget[]>('/widgets', {
+                    params: {table_id: tableId},
+                });
+                setWidgetsByTable(prev => ({...prev, [tableId]: data}));
+                return data;
+            } catch {
+                setWidgetsError('Не удалось загрузить widgets');
+                return [];
+            } finally {
+                setWidgetsLoading(false);
+            }
+        },
+        [widgetsByTable],
+    );
+
 
 
     /** GET /widgets/{id}/columns */

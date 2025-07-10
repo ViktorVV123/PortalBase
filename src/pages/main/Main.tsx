@@ -8,6 +8,10 @@ import {TopComponent} from "@/components/topComponent/TopComponent";
 import {ModalAddWorkspace} from "@/components/modals/modalAddWorkspace/ModalAddWorkspace";
 import {useLoadConnections} from "@/shared/hooks/useLoadConnections";
 import {ModalAddConnection} from "@/components/modals/modalAddConnection/ModalAddConnection";
+import AddIcon from '@/assets/image/AddIcon.svg'
+import {WorkSpaceTypes} from "@/types/typesWorkSpaces";
+import {ModalAddTable} from "@/components/modals/modalAddNewTable/ModalAddNewTable";
+import {ModalAddWidget} from "@/components/modals/modalAddWidget/ModalAddWidget";
 
 
 export const Main = () => {
@@ -19,6 +23,11 @@ export const Main = () => {
     const [tblHover, setTblHover] = useState<number | null>(null);
     const [showConnForm , setShowConnForm ] = useState(false);
     const [showCreateForm, setShowCreateForm] = useState(false);
+    const [showCreateTable, setShowCreateTable] = useState(false);
+    const [createTblWs,     setCreateTblWs]     = useState<WorkSpaceTypes|null>(null)
+    const [showCreateWidget, setShowCreateWidget] = useState(false);
+    const [createWidgetTable, setCreateWidgetTable] = useState<DTable|null>(null);
+
 
     const {
         loadWorkSpaces,
@@ -109,8 +118,12 @@ export const Main = () => {
                               handleSelectWidget={handleSelectWidget} workSpaces={workSpaces} tablesByWs={tablesByWs}
                               loadTables={loadTables} loadWidgetsForTable={loadWidgetsForTable}
                               handleSelectForm={handleSelectForm}
-
+                              setShowCreateTable={setShowCreateTable}
+                              setCreateTblWs={setCreateTblWs}
+                              setShowCreateWidget={setShowCreateWidget}
+                              setCreateWidgetTable={setCreateWidgetTable}
                 />
+
                 <TableColumn columns={columns}
                              formDisplay={formDisplay}
                              tableName={selectedTable?.name ?? ''}
@@ -155,6 +168,31 @@ export const Main = () => {
                 />
             )}
 
+            {showCreateTable && createTblWs && (
+                <ModalAddTable
+                    open={showCreateTable}
+                    workspace={createTblWs}
+                    onSuccess={async () => {
+                        setShowCreateTable(false);
+                        if (createTblWs) {
+                            await loadTables(createTblWs.id, true);   // <-- force reload
+                        }
+                    }}
+                    onCancel={() => setShowCreateTable(false)}
+                />
+            )}
+
+            {showCreateWidget && createWidgetTable && (
+                <ModalAddWidget
+                    open={showCreateWidget}
+                    table={createWidgetTable}
+                    onSuccess={async () => {
+                        setShowCreateWidget(false);
+                        await loadWidgetsForTable(createWidgetTable.id, true); // force refresh
+                    }}
+                    onCancel={() => setShowCreateWidget(false)}
+                />
+            )}
 
 
         </div>
