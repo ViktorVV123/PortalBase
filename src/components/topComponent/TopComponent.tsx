@@ -101,7 +101,7 @@ export const TopComponent: React.FC<Props> = ({
                                         await loadTables(ws.id);           // если ещё не загружали
                                     }}
                                 >
-                                    <div>
+                                    <div className={s.spaceWN}>
                                         <WorkspacesIcon width={16} height={16}/>
                                         {ws.name}
                                     </div>
@@ -145,7 +145,7 @@ export const TopComponent: React.FC<Props> = ({
                                                         closeMenu();
                                                     }}
                                                 >
-                                                    <div>
+                                                    <div className={s.spaceWN}>
                                                         <TableIcon width={16} height={16}/>
                                                         {t.name}
                                                     </div>
@@ -188,7 +188,7 @@ export const TopComponent: React.FC<Props> = ({
                                                                             closeMenu();
                                                                         }}
                                                                     >
-                                                                        <div>
+                                                                        <div className={s.spaceWN}>
                                                                             <WidgetsIcon width={16} height={16}/>
                                                                             {w.name}
                                                                         </div>

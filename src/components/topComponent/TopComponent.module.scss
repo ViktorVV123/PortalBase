@@ -30,6 +30,7 @@ $radius: 4px;
   cursor: pointer;
   font-size: 16px;
   min-width: 220px;
+
   &:hover {
     background: var(--header-color);
   }
@@ -126,8 +127,13 @@ $radius: 4px;
   position: relative;
 }
 
-.spanName{
+.spanName {
   font-weight: 900;
-  display:flex;
-  justify-content:center;
+  display: flex;
+  justify-content: center;
+}
+.spaceWN {
+  display: flex;
+  align-items: center;
+  gap: 10px
 }

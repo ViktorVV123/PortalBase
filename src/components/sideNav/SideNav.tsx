@@ -38,9 +38,9 @@ export const SideNav = ({open, toggle,changeStatusModal}: Props) => (
             <AddIcon className={s.icon}/>
             {open && <span>Создать workspace</span>}
         </div>
-        <div className={s.item}>
-            <HomeIcon className={s.icon}/>
-            {open && <span>test</span>}
+        <div  className={s.item}>
+            <AddIcon className={s.icon}/>
+            {open && <span>Создать Форму</span>}
         </div>
         <div className={s.item}>
             <HomeIcon className={s.icon}/>
