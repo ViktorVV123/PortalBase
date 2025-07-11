@@ -38,6 +38,7 @@ type Props = {
     setCreateWidgetTable: (t: DTable) => void;
     deleteTable: (t: DTable) => void;
     deleteWorkspace: (id: number) => void;
+    changeStatusModal:any
 };
 
 export const TopComponent: React.FC<Props> = ({
@@ -59,6 +60,7 @@ export const TopComponent: React.FC<Props> = ({
                                                   setShowCreateWidget,
                                                   setCreateWidgetTable,
                                                   deleteWorkspace,deleteTable,
+                                                  changeStatusModal,
                                               }) => {
 
     const [open, setOpen] = useState(false);
@@ -104,9 +106,18 @@ export const TopComponent: React.FC<Props> = ({
 
                 {open && (
                     <ul className={s.menuLv2}>
+                        <li
+                            className={s.disabled}
+                            onClick={(e) => {
+                                closeMenu();
+                                changeStatusModal()
+                                e.stopPropagation()
+                            }}
+                        >
+                            <AddIcon width={16} height={16}/> создать
+                        </li>
                         {workSpaces.map(ws => {
-                            const tables = tablesByWs[ws.id];      // может быть undefined
-                            const hasTables = !!tables?.length;
+                            const tables = tablesByWs[ws.id];      // может быть undefined onClick={changeStatusModal}
 
                             return (
                                 <li
@@ -114,8 +125,9 @@ export const TopComponent: React.FC<Props> = ({
                                     onMouseEnter={async () => {
                                         setWsHover(ws.id);
                                         await loadTables(ws.id);           // если ещё не загружали
-                                    }}
-                                >
+                                    }}>
+
+
                                     <div className={s.spaceWN}>
                                         <WorkspacesIcon width={16} height={16}/>
 
@@ -144,17 +156,17 @@ export const TopComponent: React.FC<Props> = ({
                                             <span className={s.spanName}>Таблицы</span>
                                             {/* — пункт «создать», когда таблиц нет — */}
 
-                                                <li
-                                                    className={s.disabled}
-                                                    onClick={(e) => {
-                                                        closeMenu();
-                                                        setCreateTblWs(ws);
-                                                        setShowCreateTable(true);
-                                                        e.stopPropagation()
-                                                    }}
-                                                >
-                                                    <AddIcon width={16} height={16}/> создать
-                                                </li>
+                                            <li
+                                                className={s.disabled}
+                                                onClick={(e) => {
+                                                    closeMenu();
+                                                    setCreateTblWs(ws);
+                                                    setShowCreateTable(true);
+                                                    e.stopPropagation()
+                                                }}
+                                            >
+                                                <AddIcon width={16} height={16}/> создать
+                                            </li>
 
                                             {/* — сами таблицы — */}
                                             {tables?.map(t => (
@@ -200,18 +212,18 @@ export const TopComponent: React.FC<Props> = ({
                                                             <span className={s.spanName}>Виджеты</span>
                                                             {/* — если виджетов нет → «создать» — */}
 
-                                                                <li
-                                                                    className={s.disabled}
-                                                                    onClick={(e) => {
-                                                                        closeMenu();
-                                                                        setCreateWidgetTable(t);       // передаём таблицу
-                                                                        setShowCreateWidget(true);
-                                                                        e.stopPropagation()
+                                                            <li
+                                                                className={s.disabled}
+                                                                onClick={(e) => {
+                                                                    closeMenu();
+                                                                    setCreateWidgetTable(t);       // передаём таблицу
+                                                                    setShowCreateWidget(true);
+                                                                    e.stopPropagation()
 
-                                                                    }}
-                                                                >
-                                                                    <AddIcon width={16} height={16}/> создать
-                                                                </li>
+                                                                }}
+                                                            >
+                                                                <AddIcon width={16} height={16}/> создать
+                                                            </li>
 
 
                                                             {widgetsByTable[t.id]?.map(w => {

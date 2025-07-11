@@ -109,7 +109,7 @@ export const Main = () => {
 
     return (
         <div className={styles.layout}>
-            <SideNav open={navOpen} toggle={() => setNavOpen(o => !o)} changeStatusModal={()=>setShowCreateForm(true)} />
+          {/*  <SideNav open={navOpen} toggle={() => setNavOpen(o => !o)} changeStatusModal={()=>setShowCreateForm(true)} />*/}
             <div className={styles.container}>
                 <TopComponent deleteWorkspace={deleteWorkspace} formsByWidget={formsByWidget} setWsHover={setWsHover} tblHover={tblHover}
                               setTblHover={setTblHover} wsHover={wsHover}
@@ -122,6 +122,7 @@ export const Main = () => {
                               setShowCreateWidget={setShowCreateWidget}
                               setCreateWidgetTable={setCreateWidgetTable}
                               deleteTable={deleteTable}
+                              changeStatusModal={()=>setShowCreateForm(true)}
                 />
 
                 <TableColumn columns={columns}
