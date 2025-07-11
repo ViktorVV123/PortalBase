@@ -373,6 +373,39 @@ export const useWorkSpaces = () => {
 
 
 
+    const fetchWidgetAndTable = useCallback(async (widgetId: number) => {
+        // widget
+        let widget = Object.values(widgetsByTable)
+            .flat()
+            .find(w => w?.id === widgetId);
+
+        if (!widget) {
+            const {data} = await api.get<Widget>(`/widgets/${widgetId}`);
+            widget = data;
+            setWidgetsByTable(prev => ({
+                ...prev,
+                [data.table_id]: [data],        // кэшируем
+            }));
+        }
+
+        // table
+        let table = Object.values(tablesByWs)
+            .flat()
+            .find(t => t?.id === widget.table_id);
+
+        if (!table) {
+            const {data} = await api.get<DTable>(`/tables/${widget.table_id}`);
+            table = data;
+            setTablesByWs(prev => ({
+                ...prev,
+                [data.workspace_id]: [...(prev[data.workspace_id] ?? []), data],
+            }));
+        }
+
+        return {widget, table};
+    }, [widgetsByTable, tablesByWs]);
+
+
     return {
         workSpaces,
         loadWorkSpaces,
@@ -403,5 +436,6 @@ export const useWorkSpaces = () => {
         subError,
         deleteWorkspace,
         deleteTable,
+        fetchWidgetAndTable,
     };
 };

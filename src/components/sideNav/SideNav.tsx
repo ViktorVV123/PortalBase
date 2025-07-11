@@ -1,52 +1,58 @@
-// components/sideNav/sideNav.tsx
+// components/sideNav/SideNav.tsx
 import React from 'react';
 import * as s from './SideNav.module.scss';
 
-import HomeIcon from '@/assets/image/EditIcon.svg';
-import LayersIcon from '@/assets/image/EditIcon.svg';
-import PlugIcon from '@/assets/image/EditIcon.svg';
-import SettingsIcon from '@/assets/image/EditIcon.svg';
+import FormaIcon from '@/assets/image/FormaIcon1.svg';
+
 import AddIcon from '@/assets/image/AddIcon.svg';
-
-interface Item {
-    id: string;
-    label: string;
-    Icon: React.FC<React.SVGProps<SVGSVGElement>>;
-}
-
-const items: Item[] = [
-    {id: 'home', label: 'Dashboard', Icon: HomeIcon},
-    {id: 'workspaces', label: 'Workspaces', Icon: LayersIcon},
-    {id: 'connections', label: 'Connections', Icon: PlugIcon},
-    {id: 'settings', label: 'Settings', Icon: SettingsIcon},
-];
 
 interface Props {
     open: boolean;
     toggle: () => void;
-    changeStatusModal:any
 
+    /** показать модалку "создать workspace" */
+    changeStatusModal: () => void;
+
+    /** все формы, сгруппированные по main_widget_id */
+    formsByWidget: Record<number, {
+        form_id: number; name: string; main_widget_id: number;
+    }>;
+
+    /** открыть форму (Main -> TableColumn) */
+    openForm: (widgetId: number, formId: number) => void;
 }
 
-export const SideNav = ({open, toggle,changeStatusModal}: Props) => (
-    <aside className={`${s.nav} ${open ? s.open : ''}`}>
+export const SideNav: React.FC<Props> = ({
+                                             open, toggle, formsByWidget, openForm,
+                                         }) => {
+    const formEntries = Object.values(formsByWidget);
 
-        <button className={s.toggle} onClick={toggle}>☰</button>
+    return (
+        <aside className={`${s.nav} ${open ? s.open : ''}`}>
+            {/* кнопка-бургер */}
+            <button className={s.toggle} onClick={toggle}>☰</button>
 
+            {/* ——— список форм ——— */}
+            {formEntries.length > 0 && (
+                <div>
+                    <ul className={s.formsList}>
+                        {formEntries.map(f => (
+                            <li key={f.form_id}>
+                                <button
+                                    className={s.formBtn}
+                                    title={f.name}
+                                    onClick={() => openForm(f.main_widget_id, f.form_id)}
+                                 >
+                                    {/* одна структура для open / closed */}
+                                    <FormaIcon className={s.icon}/>
+                                    <span className={s.formName}>{f.name}</span>
+                                </button>
+                            </li>
+                        ))}
+                    </ul>
 
-        <div onClick={changeStatusModal} className={s.item}>
-            <AddIcon className={s.icon}/>
-            {open && <span>Создать workspace</span>}
-        </div>
-        <div  className={s.item}>
-            <AddIcon className={s.icon}/>
-            {open && <span>Создать Форму</span>}
-        </div>
-        <div className={s.item}>
-            <HomeIcon className={s.icon}/>
-            {open && <span>NotVisible</span>}
-        </div>
-
-
-    </aside>
-);
+                </div>
+            )}
+        </aside>
+    );
+};

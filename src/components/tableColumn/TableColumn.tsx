@@ -33,6 +33,7 @@ type Props = {
     subLoading: boolean;
     subError: string | null;
     formsByWidget: Record<number, WidgetForm>;   // нужен order
+    openForm: (widgetId: number, formId: number) => void;
 };
 
 export const TableColumn: React.FC<Props> = ({
@@ -58,9 +59,9 @@ export const TableColumn: React.FC<Props> = ({
                                                  subLoading,
                                                  subError,
                                                  formsByWidget,
-                                                 loadSubDisplay
+                                                 loadSubDisplay,
                                              }) => {
-    if (!tableName) return <p className={s.placeholder}>Выберите таблицу…</p>;
+
     if (loading) return <p>Загрузка…</p>;
     if (error) return <p className={s.error}>{error}</p>;
 
@@ -105,7 +106,8 @@ export const TableColumn: React.FC<Props> = ({
                     ) : formError ? (
                         <p className={s.error}>{formError}</p>
                     ) : formDisplay ? (
-                        <FormTable subDisplay={subDisplay} subError={subError} subLoading={subLoading} selectedWidget={selectedWidget} formsByWidget={formsByWidget}
+                        <FormTable subDisplay={subDisplay} subError={subError} subLoading={subLoading}
+                                   selectedWidget={selectedWidget} formsByWidget={formsByWidget}
                                    loadSubDisplay={loadSubDisplay} formDisplay={formDisplay}/>
                     ) : null
                 )
@@ -154,7 +156,7 @@ export const TableColumn: React.FC<Props> = ({
                     /* ─── PRIORITY 3 : TABLE COLUMNS ─── */
                     : (
                         columns.length === 0
-                            ? <p>Столбцы не найдены.</p>
+                            ? <p>Нет выбранных форм</p>
                             : (
                                 <table className={s.tbl}>
                                     <thead>
@@ -182,8 +184,6 @@ export const TableColumn: React.FC<Props> = ({
                                 </table>
                             )
                     )}
-
-
 
 
         </div>

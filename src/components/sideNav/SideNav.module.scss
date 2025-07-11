@@ -4,12 +4,13 @@
   background: #212121;
   color: #fff;
   display: flex;
+
   flex-direction: column;
   transition: width .1s ease-in-out;
 }
 
 .open {
-  width: 200px;
+  width: 210px;
 }
 
 .toggle {
@@ -20,6 +21,18 @@
   padding: 12px;
   cursor: pointer;
   margin-bottom: 20px;
+  display: flex;
+  justify-content:flex-start;
+
+  &.open {
+    width: 210px;
+
+    /* здесь переопределяем бургер */
+    .toggle {
+      display: flex;
+      justify-content: center;   /* ← иконка по центру */
+    }
+  }
 }
 
 .item {
@@ -44,4 +57,72 @@
 .icon {
   width: 24px;
   height: 24px;
+  color: #EEEEEE;
+}
+
+
+//доп стили
+
+.formsBlock {
+  margin-top: 18px;
+}
+
+.formsTitle {
+  margin: 0 0 6px 14px;
+  font-size: 14px;
+  color: #aaa;
+}
+
+.formsList {
+  list-style: none;
+  padding: 0 4px;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+/* ---------- пункты меню ---------- */
+.formBtn {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  color: #EEEEEE;
+  gap: 10px; /* появится, когда название видно */
+  width: 100%;
+  /* ваши hover/цвета/т.п. */
+  background-color: var(--header-color);
+  border: none;
+
+  &:hover{
+    background-color: rgba(255, 255, 255, .08);
+  }
+}
+
+.icon {
+  flex: 0 0 24px;
+  height: 24px;
+}
+
+.formName {
+  flex: 1 1 auto;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  max-width: 100%; /* плавное раскрытие */
+  transition: max-width .15s;
+}
+
+/* --------- СВЕРНУТОЕ меню --------- */
+.nav:not(.open) {
+
+  /* убираем зазор и полностью прячем текст  */
+  .formBtn {
+    gap: 0;
+  }
+
+  .formName {
+    max-width: 0; /* «схлопываем» */
+    pointer-events: none;
+  }
 }

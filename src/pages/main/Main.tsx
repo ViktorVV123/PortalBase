@@ -43,7 +43,7 @@ export const Main = () => {
         widgetColumns, wColsLoading, wColsError, loadColumnsWidget, formsByWidget,
         loadWidgetForms,
         loadFormDisplay, formDisplay, formError, formLoading,
-        loadSubDisplay,subDisplay,subLoading,subError,deleteWorkspace,deleteTable
+        loadSubDisplay,subDisplay,subLoading,subError,deleteWorkspace,deleteTable,fetchWidgetAndTable
     } = useWorkSpaces();
 
     const {connections,loadConnections} = useLoadConnections()
@@ -103,13 +103,30 @@ export const Main = () => {
             : '';
 
 
+    const openForm = async (widgetId: number, formId: number) => {
+        const {widget, table} = await fetchWidgetAndTable(widgetId);
+
+        /* 1. выбираем таблицу и виджет, чтоб колонки были загружены */
+        handleSelectTable(table);
+        handleSelectWidget(widget);
+
+        /* 2. сама форма */
+        handleSelectForm(formId);
+    };
+
 
    /* if (loading) return <p>Загрузка…</p>;
     if (error) return <p style={{color: 'red'}}>{error}</p>;*/
 
     return (
         <div className={styles.layout}>
-          {/*  <SideNav open={navOpen} toggle={() => setNavOpen(o => !o)} changeStatusModal={()=>setShowCreateForm(true)} />*/}
+            <SideNav
+                open={navOpen}
+                toggle={() => setNavOpen(o => !o)}
+                changeStatusModal={() => setShowCreateForm(true)}
+                formsByWidget={formsByWidget}
+                openForm={openForm}
+            />
             <div className={styles.container}>
                 <TopComponent deleteWorkspace={deleteWorkspace} formsByWidget={formsByWidget} setWsHover={setWsHover} tblHover={tblHover}
                               setTblHover={setTblHover} wsHover={wsHover}
@@ -146,6 +163,7 @@ export const Main = () => {
                              subLoading={subLoading}
                              subError={subError}
                              formsByWidget={formsByWidget}
+                             openForm={openForm}
 
                 />
             </div>

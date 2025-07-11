@@ -7,7 +7,7 @@ import {DTable, Widget} from '@/shared/hooks/useWorkSpaces';
 import WorkspacesIcon from '@/assets/image/WorkspacesIcon.svg';
 import TableIcon from '@/assets/image/TableIcon.svg';
 import WidgetsIcon from '@/assets/image/WidgetsIcon.svg';
-import FormIcon from '@/assets/image/FormaIcon.svg';
+import FormIcon from '@/assets/image/FormaIcon1.svg';
 import AddIcon from '@/assets/image/AddIcon.svg';
 import DeleteIcon from '@/assets/image/DeleteIcon.svg';
 
@@ -97,6 +97,7 @@ export const TopComponent: React.FC<Props> = ({
 
     return (
         <div className={s.bar}>
+
             <div className={s.logo}>Портал ввода данных</div>
 
             <div className={s.menuWrapper} ref={menuRef}>
