@@ -2,6 +2,8 @@ import React from 'react';
 import * as s from './TableColumn.module.scss';
 import {Column, FormDisplay, SubDisplay, Widget, WidgetColumn, WidgetForm} from '@/shared/hooks/useWorkSpaces';
 import {FormTable} from "@/components/formTable/FormTable";
+import DeleteIcon from '@/assets/image/DeleteIcon.svg'
+import EditIcon from '@/assets/image/EditIcon.svg'
 
 type Props = {
     columns: Column[];
@@ -34,6 +36,8 @@ type Props = {
     subError: string | null;
     formsByWidget: Record<number, WidgetForm>;   // нужен order
     openForm: (widgetId: number, formId: number) => void;
+    deleteColumnTable: (id: number) => void;
+    deleteColumnWidget: (id: number) => void;
 };
 
 export const TableColumn: React.FC<Props> = ({
@@ -60,6 +64,8 @@ export const TableColumn: React.FC<Props> = ({
                                                  subError,
                                                  formsByWidget,
                                                  loadSubDisplay,
+                                                 deleteColumnTable,
+                                                 deleteColumnWidget
                                              }) => {
 
     if (loading) return <p>Загрузка…</p>;
@@ -129,6 +135,7 @@ export const TableColumn: React.FC<Props> = ({
                                     <th>precision</th>
                                     <th>primary</th>
                                     <th>required</th>
+                                    <th></th>
                                 </tr>
                                 </thead>
                                 <tbody>
@@ -144,6 +151,13 @@ export const TableColumn: React.FC<Props> = ({
                                                 <td>{c.precision ?? '—'}</td>
                                                 <td>{c.primary ? '✔︎' : ''}</td>
                                                 <td>{c.required ? '✔︎' : ''}</td>
+                                                <td style={{display: 'flex', justifyContent: 'space-around'}}>
+                                                    <EditIcon cursor={'pointer'}/>
+                                                    <DeleteIcon onClick={() => {
+                                                        if (confirm(`Удалить строку widget?`))
+                                                            deleteColumnWidget(wc.id)
+                                                    }} cursor={'pointer'}/>
+                                                </td>
                                             </tr>
                                         );
                                     })
@@ -167,6 +181,7 @@ export const TableColumn: React.FC<Props> = ({
                                         <th>precision</th>
                                         <th>primary</th>
                                         <th>required</th>
+                                        <th></th>
                                     </tr>
                                     </thead>
                                     <tbody>
@@ -178,6 +193,18 @@ export const TableColumn: React.FC<Props> = ({
                                             <td>{c.precision ?? '—'}</td>
                                             <td>{c.primary ? '✔︎' : ''}</td>
                                             <td>{c.required ? '✔︎' : ''}</td>
+                                            <td style={{display: 'flex', justifyContent: 'space-around'}}>
+                                                <EditIcon cursor={'pointer'}/>
+                                                <DeleteIcon onClick={() => {
+                                                    if (confirm(`Удалить строку?`))
+                                                        deleteColumnTable(c.id)
+                                                }} cursor={'pointer'}/>
+
+
+                                                {/*   if (confirm(`Удалить таблицу «${t.name}»?`))
+                                                deleteTable(t);*/}
+                                            </td>
+
                                         </tr>
                                     ))}
                                     </tbody>

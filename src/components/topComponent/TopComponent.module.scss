@@ -1,6 +1,5 @@
 /* ——— палитра / тень ——— */
-$surface: #27272a;
-$surface-hover: rgba(#7aa7ff, .14);
+
 $text: #f1f1f1;
 $text-muted: #9b9ba0;
 $radius: 4px;
@@ -67,6 +66,7 @@ $radius: 4px;
 .menuLv2 {
   top: 100%;
   left: 0;
+  border: 1px solid #444;
 }
 
 .menuLv2 > li > .menuLv3,
@@ -83,6 +83,7 @@ $radius: 4px;
   gap: 8px;
   padding: 8px 18px;
   cursor: default;
+
 
   &:hover {
     background: var(--hover-color);
@@ -132,24 +133,27 @@ $radius: 4px;
   display: flex;
   justify-content: center;
 }
+
 .spaceWN {
   display: flex;
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  gap: 10px;          // одинаковый интервал между иконками и текстом
+  gap: 10px; // одинаковый интервал между иконками и текстом
 }
 
 .wsName {
-  flex: 1 1 ;     // занимает всё оставшееся пространство
-  text-align: start;  // «влево», но внутри своей ячейки
+  flex: 1 1; // занимает всё оставшееся пространство
+  text-align: start; // «влево», но внутри своей ячейки
   white-space: nowrap;
 }
 
 .trash {
   cursor: pointer;
-  flex-shrink: 0;     // не сжимается
+  flex-shrink: 0; // не сжимается
   opacity: .7;
 
-  &:hover { opacity: 1; }
+  &:hover {
+    opacity: 1;
+  }
 }

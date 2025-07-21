@@ -10,12 +10,12 @@ type Props = {
         primary?: Record<string, unknown>,
     ) => void;
 
-    formsByWidget  : Record<number, WidgetForm>;
-    selectedWidget : any;
+    formsByWidget: Record<number, WidgetForm>;
+    selectedWidget: any;
 
     subDisplay: SubDisplay | null;
     subLoading: boolean;
-    subError  : string | null;
+    subError: string | null;
 };
 
 export const FormTable: React.FC<Props> = ({
@@ -25,7 +25,7 @@ export const FormTable: React.FC<Props> = ({
                                            }) => {
 
     /* — последняя выбранная PK и subOrder — */
-    const [lastPrimary,   setLastPrimary]   = useState<Record<string, unknown>>({});
+    const [lastPrimary, setLastPrimary] = useState<Record<string, unknown>>({});
     const [activeSubOrder, setActiveSubOrder] = useState<number>(0);
 
     /* — первая загрузка sub: без фильтра и order=0 — */
@@ -62,7 +62,7 @@ export const FormTable: React.FC<Props> = ({
 
     /* ──────────────────────────────────────────────── */
     return (
-        <div style={{display:'flex', flexDirection:'column', gap:20}}>
+        <div style={{display: 'flex', flexDirection: 'column', gap: 20}}>
 
             {/* ——— MAIN GRID ——— */}
             <table className={s.tbl}>
@@ -70,13 +70,13 @@ export const FormTable: React.FC<Props> = ({
                 <tr>{formDisplay.columns.map(c => <th key={c.column_name}>{c.column_name}</th>)}</tr>
                 </thead>
                 <tbody>
-                {formDisplay.data.map((row,i) => {
+                {formDisplay.data.map((row, i) => {
                     const pkObj = Object.fromEntries(
-                        Object.entries(row.primary_keys).map(([k,v]) => [k, String(v)])
+                        Object.entries(row.primary_keys).map(([k, v]) => [k, String(v)])
                     );
                     return (
                         <tr key={i} onClick={() => handleRowClick(pkObj)}>
-                            {row.values.map((v,j) => <td key={j}>{v}</td>)}
+                            {row.values.map((v, j) => <td key={j}>{v}</td>)}
                         </tr>
                     );
                 })}
@@ -116,8 +116,8 @@ export const FormTable: React.FC<Props> = ({
                         <tr>{subDisplay.columns.map(c => <th key={c.column_name}>{c.column_name}</th>)}</tr>
                         </thead>
                         <tbody>
-                        {subDisplay.data.map((r,i) => (
-                            <tr key={i}>{r.values.map((v,j) => <td key={j}>{v}</td>)}</tr>
+                        {subDisplay.data.map((r, i) => (
+                            <tr key={i}>{r.values.map((v, j) => <td key={j}>{v}</td>)}</tr>
                         ))}
                         </tbody>
                     </table>

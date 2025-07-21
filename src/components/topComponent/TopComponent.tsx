@@ -10,6 +10,7 @@ import WidgetsIcon from '@/assets/image/WidgetsIcon.svg';
 import FormIcon from '@/assets/image/FormaIcon1.svg';
 import AddIcon from '@/assets/image/AddIcon.svg';
 import DeleteIcon from '@/assets/image/DeleteIcon.svg';
+import {SideNav} from "@/components/sideNav/SideNav";
 
 type Props = {
     workSpaces: WorkSpaceTypes[];
@@ -38,7 +39,12 @@ type Props = {
     setCreateWidgetTable: (t: DTable) => void;
     deleteTable: (t: DTable) => void;
     deleteWorkspace: (id: number) => void;
-    changeStatusModal:any
+    changeStatusModal: any
+    setNavOpen: (value: boolean) => void;
+    navOpen: boolean;
+    setShowCreateForm: any
+    openForm: (widgetId: number, formId: number) => void;
+    deleteWidget: (widgetId: number, tableId: number) => void;
 };
 
 export const TopComponent: React.FC<Props> = ({
@@ -59,14 +65,26 @@ export const TopComponent: React.FC<Props> = ({
                                                   setCreateTblWs,
                                                   setShowCreateWidget,
                                                   setCreateWidgetTable,
-                                                  deleteWorkspace,deleteTable,
+                                                  deleteWorkspace, deleteTable,
                                                   changeStatusModal,
+                                                  setNavOpen,
+                                                  navOpen,
+                                                  setShowCreateForm,
+                                                  deleteWidget,
+                                                  openForm
                                               }) => {
 
     const [open, setOpen] = useState(false);
     const [wHover, setWHover] = useState<number | null>(null);
 
+
     const menuRef = useRef<HTMLDivElement>(null);
+
+    const toogleOpenSide = () => {
+        setNavOpen(!navOpen);
+        closeMenu();
+
+    }
 
     /* ——— закрыть меню полностью ——— */
     const closeMenu = () => {
@@ -74,6 +92,8 @@ export const TopComponent: React.FC<Props> = ({
         setWsHover(null);
         setTblHover(null);
         setWHover(null);
+
+
     };
 
     /* ——— клик вне меню ——— */
@@ -81,6 +101,7 @@ export const TopComponent: React.FC<Props> = ({
         const handleClick = (e: MouseEvent) => {
             if (open && menuRef.current && !menuRef.current.contains(e.target as Node))
                 closeMenu();
+
         };
         document.addEventListener('mousedown', handleClick);
         return () => document.removeEventListener('mousedown', handleClick);
@@ -91,9 +112,11 @@ export const TopComponent: React.FC<Props> = ({
         if (open) {
             closeMenu();        // было открыто → полностью закрываем
         } else {
+            setNavOpen(false);
             setOpen(true);      // было закрыто → открываем с «чистого» состояния
         }
     };
+
 
     return (
         <div className={s.bar}>
@@ -101,9 +124,22 @@ export const TopComponent: React.FC<Props> = ({
             <div className={s.logo}>Портал ввода данных</div>
 
             <div className={s.menuWrapper} ref={menuRef}>
-                <button className={s.trigger} onClick={handleTriggerClick}>
-                    Рабочие&nbsp;пространства▾
-                </button>
+                <div style={{display: 'flex'}}>
+                    <button className={s.trigger} onClick={handleTriggerClick}>
+                        Рабочие&nbsp;пространства▾
+                    </button>
+
+                    <div>
+                        <SideNav
+                            open={navOpen}
+                            toggle={toogleOpenSide}
+                            formsByWidget={formsByWidget}
+                            openForm={openForm}
+                        />
+
+                    </div>
+
+                </div>
 
                 {open && (
                     <ul className={s.menuLv2}>
@@ -249,6 +285,12 @@ export const TopComponent: React.FC<Props> = ({
                                                                             <WidgetsIcon width={16} height={16}/>
                                                                             <span className={s.wsName}>{w.name}</span>
                                                                             <DeleteIcon
+
+                                                                                onClick={e => {
+                                                                                    e.stopPropagation();
+                                                                                    if (confirm('Удалить виджет?'))
+                                                                                        deleteWidget(w.id, t.id);     // ← передаём widgetId и tableId
+                                                                                }}
                                                                                 className={s.trash}
                                                                                 width={16}
                                                                                 height={16}

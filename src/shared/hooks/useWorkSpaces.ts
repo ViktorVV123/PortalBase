@@ -157,7 +157,9 @@ export const useWorkSpaces = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [columns, setColumns] = useState<Column[]>([]);
+    const [columnsWidget, setColumnsWidget] = useState<Column[]>([]);
     const [selectedTable, setSelTable] = useState<DTable | null>(null);
+
 
     /* — список WS — */
     const loadWorkSpaces = useCallback(async () => {
@@ -372,7 +374,6 @@ export const useWorkSpaces = () => {
     );
 
 
-
     const fetchWidgetAndTable = useCallback(async (widgetId: number) => {
         // widget
         let widget = Object.values(widgetsByTable)
@@ -387,6 +388,8 @@ export const useWorkSpaces = () => {
                 [data.table_id]: [data],        // кэшируем
             }));
         }
+
+
 
         // table
         let table = Object.values(tablesByWs)
@@ -404,6 +407,57 @@ export const useWorkSpaces = () => {
 
         return {widget, table};
     }, [widgetsByTable, tablesByWs]);
+
+    //удаляем строку в Table
+    const deleteColumnTable = useCallback(
+        async (id: number) => {
+            try {
+                await api.delete(`/tables/columns/${id}`);
+                setColumns(prev => prev.filter(c => c.id !== id));   // ← убираем локально
+            } catch {
+                setError('Ошибка при удалении столбца');
+                throw new Error('delete failed');
+            }
+        },
+        [],
+    );
+
+    //удаляем строку в Widget
+    const deleteColumnWidget = useCallback(
+        async (widgetColumnId: number) => {
+            try {
+                await api.delete(`/widgets/columns/${widgetColumnId}`);
+
+                /* из стейта убираем весь объект WidgetColumn с этим id */
+                setWidgetColumns(prev => prev.filter(wc => wc.id !== widgetColumnId));
+            } catch {
+                setError('Ошибка при удалении столбца виджета');
+            }
+        },
+        [],
+    );
+
+    //удаления самого виджета
+    const deleteWidget = useCallback(
+        async (widgetId: number, tableId: number) => {
+            try {
+                await api.delete(`/widgets/${widgetId}`);
+
+                /* 1. убираем из списка виджетов конкретной таблицы */
+                setWidgetsByTable(prev => ({
+                    ...prev,
+                    [tableId]: (prev[tableId] ?? []).filter(w => w.id !== widgetId),
+                }));
+
+                /* 2. если этот виджет сейчас открыт — очищаем его столбцы */
+                setWidgetColumns(prev => prev.filter(wc => wc.widget_id !== widgetId));
+            } catch {
+                setError('Ошибка при удалении виджета');
+            }
+        },
+        [],
+    );
+
 
 
     return {
@@ -437,5 +491,8 @@ export const useWorkSpaces = () => {
         deleteWorkspace,
         deleteTable,
         fetchWidgetAndTable,
+        deleteColumnTable,
+        deleteColumnWidget,
+        deleteWidget
     };
 };

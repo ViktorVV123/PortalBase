@@ -20,12 +20,12 @@ export const Main = () => {
     const [selectedFormId, setSelectedFormId] = useState<number | null>(null);
     const [wsHover, setWsHover] = useState<number | null>(null);
     const [tblHover, setTblHover] = useState<number | null>(null);
-    const [showConnForm , setShowConnForm ] = useState(false);
+    const [showConnForm, setShowConnForm] = useState(false);
     const [showCreateForm, setShowCreateForm] = useState(false);
     const [showCreateTable, setShowCreateTable] = useState(false);
-    const [createTblWs,     setCreateTblWs]     = useState<WorkSpaceTypes|null>(null)
+    const [createTblWs, setCreateTblWs] = useState<WorkSpaceTypes | null>(null)
     const [showCreateWidget, setShowCreateWidget] = useState(false);
-    const [createWidgetTable, setCreateWidgetTable] = useState<DTable|null>(null);
+    const [createWidgetTable, setCreateWidgetTable] = useState<DTable | null>(null);
 
 
     const {
@@ -43,10 +43,11 @@ export const Main = () => {
         widgetColumns, wColsLoading, wColsError, loadColumnsWidget, formsByWidget,
         loadWidgetForms,
         loadFormDisplay, formDisplay, formError, formLoading,
-        loadSubDisplay,subDisplay,subLoading,subError,deleteWorkspace,deleteTable,fetchWidgetAndTable
+        loadSubDisplay, subDisplay, subLoading, subError, deleteWorkspace, deleteTable, fetchWidgetAndTable,
+        deleteColumnTable,deleteColumnWidget,deleteWidget
     } = useWorkSpaces();
 
-    const {connections,loadConnections} = useLoadConnections()
+    const {connections, loadConnections} = useLoadConnections()
 
 
     useEffect(() => {
@@ -115,20 +116,15 @@ export const Main = () => {
     };
 
 
-   /* if (loading) return <p>Загрузка…</p>;
-    if (error) return <p style={{color: 'red'}}>{error}</p>;*/
+    /* if (loading) return <p>Загрузка…</p>;
+     if (error) return <p style={{color: 'red'}}>{error}</p>;*/
 
     return (
         <div className={styles.layout}>
-            <SideNav
-                open={navOpen}
-                toggle={() => setNavOpen(o => !o)}
-                changeStatusModal={() => setShowCreateForm(true)}
-                formsByWidget={formsByWidget}
-                openForm={openForm}
-            />
+
             <div className={styles.container}>
-                <TopComponent deleteWorkspace={deleteWorkspace} formsByWidget={formsByWidget} setWsHover={setWsHover} tblHover={tblHover}
+                <TopComponent deleteWorkspace={deleteWorkspace} formsByWidget={formsByWidget} setWsHover={setWsHover}
+                              tblHover={tblHover}
                               setTblHover={setTblHover} wsHover={wsHover}
                               handleSelectTable={handleSelectTable} widgetsByTable={widgetsByTable}
                               handleSelectWidget={handleSelectWidget} workSpaces={workSpaces} tablesByWs={tablesByWs}
@@ -139,7 +135,12 @@ export const Main = () => {
                               setShowCreateWidget={setShowCreateWidget}
                               setCreateWidgetTable={setCreateWidgetTable}
                               deleteTable={deleteTable}
-                              changeStatusModal={()=>setShowCreateForm(true)}
+                              changeStatusModal={() => setShowCreateForm(true)}
+                              navOpen={navOpen}
+                              setNavOpen={setNavOpen}
+                              setShowCreateForm={setShowCreateForm}
+                              openForm={openForm}
+                              deleteWidget={deleteWidget}
                 />
 
                 <TableColumn columns={columns}
@@ -164,6 +165,8 @@ export const Main = () => {
                              subError={subError}
                              formsByWidget={formsByWidget}
                              openForm={openForm}
+                             deleteColumnTable={deleteColumnTable}
+                             deleteColumnWidget={deleteColumnWidget}
 
                 />
             </div>
@@ -171,8 +174,11 @@ export const Main = () => {
             {showConnForm && (
                 <ModalAddConnection open={showConnForm}
                     /* ← добавили */
-                    onSuccess={() => { setShowConnForm(false); loadConnections(); }}
-                    onCancel ={() =>  setShowConnForm(false)}
+                                    onSuccess={() => {
+                                        setShowConnForm(false);
+                                        loadConnections();
+                                    }}
+                                    onCancel={() => setShowConnForm(false)}
                 />
             )}
 
@@ -182,8 +188,11 @@ export const Main = () => {
                     open={showCreateForm}                  /* ✔ правильный флаг */
                     setShowConnForm={setShowConnForm}
                     connections={connections}
-                    onSuccess={() => { setShowCreateForm(false); loadWorkSpaces(); }}
-                    onCancel ={() =>  setShowCreateForm(false)}
+                    onSuccess={() => {
+                        setShowCreateForm(false);
+                        loadWorkSpaces();
+                    }}
+                    onCancel={() => setShowCreateForm(false)}
                 />
             )}
 
