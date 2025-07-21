@@ -267,7 +267,11 @@ export const useWorkSpaces = () => {
         const {data} = await api.get<WidgetForm[]>('/forms');
         const map: Record<number, WidgetForm> = {};
         data.forEach(f => {
-            map[f.main_widget_id] = f;
+            const sortedSubs = [...f.sub_widgets].sort(
+                (a, b) => a.widget_order - b.widget_order
+            );
+
+            map[f.main_widget_id] = { ...f, sub_widgets: sortedSubs };
         });       // сохраняем OBJECT
         setFormsByWidget(map);
     }, [formsByWidget]);
@@ -316,7 +320,15 @@ export const useWorkSpaces = () => {
                     {primary_keys: primary},
                     {params: {sub_widget_order: subOrder}},
                 );
-                setSubDisplay(data);
+
+
+                /* сортируем заголовки */
+                const sorted = { ...data, sub_widgets: [...data.sub_widgets].sort(
+                        (a, b) => a.widget_order - b.widget_order
+                    ) };
+
+                setSubDisplay(sorted);
+
             } catch {
                 setSubError('Не удалось загрузить данные sub-виджета');
             } finally {
