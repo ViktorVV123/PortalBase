@@ -39,8 +39,9 @@ export type WidgetColumn = {
     widget_id: number;
     alias: string | null;
     default: string | null;
-    promt: string | null;
+    placeholder: string | null;
     published: boolean;
+    type:string;
     reference: {
         width: number;
         primary: boolean;

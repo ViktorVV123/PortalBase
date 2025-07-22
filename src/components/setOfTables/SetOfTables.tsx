@@ -123,8 +123,9 @@ export const SetOfTables: React.FC<Props> = ({
         setWcValues({
             alias:   wc.alias   ?? '',
             default: wc.default ?? '',
-            promt:   wc.promt   ?? '',
+            placeholder: wc.default ?? '',
             published: wc.published,
+            type: wc.type,
         });
     };
     const cancelWcEdit = () => { setEditingWcId(null); setWcValues({}); };
@@ -198,6 +199,10 @@ export const SetOfTables: React.FC<Props> = ({
                                 <thead>
                                 <tr>
                                     <th>alias</th>
+                                    <th>default</th>
+                                    <th>placeholder</th>
+                                    <th>published</th>
+                                    <th>type</th>
                                     <th>name</th>
                                     <th>datatype</th>
                                     <th>length</th>
@@ -228,6 +233,50 @@ export const SetOfTables: React.FC<Props> = ({
                                                              className={s.inp}/>
                                                     : wc.alias ?? '—'}
                                             </td>
+                                            <td>
+                                                {isEd
+                                                    ? <input value={wcValues.default as string}
+                                                             onChange={e => setWcValues(v => ({
+                                                                 ...v,
+                                                                 default: e.target.value
+                                                             }))}
+                                                             className={s.inp}/>
+                                                    : wc.default ?? '—'}
+                                            </td>
+                                            <td>
+                                                {isEd
+                                                    ? <input value={wcValues.placeholder as string}
+                                                             onChange={e => setWcValues(v => ({
+                                                                 ...v,
+                                                                 placeholder: e.target.value
+                                                             }))}
+                                                             className={s.inp}/>
+                                                    : wc.placeholder ?? '—'}
+                                            </td>
+                                            <td>
+                                                {isEd ? (
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={wcValues.published ?? false}
+                                                        onChange={e => setWcValues(v => ({
+                                                            ...v,
+                                                            published: e.target.checked
+                                                        }))}
+                                                    />
+                                                ) : wc.published ? '✔︎' : ''}
+                                            </td>
+
+                                            <td>
+                                                {isEd
+                                                    ? <input value={wcValues.type as string}
+                                                             onChange={e => setWcValues(v => ({
+                                                                 ...v,
+                                                                 type: e.target.value
+                                                             }))}
+                                                             className={s.inp}/>
+                                                    : wc.type ?? '—'}
+                                            </td>
+
 
                                             {/* name (может быть undefined) ───────────── */}
                                             <td>{col?.name ?? '—'}</td>
