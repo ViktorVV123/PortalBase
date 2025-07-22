@@ -70,7 +70,7 @@ margin-bottom: 15px;
 
 
 
-/* TableColumn.module.scss  (или FormTable.module.scss) */
+/* SetOfTables.module.scss  (или FormTable.module.scss) */
 .selectedRow   { background:  var(--hover-color) }      /* светло-синий фон */
 .selectedRow td { font-weight: 600; }        /* опционально жирнее */
 
@@ -110,4 +110,69 @@ font-size: 16px;
   font-weight: 600;
   position: relative;
   z-index: 1;               /* чтобы выступала выше соседних */
+}
+
+/* кнопки ✓ ✕ */
+.okBtn, .cancelBtn{
+  background:none;border:0;cursor:pointer;font-size:14px;
+  line-height:1;width:18px;height:18px;padding:0;color:#ccc;
+  transition:color .15s;
+}
+
+
+
+
+
+
+//стили под таблицу потом перенести
+
+
+/* ───────── базовая сетка ───────── */
+.tbl {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;          // фиксирует ширины столбцов
+  font-size: 13px;
+}
+
+.tbl th, .tbl td {
+  border: 1px solid #959393;
+  padding: 4px 6px;
+  overflow: hidden;             // обрезаем лишнее
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ───────── inputs при редактировании ───────── */
+.inp, .inpN {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 2px 4px;
+  font: inherit;
+  color: inherit;
+  background: #1e1e1e;
+
+  border-radius: 3px;
+
+}
+
+/* number ↔ text отличаются только выравниванием */
+.inpN { text-align: right; }
+
+/* ───────── иконки действий ───────── */
+.actionIcon, .ok, .cancel {
+  width: 16px; height: 16px;
+  cursor: pointer;
+  fill: #aaa;
+  transition: fill .15s;
+}
+.actionIcon:hover,
+
+
+
+/* если нужно чуть прижать иконки к центру */
+.actionsCell {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
 }

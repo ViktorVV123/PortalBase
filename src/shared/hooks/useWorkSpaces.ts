@@ -157,7 +157,6 @@ export const useWorkSpaces = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [columns, setColumns] = useState<Column[]>([]);
-    const [columnsWidget, setColumnsWidget] = useState<Column[]>([]);
     const [selectedTable, setSelTable] = useState<DTable | null>(null);
 
 
@@ -420,6 +419,30 @@ export const useWorkSpaces = () => {
         return {widget, table};
     }, [widgetsByTable, tablesByWs]);
 
+
+    /** PATCH /tables/columns/{id}  — обновить одну колонку */
+    const updateTableColumn = useCallback(
+        async (id: number, patch: Partial<Omit<Column, 'id'>>) => {
+            try {
+                /* 1. запрос к бэку */
+                const { data } = await api.patch<Column>(`/tables/columns/${id}`, patch);
+
+                /* 2. локально подменяем в state */
+                setColumns(prev =>
+                    prev
+                        .map(col => (col.id === id ? { ...col, ...data } : col))
+                        .sort((a, b) => a.id - b.id)           // порядок сохраняем
+                );
+            } catch {
+                setError('Ошибка при сохранении изменений');
+                throw new Error('update failed');
+            }
+        },
+        []
+    );
+
+
+
     //удаляем строку в Table
     const deleteColumnTable = useCallback(
         async (id: number) => {
@@ -471,6 +494,35 @@ export const useWorkSpaces = () => {
     );
 
 
+    /* ---------- WIDGET-COLUMNS PATCH  обновляем значения в widget/columns ---------- */
+    const updateWidgetColumn = useCallback(
+        async (
+            id: number,
+            patch: Partial<Omit<WidgetColumn, 'id' | 'widget_id' | 'reference'>>
+        ) => {
+            const clean: any = { ...patch };
+            ['alias', 'default', 'promt'].forEach(f => {
+                if (clean[f] === '') delete clean[f];
+            });
+
+            try {
+                const { data } = await api.patch<WidgetColumn>(`/widgets/columns/${id}`, clean);
+
+                setWidgetColumns(prev =>
+                    [...prev]                              // создаём копию
+                        .map(wc => (wc.id === id ? { ...wc, ...data } : wc))
+                        .sort((a, b) => a.id - b.id)        // !!! сортируем по id
+                );
+            } catch {
+                setWColsError('Ошибка при сохранении столбца виджета');
+                throw new Error('update failed');
+            }
+        },
+        []
+    );
+
+
+
 
     return {
         workSpaces,
@@ -505,6 +557,8 @@ export const useWorkSpaces = () => {
         fetchWidgetAndTable,
         deleteColumnTable,
         deleteColumnWidget,
-        deleteWidget
+        deleteWidget,
+        updateTableColumn,
+        updateWidgetColumn
     };
 };

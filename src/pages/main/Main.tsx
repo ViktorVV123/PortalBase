@@ -3,7 +3,7 @@ import {DTable, useWorkSpaces, Widget} from '@/shared/hooks/useWorkSpaces';
 
 import * as styles from './Main.module.scss'
 import {SideNav} from "@/components/sideNav/SideNav";
-import {TableColumn} from "@/components/tableColumn/TableColumn";
+import {SetOfTables} from "@/components/setOfTables/SetOfTables";
 import {TopComponent} from "@/components/topComponent/TopComponent";
 import {ModalAddWorkspace} from "@/components/modals/modalAddWorkspace/ModalAddWorkspace";
 import {useLoadConnections} from "@/shared/hooks/useLoadConnections";
@@ -44,7 +44,7 @@ export const Main = () => {
         loadWidgetForms,
         loadFormDisplay, formDisplay, formError, formLoading,
         loadSubDisplay, subDisplay, subLoading, subError, deleteWorkspace, deleteTable, fetchWidgetAndTable,
-        deleteColumnTable,deleteColumnWidget,deleteWidget
+        deleteColumnTable,deleteColumnWidget,deleteWidget,updateTableColumn,updateWidgetColumn
     } = useWorkSpaces();
 
     const {connections, loadConnections} = useLoadConnections()
@@ -143,7 +143,7 @@ export const Main = () => {
                               deleteWidget={deleteWidget}
                 />
 
-                <TableColumn columns={columns}
+                <SetOfTables columns={columns}
                              formDisplay={formDisplay}
                              tableName={selectedTable?.name ?? ''}
                              loading={loading}
@@ -167,6 +167,8 @@ export const Main = () => {
                              openForm={openForm}
                              deleteColumnTable={deleteColumnTable}
                              deleteColumnWidget={deleteColumnWidget}
+                             updateTableColumn={updateTableColumn}
+                             updateWidgetColumn={updateWidgetColumn}
 
                 />
             </div>

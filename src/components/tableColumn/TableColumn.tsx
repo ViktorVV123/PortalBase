@@ -1,218 +1,134 @@
 import React from 'react';
-import * as s from './TableColumn.module.scss';
-import {Column, FormDisplay, SubDisplay, Widget, WidgetColumn, WidgetForm} from '@/shared/hooks/useWorkSpaces';
-import {FormTable} from "@/components/formTable/FormTable";
-import DeleteIcon from '@/assets/image/DeleteIcon.svg'
-import EditIcon from '@/assets/image/EditIcon.svg'
+import * as s from "@/components/setOfTables/SetOfTables.module.scss";
+import EditIcon from "@/assets/image/EditIcon.svg";
+import DeleteIcon from "@/assets/image/DeleteIcon.svg";
+import {Column} from "@/shared/hooks/useWorkSpaces";
 
-type Props = {
-    columns: Column[];
-    tableName: string;
-    workspaceName: string;
-    loading: boolean;
-    error: string | null;
 
-    /* widget */
-    widgetColumns: WidgetColumn[];
-    wColsLoading: boolean;
-    wColsError: string | null;
-    selectedWidget: Widget | null;
-    handleClearWidget: () => void;
-    handleSelectWidget: (widget: Widget | null) => void;   // ← добавили
-    /* form */
-    selectedFormId: number | null;
-    formDisplay: FormDisplay
-    formLoading: boolean;
-    formError: string | null;
-    formName: string;
+type tableColumnProps = {
+    columns:Column[]
+    editingId:any
+    editValues:any
+    handleChange:(field: keyof Column, value: any) => void
+    deleteColumnTable:(id: number) => void;
+    saveEdit:() => void
+    startEdit:(col: Column) => void;
+    cancelEdit:() => void
+}
 
-    loadSubDisplay: (
-        formId: number,
-        subOrder: number,
-        primary: Record<string, unknown>
-    ) => void;
-    subDisplay: SubDisplay | null;
-    subLoading: boolean;
-    subError: string | null;
-    formsByWidget: Record<number, WidgetForm>;   // нужен order
-    openForm: (widgetId: number, formId: number) => void;
-    deleteColumnTable: (id: number) => void;
-    deleteColumnWidget: (id: number) => void;
-};
-
-export const TableColumn: React.FC<Props> = ({
-                                                 /* базовые */
-                                                 columns,
-                                                 tableName,
-                                                 workspaceName,
-                                                 loading,
-                                                 error,
-                                                 /* widget */
-                                                 widgetColumns,
-                                                 wColsLoading,
-                                                 wColsError,
-                                                 selectedWidget,
-                                                 handleClearWidget,
-                                                 /* form */
-                                                 selectedFormId,
-                                                 formDisplay,
-                                                 formLoading,
-                                                 formError,
-                                                 formName,
-                                                 subDisplay,
-                                                 subLoading,
-                                                 subError,
-                                                 formsByWidget,
-                                                 loadSubDisplay,
-                                                 deleteColumnTable,
-                                                 deleteColumnWidget
-                                             }) => {
-
-    if (loading) return <p>Загрузка…</p>;
-    if (error) return <p className={s.error}>{error}</p>;
-
-    /* =====  UI  ===== */
+export const TableColumn = ({columns,startEdit,editingId,editValues,handleChange,deleteColumnTable,saveEdit,cancelEdit}:tableColumnProps) => {
     return (
-        <div className={s.wrapper}>
-            {/* ─── breadcrumb ─── */}
-            <div className={s.headRow}>
-                <div className={s.breadcrumb}>
-                    {workspaceName} <span className={s.arrow}>→</span>
+            <table className={s.tbl}>
+                <thead>
+                <tr>
+                    <th>name</th>
+                    <th>description</th>
+                    <th>datatype</th>
+                    <th>length</th>
+                    <th>precision</th>
+                    <th>primary</th>
+                    <th>increment</th>
+                    <th>required</th>
+                    <th>datetime</th>
+                    <th></th>
+                </tr>
+                </thead>
+                <tbody>
+                {columns.map(col => {
+                    const isEditing = editingId === col.id;
 
-                    {selectedWidget ? (
-                        <>
-                            <span className={s.link} onClick={handleClearWidget}>{tableName}</span>
-                            <span className={s.arrow}>→</span>
-                            {selectedFormId ? (
-                                <span className={s.link} onClick={() => handleClearWidget()}>
-       {selectedWidget.name}
-                                         </span>
-                            ) : (
-                                <span>{selectedWidget.name}</span>
-                            )}
+                    return (
+                        <tr key={col.id}>
+                            {/** -------- NAME -------- */}
+                            <td>
+                                {isEditing ? (
+                                    <input
+                                        value={editValues.name as string}
+                                        onChange={e => handleChange('name', e.target.value)}
+                                        className={s.inp}
+                                    />
+                                ) : col.name}
+                            </td>
 
+                            {/** -------- DESCRIPTION -------- */}
+                            <td>
+                                {isEditing ? (
+                                    <input
+                                        value={editValues.description as string}
+                                        onChange={e => handleChange('description', e.target.value)}
+                                        className={s.inp}
+                                    />
+                                ) : col.description}
+                            </td>
 
-                            {formName && (
-                                <>
-                                    <span className={s.arrow}>→</span>
-                                    <span>{formName}</span>
-                                </>
-                            )}
-                        </>
-                    ) : (
-                        <span>{tableName}</span>
-                    )}
-                </div>
-            </div>
+                            {/** -------- DATATYPE -------- */}
+                            <td>
+                                {isEditing ? (
+                                    <input
+                                        value={editValues.datatype as string}
+                                        onChange={e => handleChange('datatype', e.target.value)}
+                                        className={s.inp}
+                                    />
+                                ) : col.datatype}
+                            </td>
 
-            {/* ─── PRIORITY 1 : FORM ─── */}
-            {selectedFormId ? (
-                    formLoading ? (
-                        <p>Загрузка формы…</p>
-                    ) : formError ? (
-                        <p className={s.error}>{formError}</p>
-                    ) : formDisplay ? (
-                        <FormTable subDisplay={subDisplay} subError={subError} subLoading={subLoading}
-                                   selectedWidget={selectedWidget} formsByWidget={formsByWidget}
-                                   loadSubDisplay={loadSubDisplay} formDisplay={formDisplay}/>
-                    ) : null
-                )
+                            {/** -------- LENGTH / PRECISION -------- */}
+                            <td>
+                                {isEditing ? (
+                                    <input
+                                        type="number"
+                                        value={editValues.length as string | number}
+                                        onChange={e => handleChange('length', e.target.valueAsNumber || '')}
+                                        className={s.inpN}
+                                    />
+                                ) : col.length ?? '—'}
+                            </td>
+                            <td>
+                                {isEditing ? (
+                                    <input
+                                        type="number"
+                                        value={editValues.precision as string | number}
+                                        onChange={e => handleChange('precision', e.target.valueAsNumber || '')}
+                                        className={s.inpN}
+                                    />
+                                ) : col.precision ?? '—'}
+                            </td>
 
-                /* ─── PRIORITY 2 : WIDGET ─── */
-                : selectedWidget ? (
-                        wColsLoading ? (
-                            <p>Загрузка виджета…</p>
-                        ) : wColsError ? (
-                            <p className={s.error}>{wColsError}</p>
-                        ) : (
-                            <table className={s.tbl}>
-                                <thead>
-                                <tr>
-                                    <th>alias</th>
-                                    <th>name</th>
-                                    <th>datatype</th>
-                                    <th>length</th>
-                                    <th>precision</th>
-                                    <th>primary</th>
-                                    <th>required</th>
-                                    <th></th>
-                                </tr>
-                                </thead>
-                                <tbody>
-                                {widgetColumns.flatMap(wc =>
-                                    wc.reference.map(ref => {
-                                        const c = ref.table_column;
-                                        return (
-                                            <tr key={`${wc.id}-${c.id}`}>
-                                                <td>{wc.alias ?? '—'}</td>
-                                                <td>{c.name}</td>
-                                                <td>{c.datatype}</td>
-                                                <td>{c.length ?? '—'}</td>
-                                                <td>{c.precision ?? '—'}</td>
-                                                <td>{c.primary ? '✔︎' : ''}</td>
-                                                <td>{c.required ? '✔︎' : ''}</td>
-                                                <td style={{display: 'flex', justifyContent: 'space-around'}}>
-                                                    <EditIcon cursor={'pointer'}/>
-                                                    <DeleteIcon onClick={() => {
-                                                        if (confirm(`Удалить строку widget?`))
-                                                            deleteColumnWidget(wc.id)
-                                                    }} cursor={'pointer'}/>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })
+                            {/** -------- FLAGS (checkbox) -------- */}
+                            {(['primary', 'increment', 'required', 'datetime'] as const).map(flag => (
+                                <td key={flag} style={{textAlign: 'center'}}>
+                                    {isEditing ? (
+                                        <input
+                                            type="checkbox"
+                                            checked={editValues[flag] as boolean}
+                                            onChange={e => handleChange(flag, e.target.checked)}
+                                        />
+                                    ) : (col[flag] ? '✔︎' : '')}
+                                </td>
+                            ))}
+
+                            {/** -------- ACTIONS -------- */}
+                            <td className={s.actionsCell}>
+                                {isEditing ? (
+                                    <>
+                                        <button className={s.okBtn} onClick={saveEdit}>✓</button>
+                                        <button className={s.cancelBtn} onClick={cancelEdit}>✕
+                                        </button>
+                                    </>
+                                ) : (
+                                    <>
+                                        <EditIcon className={s.actionIcon}
+                                                  onClick={() => startEdit(col)}/>
+                                        <DeleteIcon className={s.actionIcon}
+                                                    onClick={() => confirm('Удалить?') && deleteColumnTable(col.id)}/>
+                                    </>
                                 )}
-                                </tbody>
-                            </table>
-                        )
-                    )
+                            </td>
+                        </tr>
+                    );
+                })}
+                </tbody>
 
-                    /* ─── PRIORITY 3 : TABLE COLUMNS ─── */
-                    : (
-                        columns.length === 0
-                            ? <p>Нет выбранных форм</p>
-                            : (
-                                <table className={s.tbl}>
-                                    <thead>
-                                    <tr>
-                                        <th>name</th>
-                                        <th>datatype</th>
-                                        <th>length</th>
-                                        <th>precision</th>
-                                        <th>primary</th>
-                                        <th>required</th>
-                                        <th></th>
-                                    </tr>
-                                    </thead>
-                                    <tbody>
-                                    {columns.map(c => (
-                                        <tr key={c.id}>
-                                            <td>{c.name}</td>
-                                            <td>{c.datatype}</td>
-                                            <td>{c.length ?? '—'}</td>
-                                            <td>{c.precision ?? '—'}</td>
-                                            <td>{c.primary ? '✔︎' : ''}</td>
-                                            <td>{c.required ? '✔︎' : ''}</td>
-                                            <td style={{display: 'flex', justifyContent: 'space-around'}}>
-                                                <EditIcon cursor={'pointer'}/>
-                                                <DeleteIcon onClick={() => {
-                                                    if (confirm(`Удалить строку?`))
-                                                        deleteColumnTable(c.id)
-                                                }} cursor={'pointer'}/>
-
-
-                                                {/*   if (confirm(`Удалить таблицу «${t.name}»?`))
-                                                deleteTable(t);*/}
-                                            </td>
-
-                                        </tr>
-                                    ))}
-                                    </tbody>
-                                </table>
-                            )
-                    )}
-
-
-        </div>
+            </table>
     );
 };

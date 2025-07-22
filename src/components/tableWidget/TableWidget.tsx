@@ -1,5 +1,5 @@
 import React from 'react';
-import * as s from "@/components/tableColumn/TableColumn.module.scss";
+import * as s from "@/components/setOfTables/SetOfTables.module.scss";
 import {Widget, WidgetColumn} from "@/shared/hooks/useWorkSpaces";
 
 type TableWidgetProps = {
