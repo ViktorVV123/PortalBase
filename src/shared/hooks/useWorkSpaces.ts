@@ -522,7 +522,19 @@ export const useWorkSpaces = () => {
         []
     );
 
-
+    const addReference = useCallback(
+        async (
+            widgetColId: number,
+            tblColId: number,
+            payload: { width: number; visible: boolean; primary: boolean },
+        ) => {
+            await api.post(
+                `/widgets/tables/references/${widgetColId}/${tblColId}`,
+                payload,
+            );
+        },
+        [],
+    );
 
 
     return {
@@ -560,6 +572,6 @@ export const useWorkSpaces = () => {
         deleteColumnWidget,
         deleteWidget,
         updateTableColumn,
-        updateWidgetColumn
+        updateWidgetColumn,addReference
     };
 };

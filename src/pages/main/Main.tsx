@@ -44,7 +44,7 @@ export const Main = () => {
         loadWidgetForms,
         loadFormDisplay, formDisplay, formError, formLoading,
         loadSubDisplay, subDisplay, subLoading, subError, deleteWorkspace, deleteTable, fetchWidgetAndTable,
-        deleteColumnTable,deleteColumnWidget,deleteWidget,updateTableColumn,updateWidgetColumn
+        deleteColumnTable,deleteColumnWidget,deleteWidget,updateTableColumn,updateWidgetColumn,addReference
     } = useWorkSpaces();
 
     const {connections, loadConnections} = useLoadConnections()
@@ -169,6 +169,9 @@ export const Main = () => {
                              deleteColumnWidget={deleteColumnWidget}
                              updateTableColumn={updateTableColumn}
                              updateWidgetColumn={updateWidgetColumn}
+                             addReference={addReference}
+                             loadColumns={loadColumns}
+                             loadColumnsWidget={loadColumnsWidget}
 
                 />
             </div>
