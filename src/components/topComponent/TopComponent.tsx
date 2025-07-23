@@ -45,6 +45,8 @@ type Props = {
     setShowCreateForm: any
     openForm: (widgetId: number, formId: number) => void;
     deleteWidget: (widgetId: number, tableId: number) => void;
+    loadFormTree: (formId: number) => Promise<void>;
+
 };
 
 export const TopComponent: React.FC<Props> = ({
@@ -71,7 +73,8 @@ export const TopComponent: React.FC<Props> = ({
                                                   navOpen,
                                                   setShowCreateForm,
                                                   deleteWidget,
-                                                  openForm
+                                                  openForm,
+                                                  loadFormTree
                                               }) => {
 
     const [open, setOpen] = useState(false);
@@ -304,13 +307,15 @@ export const TopComponent: React.FC<Props> = ({
                                                                                     className={s.spanName}>Формы</span>
                                                                                 <li
                                                                                     className={formObj ? '' : s.disabled}
-                                                                                    onClick={e => {
+                                                                                    onClick={async e => {
                                                                                         e.stopPropagation();
                                                                                         if (!formObj) return;
 
                                                                                         handleSelectTable(t);
                                                                                         handleSelectWidget(w);
                                                                                         handleSelectForm(formObj.form_id);
+                                                                                        await loadFormTree(formObj.form_id); // ← загружаем справочники
+
                                                                                         closeMenu();
                                                                                     }}
                                                                                 >

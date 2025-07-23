@@ -68,7 +68,30 @@ margin-bottom: 15px;
 }
 
 
+/* --- таблица со столбцами для tree --- */
 
+
+.tblTree {
+  font-size: 18px;
+
+  th, td {
+    border: 1px solid $border;
+    padding: 4px 8px;
+    text-align: left;
+
+  }
+
+  th {
+    background: var(--header-color);
+    font-weight: 500;
+
+  }
+
+  tbody tr:hover { background: var(--hover-color); }
+}
+td{
+  cursor: pointer;
+}
 
 /* SetOfTables.module.scss  (или FormTable.module.scss) */
 .selectedRow   { background:  var(--hover-color) }      /* светло-синий фон */

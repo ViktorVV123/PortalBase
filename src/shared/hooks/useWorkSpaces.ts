@@ -149,6 +149,11 @@ export interface SubDisplay {
     columns: SubFormColumn[];
     data: SubFormRow[];
 }
+export interface FormTreeColumn {
+    name: string;
+    values: (string | number | null)[];
+}
+
 
 
 // shared/hooks/useWorkSpaces.ts
@@ -537,6 +542,32 @@ export const useWorkSpaces = () => {
     );
 
 
+
+    const [formTrees, setFormTrees] = useState<Record<number, FormTreeColumn[]>>({});
+    const [formTreeLoading, setFormTreeLoading] = useState(false);
+    const [formTreeError, setFormTreeError] = useState<string | null>(null);
+
+    const loadFormTree = useCallback(async (formId: number): Promise<void> => {
+        setFormTreeLoading(true);
+        setFormTreeError(null);
+        try {
+            const { data } = await api.post<FormTreeColumn[] | FormTreeColumn>(`/display/${formId}/tree`);
+
+            const normalized: FormTreeColumn[] = Array.isArray(data) ? data : [data];
+
+            setFormTrees(prev => ({ ...prev, [formId]: normalized }));
+        } catch (err: any) {
+            console.warn('Не удалось загрузить справочники:', err?.response?.status ?? err);
+            // Не считаем ошибкой — справочники могут отсутствовать
+        } finally {
+            setFormTreeLoading(false);
+        }
+    }, []);
+
+
+
+
+
     return {
         workSpaces,
         loadWorkSpaces,
@@ -572,6 +603,8 @@ export const useWorkSpaces = () => {
         deleteColumnWidget,
         deleteWidget,
         updateTableColumn,
-        updateWidgetColumn,addReference
+        updateWidgetColumn,addReference,
+        loadFormTree,
+        formTrees
     };
 };

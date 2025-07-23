@@ -2,7 +2,6 @@ import React, {useEffect, useState} from 'react';
 import {DTable, useWorkSpaces, Widget} from '@/shared/hooks/useWorkSpaces';
 
 import * as styles from './Main.module.scss'
-import {SideNav} from "@/components/sideNav/SideNav";
 import {SetOfTables} from "@/components/setOfTables/SetOfTables";
 import {TopComponent} from "@/components/topComponent/TopComponent";
 import {ModalAddWorkspace} from "@/components/modals/modalAddWorkspace/ModalAddWorkspace";
@@ -44,7 +43,7 @@ export const Main = () => {
         loadWidgetForms,
         loadFormDisplay, formDisplay, formError, formLoading,
         loadSubDisplay, subDisplay, subLoading, subError, deleteWorkspace, deleteTable, fetchWidgetAndTable,
-        deleteColumnTable,deleteColumnWidget,deleteWidget,updateTableColumn,updateWidgetColumn,addReference
+        deleteColumnTable,deleteColumnWidget,deleteWidget,updateTableColumn,updateWidgetColumn,addReference,loadFormTree,formTrees
     } = useWorkSpaces();
 
     const {connections, loadConnections} = useLoadConnections()
@@ -113,6 +112,7 @@ export const Main = () => {
 
         /* 2. сама форма */
         handleSelectForm(formId);
+        await loadFormTree(formId);
     };
 
 
@@ -141,9 +141,11 @@ export const Main = () => {
                               setShowCreateForm={setShowCreateForm}
                               openForm={openForm}
                               deleteWidget={deleteWidget}
+                              loadFormTree={loadFormTree}
+
                 />
 
-                <SetOfTables columns={columns}
+                <SetOfTables  columns={columns}
                              formDisplay={formDisplay}
                              tableName={selectedTable?.name ?? ''}
                              loading={loading}
@@ -170,8 +172,9 @@ export const Main = () => {
                              updateTableColumn={updateTableColumn}
                              updateWidgetColumn={updateWidgetColumn}
                              addReference={addReference}
-                             loadColumns={loadColumns}
                              loadColumnsWidget={loadColumnsWidget}
+                              formTrees={formTrees}
+
 
                 />
             </div>

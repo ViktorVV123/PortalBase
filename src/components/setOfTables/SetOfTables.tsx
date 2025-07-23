@@ -9,10 +9,7 @@ import {
     WidgetForm
 } from '@/shared/hooks/useWorkSpaces';
 import {FormTable} from "@/components/formTable/FormTable";
-import DeleteIcon from '@/assets/image/DeleteIcon.svg'
-import EditIcon from '@/assets/image/EditIcon.svg'
 import {TableColumn} from "@/components/tableColumn/TableColumn";
-import {api} from "@/services/api";
 import {WidgetColumnsOfTable} from '@/components/WidgetColumnsOfTable/WidgetColumnsOfTable'
 
 type Props = {
@@ -51,8 +48,8 @@ type Props = {
     updateTableColumn: (id: number, p: Partial<Omit<Column, 'id'>>) => void;
     updateWidgetColumn: any
     addReference: any
-    loadColumns: any
     loadColumnsWidget: any
+    formTrees:any
 };
 
 export const SetOfTables: React.FC<Props> = ({
@@ -84,8 +81,8 @@ export const SetOfTables: React.FC<Props> = ({
                                                  updateTableColumn,
                                                  updateWidgetColumn,
                                                  addReference,
-                                                 loadColumns,
-                                                 loadColumnsWidget
+                                                 loadColumnsWidget,
+                                                 formTrees
                                              }) => {
 
 
@@ -133,7 +130,7 @@ export const SetOfTables: React.FC<Props> = ({
                     ) : formError ? (
                         <p className={s.error}>{formError}</p>
                     ) : formDisplay ? (
-                        <FormTable  subDisplay={subDisplay} subError={subError} subLoading={subLoading}
+                        <FormTable formTrees={formTrees} selectedFormId={selectedFormId}  subDisplay={subDisplay} subError={subError} subLoading={subLoading}
                                    selectedWidget={selectedWidget} formsByWidget={formsByWidget}
                                    loadSubDisplay={loadSubDisplay} formDisplay={formDisplay}/>
                     ) : null
