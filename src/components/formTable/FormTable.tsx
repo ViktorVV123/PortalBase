@@ -22,7 +22,8 @@ type Props = {
     subLoading: boolean;
     subError: string | null;
     formTrees: Record<number, FormTreeColumn[]>;
-    loadFilteredFormDisplay:any
+    loadFilteredFormDisplay: (formId: number, filter: { table_column_id: number; value: string | number }) => Promise<void>;
+
 };
 
 export const FormTable: React.FC<Props> = ({

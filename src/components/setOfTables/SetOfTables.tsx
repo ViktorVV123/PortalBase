@@ -50,7 +50,8 @@ type Props = {
     addReference: any
     loadColumnsWidget: any
     formTrees:any
-    loadFilteredFormDisplay:any
+    loadFilteredFormDisplay: (formId: number, filter: { table_column_id: number; value: string | number }) => Promise<void>;
+
 };
 
 export const SetOfTables: React.FC<Props> = ({
