@@ -83,6 +83,10 @@ export type WidgetForm = {
         form_id: number;
         where_conditional: string | null;
     }[];
+    tree_fields: {
+        column_order: number;
+        table_column_id: number;
+    }[];
 };
 
 

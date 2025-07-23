@@ -6,6 +6,7 @@ import {
     WidgetForm,
     FormTreeColumn
 } from '@/shared/hooks/useWorkSpaces';
+import {api} from "@/services/api";
 
 type Props = {
     formDisplay: FormDisplay;
@@ -69,34 +70,88 @@ export const FormTable: React.FC<Props> = ({
 
     const tree = selectedFormId ? formTrees[Number(selectedFormId)] : null;
 
+    const [expandedTrees, setExpandedTrees] = useState<Record<string, FormTreeColumn[]>>({});
 
+    const handleTreeValueClick = async (
+        table_column_id: number,
+        value: string | number
+    ) => {
+        if (!selectedFormId) return;
+
+        const key = `${table_column_id}-${value}`;
+        try {
+            const { data } = await api.post<FormTreeColumn[] | FormTreeColumn>(
+                `/display/${selectedFormId}/tree`,
+                [{ table_column_id, value }]
+            );
+
+            const normalized = Array.isArray(data) ? data : [data];
+            setExpandedTrees(prev => ({
+                ...prev,
+                [key]: normalized
+            }));
+        } catch (e) {
+            console.warn('Не удалось загрузить расширенные значения:', e);
+        }
+    };
+
+
+    const widgetForm = selectedWidget ? formsByWidget[selectedWidget.id] : null;
+    const treeFieldIds = widgetForm?.tree_fields?.map(f => f.table_column_id) ?? [];
     return (
         <div style={{display: 'flex', gap: 10}}>
 
             {/* ENUM / TREE BLOCK */}
             {tree && tree.length > 0 && (
                 <div>
-                    {tree.map(({name, values}, idx) => (
-                        <div key={`${name}-${idx}`} style={{marginBottom: 16}}>
+                    {tree.map(({ name, values }, idx) => {
+                        const currentTreeField = widgetForm?.tree_fields?.[idx];
+                        const columnId = currentTreeField?.table_column_id;
 
-                            <table className={s.tblTree}>
-                                <thead>
-                                <tr>
-                                    <th>{name}</th>
-                                </tr>
-                                </thead>
-                                <tbody>
-                                {values.map((v, i) => (
-                                    <tr key={i}>
-                                        <td>{v}</td>
+                        return (
+                            <div key={`${name}-${idx}`} style={{ marginBottom: 16 }}>
+                                <h4>{name}</h4>
+                                <table className={s.tblTree}>
+                                    <thead>
+                                    <tr>
+                                        <th>{name}</th>
                                     </tr>
-                                ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    ))}
+                                    </thead>
+                                    <tbody>
+                                    {values.map((v, i) => {
+                                        const key = `${columnId}-${v}`;
+                                        const nestedTree = expandedTrees[key];
+
+                                        return (
+                                            <React.Fragment key={i}>
+                                                <tr>
+                                                    <td
+                                                        style={{ cursor: 'pointer' }}
+                                                        onClick={() => columnId != null && handleTreeValueClick(columnId, v)}
+                                                    >
+                                                        {v}
+                                                    </td>
+                                                </tr>
+
+                                                {Array.isArray(nestedTree) && nestedTree.map(({ name, values }, j) => (
+                                                    <tr key={`nested-${i}-${j}`}>
+                                                        <td style={{ paddingLeft: 20 }}>
+                                                            <strong>{name}:</strong> {values.join(', ')}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </React.Fragment>
+                                        );
+                                    })}
+                                    </tbody>
+
+                                </table>
+                            </div>
+                        );
+                    })}
                 </div>
             )}
+
 
             <div style={{display: 'flex', flexDirection: 'column', gap: 20}}>
                 {/* MAIN GRID */}
