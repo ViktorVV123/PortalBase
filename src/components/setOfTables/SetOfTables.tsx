@@ -5,6 +5,7 @@ import {FormTable} from "@/components/formTable/FormTable";
 import DeleteIcon from '@/assets/image/DeleteIcon.svg'
 import EditIcon from '@/assets/image/EditIcon.svg'
 import {TableColumn} from "@/components/tableColumn/TableColumn";
+import {api} from "@/services/api";
 
 type Props = {
     columns: Column[];
@@ -78,20 +79,38 @@ export const SetOfTables: React.FC<Props> = ({
 
     const [editingId, setEditingId] = useState<number | null>(null);
     const [editValues, setEditValues] = useState<Partial<Column>>({});
-    const startEdit = (col: Column) => {
-        setEditingId(col.id);
-        setEditValues({        // копируем все редактируемые поля
-            name: col.name,
-            description: col.description ?? '',
-            datatype: col.datatype,
-            length: col.length ?? '',
-            precision: col.precision ?? '',
-            primary: col.primary,
-            increment: col.increment,
-            required: col.required,
-            datetime: col.datetime,
+    const [colValues, setColValues] = useState<Partial<Column>>({});
+
+    const startEdit = (wc: WidgetColumn) => {
+        setEditingWcId(wc.id);
+        setWcValues({
+            alias: wc.alias ?? '',
+            default: wc.default ?? '',
+            placeholder: wc.placeholder ?? '',
+            published: wc.published,
+            type: wc.type,
         });
+
+        const col = wc.reference[0]?.table_column;
+        if (col) {
+            setColValues({
+                id: col.id,
+                table_id: col.table_id,
+                name: col.name,
+                description: col.description ?? '',
+                datatype: col.datatype,
+                length: col.length ?? '',
+                precision: col.precision ?? '',
+                primary: col.primary,
+                increment: col.increment,
+                required: col.required,
+                datetime: col.datetime,
+            });
+        } else {
+            setColValues({});
+        }
     };
+
     const cancelEdit = () => {
         setEditingId(null);
         setEditValues({});
@@ -102,12 +121,9 @@ export const SetOfTables: React.FC<Props> = ({
 
     const cleanPatch = (p: Partial<Column>): Partial<Column> => {
         const patch: any = {...p};
-
-        // ↴ превращаем '' → null  /  убираем поля, которые не меняли
         ['length', 'precision'].forEach(k => {
             if (patch[k] === '' || patch[k] === undefined) delete patch[k];
         });
-
         return patch;
     };
 
@@ -133,11 +149,42 @@ export const SetOfTables: React.FC<Props> = ({
     };
     const cancelWcEdit = () => { setEditingWcId(null); setWcValues({}); };
 
-    const saveWcEdit   = async () => {
+    const saveWcEdit = async () => {
         if (editingWcId == null) return;
+
+        // 1. Обновляем только виджет-колонку
         await updateWidgetColumn(editingWcId, wcValues);
+
+        // 2. Проверяем, редактировал ли пользователь table_column (colValues)
+        const ref = widgetColumns.find(w => w.id === editingWcId)?.reference[0];
+        const tableColumnId = ref?.table_column?.id;
+
+        const hasTableColumnChanges =
+            colValues && Object.values(colValues).some(v => v !== undefined && v !== null && v !== '');
+
+        // 3. Отправляем PATCH на reference ТОЛЬКО если есть изменения
+        if (ref && tableColumnId && hasTableColumnChanges) {
+            try {
+                await api.patch(`/widgets/tables/references/${editingWcId}/${tableColumnId}`, {
+                    width: ref.width ?? 1,
+                    visible: ref.visible ?? false,
+                    primary: ref.primary ?? false,
+                    table_column: cleanPatch(colValues),
+                });
+            } catch (e) {
+                console.error('Ошибка при сохранении table_column:', e);
+            }
+        }
+
+        // 👇 Подгружаем обновлённые данные
+        if (selectedWidget) {
+            await loadColumnsWidget(selectedWidget.id);
+        }
+
         cancelWcEdit();
     };
+
+
 
     const handleMerge = async (wColId: number) => {
         if (selectedWidget == null) return;
@@ -241,126 +288,100 @@ export const SetOfTables: React.FC<Props> = ({
                                 </tr>
                                 </thead>
                                 <tbody>
-                                {widgetColumns.flatMap(wc => {
+                                {widgetColumns.map(wc => {
                                     const isEd = editingWcId === wc.id;
 
-                                    // если нет reference — рендерим одну строку
-                                    if (!wc.reference.length) {
-                                        return (
-                                            <tr key={`${wc.id}-no-ref`}>
-                                                <td>{wc.id}</td>
-                                                <td>{wc.widget_id}</td>
+                                    const colValues = (field: keyof Column) =>
+                                        wc.reference.map(r => r.table_column?.[field] ?? '—').join(', ');
 
-                                                <td>
-                                                    {isEd ? (
-                                                        <input value={wcValues.alias ?? ''}
-                                                               onChange={e => setWcValues(v => ({
-                                                                   ...v,
-                                                                   alias: e.target.value
-                                                               }))}
-                                                               className={s.inp}/>
-                                                    ) : wc.alias ?? '—'}
-                                                </td>
-                                                <td>
-                                                    {isEd ? (
-                                                        <input value={wcValues.default ?? ''}
-                                                               onChange={e => setWcValues(v => ({
-                                                                   ...v,
-                                                                   default: e.target.value
-                                                               }))}
-                                                               className={s.inp}/>
-                                                    ) : wc.default ?? '—'}
-                                                </td>
-                                                <td>
-                                                    {isEd ? (
-                                                        <input value={wcValues.placeholder ?? ''}
-                                                               onChange={e => setWcValues(v => ({
-                                                                   ...v,
-                                                                   placeholder: e.target.value
-                                                               }))}
-                                                               className={s.inp}/>
-                                                    ) : wc.placeholder ?? '—'}
-                                                </td>
-                                                <td>
-                                                    {isEd ? (
-                                                        <input type="checkbox"
-                                                               checked={wcValues.published ?? false}
-                                                               onChange={e => setWcValues(v => ({
-                                                                   ...v,
-                                                                   published: e.target.checked
-                                                               }))}
-                                                        />
-                                                    ) : wc.published ? '✔︎' : ''}
-                                                </td>
-                                                <td>
-                                                    {isEd ? (
-                                                        <input value={wcValues.type ?? ''}
-                                                               onChange={e => setWcValues(v => ({
-                                                                   ...v,
-                                                                   type: e.target.value
-                                                               }))}
-                                                               className={s.inp}/>
-                                                    ) : wc.type ?? '—'}
-                                                </td>
-                                                <td colSpan={9} style={{textAlign: 'center', color: '#999'}}>нет
-                                                    связей
-                                                </td>
-                                                <td className={s.actionsCell}>
-                                                    {isEd ? (
-                                                        <>
-                                                            <button className={s.okBtn} onClick={saveWcEdit}>✓</button>
-                                                            <button className={s.cancelBtn} onClick={cancelWcEdit}>✕
-                                                            </button>
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <button onClick={() => handleMerge(wc.id)}>+</button>
-                                                            <EditIcon className={s.actionIcon}
-                                                                      onClick={() => startWcEdit(wc)}/>
-                                                            <DeleteIcon className={s.actionIcon} onClick={() =>
-                                                                confirm('Удалить?') && deleteColumnWidget(wc.id)}/>
-                                                        </>
-                                                    )}
-                                                </td>
-                                            </tr>
-                                        );
-                                    }
+                                    const refValues = (field: 'primary' | 'visible') =>
+                                        wc.reference.map(r => (r[field] ? '✔︎' : '')).join(', ');
 
-                                    // если есть reference[] — делаем отдельную строку на каждую
-                                    return wc.reference.map((ref, i) => {
-                                        const col = ref.table_column;
-                                        return (
-                                            <tr key={`${wc.id}-${col.id}`}>
-                                                <td>{wc.id}</td>
-                                                <td>{wc.widget_id}</td>
 
-                                                <td>{wc.alias ?? '—'}</td>
-                                                <td>{wc.default ?? '—'}</td>
-                                                <td>{wc.placeholder ?? '—'}</td>
-                                                <td>{wc.published ? '✔︎' : ''}</td>
-                                                <td>{wc.type ?? '—'}</td>
+                                    return (
+                                        <tr key={wc.id}>
+                                            <td>{wc.id}</td>
+                                            <td>{wc.widget_id}</td>
 
-                                                <td>{col.id}</td>
-                                                <td>{col.table_id}</td>
-                                                <td>{col.name}</td>
-                                                <td>{col.datatype}</td>
-                                                <td>{col.length}</td>
-                                                <td>{col.precision}</td>
-                                                <td>{ref.primary ? '✔︎' : ''}</td>
-                                                <td>{ref.visible ? '✔︎' : ''}</td>
+                                            <td>
+                                                {isEd ? (
+                                                    <input value={wcValues.alias ?? ''}
+                                                           onChange={e => setWcValues(v => ({
+                                                               ...v,
+                                                               alias: e.target.value
+                                                           }))}
+                                                           className={s.inp}/>
+                                                ) : wc.alias ?? '—'}
+                                            </td>
+                                            <td>
+                                                {isEd ? (
+                                                    <input value={wcValues.default ?? ''}
+                                                           onChange={e => setWcValues(v => ({
+                                                               ...v,
+                                                               default: e.target.value
+                                                           }))}
+                                                           className={s.inp}/>
+                                                ) : wc.default ?? '—'}
+                                            </td>
+                                            <td>
+                                                {isEd ? (
+                                                    <input value={wcValues.placeholder ?? ''}
+                                                           onChange={e => setWcValues(v => ({
+                                                               ...v,
+                                                               placeholder: e.target.value
+                                                           }))}
+                                                           className={s.inp}/>
+                                                ) : wc.placeholder ?? '—'}
+                                            </td>
+                                            <td>
+                                                {isEd ? (
+                                                    <input type="checkbox"
+                                                           checked={wcValues.published ?? false}
+                                                           onChange={e => setWcValues(v => ({
+                                                               ...v,
+                                                               published: e.target.checked
+                                                           }))}/>
+                                                ) : wc.published ? '✔︎' : ''}
+                                            </td>
+                                            <td>
+                                                {isEd ? (
+                                                    <input value={wcValues.type ?? ''}
+                                                           onChange={e => setWcValues(v => ({
+                                                               ...v,
+                                                               type: e.target.value
+                                                           }))}
+                                                           className={s.inp}/>
+                                                ) : wc.type ?? '—'}
+                                            </td>
 
-                                                {i === 0 && (
-                                                    <td rowSpan={wc.reference.length} className={s.actionsCell}>
+                                            <td>{colValues('id')}</td>
+                                            <td>{colValues('table_id')}</td>
+                                            <td>{colValues('name')}</td>
+                                            <td>{colValues('datatype')}</td>
+                                            <td>{colValues('length')}</td>
+                                            <td>{colValues('precision')}</td>
+                                            <td>{refValues('primary')}</td>
+                                            <td>{refValues('visible')}</td>
+
+                                            <td className={s.actionsCell}>
+                                                {isEd ? (
+                                                    <>
+                                                        <button className={s.okBtn} onClick={saveWcEdit}>✓</button>
+                                                        <button className={s.cancelBtn} onClick={cancelWcEdit}>✕
+                                                        </button>
+                                                    </>
+                                                ) : (
+                                                    <>
                                                         <button onClick={() => handleMerge(wc.id)}>+</button>
                                                         <EditIcon className={s.actionIcon}
                                                                   onClick={() => startWcEdit(wc)}/>
                                                         <DeleteIcon className={s.actionIcon}
                                                                     onClick={() => confirm('Удалить?') && deleteColumnWidget(wc.id)}/>
-                                                    </td>
+                                                    </>
                                                 )}
-                                            </tr>
-                                        );
-                                    });
+                                            </td>
+                                        </tr>
+                                    );
                                 })}
                                 </tbody>
 

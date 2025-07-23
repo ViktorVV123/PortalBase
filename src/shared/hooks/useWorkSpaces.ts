@@ -22,7 +22,7 @@ export interface Column {
     precision: number | null | string;
     primary: boolean;
     increment: boolean;
-    datetime: number | null | string;
+    datetime: number | null | string | boolean;
     // остальные поля по желанию
 }
 
