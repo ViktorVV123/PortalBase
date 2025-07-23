@@ -306,6 +306,29 @@ export const useWorkSpaces = () => {
         }
     }, []);
 
+    const loadFilteredFormDisplay = useCallback(
+        async (
+            formId: number,
+            filter: { table_column_id: number; value: string | number }
+        ) => {
+            try {
+                const payload = [filter]; // 👈 оборачиваем в массив
+
+                const { data } = await api.post<FormDisplay>(
+                    `/display/${formId}/main`,
+                    payload
+                );
+
+                setFormDisplay(data); // 👈 теперь данные отобразятся
+            } catch (e) {
+                console.warn('Ошибка при загрузке данных формы с фильтром:', e);
+            }
+        },
+        []
+    );
+
+
+
 
     /* --- sub-display state --- */
     const [subDisplay, setSubDisplay] = useState<SubDisplay | null>(null);
@@ -609,6 +632,7 @@ export const useWorkSpaces = () => {
         updateTableColumn,
         updateWidgetColumn,addReference,
         loadFormTree,
-        formTrees
+        formTrees,
+        loadFilteredFormDisplay
     };
 };

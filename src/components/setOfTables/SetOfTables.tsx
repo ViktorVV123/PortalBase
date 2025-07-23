@@ -50,6 +50,7 @@ type Props = {
     addReference: any
     loadColumnsWidget: any
     formTrees:any
+    loadFilteredFormDisplay:any
 };
 
 export const SetOfTables: React.FC<Props> = ({
@@ -82,7 +83,8 @@ export const SetOfTables: React.FC<Props> = ({
                                                  updateWidgetColumn,
                                                  addReference,
                                                  loadColumnsWidget,
-                                                 formTrees
+                                                 formTrees,
+                                                 loadFilteredFormDisplay
                                              }) => {
 
 
@@ -132,6 +134,7 @@ export const SetOfTables: React.FC<Props> = ({
                     ) : formDisplay ? (
                         <FormTable formTrees={formTrees} selectedFormId={selectedFormId}  subDisplay={subDisplay} subError={subError} subLoading={subLoading}
                                    selectedWidget={selectedWidget} formsByWidget={formsByWidget}
+                                   loadFilteredFormDisplay={loadFilteredFormDisplay}
                                    loadSubDisplay={loadSubDisplay} formDisplay={formDisplay}/>
                     ) : null
                 )

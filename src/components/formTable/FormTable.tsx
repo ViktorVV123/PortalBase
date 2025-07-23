@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useState, useCallback} from 'react';
 import * as s from '@/components/setOfTables/SetOfTables.module.scss';
 import {
     FormDisplay,
@@ -22,6 +22,7 @@ type Props = {
     subLoading: boolean;
     subError: string | null;
     formTrees: Record<number, FormTreeColumn[]>;
+    loadFilteredFormDisplay:any
 };
 
 export const FormTable: React.FC<Props> = ({
@@ -34,9 +35,12 @@ export const FormTable: React.FC<Props> = ({
                                                formsByWidget,
                                                loadSubDisplay,
                                                formTrees,
+                                               loadFilteredFormDisplay,
                                            }) => {
     const [lastPrimary, setLastPrimary] = useState<Record<string, unknown>>({});
     const [activeSubOrder, setActiveSubOrder] = useState<number>(0);
+    const [expandedTrees, setExpandedTrees] = useState<Record<string, FormTreeColumn[]>>({});
+
 
 
     useEffect(() => {
@@ -68,9 +72,8 @@ export const FormTable: React.FC<Props> = ({
         loadSubDisplay(widgetForm.form_id, order, lastPrimary);
     };
 
-    const tree = selectedFormId ? formTrees[Number(selectedFormId)] : null;
-
-    const [expandedTrees, setExpandedTrees] = useState<Record<string, FormTreeColumn[]>>({});
+    const tree = selectedFormId ? formTrees[selectedFormId] : null;
+    const widgetForm = selectedWidget ? formsByWidget[selectedWidget.id] : null;
 
     const handleTreeValueClick = async (
         table_column_id: number,
@@ -79,29 +82,26 @@ export const FormTable: React.FC<Props> = ({
         if (!selectedFormId) return;
 
         const key = `${table_column_id}-${value}`;
+
         try {
+            // 1. Подгружаем вложенные значения
             const { data } = await api.post<FormTreeColumn[] | FormTreeColumn>(
                 `/display/${selectedFormId}/tree`,
                 [{ table_column_id, value }]
             );
-
             const normalized = Array.isArray(data) ? data : [data];
-            setExpandedTrees(prev => ({
-                ...prev,
-                [key]: normalized
-            }));
+            setExpandedTrees(prev => ({ ...prev, [key]: normalized }));
+
+            // 2. Обновляем main grid
+            await loadFilteredFormDisplay(selectedFormId, { table_column_id, value });
         } catch (e) {
-            console.warn('Не удалось загрузить расширенные значения:', e);
+            console.warn('Не удалось загрузить вложенные или основные значения:', e);
         }
     };
 
-
-    const widgetForm = selectedWidget ? formsByWidget[selectedWidget.id] : null;
-    const treeFieldIds = widgetForm?.tree_fields?.map(f => f.table_column_id) ?? [];
     return (
         <div style={{display: 'flex', gap: 10}}>
-
-            {/* ENUM / TREE BLOCK */}
+            {/* TREE BLOCK */}
             {tree && tree.length > 0 && (
                 <div>
                     {tree.map(({ name, values }, idx) => {
@@ -132,19 +132,18 @@ export const FormTable: React.FC<Props> = ({
                                                         {v}
                                                     </td>
                                                 </tr>
-
-                                                {Array.isArray(nestedTree) && nestedTree.map(({ name, values }, j) => (
-                                                    <tr key={`nested-${i}-${j}`}>
-                                                        <td style={{ paddingLeft: 20 }}>
-                                                            <strong>{name}:</strong> {values.join(', ')}
-                                                        </td>
-                                                    </tr>
-                                                ))}
+                                                {Array.isArray(nestedTree) &&
+                                                    nestedTree.map(({ name, values }, j) => (
+                                                        <tr key={`nested-${i}-${j}`}>
+                                                            <td style={{ paddingLeft: 20 }}>
+                                                                <strong>{name}:</strong> {values.join(', ')}
+                                                            </td>
+                                                        </tr>
+                                                    ))}
                                             </React.Fragment>
                                         );
                                     })}
                                     </tbody>
-
                                 </table>
                             </div>
                         );
@@ -152,9 +151,8 @@ export const FormTable: React.FC<Props> = ({
                 </div>
             )}
 
-
+            {/* MAIN + SUB */}
             <div style={{display: 'flex', flexDirection: 'column', gap: 20}}>
-                {/* MAIN GRID */}
                 <table className={s.tbl}>
                     <thead>
                     <tr>{formDisplay.columns.map(c => <th key={c.column_name}>{c.column_name}</th>)}</tr>
@@ -173,7 +171,6 @@ export const FormTable: React.FC<Props> = ({
                     </tbody>
                 </table>
 
-                {/* SUB-TABS */}
                 {subDisplay?.sub_widgets.length > 1 && (
                     <ul className={s.tabs}>
                         {subDisplay.sub_widgets.map(sw => {
@@ -192,7 +189,6 @@ export const FormTable: React.FC<Props> = ({
                     </ul>
                 )}
 
-                {/* SUB GRID */}
                 {subDisplay && (
                     subLoading ? (
                         <p>Загрузка sub-виджета…</p>
@@ -212,7 +208,6 @@ export const FormTable: React.FC<Props> = ({
                     )
                 )}
             </div>
-
         </div>
     );
 };

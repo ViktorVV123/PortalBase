@@ -39,11 +39,32 @@ export const Main = () => {
         error,
         loadWidgetsForTable,
         widgetsByTable,
-        widgetColumns, wColsLoading, wColsError, loadColumnsWidget, formsByWidget,
+        widgetColumns,
+        wColsLoading,
+        wColsError,
+        loadColumnsWidget,
+        formsByWidget,
         loadWidgetForms,
-        loadFormDisplay, formDisplay, formError, formLoading,
-        loadSubDisplay, subDisplay, subLoading, subError, deleteWorkspace, deleteTable, fetchWidgetAndTable,
-        deleteColumnTable,deleteColumnWidget,deleteWidget,updateTableColumn,updateWidgetColumn,addReference,loadFormTree,formTrees
+        loadFormDisplay,
+        formDisplay,
+        formError,
+        formLoading,
+        loadSubDisplay,
+        subDisplay,
+        subLoading,
+        subError,
+        deleteWorkspace,
+        deleteTable,
+        fetchWidgetAndTable,
+        deleteColumnTable,
+        deleteColumnWidget,
+        deleteWidget,
+        updateTableColumn,
+        updateWidgetColumn,
+        addReference,
+        loadFormTree,
+        formTrees,
+        loadFilteredFormDisplay
     } = useWorkSpaces();
 
     const {connections, loadConnections} = useLoadConnections()
@@ -145,7 +166,7 @@ export const Main = () => {
 
                 />
 
-                <SetOfTables  columns={columns}
+                <SetOfTables columns={columns}
                              formDisplay={formDisplay}
                              tableName={selectedTable?.name ?? ''}
                              loading={loading}
@@ -173,7 +194,8 @@ export const Main = () => {
                              updateWidgetColumn={updateWidgetColumn}
                              addReference={addReference}
                              loadColumnsWidget={loadColumnsWidget}
-                              formTrees={formTrees}
+                             formTrees={formTrees}
+                             loadFilteredFormDisplay={loadFilteredFormDisplay}
 
 
                 />
