@@ -464,7 +464,7 @@ export const useWorkSpaces = () => {
             try {
                 await api.delete(`/widgets/columns/${widgetColumnId}`);
 
-                /* из стейта убираем весь объект WidgetColumn с этим id */
+                /* из стейта убираем весь объект WidgetColumnsOfTable с этим id */
                 setWidgetColumns(prev => prev.filter(wc => wc.id !== widgetColumnId));
             } catch {
                 setError('Ошибка при удалении столбца виджета');
