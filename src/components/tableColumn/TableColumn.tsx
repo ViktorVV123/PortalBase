@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useState} from 'react';
 import * as s from "@/components/setOfTables/SetOfTables.module.scss";
 import EditIcon from "@/assets/image/EditIcon.svg";
 import DeleteIcon from "@/assets/image/DeleteIcon.svg";
@@ -7,16 +7,55 @@ import {Column} from "@/shared/hooks/useWorkSpaces";
 
 type tableColumnProps = {
     columns:Column[]
-    editingId:any
-    editValues:any
-    handleChange:(field: keyof Column, value: any) => void
     deleteColumnTable:(id: number) => void;
-    saveEdit:() => void
-    startEdit:(col: Column) => void;
-    cancelEdit:() => void
+    updateTableColumn: (id: number, p: Partial<Omit<Column, 'id'>>) => void;
 }
 
-export const TableColumn = ({columns,startEdit,editingId,editValues,handleChange,deleteColumnTable,saveEdit,cancelEdit}:tableColumnProps) => {
+export const TableColumn = ({columns,deleteColumnTable,updateTableColumn}:tableColumnProps) => {
+
+    const [editingId, setEditingId] = useState<number | null>(null);
+    const [editValues, setEditValues] = useState<Partial<Column>>({});
+    const startEdit = (col: Column) => {
+        setEditingId(col.id);
+        setEditValues({        // копируем все редактируемые поля
+            name: col.name,
+            description: col.description ?? '',
+            datatype: col.datatype,
+            length: col.length ?? '',
+            precision: col.precision ?? '',
+            primary: col.primary,
+            increment: col.increment,
+            required: col.required,
+            datetime: col.datetime,
+        });
+    };
+    const cancelEdit = () => {
+        setEditingId(null);
+        setEditValues({});
+    };
+
+    const handleChange = (field: keyof Column, value: any) =>
+        setEditValues(prev => ({...prev, [field]: value}));
+
+    const cleanPatch = (p: Partial<Column>): Partial<Column> => {
+        const patch: any = {...p};
+
+        // ↴ превращаем '' → null  /  убираем поля, которые не меняли
+        ['length', 'precision'].forEach(k => {
+            if (patch[k] === '' || patch[k] === undefined) delete patch[k];
+        });
+
+        return patch;
+    };
+
+    const saveEdit = async () => {
+        if (editingId == null) return;
+        await updateTableColumn(editingId, cleanPatch(editValues));
+        cancelEdit();
+    };
+
+
+
     return (
             <table className={s.tbl}>
                 <thead>

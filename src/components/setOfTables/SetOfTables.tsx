@@ -395,10 +395,10 @@ export const SetOfTables: React.FC<Props> = ({
                         columns.length === 0
                             ? <p>Нет выбранных форм</p>
                             : (
-                                <TableColumn cancelEdit={cancelEdit} saveEdit={saveEdit} startEdit={startEdit}
+                                <TableColumn
+                                    updateTableColumn={updateTableColumn}
                                              columns={columns}
-                                             deleteColumnTable={deleteColumnTable} editingId={editingId}
-                                             editValues={editValues} handleChange={handleChange}/>
+                                             deleteColumnTable={deleteColumnTable}/>
                             )
                     )}
 
