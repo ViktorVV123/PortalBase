@@ -154,6 +154,7 @@ export interface SubDisplay {
     data: SubFormRow[];
 }
 export interface FormTreeColumn {
+    table_column_id: number;
     name: string;
     values: (string | number | null)[];
 }

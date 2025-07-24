@@ -48,8 +48,8 @@ export const FormTable: React.FC<Props> = ({
     const [activeFilters, setActiveFilters] = useState<
         { table_column_id: number; value: string | number }[]
     >([]);
-    const [expandedTrees, setExpandedTrees] = useState<Record<string, FormTreeColumn[]>>({});
-
+    const [nestedTrees, setNestedTrees] = useState<Record<string, FormTreeColumn[]>>({});
+    const [activeExpandedKey, setActiveExpandedKey] = useState<string | null>(null);
 
 
     useEffect(() => {
@@ -84,7 +84,6 @@ export const FormTable: React.FC<Props> = ({
         if (!selectedFormId || !selectedWidget) return;
 
         setActiveFilters([]);
-        setExpandedTrees({});
 
         try {
             // 1. main таблица
@@ -124,23 +123,71 @@ export const FormTable: React.FC<Props> = ({
     ) => {
         if (!selectedFormId) return;
 
-        const key = `${table_column_id}-${value}`;
+        const filters = [{ table_column_id, value }];
+
+        console.log('[TREE CLICK] → POST /main + /tree', {
+            formId: selectedFormId,
+            payload: filters
+        });
 
         try {
-            // 1. Подгружаем вложенные значения
+            // Обновить main таблицу
+            const { data: mainData } = await api.post<FormDisplay>(
+                `/display/${selectedFormId}/main`,
+                filters
+            );
+            setFormDisplay(mainData);
+
+            // Обновить фильтры
+            setActiveFilters(filters);
+
+            // Загрузить вложенное дерево
             const { data } = await api.post<FormTreeColumn[] | FormTreeColumn>(
                 `/display/${selectedFormId}/tree`,
-                [{ table_column_id, value }]
+                filters
             );
             const normalized = Array.isArray(data) ? data : [data];
-            setExpandedTrees(prev => ({ ...prev, [key]: normalized }));
 
-            // 2. Обновляем main grid
-            await loadFilteredFormDisplay(selectedFormId, { table_column_id, value });
+            const key = `${table_column_id}-${value}`;
+            setNestedTrees(prev => ({ ...prev, [key]: normalized }));
+            setActiveExpandedKey(key);
         } catch (e) {
-            console.warn('Не удалось загрузить вложенные или основные значения:', e);
+            console.warn('❌ Ошибка handleTreeValueClick:', e);
         }
     };
+
+
+
+    const handleNestedValueClick = async (
+        table_column_id: number,
+        value: string | number
+    ) => {
+        if (!selectedFormId) return;
+
+        const newFilter = { table_column_id, value };
+        const updatedFilters = [...activeFilters, newFilter];
+
+        // Убираем дубли
+        const filters = updatedFilters.filter((v, i, self) =>
+            i === self.findIndex(f => f.table_column_id === v.table_column_id && f.value === v.value)
+        );
+
+        try {
+            setActiveFilters(filters);
+            console.log('📤 [POST /main] sending nested filters:', filters);
+
+            const { data } = await api.post<FormDisplay>(
+                `/display/${selectedFormId}/main`,
+                filters
+            );
+            setFormDisplay(data);
+        } catch (e) {
+            console.warn('❌ Ошибка nested фильтра:', e);
+        }
+    };
+
+
+
 
     return (
         <div style={{display: 'flex', gap: 10}}>
@@ -153,46 +200,43 @@ export const FormTable: React.FC<Props> = ({
 
                         return (
                             <div key={`${name}-${idx}`} style={{ marginBottom: 16 }}>
-
                                 <table className={s.tblTree}>
                                     <thead>
-                                    <tr style={{}}>
-                                        <th>
-                                            {name}
-                                        </th>
-                                    </tr>
+                                    <tr><th>{name}</th></tr>
                                     <tr>
-                                        <td onClick={handleResetFilters} style={{textAlign: 'center'}}>
-                                            <FilterOffIcon   width={16} height={16} cursor={'pointer'}/>
+                                        <td onClick={handleResetFilters} style={{ textAlign: 'center' }}>
+                                            <FilterOffIcon width={16} height={16} cursor={'pointer'} />
                                         </td>
-
                                     </tr>
                                     </thead>
                                     <tbody>
                                     {values.map((v, i) => {
                                         const key = `${columnId}-${v}`;
-                                        const nestedTree = expandedTrees[key];
+                                        const isExpanded = key === activeExpandedKey;
 
                                         return (
                                             <React.Fragment key={i}>
                                                 <tr>
                                                     <td
-                                                        style={{cursor: 'pointer'}}
+                                                        style={{ cursor: 'pointer' }}
                                                         onClick={() => columnId != null && handleTreeValueClick(columnId, v)}
                                                     >
                                                         {v}
                                                     </td>
                                                 </tr>
 
-                                                {Array.isArray(nestedTree) &&
-                                                    nestedTree.map(({name, values}, j) => (
-                                                        <tr key={`nested-${i}-${j}`}>
-                                                            <td style={{paddingLeft: 20}}>
-                                                                <strong>{name}:</strong> {values.join(', ')}
+                                                {isExpanded && nestedTrees[key]?.map(({ name, values, table_column_id }, j) =>
+                                                    values.map((val, k) => (
+                                                        <tr key={`nested-${i}-${j}-${k}`}>
+                                                            <td
+                                                                style={{ paddingLeft: 20, cursor: 'pointer' }}
+                                                                onClick={() => handleNestedValueClick(table_column_id, val)}
+                                                            >
+                                                                <strong>{name}:</strong> {val}
                                                             </td>
                                                         </tr>
-                                                    ))}
-
+                                                    ))
+                                                )}
                                             </React.Fragment>
                                         );
                                     })}
@@ -202,6 +246,9 @@ export const FormTable: React.FC<Props> = ({
                             </div>
                         );
                     })}
+
+
+
                 </div>
             )}
 

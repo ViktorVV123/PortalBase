@@ -60,8 +60,8 @@ if (isLocalhost && !accessToken) {
 /* ───────── 4. URL-ы API и POST /refresh_session ────────────────────────── */
 
 const API_URL = isLocalhost
-    ? 'https://csc-fv.pro.lukoil.com'
-    : 'https://csc-fv.pro.lukoil.com';
+    ? 'https://csc-fv.pro.lukoil.com/api'
+    : 'https://csc-fv.pro.lukoil.com/api';
 
 const REFRESH_URL = `${API_URL}/refresh`;
 
