@@ -51,6 +51,8 @@ type Props = {
     loadColumnsWidget: any
     formTrees:any
     loadFilteredFormDisplay: (formId: number, filter: { table_column_id: number; value: string | number }) => Promise<void>;
+    setFormDisplay:any
+    setSubDisplay:any
 
 };
 
@@ -85,7 +87,9 @@ export const SetOfTables: React.FC<Props> = ({
                                                  addReference,
                                                  loadColumnsWidget,
                                                  formTrees,
-                                                 loadFilteredFormDisplay
+                                                 loadFilteredFormDisplay,
+                                                 setFormDisplay,
+                                                 setSubDisplay
                                              }) => {
 
 
@@ -133,9 +137,9 @@ export const SetOfTables: React.FC<Props> = ({
                     ) : formError ? (
                         <p className={s.error}>{formError}</p>
                     ) : formDisplay ? (
-                        <FormTable formTrees={formTrees} selectedFormId={selectedFormId}  subDisplay={subDisplay} subError={subError} subLoading={subLoading}
+                        <FormTable setSubDisplay={setSubDisplay} formTrees={formTrees} selectedFormId={selectedFormId}  subDisplay={subDisplay} subError={subError} subLoading={subLoading}
                                    selectedWidget={selectedWidget} formsByWidget={formsByWidget}
-                                   loadFilteredFormDisplay={loadFilteredFormDisplay}
+                                   loadFilteredFormDisplay={loadFilteredFormDisplay} setFormDisplay={setFormDisplay}
                                    loadSubDisplay={loadSubDisplay} formDisplay={formDisplay}/>
                     ) : null
                 )

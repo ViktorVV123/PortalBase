@@ -64,7 +64,9 @@ export const Main = () => {
         addReference,
         loadFormTree,
         formTrees,
-        loadFilteredFormDisplay
+        loadFilteredFormDisplay,
+        setFormDisplay,
+        setSubDisplay
     } = useWorkSpaces();
 
     const {connections, loadConnections} = useLoadConnections()
@@ -196,6 +198,8 @@ export const Main = () => {
                              loadColumnsWidget={loadColumnsWidget}
                              formTrees={formTrees}
                              loadFilteredFormDisplay={loadFilteredFormDisplay}
+                             setFormDisplay={setFormDisplay}
+                             setSubDisplay={setSubDisplay}
 
 
                 />

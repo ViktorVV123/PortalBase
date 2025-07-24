@@ -1,5 +1,6 @@
 import React, {useEffect, useState, useCallback} from 'react';
 import * as s from '@/components/setOfTables/SetOfTables.module.scss';
+import FilterOffIcon from '@/assets/image/FilterOffIcon.svg';
 import {
     FormDisplay,
     SubDisplay,
@@ -23,6 +24,8 @@ type Props = {
     subError: string | null;
     formTrees: Record<number, FormTreeColumn[]>;
     loadFilteredFormDisplay: (formId: number, filter: { table_column_id: number; value: string | number }) => Promise<void>;
+    setFormDisplay:any
+    setSubDisplay:any
 
 };
 
@@ -36,10 +39,15 @@ export const FormTable: React.FC<Props> = ({
                                                formsByWidget,
                                                loadSubDisplay,
                                                formTrees,
-                                               loadFilteredFormDisplay,
+                                               loadFilteredFormDisplay,setFormDisplay,
+                                               setSubDisplay
+
                                            }) => {
     const [lastPrimary, setLastPrimary] = useState<Record<string, unknown>>({});
     const [activeSubOrder, setActiveSubOrder] = useState<number>(0);
+    const [activeFilters, setActiveFilters] = useState<
+        { table_column_id: number; value: string | number }[]
+    >([]);
     const [expandedTrees, setExpandedTrees] = useState<Record<string, FormTreeColumn[]>>({});
 
 
@@ -72,6 +80,40 @@ export const FormTable: React.FC<Props> = ({
         setActiveSubOrder(order);
         loadSubDisplay(widgetForm.form_id, order, lastPrimary);
     };
+    const handleResetFilters = async () => {
+        if (!selectedFormId || !selectedWidget) return;
+
+        setActiveFilters([]);
+        setExpandedTrees({});
+
+        try {
+            // 1. main таблица
+            const { data: mainData } = await api.post<FormDisplay>(
+                `/display/${selectedFormId}/main`,
+                []
+            );
+            setFormDisplay(mainData);
+
+            // 2. sabDisplay — без primary_keys
+            const widgetForm = formsByWidget[selectedWidget.id];
+            const subOrder = widgetForm?.sub_widgets[0]?.widget_order ?? 0;
+
+            const { data: subData } = await api.post<SubDisplay>(
+                `/display/${selectedFormId}/sub`,
+                { primary_keys: {} },                         // сброс pk
+                { params: { sub_widget_order: subOrder } }
+            );
+            setSubDisplay(subData);
+
+            // 3. сброс активного саб-ордера
+            setActiveSubOrder(subOrder);
+
+            console.log('✅ Сброс фильтров + сабтаблицы выполнен');
+        } catch (e) {
+            console.warn('❌ Ошибка при полном сбросе:', e);
+        }
+    };
+
 
     const tree = selectedFormId ? formTrees[selectedFormId] : null;
     const widgetForm = selectedWidget ? formsByWidget[selectedWidget.id] : null;
@@ -111,11 +153,19 @@ export const FormTable: React.FC<Props> = ({
 
                         return (
                             <div key={`${name}-${idx}`} style={{ marginBottom: 16 }}>
-                                <h4>{name}</h4>
+
                                 <table className={s.tblTree}>
                                     <thead>
+                                    <tr style={{}}>
+                                        <th>
+                                            {name}
+                                        </th>
+                                    </tr>
                                     <tr>
-                                        <th>{name}</th>
+                                        <td onClick={handleResetFilters} style={{textAlign: 'center'}}>
+                                            <FilterOffIcon   width={16} height={16} cursor={'pointer'}/>
+                                        </td>
+
                                     </tr>
                                     </thead>
                                     <tbody>
@@ -127,23 +177,26 @@ export const FormTable: React.FC<Props> = ({
                                             <React.Fragment key={i}>
                                                 <tr>
                                                     <td
-                                                        style={{ cursor: 'pointer' }}
+                                                        style={{cursor: 'pointer'}}
                                                         onClick={() => columnId != null && handleTreeValueClick(columnId, v)}
                                                     >
                                                         {v}
                                                     </td>
                                                 </tr>
+
                                                 {Array.isArray(nestedTree) &&
-                                                    nestedTree.map(({ name, values }, j) => (
+                                                    nestedTree.map(({name, values}, j) => (
                                                         <tr key={`nested-${i}-${j}`}>
-                                                            <td style={{ paddingLeft: 20 }}>
+                                                            <td style={{paddingLeft: 20}}>
                                                                 <strong>{name}:</strong> {values.join(', ')}
                                                             </td>
                                                         </tr>
                                                     ))}
+
                                             </React.Fragment>
                                         );
                                     })}
+
                                     </tbody>
                                 </table>
                             </div>

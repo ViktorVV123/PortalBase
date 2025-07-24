@@ -633,6 +633,9 @@ export const useWorkSpaces = () => {
         updateWidgetColumn,addReference,
         loadFormTree,
         formTrees,
-        loadFilteredFormDisplay
+        loadFilteredFormDisplay,
+        setFormDisplay,
+        setSubDisplay
+
     };
 };
