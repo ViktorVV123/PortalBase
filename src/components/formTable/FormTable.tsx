@@ -165,12 +165,12 @@ export const FormTable: React.FC<Props> = ({
         if (!selectedFormId) return;
 
         const newFilter = { table_column_id, value };
-        const updatedFilters = [...activeFilters, newFilter];
 
-        // Убираем дубли
-        const filters = updatedFilters.filter((v, i, self) =>
-            i === self.findIndex(f => f.table_column_id === v.table_column_id && f.value === v.value)
-        );
+        // Удаляем старые фильтры по этому же столбцу
+        const filters = [
+            ...activeFilters.filter(f => f.table_column_id !== table_column_id),
+            newFilter
+        ];
 
         try {
             setActiveFilters(filters);
@@ -185,6 +185,7 @@ export const FormTable: React.FC<Props> = ({
             console.warn('❌ Ошибка nested фильтра:', e);
         }
     };
+
 
 
 
