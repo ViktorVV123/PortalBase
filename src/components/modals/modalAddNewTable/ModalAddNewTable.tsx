@@ -80,7 +80,7 @@ export const ModalAddTable = ({
     /* ——— рендер модалки ——— */
     return (
         <ThemeProvider theme={dark}>
-            <CssBaseline/>
+
 
             <Dialog open={open} onClose={onCancel} fullWidth maxWidth="sm">
                 <DialogTitle>Новая таблица в «{workspace.name}»</DialogTitle>

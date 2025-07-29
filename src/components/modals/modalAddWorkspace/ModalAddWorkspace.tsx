@@ -91,7 +91,7 @@ export const ModalAddWorkspace = ({
     return (
         <ThemeProvider theme={dark}>
 
-            <CssBaseline/>
+
             <Dialog open={open} onClose={onCancel} fullWidth maxWidth="sm">
                 <DialogTitle>Создать workspace</DialogTitle>
 

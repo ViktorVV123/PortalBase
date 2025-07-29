@@ -57,7 +57,6 @@ export const ModalAddWidget = ({open, table, onSuccess, onCancel}: Props) => {
 
     return (
         <ThemeProvider theme={dark}>
-            <CssBaseline/>
             <Dialog open={open} onClose={onCancel} fullWidth maxWidth="sm">
                 <DialogTitle>Новый widget в «{table.name}»</DialogTitle>
 

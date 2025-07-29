@@ -54,7 +54,6 @@ export const ModalAddConnection = ({  open,onSuccess, onCancel }: Props) => {
 
     return (
         <ThemeProvider theme={dark}>
-            <CssBaseline/>
 
             <Dialog
                 open={open}

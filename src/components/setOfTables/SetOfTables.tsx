@@ -11,7 +11,7 @@ import {
 import {FormTable} from "@/components/formTable/FormTable";
 import {TableColumn} from "@/components/tableColumn/TableColumn";
 import {WidgetColumnsOfTable} from '@/components/WidgetColumnsOfTable/WidgetColumnsOfTable'
-import {TableListView} from "@/components/tableColumn/TableListSelector";
+import {TableListView} from "@/components/tableColumn/TableListView";
 
 type Props = {
     columns: Column[];
