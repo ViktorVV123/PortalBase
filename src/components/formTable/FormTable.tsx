@@ -200,54 +200,55 @@ export const FormTable: React.FC<Props> = ({
                         const columnId = currentTreeField?.table_column_id;
 
                         return (
-                            <div key={`${name}-${idx}`} style={{ marginBottom: 16 }}>
-                                <table className={s.tblTree}>
-                                    <thead>
-                                    <tr><th>{name}</th></tr>
-                                    <tr>
-                                        <td onClick={handleResetFilters} style={{ textAlign: 'center' }}>
-                                            <FilterOffIcon width={16} height={16} cursor={'pointer'} />
-                                        </td>
-                                    </tr>
-                                    </thead>
-                                    <tbody>
+                            <div key={`${name}-${idx}`} className={s.treeList}>
+                                <div className={s.treeHeader}>
+                                    <span>{name}</span>
+                                    <FilterOffIcon
+                                        width={16}
+                                        height={16}
+                                        cursor="pointer"
+                                        onClick={handleResetFilters}
+                                    />
+                                </div>
+                                <ul className={s.treeUl}>
                                     {values.map((v, i) => {
                                         const key = `${columnId}-${v}`;
                                         const isExpanded = key === activeExpandedKey;
 
                                         return (
-                                            <React.Fragment key={i}>
-                                                <tr>
-                                                    <td
-                                                        style={{ cursor: 'pointer' }}
-                                                        onClick={() => columnId != null && handleTreeValueClick(columnId, v)}
-                                                    >
-                                                        {v}
-                                                    </td>
-                                                </tr>
+                                            <li key={i}>
+                                                <div
+                                                    className={s.treeItem}
+                                                    onClick={() =>
+                                                        columnId != null && handleTreeValueClick(columnId, v)
+                                                    }
+                                                >
+                                                    {v}
+                                                </div>
 
-                                                {isExpanded && nestedTrees[key]?.map(({ name, values, table_column_id }, j) =>
-                                                    values.map((val, k) => (
-                                                        <tr key={`nested-${i}-${j}-${k}`}>
-                                                            <td
-                                                                style={{ paddingLeft: 20, cursor: 'pointer' }}
-                                                                onClick={() => handleNestedValueClick(table_column_id, val)}
-                                                            >
-                                                                <strong>{name}:</strong> {val}
-                                                            </td>
-                                                        </tr>
-                                                    ))
+                                                {isExpanded && (
+                                                    <ul className={s.nestedUl}>
+                                                        {nestedTrees[key]?.map(({name, values, table_column_id}, j) =>
+                                                            values.map((val, k) => (
+                                                                <li
+                                                                    key={`nested-${i}-${j}-${k}`}
+                                                                    className={s.nestedItem}
+                                                                    onClick={() => handleNestedValueClick(table_column_id, val)}
+                                                                >
+                                                                    {val}
+                                                                </li>
+                                                            ))
+                                                        )}
+                                                    </ul>
                                                 )}
-                                            </React.Fragment>
+                                            </li>
                                         );
                                     })}
-
-                                    </tbody>
-                                </table>
+                                </ul>
                             </div>
+
                         );
                     })}
-
 
 
                 </div>
