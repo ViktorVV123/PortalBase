@@ -9,6 +9,10 @@ export interface DTable {
     name: string;
     description: string;
     published: boolean;
+    select_query?: string;
+    insert_query?:string;
+    update_query?:string;
+    delete_query:string;
 }
 
 export interface Column {
@@ -88,7 +92,6 @@ export type WidgetForm = {
         table_column_id: number;
     }[];
 };
-
 
 //типизация формы MAIN
 
@@ -198,6 +201,28 @@ export const useWorkSpaces = () => {
         },
         [tablesByWs],
     );
+
+    const updateTableMeta = useCallback(
+        async (id: number, patch: Partial<DTable>) => {
+            try {
+                const { data } = await api.patch<DTable>(`/tables/${id}`, patch);
+
+                setTablesByWs(prev => {
+                    const copy = { ...prev };
+                    const wsId = data.workspace_id;
+                    copy[wsId] = (copy[wsId] || []).map(t => t.id === id ? { ...t, ...data } : t);
+                    return copy;
+                });
+
+                // 👇 Обновим selectedTable вручную
+                setSelTable(prev => prev && prev.id === id ? { ...prev, ...data } : prev);
+            } catch (err) {
+                console.warn('Ошибка при обновлении таблицы:', err);
+            }
+        },
+        []
+    );
+
 
     const loadColumns = useCallback(
         async (table: DTable) => {
@@ -636,7 +661,8 @@ export const useWorkSpaces = () => {
         formTrees,
         loadFilteredFormDisplay,
         setFormDisplay,
-        setSubDisplay
+        setSubDisplay,
+        updateTableMeta
 
     };
 };

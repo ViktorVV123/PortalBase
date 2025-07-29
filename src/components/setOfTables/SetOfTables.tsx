@@ -1,7 +1,7 @@
 import React, {useState} from 'react';
 import * as s from './SetOfTables.module.scss';
 import {
-    Column,
+    Column, DTable,
     FormDisplay,
     SubDisplay,
     Widget,
@@ -11,6 +11,7 @@ import {
 import {FormTable} from "@/components/formTable/FormTable";
 import {TableColumn} from "@/components/tableColumn/TableColumn";
 import {WidgetColumnsOfTable} from '@/components/WidgetColumnsOfTable/WidgetColumnsOfTable'
+import {TableListView} from "@/components/tableColumn/TableListSelector";
 
 type Props = {
     columns: Column[];
@@ -53,6 +54,8 @@ type Props = {
     loadFilteredFormDisplay: (formId: number, filter: { table_column_id: number; value: string | number }) => Promise<void>;
     setFormDisplay:any
     setSubDisplay:any
+    selectedTable:  DTable | null;
+    updateTableMeta: (id: number, patch: Partial<DTable>) => void;
 
 };
 
@@ -89,8 +92,12 @@ export const SetOfTables: React.FC<Props> = ({
                                                  formTrees,
                                                  loadFilteredFormDisplay,
                                                  setFormDisplay,
-                                                 setSubDisplay
+                                                 setSubDisplay,
+                                                 selectedTable,
+                                                 updateTableMeta,
                                              }) => {
+
+
 
 
     if (loading) return <p>Загрузка…</p>;
@@ -162,10 +169,16 @@ export const SetOfTables: React.FC<Props> = ({
                         columns.length === 0
                             ? <p>Нет выбранных форм</p>
                             : (
+                                <div>
+
                                 <TableColumn
+
                                     updateTableColumn={updateTableColumn}
                                     columns={columns}
                                     deleteColumnTable={deleteColumnTable}/>
+
+                                   <TableListView selectedTable={selectedTable} updateTableMeta={updateTableMeta}/>
+                                </div>
                             )
                     )}
 

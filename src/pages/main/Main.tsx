@@ -66,7 +66,8 @@ export const Main = () => {
         formTrees,
         loadFilteredFormDisplay,
         setFormDisplay,
-        setSubDisplay
+        setSubDisplay,
+        updateTableMeta,
     } = useWorkSpaces();
 
     const {connections, loadConnections} = useLoadConnections()
@@ -200,7 +201,8 @@ export const Main = () => {
                              loadFilteredFormDisplay={loadFilteredFormDisplay}
                              setFormDisplay={setFormDisplay}
                              setSubDisplay={setSubDisplay}
-
+                             selectedTable={selectedTable}
+                             updateTableMeta={updateTableMeta}
 
                 />
             </div>

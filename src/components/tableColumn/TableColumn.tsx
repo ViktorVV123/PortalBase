@@ -57,6 +57,7 @@ export const TableColumn = ({columns,deleteColumnTable,updateTableColumn}:tableC
 
 
     return (
+        <div>
             <table className={s.tbl}>
                 <thead>
                 <tr>
@@ -169,5 +170,7 @@ export const TableColumn = ({columns,deleteColumnTable,updateTableColumn}:tableC
                 </tbody>
 
             </table>
+
+        </div>
     );
 };
