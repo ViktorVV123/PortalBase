@@ -273,7 +273,7 @@ export const FormTable: React.FC<Props> = ({
                     </tbody>
                 </table>
 
-                {subDisplay?.sub_widgets.length > 1 && (
+                {subDisplay?.sub_widgets.length > 0 && (
                     <ul className={s.tabs}>
                         {subDisplay.sub_widgets.map(sw => {
                             const isActive = sw.widget_order === subDisplay.displayed_widget.widget_order;
