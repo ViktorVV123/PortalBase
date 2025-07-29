@@ -113,10 +113,10 @@ export const SetOfTables: React.FC<Props> = ({
 
                     {selectedWidget ? (
                         <>
-                            <span className={s.link} onClick={handleClearWidget}>{tableName}</span>
+                            <span  onClick={handleClearWidget}>{tableName}</span>
                             <span className={s.arrow}>→</span>
                             {selectedFormId ? (
-                                <span className={s.link} onClick={() => handleClearWidget()}>
+                                <span onClick={() => handleClearWidget()}>
        {selectedWidget.name}
                                          </span>
                             ) : (

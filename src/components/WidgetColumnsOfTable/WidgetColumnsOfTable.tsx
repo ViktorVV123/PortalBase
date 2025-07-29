@@ -107,6 +107,7 @@ export const WidgetColumnsOfTable = ({updateWidgetColumn,widgetColumns,selectedW
     };
 
     return (
+        <div className={s.tableWrapperWidget}>
         <table className={s.tbl}>
             <thead>
             <tr>
@@ -228,6 +229,7 @@ export const WidgetColumnsOfTable = ({updateWidgetColumn,widgetColumns,selectedW
 
 
         </table>
+        </div>
     );
 };
 

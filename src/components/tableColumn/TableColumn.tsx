@@ -57,7 +57,7 @@ export const TableColumn = ({columns,deleteColumnTable,updateTableColumn}:tableC
 
 
     return (
-        <div>
+        <div className={s.tableWrapper}>
             <table className={s.tbl}>
                 <thead>
                 <tr>

@@ -154,7 +154,7 @@ export const TopComponent: React.FC<Props> = ({
                                 e.stopPropagation()
                             }}
                         >
-                            <AddIcon width={16} height={16}/> создать
+                            <AddIcon className={s.actionIcon} width={16} height={16}/> создать
                         </li>
                         {workSpaces.map(ws => {
                             const tables = tablesByWs[ws.id];      // может быть undefined onClick={changeStatusModal}
@@ -169,14 +169,14 @@ export const TopComponent: React.FC<Props> = ({
 
 
                                     <div className={s.spaceWN}>
-                                        <WorkspacesIcon width={16} height={16}/>
+                                        <WorkspacesIcon className={s.actionIcon} width={16} height={16}/>
 
                                         {/* текст — отдельный элемент, чтобы управлять flex-свойствами */}
                                         <span className={s.wsName}>{ws.name}</span>
 
                                         <div>
                                             <DeleteIcon
-                                                className={s.trash}
+                                                className={s.actionIcon}
                                                 width={16}
                                                 height={16}
                                                 onClick={e => {
@@ -205,7 +205,7 @@ export const TopComponent: React.FC<Props> = ({
                                                     e.stopPropagation()
                                                 }}
                                             >
-                                                <AddIcon width={16} height={16}/> создать
+                                                <AddIcon className={s.actionIcon} width={16} height={16}/> создать
                                             </li>
 
                                             {/* — сами таблицы — */}
@@ -229,7 +229,7 @@ export const TopComponent: React.FC<Props> = ({
                                                     }}
                                                 >
                                                     <div className={s.spaceWN}>
-                                                        <TableIcon width={16} height={16}/>
+                                                        <TableIcon className={s.actionIcon} width={16} height={16}/>
                                                         <span className={s.wsName}>{t.name}</span>
                                                         <div>
                                                             <DeleteIcon
@@ -239,7 +239,7 @@ export const TopComponent: React.FC<Props> = ({
                                                                     if (confirm(`Удалить таблицу «${t.name}»?`))
                                                                         deleteTable(t);
                                                                 }}
-                                                                className={s.trash}
+                                                                className={s.actionIcon}
                                                                 width={16}
                                                                 height={16}
                                                             />
@@ -262,7 +262,7 @@ export const TopComponent: React.FC<Props> = ({
 
                                                                 }}
                                                             >
-                                                                <AddIcon width={16} height={16}/> создать
+                                                                <AddIcon className={s.actionIcon} width={16} height={16}/> создать
                                                             </li>
 
 
@@ -285,16 +285,15 @@ export const TopComponent: React.FC<Props> = ({
                                                                         }}
                                                                     >
                                                                         <div className={s.spaceWN}>
-                                                                            <WidgetsIcon width={16} height={16}/>
+                                                                            <WidgetsIcon className={s.actionIcon} width={16} height={16}/>
                                                                             <span className={s.wsName}>{w.name}</span>
-                                                                            <DeleteIcon
+                                                                            <DeleteIcon className={s.actionIcon}
 
                                                                                 onClick={e => {
                                                                                     e.stopPropagation();
                                                                                     if (confirm('Удалить виджет?'))
                                                                                         deleteWidget(w.id, t.id);     // ← передаём widgetId и tableId
                                                                                 }}
-                                                                                className={s.trash}
                                                                                 width={16}
                                                                                 height={16}
                                                                             />
@@ -319,7 +318,7 @@ export const TopComponent: React.FC<Props> = ({
                                                                                         closeMenu();
                                                                                     }}
                                                                                 >
-                                                                                    <FormIcon/>
+                                                                                    <FormIcon className={s.actionIcon}/>
                                                                                     {formName}
                                                                                 </li>
                                                                             </ul>

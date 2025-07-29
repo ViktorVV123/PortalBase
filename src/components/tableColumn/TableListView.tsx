@@ -21,13 +21,13 @@ export const TableListView: React.FC<Props> = ({ selectedTable, updateTableMeta 
     return (
         <div style={{ marginTop: '24px' }}>
             <Typography
+                onClick={() => setOpenMetaModal(true)}
                 variant="h6"
                 gutterBottom
-                onClick={() => setOpenMetaModal(true)}
-                sx={{ cursor: 'pointer', textDecoration: 'underline', color: '#8ac7ff',display:'flex', alignItems: 'center',gap:1 }}
+                sx={{ cursor: 'pointer', textDecoration: 'underline', color: '#8ac7ff',display:'flex', alignItems: 'center',gap:1, width:'15%' }}
             >
                 Метаданные таблицы
-                <Editicon/>
+                <Editicon />
             </Typography>
 
             <p><strong>Название:</strong> {selectedTable.name}</p>
