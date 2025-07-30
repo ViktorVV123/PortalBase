@@ -22,7 +22,7 @@ export const SideNav: React.FC<Props> = ({open, toggle, formsByWidget, openForm}
         <div className={s.wrap}>
             {/* бургер */}
             <button className={s.burger} onClick={toggle}>
-                <MenuIcon color={'white'} width={25} height={25}/>
+                <MenuIcon className={s.icon} color={'white'} width={25} height={25}/>
             </button>
 
             {/* выпадашка */}
@@ -37,7 +37,7 @@ export const SideNav: React.FC<Props> = ({open, toggle, formsByWidget, openForm}
                             return (
                                 <li key={f.form_id}>
                                     <button onClick={handleOnclick}>
-                                        <FormaIcon/>
+                                        <FormaIcon className={s.icon}/>
                                         <span className={s.name}>{f.name}</span>
                                     </button>
                                 </li>

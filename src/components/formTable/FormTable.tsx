@@ -84,7 +84,7 @@ export const FormTable: React.FC<Props> = ({
         if (!selectedFormId || !selectedWidget) return;
 
         setActiveFilters([]);
-
+        setActiveExpandedKey(null)
         try {
             // 1. main таблица
             const { data: mainData } = await api.post<FormDisplay>(
