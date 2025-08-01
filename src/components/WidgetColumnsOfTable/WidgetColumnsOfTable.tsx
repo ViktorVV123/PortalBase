@@ -7,11 +7,16 @@ import {api} from "@/services/api";
 
 
 type WidgetColumnsProps = {
-    updateWidgetColumn: any
+    updateWidgetColumn: (id: number,
+                         patch: Partial<Omit<WidgetColumn, 'id' | 'widget_id' | 'reference'>>) => void;
     widgetColumns: WidgetColumn[];
     selectedWidget: Widget | null;
     loadColumnsWidget: any
-    addReference:any
+    addReference: (widgetColId: number, tblColId: number, payload: {
+        width: number;
+        visible: boolean;
+        primary: boolean;
+    }) => Promise<void>;
     deleteColumnWidget: (id: number) => void;
 }
 

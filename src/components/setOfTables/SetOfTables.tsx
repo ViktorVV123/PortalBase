@@ -1,8 +1,8 @@
-import React, {useState} from 'react';
+import React from 'react';
 import * as s from './SetOfTables.module.scss';
 import {
     Column, DTable,
-    FormDisplay,
+    FormDisplay, FormTreeColumn,
     SubDisplay,
     Widget,
     WidgetColumn,
@@ -47,14 +47,22 @@ type Props = {
     deleteColumnTable: (id: number) => void;
     deleteColumnWidget: (id: number) => void;
     updateTableColumn: (id: number, p: Partial<Omit<Column, 'id'>>) => void;
-    updateWidgetColumn: any
-    addReference: any
-    loadColumnsWidget: any
-    formTrees:any
-    loadFilteredFormDisplay: (formId: number, filter: { table_column_id: number; value: string | number }) => Promise<void>;
-    setFormDisplay:any
-    setSubDisplay:any
-    selectedTable:  DTable | null;
+    updateWidgetColumn: (id: number,
+                         patch: Partial<Omit<WidgetColumn, 'id' | 'widget_id' | 'reference'>>) => void;
+    addReference: (widgetColId: number, tblColId: number, payload: {
+        width: number;
+        visible: boolean;
+        primary: boolean;
+    }) => Promise<void>;
+    loadColumnsWidget: (widgetId: number) => void;
+    formTrees: Record<number, FormTreeColumn[]>
+    loadFilteredFormDisplay: (formId: number, filter: {
+        table_column_id: number;
+        value: string | number
+    }) => Promise<void>;
+    setFormDisplay: (value: FormDisplay | null) => void
+    setSubDisplay: (value: SubDisplay | null) => void;
+    selectedTable: DTable | null;
     updateTableMeta: (id: number, patch: Partial<DTable>) => void;
 
 };
@@ -98,8 +106,6 @@ export const SetOfTables: React.FC<Props> = ({
                                              }) => {
 
 
-
-
     if (loading) return <p>Загрузка…</p>;
     if (error) return <p className={s.error}>{error}</p>;
 
@@ -113,7 +119,7 @@ export const SetOfTables: React.FC<Props> = ({
 
                     {selectedWidget ? (
                         <>
-                            <span  onClick={handleClearWidget}>{tableName}</span>
+                            <span onClick={handleClearWidget}>{tableName}</span>
                             <span className={s.arrow}>→</span>
                             {selectedFormId ? (
                                 <span onClick={() => handleClearWidget()}>
@@ -144,7 +150,8 @@ export const SetOfTables: React.FC<Props> = ({
                     ) : formError ? (
                         <p className={s.error}>{formError}</p>
                     ) : formDisplay ? (
-                        <FormTable setSubDisplay={setSubDisplay} formTrees={formTrees} selectedFormId={selectedFormId}  subDisplay={subDisplay} subError={subError} subLoading={subLoading}
+                        <FormTable setSubDisplay={setSubDisplay} formTrees={formTrees} selectedFormId={selectedFormId}
+                                   subDisplay={subDisplay} subError={subError} subLoading={subLoading}
                                    selectedWidget={selectedWidget} formsByWidget={formsByWidget}
                                    loadFilteredFormDisplay={loadFilteredFormDisplay} setFormDisplay={setFormDisplay}
                                    loadSubDisplay={loadSubDisplay} formDisplay={formDisplay}/>
@@ -171,13 +178,13 @@ export const SetOfTables: React.FC<Props> = ({
                             : (
                                 <div>
 
-                                <TableColumn
+                                    <TableColumn
 
-                                    updateTableColumn={updateTableColumn}
-                                    columns={columns}
-                                    deleteColumnTable={deleteColumnTable}/>
+                                        updateTableColumn={updateTableColumn}
+                                        columns={columns}
+                                        deleteColumnTable={deleteColumnTable}/>
 
-                                   <TableListView selectedTable={selectedTable} updateTableMeta={updateTableMeta}/>
+                                    <TableListView selectedTable={selectedTable} updateTableMeta={updateTableMeta}/>
                                 </div>
                             )
                     )}

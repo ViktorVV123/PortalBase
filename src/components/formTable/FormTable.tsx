@@ -1,13 +1,14 @@
-import React, {useEffect, useState, useCallback} from 'react';
+import React, {useEffect, useState} from 'react';
 import * as s from '@/components/setOfTables/SetOfTables.module.scss';
-import FilterOffIcon from '@/assets/image/FilterOffIcon.svg';
 import {
     FormDisplay,
     SubDisplay,
     WidgetForm,
-    FormTreeColumn
+    FormTreeColumn, Widget
 } from '@/shared/hooks/useWorkSpaces';
 import {api} from "@/services/api";
+import {SubWormTable} from "@/components/formTable/SubFormTable";
+import {TreeFormTable} from "@/components/formTable/TreeFormTable";
 
 type Props = {
     formDisplay: FormDisplay;
@@ -17,15 +18,18 @@ type Props = {
         primary?: Record<string, unknown>,
     ) => void;
     formsByWidget: Record<number, WidgetForm>;
-    selectedWidget: any;
+    selectedWidget: Widget | null;
     selectedFormId: number | null;
     subDisplay: SubDisplay | null;
     subLoading: boolean;
     subError: string | null;
     formTrees: Record<number, FormTreeColumn[]>;
-    loadFilteredFormDisplay: (formId: number, filter: { table_column_id: number; value: string | number }) => Promise<void>;
-    setFormDisplay:any
-    setSubDisplay:any
+    loadFilteredFormDisplay: (formId: number, filter: {
+        table_column_id: number;
+        value: string | number
+    }) => Promise<void>;
+    setFormDisplay: (value: FormDisplay | null) => void;
+    setSubDisplay: (value: SubDisplay | null) => void;
 
 };
 
@@ -39,7 +43,7 @@ export const FormTable: React.FC<Props> = ({
                                                formsByWidget,
                                                loadSubDisplay,
                                                formTrees,
-                                               loadFilteredFormDisplay,setFormDisplay,
+                                               loadFilteredFormDisplay, setFormDisplay,
                                                setSubDisplay
 
                                            }) => {
@@ -87,7 +91,7 @@ export const FormTable: React.FC<Props> = ({
         setActiveExpandedKey(null)
         try {
             // 1. main таблица
-            const { data: mainData } = await api.post<FormDisplay>(
+            const {data: mainData} = await api.post<FormDisplay>(
                 `/display/${selectedFormId}/main`,
                 []
             );
@@ -97,10 +101,10 @@ export const FormTable: React.FC<Props> = ({
             const widgetForm = formsByWidget[selectedWidget.id];
             const subOrder = widgetForm?.sub_widgets[0]?.widget_order ?? 0;
 
-            const { data: subData } = await api.post<SubDisplay>(
+            const {data: subData} = await api.post<SubDisplay>(
                 `/display/${selectedFormId}/sub`,
-                { primary_keys: {} },                         // сброс pk
-                { params: { sub_widget_order: subOrder } }
+                {primary_keys: {}},                         // сброс pk
+                {params: {sub_widget_order: subOrder}}
             );
             setSubDisplay(subData);
 
@@ -123,7 +127,7 @@ export const FormTable: React.FC<Props> = ({
     ) => {
         if (!selectedFormId) return;
 
-        const filters = [{ table_column_id, value }];
+        const filters = [{table_column_id, value}];
 
         console.log('[TREE CLICK] → POST /main + /tree', {
             formId: selectedFormId,
@@ -132,7 +136,7 @@ export const FormTable: React.FC<Props> = ({
 
         try {
             // Обновить main таблицу
-            const { data: mainData } = await api.post<FormDisplay>(
+            const {data: mainData} = await api.post<FormDisplay>(
                 `/display/${selectedFormId}/main`,
                 filters
             );
@@ -142,20 +146,19 @@ export const FormTable: React.FC<Props> = ({
             setActiveFilters(filters);
 
             // Загрузить вложенное дерево
-            const { data } = await api.post<FormTreeColumn[] | FormTreeColumn>(
+            const {data} = await api.post<FormTreeColumn[] | FormTreeColumn>(
                 `/display/${selectedFormId}/tree`,
                 filters
             );
             const normalized = Array.isArray(data) ? data : [data];
 
             const key = `${table_column_id}-${value}`;
-            setNestedTrees(prev => ({ ...prev, [key]: normalized }));
+            setNestedTrees(prev => ({...prev, [key]: normalized}));
             setActiveExpandedKey(key);
         } catch (e) {
             console.warn('❌ Ошибка handleTreeValueClick:', e);
         }
     };
-
 
 
     const handleNestedValueClick = async (
@@ -164,7 +167,7 @@ export const FormTable: React.FC<Props> = ({
     ) => {
         if (!selectedFormId) return;
 
-        const newFilter = { table_column_id, value };
+        const newFilter = {table_column_id, value};
 
         // Удаляем старые фильтры по этому же столбцу
         const filters = [
@@ -176,7 +179,7 @@ export const FormTable: React.FC<Props> = ({
             setActiveFilters(filters);
             console.log('📤 [POST /main] sending nested filters:', filters);
 
-            const { data } = await api.post<FormDisplay>(
+            const {data} = await api.post<FormDisplay>(
                 `/display/${selectedFormId}/main`,
                 filters
             );
@@ -192,78 +195,18 @@ export const FormTable: React.FC<Props> = ({
         if (last && last.name === col.column_name) {
             last.count += 1;
         } else {
-            acc.push({ name: col.column_name, count: 1 });
+            acc.push({name: col.column_name, count: 1});
         }
         return acc;
     }, [] as { name: string; count: number }[]);
 
 
-
-
     return (
         <div style={{display: 'flex', gap: 10}}>
             {/* TREE BLOCK */}
-            {tree && tree.length > 0 && (
-                <div>
-                    {tree.map(({ name, values }, idx) => {
-                        const currentTreeField = widgetForm?.tree_fields?.[idx];
-                        const columnId = currentTreeField?.table_column_id;
-
-                        return (
-                            <div key={`${name}-${idx}`} className={s.treeList}>
-                                <div className={s.treeHeader}>
-                                    <span>{name}</span>
-                                    <FilterOffIcon
-                                        width={16}
-                                        height={16}
-                                        cursor="pointer"
-                                        onClick={handleResetFilters}
-                                    />
-                                </div>
-                                <ul className={s.treeUl}>
-                                    {values.map((v, i) => {
-                                        const key = `${columnId}-${v}`;
-                                        const isExpanded = key === activeExpandedKey;
-
-                                        return (
-                                            <li key={i}>
-                                                <div
-                                                    className={s.treeItem}
-                                                    onClick={() =>
-                                                        columnId != null && handleTreeValueClick(columnId, v)
-                                                    }
-                                                >
-                                                    {v}
-                                                </div>
-
-                                                {isExpanded && (
-                                                    <ul className={s.nestedUl}>
-                                                        {nestedTrees[key]?.map(({name, values, table_column_id}, j) =>
-                                                            values.map((val, k) => (
-                                                                <li
-                                                                    key={`nested-${i}-${j}-${k}`}
-                                                                    className={s.nestedItem}
-                                                                    onClick={() => handleNestedValueClick(table_column_id, val)}
-                                                                >
-                                                                    {val}
-                                                                </li>
-                                                            ))
-                                                        )}
-                                                    </ul>
-                                                )}
-                                            </li>
-                                        );
-                                    })}
-                                </ul>
-                            </div>
-
-                        );
-                    })}
-
-
-                </div>
-            )}
-
+            <TreeFormTable tree={tree} widgetForm={widgetForm} activeExpandedKey={activeExpandedKey}
+                           handleNestedValueClick={handleNestedValueClick} nestedTrees={nestedTrees}
+                           handleTreeValueClick={handleTreeValueClick} handleResetFilters={handleResetFilters}/>
             {/* MAIN + SUB */}
             <div style={{display: 'flex', flexDirection: 'column', gap: 20}}>
                 <table className={s.tbl}>
@@ -291,42 +234,8 @@ export const FormTable: React.FC<Props> = ({
                     </tbody>
                 </table>
 
-                {subDisplay?.sub_widgets.length > 0 && (
-                    <ul className={s.tabs}>
-                        {subDisplay.sub_widgets.map(sw => {
-                            const isActive = sw.widget_order === subDisplay.displayed_widget.widget_order;
-                            return (
-                                <li key={sw.widget_order}>
-                                    <button
-                                        className={isActive ? s.tabActive : s.tab}
-                                        onClick={() => handleTabClick(sw.widget_order)}
-                                    >
-                                        {sw.name}
-                                    </button>
-                                </li>
-                            );
-                        })}
-                    </ul>
-                )}
-
-                {subDisplay && (
-                    subLoading ? (
-                        <p>Загрузка sub-виджета…</p>
-                    ) : subError ? (
-                        <p className={s.error}>{subError}</p>
-                    ) : (
-                        <table className={s.tbl}>
-                            <thead>
-                            <tr>{subDisplay.columns.map(c => <th key={c.column_name}>{c.column_name}</th>)}</tr>
-                            </thead>
-                            <tbody>
-                            {subDisplay.data.map((r, i) => (
-                                <tr key={i}>{r.values.map((v, j) => <td key={j}>{v}</td>)}</tr>
-                            ))}
-                            </tbody>
-                        </table>
-                    )
-                )}
+                <SubWormTable subLoading={subLoading} subError={subError} subDisplay={subDisplay}
+                              handleTabClick={handleTabClick}/>
             </div>
         </div>
     );

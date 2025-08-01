@@ -39,10 +39,10 @@ type Props = {
     setCreateWidgetTable: (t: DTable) => void;
     deleteTable: (t: DTable) => void;
     deleteWorkspace: (id: number) => void;
-    changeStatusModal: any
+    changeStatusModal: () => void
     setNavOpen: (value: boolean) => void;
     navOpen: boolean;
-    setShowCreateForm: any
+    setShowCreateForm: (value:boolean)=>void;
     openForm: (widgetId: number, formId: number) => void;
     deleteWidget: (widgetId: number, tableId: number) => void;
     loadFormTree: (formId: number) => Promise<void>;

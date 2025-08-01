@@ -5,7 +5,6 @@ import * as styles from './Main.module.scss'
 import {SetOfTables} from "@/components/setOfTables/SetOfTables";
 import {TopComponent} from "@/components/topComponent/TopComponent";
 import {ModalAddWorkspace} from "@/components/modals/modalAddWorkspace/ModalAddWorkspace";
-import {useLoadConnections} from "@/shared/hooks/useLoadConnections";
 import {ModalAddConnection} from "@/components/modals/modalAddConnection/ModalAddConnection";
 import {WorkSpaceTypes} from "@/types/typesWorkSpaces";
 import {ModalAddTable} from "@/components/modals/modalAddNewTable/ModalAddNewTable";
