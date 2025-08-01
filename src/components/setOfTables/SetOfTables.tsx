@@ -165,7 +165,9 @@ export const SetOfTables: React.FC<Props> = ({
                         ) : wColsError ? (
                             <p className={s.error}>{wColsError}</p>
                         ) : (
-                            <WidgetColumnsOfTable deleteColumnWidget={deleteColumnWidget} addReference={addReference}
+                            <WidgetColumnsOfTable columns={columns}
+                                                  updateTableColumn={updateTableColumn}
+                                                  deleteColumnTable={deleteColumnTable} deleteColumnWidget={deleteColumnWidget} addReference={addReference}
                                                   updateWidgetColumn={updateWidgetColumn} widgetColumns={widgetColumns}
                                                   loadColumnsWidget={loadColumnsWidget} selectedWidget={selectedWidget}/>
                         )
@@ -177,14 +179,12 @@ export const SetOfTables: React.FC<Props> = ({
                             ? <p>Нет выбранных форм</p>
                             : (
                                 <div>
-
+                                    <TableListView selectedTable={selectedTable} updateTableMeta={updateTableMeta}/>
                                     <TableColumn
 
                                         updateTableColumn={updateTableColumn}
                                         columns={columns}
                                         deleteColumnTable={deleteColumnTable}/>
-
-                                    <TableListView selectedTable={selectedTable} updateTableMeta={updateTableMeta}/>
                                 </div>
                             )
                     )}

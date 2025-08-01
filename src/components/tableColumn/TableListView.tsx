@@ -30,13 +30,13 @@ export const TableListView: React.FC<Props> = ({ selectedTable, updateTableMeta 
                 <Editicon />
             </Typography>
 
-            <p><strong>Название:</strong> {selectedTable.name}</p>
+         {/*   <p><strong>Название:</strong> {selectedTable.name}</p>*/}
            {/* <p><strong>ID:</strong> {selectedTable.id}</p>*/}
-            <p><strong>Описание:</strong> {selectedTable.description || '—'}</p>
+           {/* <p><strong>Описание:</strong> {selectedTable.description || '—'}</p>
             <p><strong>SELECT:</strong> <code>{selectedTable.select_query || '—'}</code></p>
             <p><strong>INSERT:</strong> <code>{selectedTable.insert_query || '—'}</code></p>
             <p><strong>UPDATE:</strong> <code>{selectedTable.update_query || '—'}</code></p>
-            <p><strong>DELETE:</strong> <code>{selectedTable.delete_query || '—'}</code></p>
+            <p><strong>DELETE:</strong> <code>{selectedTable.delete_query || '—'}</code></p>*/}
 
             {openMetaModal && (
                 <ModalEditTableMeta

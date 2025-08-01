@@ -65,6 +65,7 @@ export const FormTable: React.FC<Props> = ({
         const order0 = widgetForm.sub_widgets[0]?.widget_order ?? 0;
 
         setActiveSubOrder(order0);
+        setSubDisplay(null); // 👈 сбрасываем старый subDisplay
         loadSubDisplay(widgetForm.form_id, order0, {});
     }, [selectedWidget, formsByWidget, loadSubDisplay]);
 

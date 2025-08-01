@@ -225,7 +225,7 @@ td {
 
 
 .tableWrapper {
-  max-height: calc(60vh - 200px); // ← подстрой под layout
+  max-height: calc(85vh - 200px); // ← подстрой под layout
   overflow-y: auto;
   overflow-x: auto;
   border: 1px solid var(--header-color);
