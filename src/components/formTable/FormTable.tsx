@@ -187,6 +187,16 @@ export const FormTable: React.FC<Props> = ({
     };
 
 
+    const groupedHeaders = formDisplay.columns.reduce((acc, col) => {
+        const last = acc[acc.length - 1];
+        if (last && last.name === col.column_name) {
+            last.count += 1;
+        } else {
+            acc.push({ name: col.column_name, count: 1 });
+        }
+        return acc;
+    }, [] as { name: string; count: number }[]);
+
 
 
 
@@ -258,7 +268,14 @@ export const FormTable: React.FC<Props> = ({
             <div style={{display: 'flex', flexDirection: 'column', gap: 20}}>
                 <table className={s.tbl}>
                     <thead>
-                    <tr>{formDisplay.columns.map(c => <th key={c.column_name}>{c.column_name}</th>)}</tr>
+                    <tr>
+                        {groupedHeaders.map((header, idx) => (
+                            <th key={`${header.name}-${idx}`} colSpan={header.count}>
+                                {header.name}
+                            </th>
+                        ))}
+                    </tr>
+
                     </thead>
                     <tbody>
                     {formDisplay.data.map((row, i) => {

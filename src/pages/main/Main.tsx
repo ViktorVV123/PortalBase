@@ -68,10 +68,9 @@ export const Main = () => {
         setFormDisplay,
         setSubDisplay,
         updateTableMeta,
+        connections,
+        loadConnections,
     } = useWorkSpaces();
-
-    const {connections, loadConnections} = useLoadConnections()
-
 
     useEffect(() => {
             loadWorkSpaces()

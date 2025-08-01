@@ -1,6 +1,8 @@
 import {useCallback, useState} from "react";
 import {api} from "@/services/api";
 import {WorkSpaceTypes} from "@/types/typesWorkSpaces";
+import {Connection} from "@/types/typesConnection";
+import {useLoadConnections} from "@/shared/hooks/useLoadConnections";
 
 
 export interface DTable {
@@ -10,9 +12,9 @@ export interface DTable {
     description: string;
     published: boolean;
     select_query?: string;
-    insert_query?:string;
-    update_query?:string;
-    delete_query:string;
+    insert_query?: string;
+    update_query?: string;
+    delete_query: string;
 }
 
 export interface Column {
@@ -45,7 +47,7 @@ export type WidgetColumn = {
     default: string | null;
     placeholder: string | null;
     published: boolean;
-    type:string;
+    type: string;
     reference: {
         width: number;
         primary: boolean;
@@ -156,12 +158,12 @@ export interface SubDisplay {
     columns: SubFormColumn[];
     data: SubFormRow[];
 }
+
 export interface FormTreeColumn {
     table_column_id: number;
     name: string;
     values: (string | number | null)[];
 }
-
 
 
 // shared/hooks/useWorkSpaces.ts
@@ -187,35 +189,20 @@ export const useWorkSpaces = () => {
         }
     }, []);
 
-    /* — таблицы конкретного WS — */
-    const loadTables = useCallback(
-        /** force = true → игнорируем кэш и перезапрашиваем */
-        async (wsId: number, force = false): Promise<DTable[]> => {
-            if (!force && tablesByWs[wsId]) return tablesByWs[wsId];
-
-            const {data} = await api.get<DTable[]>('/tables', {
-                params: {workspace_id: wsId},
-            });
-            setTablesByWs(prev => ({...prev, [wsId]: data}));
-            return data;
-        },
-        [tablesByWs],
-    );
-
     const updateTableMeta = useCallback(
         async (id: number, patch: Partial<DTable>) => {
             try {
-                const { data } = await api.patch<DTable>(`/tables/${id}`, patch);
+                const {data} = await api.patch<DTable>(`/tables/${id}`, patch);
 
                 setTablesByWs(prev => {
-                    const copy = { ...prev };
+                    const copy = {...prev};
                     const wsId = data.workspace_id;
-                    copy[wsId] = (copy[wsId] || []).map(t => t.id === id ? { ...t, ...data } : t);
+                    copy[wsId] = (copy[wsId] || []).map(t => t.id === id ? {...t, ...data} : t);
                     return copy;
                 });
 
                 // 👇 Обновим selectedTable вручную
-                setSelTable(prev => prev && prev.id === id ? { ...prev, ...data } : prev);
+                setSelTable(prev => prev && prev.id === id ? {...prev, ...data} : prev);
             } catch (err) {
                 console.warn('Ошибка при обновлении таблицы:', err);
             }
@@ -293,113 +280,6 @@ export const useWorkSpaces = () => {
         }
     }, []);
 
-    const [formsByWidget, setFormsByWidget] = useState<Record<number, WidgetForm>>({});
-
-
-    /* ─ загружаем все формы один раз ─ */
-    const loadWidgetForms = useCallback(async () => {
-        if (Object.keys(formsByWidget).length) return;      // уже загружено
-        const {data} = await api.get<WidgetForm[]>('/forms');
-        const map: Record<number, WidgetForm> = {};
-        data.forEach(f => {
-            const sortedSubs = [...f.sub_widgets].sort(
-                (a, b) => a.widget_order - b.widget_order
-            );
-
-            map[f.main_widget_id] = { ...f, sub_widgets: sortedSubs };
-        });       // сохраняем OBJECT
-        setFormsByWidget(map);
-    }, [formsByWidget]);
-
-
-    /* --- новое состояние --- */
-    const [formDisplay, setFormDisplay] = useState<FormDisplay | null>(null);
-    const [formLoading, setFormLoading] = useState(false);
-    const [formError, setFormError] = useState<string | null>(null);
-
-
-    /* --- загрузка таблицы формы --- */
-    const loadFormDisplay = useCallback(async (formId: number) => {
-        setFormLoading(true);
-        setFormError(null);
-        try {
-            const {data} = await api.post<FormDisplay>(`/display/${formId}/main`);
-            setFormDisplay(data);
-        } catch {
-            setFormError('Не удалось загрузить данные формы');
-        } finally {
-            setFormLoading(false);
-        }
-    }, []);
-
-    const loadFilteredFormDisplay = useCallback(
-        async (
-            formId: number,
-            filter: { table_column_id: number; value: string | number }
-        ) => {
-            try {
-                const payload = [filter]; // 👈 оборачиваем в массив
-
-                const { data } = await api.post<FormDisplay>(
-                    `/display/${formId}/main`,
-                    payload
-                );
-
-                setFormDisplay(data); // 👈 теперь данные отобразятся
-            } catch (e) {
-                console.warn('Ошибка при загрузке данных формы с фильтром:', e);
-            }
-        },
-        []
-    );
-
-
-
-
-    /* --- sub-display state --- */
-    const [subDisplay, setSubDisplay] = useState<SubDisplay | null>(null);
-    const [subLoading, setSubLoading] = useState(false);
-    const [subError, setSubError] = useState<string | null>(null);
-
-    const loadSubDisplay = useCallback(
-        /**
-         * primary — опционален: {} → БЕЗ фильтра.
-         */
-        async (
-            formId: number,
-            subOrder: number,
-            primary: Record<string, unknown> = {},   // ← default
-        ) => {
-            setSubLoading(true);
-            setSubError(null);
-            try {
-                const {data} = await api.post<SubDisplay>(
-                    `/display/${formId}/sub`,
-                    {primary_keys: primary},
-                    {params: {sub_widget_order: subOrder}},
-                );
-
-
-                /* сортируем заголовки */
-                const sorted = { ...data, sub_widgets: [...data.sub_widgets].sort(
-                        (a, b) => a.widget_order - b.widget_order
-                    ) };
-
-                setSubDisplay(sorted);
-
-            } catch {
-                setSubError('Не удалось загрузить данные sub-виджета');
-            } finally {
-                setSubLoading(false);
-            }
-        },
-        [],
-    );
-
-
-    //DELETE_MET_ALL
-
-
     //удалили workspace
     const deleteWorkspace = useCallback(async (wsId: number) => {
         setWorkSpaces(prev => prev.filter(w => w.id !== wsId));
@@ -416,6 +296,22 @@ export const useWorkSpaces = () => {
         }
     }, [loadWorkSpaces]);
 
+    /* — таблицы конкретного WS — */
+    const loadTables = useCallback(
+        /** force = true → игнорируем кэш и перезапрашиваем */
+        async (wsId: number, force = false): Promise<DTable[]> => {
+            if (!force && tablesByWs[wsId]) return tablesByWs[wsId];
+
+            const {data} = await api.get<DTable[]>('/tables', {
+                params: {workspace_id: wsId},
+            });
+            setTablesByWs(prev => ({...prev, [wsId]: data}));
+            return data;
+        },
+        [tablesByWs],
+    );
+
+    //ВСЕ О ТАБЛИЦАХ
 //удалили таблицу
     const deleteTable = useCallback(
         async (table: DTable) => {
@@ -444,52 +340,17 @@ export const useWorkSpaces = () => {
     );
 
 
-    const fetchWidgetAndTable = useCallback(async (widgetId: number) => {
-        // widget
-        let widget = Object.values(widgetsByTable)
-            .flat()
-            .find(w => w?.id === widgetId);
-
-        if (!widget) {
-            const {data} = await api.get<Widget>(`/widgets/${widgetId}`);
-            widget = data;
-            setWidgetsByTable(prev => ({
-                ...prev,
-                [data.table_id]: [data],        // кэшируем
-            }));
-        }
-
-
-
-        // table
-        let table = Object.values(tablesByWs)
-            .flat()
-            .find(t => t?.id === widget.table_id);
-
-        if (!table) {
-            const {data} = await api.get<DTable>(`/tables/${widget.table_id}`);
-            table = data;
-            setTablesByWs(prev => ({
-                ...prev,
-                [data.workspace_id]: [...(prev[data.workspace_id] ?? []), data],
-            }));
-        }
-
-        return {widget, table};
-    }, [widgetsByTable, tablesByWs]);
-
-
     /** PATCH /tables/columns/{id}  — обновить одну колонку */
     const updateTableColumn = useCallback(
         async (id: number, patch: Partial<Omit<Column, 'id'>>) => {
             try {
                 /* 1. запрос к бэку */
-                const { data } = await api.patch<Column>(`/tables/columns/${id}`, patch);
+                const {data} = await api.patch<Column>(`/tables/columns/${id}`, patch);
 
                 /* 2. локально подменяем в state */
                 setColumns(prev =>
                     prev
-                        .map(col => (col.id === id ? { ...col, ...data } : col))
+                        .map(col => (col.id === id ? {...col, ...data} : col))
                         .sort((a, b) => a.id - b.id)           // порядок сохраняем
                 );
             } catch {
@@ -499,7 +360,6 @@ export const useWorkSpaces = () => {
         },
         []
     );
-
 
 
     //удаляем строку в Table
@@ -516,6 +376,27 @@ export const useWorkSpaces = () => {
         [],
     );
 
+    //НАЧАЛО WIDGET (удаление ,update b т.д)
+
+    const [formsByWidget, setFormsByWidget] = useState<Record<number, WidgetForm>>({});
+
+
+    /* ─ загружаем все формы один раз ─ */
+    const loadWidgetForms = useCallback(async () => {
+        if (Object.keys(formsByWidget).length) return;      // уже загружено
+        const {data} = await api.get<WidgetForm[]>('/forms');
+        const map: Record<number, WidgetForm> = {};
+        data.forEach(f => {
+            const sortedSubs = [...f.sub_widgets].sort(
+                (a, b) => a.widget_order - b.widget_order
+            );
+
+            map[f.main_widget_id] = {...f, sub_widgets: sortedSubs};
+        });       // сохраняем OBJECT
+        setFormsByWidget(map);
+    }, [formsByWidget]);
+
+
     //удаляем строку в Widget
     const deleteColumnWidget = useCallback(
         async (widgetColumnId: number) => {
@@ -531,7 +412,6 @@ export const useWorkSpaces = () => {
         [],
     );
 
-    //удаления самого виджета
     const deleteWidget = useCallback(
         async (widgetId: number, tableId: number) => {
             try {
@@ -554,22 +434,56 @@ export const useWorkSpaces = () => {
 
 
     /* ---------- WIDGET-COLUMNS PATCH  обновляем значения в widget/columns ---------- */
+    const fetchWidgetAndTable = useCallback(async (widgetId: number) => {
+        // widget
+        let widget = Object.values(widgetsByTable)
+            .flat()
+            .find(w => w?.id === widgetId);
+
+        if (!widget) {
+            const {data} = await api.get<Widget>(`/widgets/${widgetId}`);
+            widget = data;
+            setWidgetsByTable(prev => ({
+                ...prev,
+                [data.table_id]: [data],        // кэшируем
+            }));
+        }
+
+
+        // table
+        let table = Object.values(tablesByWs)
+            .flat()
+            .find(t => t?.id === widget.table_id);
+
+        if (!table) {
+            const {data} = await api.get<DTable>(`/tables/${widget.table_id}`);
+            table = data;
+            setTablesByWs(prev => ({
+                ...prev,
+                [data.workspace_id]: [...(prev[data.workspace_id] ?? []), data],
+            }));
+        }
+
+        return {widget, table};
+    }, [widgetsByTable, tablesByWs]);
+
+
     const updateWidgetColumn = useCallback(
         async (
             id: number,
             patch: Partial<Omit<WidgetColumn, 'id' | 'widget_id' | 'reference'>>
         ) => {
-            const clean: any = { ...patch };
+            const clean: any = {...patch};
             ['alias', 'default', 'promt'].forEach(f => {
                 if (clean[f] === '') delete clean[f];
             });
 
             try {
-                const { data } = await api.patch<WidgetColumn>(`/widgets/columns/${id}`, clean);
+                const {data} = await api.patch<WidgetColumn>(`/widgets/columns/${id}`, clean);
 
                 setWidgetColumns(prev =>
                     [...prev]                              // создаём копию
-                        .map(wc => (wc.id === id ? { ...wc, ...data } : wc))
+                        .map(wc => (wc.id === id ? {...wc, ...data} : wc))
                         .sort((a, b) => a.id - b.id)        // !!! сортируем по id
                 );
             } catch {
@@ -594,8 +508,7 @@ export const useWorkSpaces = () => {
         [],
     );
 
-
-
+    //ВСЕ ДЛЯ ФОРМ (они у нас самые последние из вывода таблиц и тд)
     const [formTrees, setFormTrees] = useState<Record<number, FormTreeColumn[]>>({});
     const [formTreeLoading, setFormTreeLoading] = useState(false);
     const [formTreeError, setFormTreeError] = useState<string | null>(null);
@@ -604,11 +517,11 @@ export const useWorkSpaces = () => {
         setFormTreeLoading(true);
         setFormTreeError(null);
         try {
-            const { data } = await api.post<FormTreeColumn[] | FormTreeColumn>(`/display/${formId}/tree`);
+            const {data} = await api.post<FormTreeColumn[] | FormTreeColumn>(`/display/${formId}/tree`);
 
             const normalized: FormTreeColumn[] = Array.isArray(data) ? data : [data];
 
-            setFormTrees(prev => ({ ...prev, [formId]: normalized }));
+            setFormTrees(prev => ({...prev, [formId]: normalized}));
         } catch (err: any) {
             console.warn('Не удалось загрузить справочники:', err?.response?.status ?? err);
             // Не считаем ошибкой — справочники могут отсутствовать
@@ -617,8 +530,103 @@ export const useWorkSpaces = () => {
         }
     }, []);
 
+    /* --- sub форма --- */
+    const [subDisplay, setSubDisplay] = useState<SubDisplay | null>(null);
+    const [subLoading, setSubLoading] = useState(false);
+    const [subError, setSubError] = useState<string | null>(null);
+
+    const loadSubDisplay = useCallback(
+        /**
+         * primary — опционален: {} → БЕЗ фильтра.
+         */
+        async (
+            formId: number,
+            subOrder: number,
+            primary: Record<string, unknown> = {},   // ← default
+        ) => {
+            setSubLoading(true);
+            setSubError(null);
+            try {
+                const {data} = await api.post<SubDisplay>(
+                    `/display/${formId}/sub`,
+                    {primary_keys: primary},
+                    {params: {sub_widget_order: subOrder}},
+                );
 
 
+                /* сортируем заголовки */
+                const sorted = {
+                    ...data, sub_widgets: [...data.sub_widgets].sort(
+                        (a, b) => a.widget_order - b.widget_order
+                    )
+                };
+
+                setSubDisplay(sorted);
+
+            } catch {
+                setSubError('Не удалось загрузить данные sub-виджета');
+            } finally {
+                setSubLoading(false);
+            }
+        },
+        [],
+    );
+    /* --- новое состояние --- */
+    const [formDisplay, setFormDisplay] = useState<FormDisplay | null>(null);
+    const [formLoading, setFormLoading] = useState(false);
+    const [formError, setFormError] = useState<string | null>(null);
+
+
+    /* --- загрузка таблицы формы --- */
+    const loadFormDisplay = useCallback(async (formId: number) => {
+        setFormLoading(true);
+        setFormError(null);
+        try {
+            const {data} = await api.post<FormDisplay>(`/display/${formId}/main`);
+            setFormDisplay(data);
+        } catch {
+            setFormError('Не удалось загрузить данные формы');
+        } finally {
+            setFormLoading(false);
+        }
+    }, []);
+
+    const loadFilteredFormDisplay = useCallback(
+        async (
+            formId: number,
+            filter: { table_column_id: number; value: string | number }
+        ) => {
+            try {
+                const payload = [filter]; // 👈 оборачиваем в массив
+
+                const {data} = await api.post<FormDisplay>(
+                    `/display/${formId}/main`,
+                    payload
+                );
+
+                setFormDisplay(data); // 👈 теперь данные отобразятся
+            } catch (e) {
+                console.warn('Ошибка при загрузке данных формы с фильтром:', e);
+            }
+        },
+        []
+    );
+
+
+
+//connections
+    const [connections, setConnections] = useState<Connection[]>([]);
+
+    const loadConnections = useCallback(async () => {
+        try {
+            const {data} = await api.get<Connection[]>('/connections');
+            setConnections(data);
+        } catch {
+            setError('Не удалось загрузить список соединений');
+        } finally {
+            setLoading(false);
+        }
+    }, []);
 
 
     return {
@@ -656,13 +664,15 @@ export const useWorkSpaces = () => {
         deleteColumnWidget,
         deleteWidget,
         updateTableColumn,
-        updateWidgetColumn,addReference,
+        updateWidgetColumn, addReference,
         loadFormTree,
         formTrees,
         loadFilteredFormDisplay,
         setFormDisplay,
         setSubDisplay,
-        updateTableMeta
+        updateTableMeta,
+        connections,
+        loadConnections
 
     };
 };
