@@ -7,6 +7,7 @@ import {api} from "@/services/api";
 import {TableColumn} from "@/components/tableColumn/TableColumn";
 import {Box, Modal, Typography} from "@mui/material";
 import Editicon from "@/assets/image/EditIcon.svg";
+import ConColumnIcon from '@/assets/image/ConColumnIcon.svg'
 
 
 type WidgetColumnsProps = {
@@ -147,7 +148,7 @@ export const WidgetColumnsOfTable = ({
 
     return (
         <div className={s.tableWrapperWidget}>
-            <div style={{marginBottom: 10}}>
+            <div >
                 <Typography
                     onClick={openModal}
                     variant="h6"
@@ -265,7 +266,7 @@ export const WidgetColumnsOfTable = ({
                                     </>
                                 ) : (
                                     <>
-                                        <button onClick={() => handleMerge(wc.id)}>+</button>
+                                        <ConColumnIcon className={s.actionIcon} onClick={() => handleMerge(wc.id)}/>
                                         <EditIcon className={s.actionIcon}
                                                   onClick={() => startWcEdit(wc)}/>
                                         <DeleteIcon className={s.actionIcon}
