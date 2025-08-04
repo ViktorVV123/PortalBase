@@ -106,6 +106,9 @@ export interface FormColumn {
     published: boolean;
     required: boolean;
     width: number;
+    widget_column_id: number;
+
+
 }
 
 /** Одна строка данных */
@@ -181,7 +184,7 @@ export const useWorkSpaces = () => {
         setLoading(true);
         try {
             const {data} = await api.get<WorkSpaceTypes[]>('/workspaces');
-            setWorkSpaces(data);
+            setWorkSpaces(data.sort((a, b) => a.id - b.id));
         } catch {
             setError('Не удалось загрузить рабочие пространства');
         } finally {
@@ -395,6 +398,8 @@ export const useWorkSpaces = () => {
         });       // сохраняем OBJECT
         setFormsByWidget(map);
     }, [formsByWidget]);
+
+
 
 
     //удаляем строку в Widget
@@ -672,7 +677,8 @@ export const useWorkSpaces = () => {
         setSubDisplay,
         updateTableMeta,
         connections,
-        loadConnections
+        loadConnections,
+        setWidgetsByTable
 
     };
 };

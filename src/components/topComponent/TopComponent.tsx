@@ -11,6 +11,9 @@ import FormIcon from '@/assets/image/FormaIcon1.svg';
 import AddIcon from '@/assets/image/AddIcon.svg';
 import DeleteIcon from '@/assets/image/DeleteIcon.svg';
 import {SideNav} from "@/components/sideNav/SideNav";
+import EditIcon from "@/assets/image/EditIcon.svg";
+import {EditWorkspaceModal} from "@/components/modals/editWorkspaceModal/EditWorkspaceModal";
+import {api} from "@/services/api";
 
 type Props = {
     workSpaces: WorkSpaceTypes[];
@@ -42,10 +45,11 @@ type Props = {
     changeStatusModal: () => void
     setNavOpen: (value: boolean) => void;
     navOpen: boolean;
-    setShowCreateForm: (value:boolean)=>void;
+    setShowCreateForm: (value: boolean) => void;
     openForm: (widgetId: number, formId: number) => void;
     deleteWidget: (widgetId: number, tableId: number) => void;
     loadFormTree: (formId: number) => Promise<void>;
+    loadWorkSpaces:() =>void
 
 };
 
@@ -74,11 +78,14 @@ export const TopComponent: React.FC<Props> = ({
                                                   setShowCreateForm,
                                                   deleteWidget,
                                                   openForm,
-                                                  loadFormTree
+                                                  loadFormTree,
+                                                  loadWorkSpaces
                                               }) => {
 
     const [open, setOpen] = useState(false);
     const [wHover, setWHover] = useState<number | null>(null);
+    const [editModalOpen, setEditModalOpen] = useState(false);
+    const [selectedWS, setSelectedWS] = useState<WorkSpaceTypes | null>(null);
 
 
     const menuRef = useRef<HTMLDivElement>(null);
@@ -168,26 +175,41 @@ export const TopComponent: React.FC<Props> = ({
                                     }}>
 
 
-                                    <div className={s.spaceWN}>
-                                        <WorkspacesIcon className={s.actionIcon} width={16} height={16}/>
+                                    <div className={s.wsWrapper}>
+                                        <div className={s.spaceWN}>
+                                            <WorkspacesIcon className={s.actionIcon} width={16} height={16}/>
 
-                                        {/* текст — отдельный элемент, чтобы управлять flex-свойствами */}
-                                        <span className={s.wsName}>{ws.name}</span>
+                                            {/* текст — отдельный элемент, чтобы управлять flex-свойствами */}
+                                            <span className={s.wsName}>{ws.name}</span>
 
-                                        <div>
-                                            <DeleteIcon
-                                                className={s.actionIcon}
-                                                width={16}
-                                                height={16}
-                                                onClick={e => {
-                                                    e.stopPropagation();                   // не выбирать WS
-                                                    if (confirm(`Удалить workspace «${ws.name}»?`)) {
-                                                        deleteWorkspace(ws.id);
-                                                    }
-                                                }}
-                                            />
+                                            <span className={s.tooltip}><strong>Описание:</strong>{ws.description}</span>
+
+
+                                            <div style={{display: 'flex', gap:4, alignItems:'center'}}>
+                                                <EditIcon
+                                                    className={s.actionIcon}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setSelectedWS(ws);
+                                                        setEditModalOpen(true);
+                                                        closeMenu();
+                                                    }}
+                                                />
+                                                <DeleteIcon
+
+                                                    style={{cursor: 'pointer'}}
+                                                    className={s.actionIcon}
+                                                    width={16}
+                                                    height={16}
+                                                    onClick={e => {
+                                                        e.stopPropagation();                   // не выбирать WS
+                                                        if (confirm(`Удалить workspace «${ws.name}»?`)) {
+                                                            deleteWorkspace(ws.id);
+                                                        }
+                                                    }}
+                                                />
+                                            </div>
                                         </div>
-
                                     </div>
 
                                     {/* ───── LVL-3 : TABLES ───── */}
@@ -231,9 +253,9 @@ export const TopComponent: React.FC<Props> = ({
                                                     <div className={s.spaceWN}>
                                                         <TableIcon className={s.actionIcon} width={16} height={16}/>
                                                         <span className={s.wsName}>{t.name}</span>
-                                                        <div>
+                                                        <div style={{display: 'flex', gap:4, alignItems:'center'}}>
                                                             <DeleteIcon
-
+                                                                style={{cursor: 'pointer'}}
                                                                 onClick={e => {
                                                                     e.stopPropagation();                       // не выбирать таблицу
                                                                     if (confirm(`Удалить таблицу «${t.name}»?`))
@@ -262,7 +284,8 @@ export const TopComponent: React.FC<Props> = ({
 
                                                                 }}
                                                             >
-                                                                <AddIcon className={s.actionIcon} width={16} height={16}/> создать
+                                                                <AddIcon className={s.actionIcon} width={16}
+                                                                         height={16}/> создать
                                                             </li>
 
 
@@ -285,17 +308,19 @@ export const TopComponent: React.FC<Props> = ({
                                                                         }}
                                                                     >
                                                                         <div className={s.spaceWN}>
-                                                                            <WidgetsIcon className={s.actionIcon} width={16} height={16}/>
-                                                                            <span className={s.wsName}>{w.name}</span>
+                                                                            <WidgetsIcon className={s.actionIcon}
+                                                                                         width={16} height={16}/>
+                                                                            <span
+                                                                                className={s.wsName}>{w.name}</span>
                                                                             <DeleteIcon className={s.actionIcon}
 
-                                                                                onClick={e => {
-                                                                                    e.stopPropagation();
-                                                                                    if (confirm('Удалить виджет?'))
-                                                                                        deleteWidget(w.id, t.id);     // ← передаём widgetId и tableId
-                                                                                }}
-                                                                                width={16}
-                                                                                height={16}
+                                                                                        onClick={e => {
+                                                                                            e.stopPropagation();
+                                                                                            if (confirm('Удалить виджет?'))
+                                                                                                deleteWidget(w.id, t.id);     // ← передаём widgetId и tableId
+                                                                                        }}
+                                                                                        width={16}
+                                                                                        height={16}
                                                                             />
                                                                         </div>
 
@@ -318,7 +343,8 @@ export const TopComponent: React.FC<Props> = ({
                                                                                         closeMenu();
                                                                                     }}
                                                                                 >
-                                                                                    <FormIcon className={s.actionIcon}/>
+                                                                                    <FormIcon
+                                                                                        className={s.actionIcon}/>
                                                                                     {formName}
                                                                                 </li>
                                                                             </ul>
@@ -338,6 +364,31 @@ export const TopComponent: React.FC<Props> = ({
                     </ul>
                 )}
             </div>
+            {selectedWS && (
+                <EditWorkspaceModal
+                    open={editModalOpen}
+                    onClose={() => setEditModalOpen(false)}
+                    defaultName={selectedWS.name}
+                    defaultDescription={selectedWS.description}
+                    onSubmit={async ({ name, description }) => {
+                        try {
+                            await api.patch(`/workspaces/${selectedWS.id}`, {
+                                name,
+                                description,
+                                connection_id: selectedWS.connection_id ?? 0,
+                                group: selectedWS.group ?? 'default'
+                            });
+
+                            await loadWorkSpaces();  // или локально обнови workSpaces[]
+                            setEditModalOpen(false);
+
+                        } catch (err) {
+                            console.warn('Ошибка при обновлении:', err);
+                        }
+                    }}
+                />
+            )}
+
         </div>
     );
 };

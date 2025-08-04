@@ -10,6 +10,7 @@ import {
 import AddIcon from '@/assets/image/AddIcon.svg';   // ← ваш SVG-компонент
 import {api} from '@/services/api';
 import {Connection} from '@/types/typesConnection';
+import * as styles from './ModalAddWorkspace.module.scss'
 
 const dark = createTheme({
     palette: {
@@ -110,8 +111,17 @@ export const ModalAddWorkspace = ({
                                     required
                                 >
                                     {connections.map(c => (
-                                        <MenuItem key={c.id} value={c.id}>
-                                            {c.name} (id:{c.id})
+                                        <MenuItem style={{display: 'flex', flexDirection: 'column'}} key={c.id}
+                                                  value={c.id}>
+                                            <span> {c.name}</span>
+                                            <span className={styles.descriptionModal}>
+                                                {c.description === '' ?
+                                                    <span><strong>Описание:</strong> {c.description},</span> : ''}
+                                                <span>   <strong>Тип:</strong> {c.conn_type},</span>
+                                                <span><strong>Строка подключения:</strong> {c.conn_str}</span>
+                                            </span>
+
+
                                         </MenuItem>
                                     ))}
                                 </Select>

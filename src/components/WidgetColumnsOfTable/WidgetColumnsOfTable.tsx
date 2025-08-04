@@ -1,11 +1,21 @@
-import React, {useState} from 'react';
+import React, {useCallback, useEffect, useState} from 'react';
 import * as s from "@/components/setOfTables/SetOfTables.module.scss";
 import {Column, Widget, WidgetColumn} from "@/shared/hooks/useWorkSpaces";
 import EditIcon from "@/assets/image/EditIcon.svg";
 import DeleteIcon from "@/assets/image/DeleteIcon.svg";
 import {api} from "@/services/api";
 import {TableColumn} from "@/components/tableColumn/TableColumn";
-import {Box, Modal, Typography} from "@mui/material";
+import {
+    Box,
+    Button,
+    createTheme,
+    Dialog,
+    DialogActions, DialogContent, DialogTitle,
+    Modal, Stack,
+    TextField,
+    ThemeProvider,
+    Typography
+} from "@mui/material";
 import Editicon from "@/assets/image/EditIcon.svg";
 import ConColumnIcon from '@/assets/image/ConColumnIcon.svg'
 
@@ -25,6 +35,9 @@ type WidgetColumnsProps = {
     columns: any;
     updateTableColumn: any;
     deleteColumnTable: any;
+    setSelectedWidget:any;
+    setWidgetsByTable: React.Dispatch<React.SetStateAction<Record<number, Widget[]>>>
+
 }
 
 const modalStyle = {
@@ -42,6 +55,37 @@ const modalStyle = {
     color: 'white'
 };
 
+const dark = createTheme({
+    palette: {
+        mode: 'dark',
+        primary: {main: '#ffffff'},  // ← чтобы все focus-ring были белые
+    },
+    components: {
+        /* белый бордер при фокусе */
+        MuiOutlinedInput: {
+            styleOverrides: {
+                root: {
+                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                        borderColor: '#ffffff',
+                    },
+                },
+            },
+        },
+        /* белая подпись (label) в фокусе */
+        MuiInputLabel: {
+            styleOverrides: {
+                root: {
+                    '&.Mui-focused': {color: '#ffffff'},
+                },
+            },
+        },
+        /* белая стрелочка у Select */
+        MuiSelect: {
+            styleOverrides: {icon: {color: '#ffffff'}},
+        },
+    },
+});
+
 export const WidgetColumnsOfTable = ({
                                          updateWidgetColumn,
                                          widgetColumns,
@@ -51,11 +95,51 @@ export const WidgetColumnsOfTable = ({
                                          deleteColumnWidget,
                                          columns,
                                          updateTableColumn,
-                                         deleteColumnTable
+                                         deleteColumnTable,setSelectedWidget,setWidgetsByTable
+
                                      }: WidgetColumnsProps) => {
 
 
     const [colValues, setColValues] = useState<Partial<Column>>({});
+    const [widgetModalOpen, setWidgetModalOpen] = useState(false);
+    const openWidgetModal = () => setWidgetModalOpen(true);
+    const closeWidgetModal = () => setWidgetModalOpen(false);
+
+    const [widgetMeta, setWidgetMeta] = useState<Partial<Widget>>({
+        name: selectedWidget?.name ?? '',
+        description: selectedWidget?.description ?? '',
+        table_id: selectedWidget?.table_id ?? 0
+    });
+
+    const saveWidgetMeta = useCallback(async () => {
+        if (!selectedWidget) return;
+
+        try {
+            await api.patch(`/widgets/${selectedWidget.id}`, {
+                name: widgetMeta.name,
+                description: widgetMeta.description,
+                table_id: widgetMeta.table_id,
+            });
+
+            const { data: updatedWidget } = await api.get<Widget>(`/widgets/${selectedWidget.id}`);
+            setSelectedWidget(updatedWidget);
+
+            // 👇 обновим виджет в списке
+            setWidgetsByTable(prev => {
+                const tableId = updatedWidget.table_id;
+                const updated = (prev[tableId] ?? []).map(w =>
+                    w.id === updatedWidget.id ? updatedWidget : w
+                );
+                return { ...prev, [tableId]: updated };
+            });
+
+            await loadColumnsWidget(updatedWidget.id);
+        } catch (e) {
+            console.warn('❌ Ошибка при сохранении метаданных виджета:', e);
+        }
+    }, [selectedWidget, widgetMeta, loadColumnsWidget, setWidgetsByTable]);
+
+
 
 
     const cleanPatch = (p: Partial<Column>): Partial<Column> => {
@@ -125,20 +209,24 @@ export const WidgetColumnsOfTable = ({
 
 
     const handleMerge = async (wColId: number) => {
-        if (selectedWidget == null) return;
+        if (!selectedWidget) return;
 
-        const input = prompt('Введите tbl_col ID, который нужно привязать:');
-        const tblId = Number(input);
-        if (!tblId) return;
+        const input = prompt('Введите *имя* столбца (name), который нужно привязать:');
+        if (!input) return;
+
+        const found = columns.find((col: Column) => col.name === input.trim());
+        if (!found) {
+            alert(`Столбец с именем "${input}" не найден`);
+            return;
+        }
 
         try {
-            await addReference(wColId, tblId, {
+            await addReference(wColId, found.id, {
                 width: 33,
                 visible: false,
                 primary: false,
             });
 
-            // 👇 обновляем именно виджет-колонки
             await loadColumnsWidget(selectedWidget.id);
         } catch (e) {
             alert('Не удалось добавить reference');
@@ -146,9 +234,10 @@ export const WidgetColumnsOfTable = ({
         }
     };
 
+
     return (
         <div className={s.tableWrapperWidget}>
-            <div >
+            <div style={{display: 'flex'}}>
                 <Typography
                     onClick={openModal}
                     variant="h6"
@@ -158,6 +247,16 @@ export const WidgetColumnsOfTable = ({
                     Посмотреть таблицу
                     <Editicon />
                 </Typography>
+                <Typography
+                    onClick={openWidgetModal}
+                    variant="h6"
+                    gutterBottom
+                    sx={{ cursor: 'pointer', textDecoration: 'underline', color: '#8ac7ff', display: 'flex', alignItems: 'center', gap: 1, width: '15%' }}
+                >
+                    Метаданные widget
+                    <Editicon />
+                </Typography>
+
             </div>
 
             <table className={s.tbl}>
@@ -293,6 +392,49 @@ export const WidgetColumnsOfTable = ({
                         )}
                     </Box>
                 </Modal>
+                <ThemeProvider theme={dark}>
+                    <Dialog open={widgetModalOpen} onClose={closeWidgetModal} fullWidth maxWidth="sm">
+                        <form onSubmit={(e) => {
+                            e.preventDefault();
+                            saveWidgetMeta();
+                        }}>
+
+                            <DialogTitle>Редактирование виджета</DialogTitle>
+
+                            <DialogContent dividers>
+                                <Stack spacing={2}>
+                                    <TextField
+                                        label="Название"
+                                        name="name"
+                                        size="small"
+                                        fullWidth
+                                        value={widgetMeta.name}
+                                        onChange={e => setWidgetMeta(v => ({...v, name: e.target.value}))}
+                                        required
+                                    />
+
+                                    <TextField
+                                        label="Описание"
+                                        name="description"
+                                        size="small"
+                                        fullWidth
+                                        multiline rows={3}
+                                        value={widgetMeta.description}
+                                        onChange={e => setWidgetMeta(v => ({...v, description: e.target.value}))}
+                                    />
+                                </Stack>
+                            </DialogContent>
+
+                            <DialogActions sx={{pr: 3, pb: 2}}>
+                                <Button onClick={closeWidgetModal}>Отмена</Button>
+                                <Button type="submit" variant="contained">
+                                    Сохранить
+                                </Button>
+                            </DialogActions>
+                        </form>
+                    </Dialog>
+                </ThemeProvider>
+
 
             </table>
         </div>

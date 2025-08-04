@@ -1,8 +1,8 @@
 // components/WidgetSelect/WidgetSelect.tsx
 import React, { useState } from 'react';
 import * as s from './WidgetSelect.module.scss';
-import {Widget} from "@/shared/hooks/useWidget";
-import {DTable} from "@/shared/hooks/useWorkSpaces";
+
+import {DTable, Widget} from "@/shared/hooks/useWorkSpaces";
 
 
 type Props = {

@@ -9,6 +9,7 @@ import {
 import {api} from "@/services/api";
 import {SubWormTable} from "@/components/formTable/SubFormTable";
 import {TreeFormTable} from "@/components/formTable/TreeFormTable";
+import {WorkSpaceTypes} from "@/types/typesWorkSpaces";
 
 type Props = {
     formDisplay: FormDisplay;
@@ -54,6 +55,7 @@ export const FormTable: React.FC<Props> = ({
     >([]);
     const [nestedTrees, setNestedTrees] = useState<Record<string, FormTreeColumn[]>>({});
     const [activeExpandedKey, setActiveExpandedKey] = useState<string | null>(null);
+
 
 
     useEffect(() => {
@@ -191,7 +193,7 @@ export const FormTable: React.FC<Props> = ({
     };
 
 
-    const groupedHeaders = formDisplay.columns.reduce((acc, col) => {
+  /*  const groupedHeaders = formDisplay.columns.reduce((acc, col) => {
         const last = acc[acc.length - 1];
         if (last && last.name === col.column_name) {
             last.count += 1;
@@ -199,7 +201,24 @@ export const FormTable: React.FC<Props> = ({
             acc.push({name: col.column_name, count: 1});
         }
         return acc;
-    }, [] as { name: string; count: number }[]);
+    }, [] as { name: string; count: number }[]);*/
+
+    // 1. Сортируем по column_order, как есть
+    const sortedColumns = [...formDisplay.columns].sort(
+        (a, b) => a.column_order - b.column_order
+    );
+
+// 2. Группировка по column_name
+    const groupedColumns = sortedColumns.reduce((acc: { name: string, cols: typeof sortedColumns }[], col) => {
+        const last = acc[acc.length - 1];
+        if (last && last.name === col.column_name) {
+            last.cols.push(col);
+        } else {
+            acc.push({ name: col.column_name, cols: [col] });
+        }
+        return acc;
+    }, []);
+
 
 
     return (
@@ -213,27 +232,40 @@ export const FormTable: React.FC<Props> = ({
                 <table className={s.tbl}>
                     <thead>
                     <tr>
-                        {groupedHeaders.map((header, idx) => (
-                            <th key={`${header.name}-${idx}`} colSpan={header.count}>
-                                {header.name}
+                        {groupedColumns.map(group => (
+                            <th key={group.name} colSpan={group.cols.length}>
+                                {group.name}
                             </th>
                         ))}
                     </tr>
-
                     </thead>
+
                     <tbody>
-                    {formDisplay.data.map((row, i) => {
+                    {formDisplay.data.map((row, rowIdx) => {
                         const pkObj = Object.fromEntries(
                             Object.entries(row.primary_keys).map(([k, v]) => [k, String(v)])
                         );
+
                         return (
-                            <tr key={i} onClick={() => handleRowClick(pkObj)}>
-                                {row.values.map((v, j) => <td key={j}>{v}</td>)}
+                            <tr key={rowIdx} onClick={() => handleRowClick(pkObj)}>
+                                {groupedColumns.flatMap(group =>
+                                    group.cols.map(col => {
+                                        const idx = sortedColumns.indexOf(col); // 🟢 правильный индекс
+                                        const val = row.values[idx];
+                                        return (
+                                            <td key={`r${rowIdx}-c${col.column_order}`}>
+                                                {val}
+                                            </td>
+                                        );
+                                    })
+                                )}
                             </tr>
                         );
                     })}
                     </tbody>
+
                 </table>
+
 
                 <SubWormTable subLoading={subLoading} subError={subError} subDisplay={subDisplay}
                               handleTabClick={handleTabClick}/>
