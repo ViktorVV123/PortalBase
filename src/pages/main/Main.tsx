@@ -60,7 +60,7 @@ export const Main = () => {
         deleteWidget,
         updateTableColumn,
         updateWidgetColumn,
-
+        addReference,
         loadFormTree,
         formTrees,
         loadFilteredFormDisplay,
@@ -199,6 +199,7 @@ export const Main = () => {
                              deleteColumnWidget={deleteColumnWidget}
                              updateTableColumn={updateTableColumn}
                              updateWidgetColumn={updateWidgetColumn}
+                             addReference={addReference}
                              loadColumnsWidget={loadColumnsWidget}
                              formTrees={formTrees}
                              loadFilteredFormDisplay={loadFilteredFormDisplay}

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, {useCallback, useEffect, useState} from 'react';
 import * as s from '@/components/setOfTables/SetOfTables.module.scss';
 import {
     Column,
@@ -10,7 +10,7 @@ import DeleteIcon from '@/assets/image/DeleteIcon.svg';
 import ConColumnIcon from '@/assets/image/ConColumnIcon.svg';
 import Editicon from '@/assets/image/EditIcon.svg';
 
-import { TableColumn } from '@/components/tableColumn/TableColumn';
+import {TableColumn} from '@/components/tableColumn/TableColumn';
 import {
     Box,
     Button,
@@ -29,11 +29,11 @@ import {WidgetColumnsMainTable} from "@/components/WidgetColumnsOfTable/WidgetCo
 
 /* ──────────── TYPES & THEME ──────────── */
 
- export type WcReference = WidgetColumn['reference'][number];
+export type WcReference = WidgetColumn['reference'][number];
 
 interface Props {
     /* базовые CRUD по widget-columns */
-    updateWidgetColumn:any
+    updateWidgetColumn: any
     deleteColumnWidget: (id: number) => void;
 
     /* данные для отображения */
@@ -43,7 +43,11 @@ interface Props {
 
     /* побочные действия */
     loadColumnsWidget: (widgetId: number) => void;
-
+    addReference: (
+        widgetColId: number,
+        tblColId: number,
+        payload: { width: number; combobox_visible: boolean; combobox_primary: boolean; ref_column_order: number }
+    ) => Promise<void>;
 
     /* API-методы, перенесённые в useWorkSpaces */
     fetchReferences: (
@@ -79,7 +83,7 @@ const modalStyle = {
 
 /* тёмная тема для MUI-диалога */
 const dark = createTheme({
-    palette: { mode: 'dark', primary: { main: '#ffffff' } },
+    palette: {mode: 'dark', primary: {main: '#ffffff'}},
     components: {
         MuiOutlinedInput: {
             styleOverrides: {
@@ -91,9 +95,9 @@ const dark = createTheme({
             },
         },
         MuiInputLabel: {
-            styleOverrides: { root: { '&.Mui-focused': { color: '#ffffff' } } },
+            styleOverrides: {root: {'&.Mui-focused': {color: '#ffffff'}}},
         },
-        MuiSelect: { styleOverrides: { icon: { color: '#ffffff' } } },
+        MuiSelect: {styleOverrides: {icon: {color: '#ffffff'}}},
     },
 });
 
@@ -109,7 +113,7 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                                                           columns,
                                                           /* workspace-api */
                                                           loadColumnsWidget,
-
+                                                          addReference,
                                                           fetchReferences,
                                                           deleteReference,
                                                           updateWidgetMeta,
@@ -154,7 +158,7 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
             alias: wc.alias ?? '',
             default: wc.default ?? '',
             placeholder: wc.placeholder ?? '',
-            published: wc.published,
+            visible: wc.visible,
             type: wc.type,
         });
     };
@@ -199,7 +203,7 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                 const updated = (prev[tblId] ?? []).map((w) =>
                     w.id === upd.id ? upd : w
                 );
-                return { ...prev, [tblId]: updated };
+                return {...prev, [tblId]: updated};
             });
 
             await loadColumnsWidget(upd.id);
@@ -216,6 +220,32 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
         setSelectedWidget,
     ]);
 
+    /* ───── merge column → reference ───── */
+    const handleMerge = async (wcId: number) => {
+        if (!selectedWidget) return;
+
+        const input = prompt('Введите *имя* столбца (name), который нужно привязать:');
+        if (!input) return;
+
+        const found = columns.find((c) => c.name === input.trim());
+        if (!found) {
+            alert(`Столбец "${input}" не найден`);
+            return;
+        }
+
+        try {
+            await addReference(wcId, found.id, {
+                width: 1,
+                ref_column_order: 0,
+                combobox_visible: false,
+                combobox_primary: false,
+            });
+            await loadColumnsWidget(selectedWidget.id);
+        } catch (e) {
+            alert('Не удалось добавить reference');
+            console.error(e);
+        }
+    };
 
     /* ───── delete reference ───── */
     const handleDeleteReference = async (wcId: number, tblColId: number) => {
@@ -245,7 +275,7 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
     return (
         <div className={s.tableWrapperWidget}>
             {/* ───── верхние ссылки ───── */}
-            <div style={{ display: 'flex', gap: 24 }}>
+            <div style={{display: 'flex', gap: 24}}>
                 <Typography
                     variant="h6"
                     onClick={() => setModalOpen(true)}
@@ -260,7 +290,7 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                     }}
                 >
                     Посмотреть таблицу
-                    <Editicon />
+                    <Editicon/>
                 </Typography>
 
                 <Typography
@@ -277,7 +307,7 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                     }}
                 >
                     Метаданные widget
-                    <Editicon />
+                    <Editicon/>
                 </Typography>
             </div>
 
@@ -290,7 +320,7 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                     <th>alias</th>
                     <th>default</th>
                     <th>placeholder</th>
-                    <th>published</th>
+                    <th>visible</th>
                     <th>type</th>
                     <th>id</th>
                     <th>id table</th>
@@ -298,7 +328,7 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                     <th>datatype</th>
                     <th>length</th>
                     <th>precision</th>
-                    <th>primary</th>
+                    <th>primary(test)</th>
                     <th>required</th>
                     <th></th>
                 </tr>
@@ -311,11 +341,13 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                     /* агрегаты по reference */
                     const agg = (k: keyof Column) =>
                         wc.reference
-                            .map((r) => r.table_column?.[k] ?? '—')
+                            .map((r) => {
+                                const val = r.table_column?.[k];
+                                if (typeof val === 'boolean') return val ? '✔︎' : '';
+                                return val ?? '—';
+                            })
+                            .filter(Boolean)
                             .join(', ');
-                    const refAgg = (k: 'primary' | 'visible') =>
-                        wc.reference.map((r) => (r[k] ? '✔︎' : '')).join(', ');
-
                     return (
                         <tr key={wc.id}>
                             <td>{wc.id}</td>
@@ -328,7 +360,7 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                                         className={s.inp}
                                         value={wcValues.alias ?? ''}
                                         onChange={(e) =>
-                                            setWcValues((v) => ({ ...v, alias: e.target.value }))
+                                            setWcValues((v) => ({...v, alias: e.target.value}))
                                         }
                                     />
                                 ) : (
@@ -343,7 +375,7 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                                         className={s.inp}
                                         value={wcValues.default ?? ''}
                                         onChange={(e) =>
-                                            setWcValues((v) => ({ ...v, default: e.target.value }))
+                                            setWcValues((v) => ({...v, default: e.target.value}))
                                         }
                                     />
                                 ) : (
@@ -370,19 +402,19 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                             </td>
 
                             {/* published */}
-                            <td style={{ textAlign: 'center' }}>
+                            <td style={{textAlign: 'center'}}>
                                 {isEd ? (
                                     <input
                                         type="checkbox"
-                                        checked={wcValues.published ?? false}
+                                        checked={wcValues.visible ?? false}
                                         onChange={(e) =>
                                             setWcValues((v) => ({
                                                 ...v,
-                                                published: e.target.checked,
+                                                visible: e.target.checked,
                                             }))
                                         }
                                     />
-                                ) : wc.published ? (
+                                ) : wc.visible ? (
                                     '✔︎'
                                 ) : (
                                     ''
@@ -396,7 +428,7 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                                         className={s.inp}
                                         value={wcValues.type ?? ''}
                                         onChange={(e) =>
-                                            setWcValues((v) => ({ ...v, type: e.target.value }))
+                                            setWcValues((v) => ({...v, type: e.target.value}))
                                         }
                                     />
                                 ) : (
@@ -411,7 +443,7 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                             <td>{agg('datatype')}</td>
                             <td>{agg('length')}</td>
                             <td>{agg('precision')}</td>
-                            <td>{refAgg('primary')}</td>
+                            <td>{agg('primary')}</td>
                             <td>{agg('required')}</td>
 
                             {/* actions */}
@@ -429,7 +461,7 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                                     <>
                                         <ConColumnIcon
                                             className={s.actionIcon}
-                                            onClick={() => {}}
+                                            onClick={() => handleMerge(wc.id)}
                                         />
                                         <EditIcon
                                             className={s.actionIcon}
@@ -450,12 +482,13 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                 </tbody>
             </table>
 
-        <WidgetColumnsMainTable widgetColumns={widgetColumns} handleDeleteReference={handleDeleteReference} referencesMap={referencesMap} />
+            <WidgetColumnsMainTable  widgetColumns={widgetColumns} handleDeleteReference={handleDeleteReference}
+                                    referencesMap={referencesMap}/>
 
             {/* ───── Modal “Посмотреть таблицу” ───── */}
             <Modal open={modalOpen} onClose={() => setModalOpen(false)}>
                 <Box sx={modalStyle}>
-                    <h3 style={{ marginBottom: 15 }}>Таблица</h3>
+                    <h3 style={{marginBottom: 15}}>Таблица</h3>
                     {columns.length ? (
                         <TableColumn
                             columns={columns}
@@ -491,7 +524,7 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                                     fullWidth
                                     value={widgetMeta.name}
                                     onChange={(e) =>
-                                        setWidgetMeta((v) => ({ ...v, name: e.target.value }))
+                                        setWidgetMeta((v) => ({...v, name: e.target.value}))
                                     }
                                     required
                                 />
@@ -511,7 +544,7 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                                 />
                             </Stack>
                         </DialogContent>
-                        <DialogActions sx={{ pr: 3, pb: 2 }}>
+                        <DialogActions sx={{pr: 3, pb: 2}}>
                             <Button onClick={() => setWidgetModalOpen(false)}>Отмена</Button>
                             <Button type="submit" variant="contained">
                                 Сохранить

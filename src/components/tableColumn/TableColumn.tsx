@@ -62,6 +62,8 @@ export const TableColumn = ({columns,deleteColumnTable,updateTableColumn}:tableC
             <table className={s.tbl}>
                 <thead>
                 <tr>
+                    <th>id</th>
+                    <th>id_column</th>
                     <th>name</th>
                     <th>description</th>
                     <th>datatype</th>
@@ -80,6 +82,8 @@ export const TableColumn = ({columns,deleteColumnTable,updateTableColumn}:tableC
                     return (
                         <tr key={col.id}>
                             {/** -------- NAME -------- */}
+                            <td>{col.table_id}</td>
+                            <td>{col.id}</td>
                             <td>
                                 {isEditing ? (
                                     <input

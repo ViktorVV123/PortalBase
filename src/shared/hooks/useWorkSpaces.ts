@@ -3,6 +3,7 @@ import {api} from "@/services/api";
 import {WorkSpaceTypes} from "@/types/typesWorkSpaces";
 import {Connection} from "@/types/typesConnection";
 import {useLoadConnections} from "@/shared/hooks/useLoadConnections";
+import {WcReference} from "@/components/WidgetColumnsOfTable/WidgetColumnsOfTable";
 
 
 export interface DTable {
@@ -46,12 +47,14 @@ export type WidgetColumn = {
     alias: string | null;
     default: string | null;
     placeholder: string | null;
-    published: boolean;
+    column_order: number,
+    visible: boolean;
     type: string;
     reference: {
         width: number;
-        primary: boolean;
-        visible: boolean;
+        combobox_primary: boolean;
+        ref_column_order: number,
+        combobox_visible: boolean;
         table_column: {
             table_id: number;
             id: number;
@@ -537,6 +540,42 @@ export const useWorkSpaces = () => {
         []
     );
 
+    const updateReference = useCallback(
+        async (
+            widgetColumnId: number,
+            tableColumnId: number,
+            patch: Partial<Pick<WcReference,
+                'width'            |
+                'combobox_visible' |
+                'combobox_primary' |
+                'ref_column_order'
+            >>
+        ) => {
+            const { data } = await api.patch<WcReference>(
+                `/widgets/tables/references/${widgetColumnId}/${tableColumnId}`,
+                patch,
+            );
+            /* вернём свежие данные — решать наверху, как их подмешивать */
+            return data;
+        },
+        [],
+    );
+
+
+    const addReference = useCallback(
+        async (
+            widgetColId: number,
+            tblColId: number,
+            payload: { width: number; combobox_visible: boolean; combobox_primary: boolean;ref_column_order:number },
+        ) => {
+            await api.post(
+                `/widgets/tables/references/${widgetColId}/${tblColId}`,
+                payload,
+            );
+        },
+        [],
+    );
+
     //ВСЕ ДЛЯ ФОРМ (они у нас самые последние из вывода таблиц и тд)
     const [formTrees, setFormTrees] = useState<Record<number, FormTreeColumn[]>>({});
     const [formTreeLoading, setFormTreeLoading] = useState(false);
@@ -693,7 +732,7 @@ export const useWorkSpaces = () => {
         deleteColumnWidget,
         deleteWidget,
         updateTableColumn,
-        updateWidgetColumn,
+        updateWidgetColumn, addReference,
         loadFormTree,
         formTrees,
         loadFilteredFormDisplay,
@@ -706,6 +745,7 @@ export const useWorkSpaces = () => {
         fetchReferences,
         deleteReference,
         updateWidgetMeta,
+        updateReference
 
     };
 };
