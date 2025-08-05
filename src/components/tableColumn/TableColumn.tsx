@@ -58,6 +58,7 @@ export const TableColumn = ({columns,deleteColumnTable,updateTableColumn}:tableC
 
     return (
         <div className={s.tableWrapper}>
+
             <table className={s.tbl}>
                 <thead>
                 <tr>
@@ -69,7 +70,6 @@ export const TableColumn = ({columns,deleteColumnTable,updateTableColumn}:tableC
                     <th>primary</th>
                     <th>increment</th>
                     <th>required</th>
-                    <th>datetime</th>
                     <th></th>
                 </tr>
                 </thead>
@@ -135,7 +135,7 @@ export const TableColumn = ({columns,deleteColumnTable,updateTableColumn}:tableC
                             </td>
 
                             {/** -------- FLAGS (checkbox) -------- */}
-                            {(['primary', 'increment', 'required', 'datetime'] as const).map(flag => (
+                            {(['primary', 'increment', 'required'] as const).map(flag => (
                                 <td key={flag} style={{textAlign: 'center'}}>
                                     {isEditing ? (
                                         <input

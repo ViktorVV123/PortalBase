@@ -269,13 +269,51 @@ export const useWorkSpaces = () => {
     );
 
 
+    // ↓ добавьте сразу под addReference
+    /** GET /widgets/tables/references/{widgetColumnId} */
+    const fetchReferences = useCallback(
+        async (widgetColumnId: number) => {
+            const { data } = await api.get<WidgetColumn['reference'][number][]>(
+                `/widgets/tables/references/${widgetColumnId}`,
+            );
+            return data;
+        },
+        [],
+    );
+
+    /** DELETE /widgets/tables/references/{widgetColumnId}/{tableColumnId} */
+    const deleteReference = useCallback(
+        async (widgetColumnId: number, tableColumnId: number) => {
+            await api.delete(
+                `/widgets/tables/references/${widgetColumnId}/${tableColumnId}`,
+            );
+        },
+        [],
+    );
+    // внутри useWorkSpaces
+    const updateWidgetMeta = useCallback(
+        async (id: number, patch: Partial<Widget>) => {
+            const { data } = await api.patch<Widget>(`/widgets/${id}`, patch);
+            /* синхронизируем кеш */
+            setWidgetsByTable(prev => {
+                const tbl = data.table_id;
+                return { ...prev,
+                    [tbl]: (prev[tbl] ?? []).map(w => w.id === id ? data : w) };
+            });
+            return data;
+        },
+        []
+    );
+
+
+
     /** GET /widgets/{id}/columns */
     const loadColumnsWidget = useCallback(async (widgetId: number) => {
         setWColsLoading(true);
         setWColsError(null);
         try {
             const {data} = await api.get<WidgetColumn[]>(`/widgets/${widgetId}/columns`);
-            setWidgetColumns(data);
+            setWidgetColumns(data.sort((a, b) => a.id - b.id));
         } catch {
             setWColsError('Не удалось загрузить столбцы виджета');
         } finally {
@@ -678,7 +716,9 @@ export const useWorkSpaces = () => {
         updateTableMeta,
         connections,
         loadConnections,
-        setWidgetsByTable
-
+        setWidgetsByTable,
+        fetchReferences,
+        deleteReference,
+        updateWidgetMeta
     };
 };

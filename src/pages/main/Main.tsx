@@ -70,6 +70,9 @@ export const Main = () => {
         connections,
         loadConnections,
         setWidgetsByTable,
+        fetchReferences,
+        updateWidgetMeta,
+        deleteReference
     } = useWorkSpaces();
 
     useEffect(() => {
@@ -146,7 +149,8 @@ export const Main = () => {
         <div className={styles.layout}>
 
             <div className={styles.container}>
-                <TopComponent loadWorkSpaces={loadWorkSpaces} deleteWorkspace={deleteWorkspace} formsByWidget={formsByWidget} setWsHover={setWsHover}
+                <TopComponent loadWorkSpaces={loadWorkSpaces} deleteWorkspace={deleteWorkspace}
+                              formsByWidget={formsByWidget} setWsHover={setWsHover}
                               tblHover={tblHover}
                               setTblHover={setTblHover} wsHover={wsHover}
                               handleSelectTable={handleSelectTable} widgetsByTable={widgetsByTable}
@@ -169,7 +173,7 @@ export const Main = () => {
                 />
 
                 <SetOfTables setWidgetsByTable={setWidgetsByTable} setSelectedWidget={setSelectedWidget}
-                    columns={columns}
+                             columns={columns}
                              formDisplay={formDisplay}
                              tableName={selectedTable?.name ?? ''}
                              loading={loading}

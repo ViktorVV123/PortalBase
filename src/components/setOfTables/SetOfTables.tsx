@@ -64,7 +64,7 @@ type Props = {
     setSubDisplay: (value: SubDisplay | null) => void;
     selectedTable: DTable | null;
     updateTableMeta: (id: number, patch: Partial<DTable>) => void;
-    setSelectedWidget:any
+    setSelectedWidget: any
     setWidgetsByTable: React.Dispatch<React.SetStateAction<Record<number, Widget[]>>>
 
 
@@ -107,9 +107,10 @@ export const SetOfTables: React.FC<Props> = ({
                                                  setSubDisplay,
                                                  selectedTable,
                                                  updateTableMeta,
-                                                 setSelectedWidget
-                                             }) => {
+                                                 setSelectedWidget,
 
+
+                                             }) => {
 
 
     if (loading) return <p>Загрузка…</p>;
@@ -171,9 +172,12 @@ export const SetOfTables: React.FC<Props> = ({
                         ) : wColsError ? (
                             <p className={s.error}>{wColsError}</p>
                         ) : (
-                            <WidgetColumnsOfTable setWidgetsByTable={setWidgetsByTable} setSelectedWidget={setSelectedWidget} columns={columns}
+                            <WidgetColumnsOfTable
+                                setWidgetsByTable={setWidgetsByTable}
+                                                  setSelectedWidget={setSelectedWidget} columns={columns}
                                                   updateTableColumn={updateTableColumn}
-                                                  deleteColumnTable={deleteColumnTable} deleteColumnWidget={deleteColumnWidget} addReference={addReference}
+                                                  deleteColumnTable={deleteColumnTable}
+                                                  deleteColumnWidget={deleteColumnWidget} addReference={addReference}
                                                   updateWidgetColumn={updateWidgetColumn} widgetColumns={widgetColumns}
                                                   loadColumnsWidget={loadColumnsWidget} selectedWidget={selectedWidget}/>
                         )

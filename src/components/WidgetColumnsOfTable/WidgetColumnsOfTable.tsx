@@ -1,45 +1,60 @@
-import React, {useCallback, useEffect, useState} from 'react';
-import * as s from "@/components/setOfTables/SetOfTables.module.scss";
-import {Column, Widget, WidgetColumn} from "@/shared/hooks/useWorkSpaces";
-import EditIcon from "@/assets/image/EditIcon.svg";
-import DeleteIcon from "@/assets/image/DeleteIcon.svg";
-import {api} from "@/services/api";
-import {TableColumn} from "@/components/tableColumn/TableColumn";
+// components/WidgetColumnsOfTable/WidgetColumnsOfTable.tsx
+import React, { useCallback, useEffect, useState } from 'react';
+import * as s from '@/components/setOfTables/SetOfTables.module.scss';
+import {
+    Column,
+    Widget,
+    WidgetColumn,
+} from '@/shared/hooks/useWorkSpaces';
+import EditIcon from '@/assets/image/EditIcon.svg';
+import DeleteIcon from '@/assets/image/DeleteIcon.svg';
+import ConColumnIcon from '@/assets/image/ConColumnIcon.svg';
+import Editicon from '@/assets/image/EditIcon.svg';
+
+import { api } from '@/services/api';
+import { TableColumn } from '@/components/tableColumn/TableColumn';
+
 import {
     Box,
     Button,
     createTheme,
     Dialog,
-    DialogActions, DialogContent, DialogTitle,
-    Modal, Stack,
+    DialogActions,
+    DialogContent,
+    DialogTitle,
+    Modal,
+    Stack,
     TextField,
     ThemeProvider,
-    Typography
-} from "@mui/material";
-import Editicon from "@/assets/image/EditIcon.svg";
-import ConColumnIcon from '@/assets/image/ConColumnIcon.svg'
+    Typography,
+} from '@mui/material';
 
+type WcReference = WidgetColumn['reference'][number];
 
-type WidgetColumnsProps = {
-    updateWidgetColumn: (id: number,
-                         patch: Partial<Omit<WidgetColumn, 'id' | 'widget_id' | 'reference'>>) => void;
+interface Props {
+    updateWidgetColumn: (
+        id: number,
+        patch: Partial<Omit<WidgetColumn, 'id' | 'widget_id' | 'reference'>>
+    ) => void;
     widgetColumns: WidgetColumn[];
     selectedWidget: Widget | null;
-    loadColumnsWidget: any
-    addReference: (widgetColId: number, tblColId: number, payload: {
-        width: number;
-        visible: boolean;
-        primary: boolean;
-    }) => Promise<void>;
+    loadColumnsWidget: (widgetId: number) => void;
+    addReference: (
+        widgetColId: number,
+        tblColId: number,
+        payload: { width: number; visible: boolean; primary: boolean }
+    ) => Promise<void>;
     deleteColumnWidget: (id: number) => void;
-    columns: any;
-    updateTableColumn: any;
-    deleteColumnTable: any;
-    setSelectedWidget:any;
-    setWidgetsByTable: React.Dispatch<React.SetStateAction<Record<number, Widget[]>>>
-
+    columns: Column[];
+    updateTableColumn: (id: number, p: Partial<Omit<Column, 'id'>>) => void;
+    deleteColumnTable: (id: number) => void;
+    setSelectedWidget: React.Dispatch<React.SetStateAction<Widget | null>>;
+    setWidgetsByTable: React.Dispatch<
+        React.SetStateAction<Record<number, Widget[]>>
+    >;
 }
 
+/* стили модалки */
 const modalStyle = {
     position: 'absolute' as const,
     top: '50%',
@@ -52,16 +67,13 @@ const modalStyle = {
     overflowY: 'auto',
     width: '90vw',
     padding: '20px',
-    color: 'white'
+    color: 'white',
 };
 
+/* тёмная тема для MUI-диалога */
 const dark = createTheme({
-    palette: {
-        mode: 'dark',
-        primary: {main: '#ffffff'},  // ← чтобы все focus-ring были белые
-    },
+    palette: { mode: 'dark', primary: { main: '#ffffff' } },
     components: {
-        /* белый бордер при фокусе */
         MuiOutlinedInput: {
             styleOverrides: {
                 root: {
@@ -71,44 +83,93 @@ const dark = createTheme({
                 },
             },
         },
-        /* белая подпись (label) в фокусе */
         MuiInputLabel: {
             styleOverrides: {
-                root: {
-                    '&.Mui-focused': {color: '#ffffff'},
-                },
+                root: { '&.Mui-focused': { color: '#ffffff' } },
             },
         },
-        /* белая стрелочка у Select */
-        MuiSelect: {
-            styleOverrides: {icon: {color: '#ffffff'}},
-        },
+        MuiSelect: { styleOverrides: { icon: { color: '#ffffff' } } },
     },
 });
 
-export const WidgetColumnsOfTable = ({
-                                         updateWidgetColumn,
-                                         widgetColumns,
-                                         selectedWidget,
-                                         loadColumnsWidget,
-                                         addReference,
-                                         deleteColumnWidget,
-                                         columns,
-                                         updateTableColumn,
-                                         deleteColumnTable,setSelectedWidget,setWidgetsByTable
+export const WidgetColumnsOfTable: React.FC<Props> = ({
+                                                          updateWidgetColumn,
+                                                          widgetColumns,
+                                                          selectedWidget,
+                                                          loadColumnsWidget,
+                                                          addReference,
+                                                          deleteColumnWidget,
+                                                          columns,
+                                                          updateTableColumn,
+                                                          deleteColumnTable,
+                                                          setSelectedWidget,
+                                                          setWidgetsByTable,
+                                                      }) => {
+    /* ───────────── reference cache ───────────── */
+    const [referencesMap, setReferencesMap] = useState<
+        Record<number, WcReference[]>
+    >({});
 
-                                     }: WidgetColumnsProps) => {
+    const fetchReferences = useCallback(async (wcId: number) => {
+        const { data } = await api.get<WcReference[]>(
+            `/widgets/tables/references/${wcId}`
+        );
+        return data;
+    }, []);
 
+    useEffect(() => {
+        if (!widgetColumns.length) return;
 
-    const [colValues, setColValues] = useState<Partial<Column>>({});
+        const loadAll = async () => {
+            const map: Record<number, WcReference[]> = {};
+            await Promise.all(
+                widgetColumns.map(async (wc) => {
+                    try {
+                        map[wc.id] = await fetchReferences(wc.id);
+                    } catch (e) {
+                        console.warn(`reference load error (wc ${wc.id})`, e);
+                        map[wc.id] = [];
+                    }
+                })
+            );
+            setReferencesMap(map);
+        };
+
+        loadAll();
+    }, [widgetColumns, fetchReferences]);
+
+    /* ───────────── state для редактирования WC ───────────── */
+    const [editingWcId, setEditingWcId] = useState<number | null>(null);
+    const [wcValues, setWcValues] = useState<Partial<WidgetColumn>>({});
+    const startEdit = (wc: WidgetColumn) => {
+        setEditingWcId(wc.id);
+        setWcValues({
+            alias: wc.alias ?? '',
+            default: wc.default ?? '',
+            placeholder: wc.placeholder ?? '',
+            published: wc.published,
+            type: wc.type,
+        });
+    };
+    const cancelEdit = () => {
+        setEditingWcId(null);
+        setWcValues({});
+    };
+    const saveEdit = async () => {
+        if (editingWcId == null) return;
+        await updateWidgetColumn(editingWcId, wcValues);
+        if (selectedWidget) await loadColumnsWidget(selectedWidget.id);
+        cancelEdit();
+    };
+
+    /* ───────────── модалки ───────────── */
+    const [modalOpen, setModalOpen] = useState(false);
     const [widgetModalOpen, setWidgetModalOpen] = useState(false);
-    const openWidgetModal = () => setWidgetModalOpen(true);
-    const closeWidgetModal = () => setWidgetModalOpen(false);
 
     const [widgetMeta, setWidgetMeta] = useState<Partial<Widget>>({
         name: selectedWidget?.name ?? '',
         description: selectedWidget?.description ?? '',
-        table_id: selectedWidget?.table_id ?? 0
+        table_id: selectedWidget?.table_id ?? 0,
     });
 
     const saveWidgetMeta = useCallback(async () => {
@@ -121,144 +182,125 @@ export const WidgetColumnsOfTable = ({
                 table_id: widgetMeta.table_id,
             });
 
-            const { data: updatedWidget } = await api.get<Widget>(`/widgets/${selectedWidget.id}`);
-            setSelectedWidget(updatedWidget);
+            const { data: upd } = await api.get<Widget>(
+                `/widgets/${selectedWidget.id}`
+            );
+            setSelectedWidget(upd);
 
-            // 👇 обновим виджет в списке
-            setWidgetsByTable(prev => {
-                const tableId = updatedWidget.table_id;
-                const updated = (prev[tableId] ?? []).map(w =>
-                    w.id === updatedWidget.id ? updatedWidget : w
+            setWidgetsByTable((prev) => {
+                const tblId = upd.table_id;
+                const updated = (prev[tblId] ?? []).map((w) =>
+                    w.id === upd.id ? upd : w
                 );
-                return { ...prev, [tableId]: updated };
+                return { ...prev, [tblId]: updated };
             });
 
-            await loadColumnsWidget(updatedWidget.id);
+            await loadColumnsWidget(upd.id);
+            setWidgetModalOpen(false);
         } catch (e) {
             console.warn('❌ Ошибка при сохранении метаданных виджета:', e);
         }
-    }, [selectedWidget, widgetMeta, loadColumnsWidget, setWidgetsByTable]);
+    }, [
+        selectedWidget,
+        widgetMeta,
+        loadColumnsWidget,
+        setWidgetsByTable,
+        setSelectedWidget,
+    ]);
 
 
-
-
-    const cleanPatch = (p: Partial<Column>): Partial<Column> => {
-        const patch: any = {...p};
-        ['length', 'precision'].forEach(k => {
-            if (patch[k] === '' || patch[k] === undefined) delete patch[k];
-        });
-        return patch;
-    };
-
-
-    const [editingWcId, setEditingWcId] = useState<number | null>(null);
-    const [wcValues, setWcValues] = useState<Partial<WidgetColumn>>({});
-    const [modalOpen, setModalOpen] = useState(false);
-    const openModal = () => setModalOpen(true);
-    const closeModal = () => setModalOpen(false);
-
-    const startWcEdit = (wc: WidgetColumn) => {
-        setEditingWcId(wc.id);
-        setWcValues({
-            alias: wc.alias ?? '',
-            default: wc.default ?? '',
-            placeholder: wc.default ?? '',
-            published: wc.published,
-            type: wc.type,
-        });
-    };
-    const cancelWcEdit = () => {
-        setEditingWcId(null);
-        setWcValues({});
-    };
-
-    const saveWcEdit = async () => {
-        if (editingWcId == null) return;
-
-        // 1. Обновляем только виджет-колонку
-        await updateWidgetColumn(editingWcId, wcValues);
-
-        // 2. Проверяем, редактировал ли пользователь table_column (colValues)
-        const ref = widgetColumns.find(w => w.id === editingWcId)?.reference[0];
-        const tableColumnId = ref?.table_column?.id;
-
-        const hasTableColumnChanges =
-            colValues && Object.values(colValues).some(v => v !== undefined && v !== null && v !== '');
-
-        // 3. Отправляем PATCH на reference ТОЛЬКО если есть изменения
-        if (ref && tableColumnId && hasTableColumnChanges) {
-            try {
-                await api.patch(`/widgets/tables/references/${editingWcId}/${tableColumnId}`, {
-                    width: ref.width ?? 1,
-                    visible: ref.visible ?? false,
-                    primary: ref.primary ?? false,
-                    table_column: cleanPatch(colValues),
-                });
-            } catch (e) {
-                console.error('Ошибка при сохранении table_column:', e);
-            }
-        }
-
-        // 👇 Подгружаем обновлённые данные
-        if (selectedWidget) {
-            await loadColumnsWidget(selectedWidget.id);
-        }
-
-        cancelWcEdit();
-    };
-
-
-    const handleMerge = async (wColId: number) => {
+    // сразу после saveEdit()
+    const handleMerge = async (wcId: number) => {
         if (!selectedWidget) return;
 
         const input = prompt('Введите *имя* столбца (name), который нужно привязать:');
         if (!input) return;
 
-        const found = columns.find((col: Column) => col.name === input.trim());
+        const found = columns.find((c) => c.name === input.trim());
         if (!found) {
-            alert(`Столбец с именем "${input}" не найден`);
+            alert(`Столбец "${input}" не найден`);
             return;
         }
 
         try {
-            await addReference(wColId, found.id, {
+            await addReference(wcId, found.id, {
                 width: 33,
                 visible: false,
                 primary: false,
             });
-
-            await loadColumnsWidget(selectedWidget.id);
+            await loadColumnsWidget(selectedWidget.id); // обновим reference
         } catch (e) {
             alert('Не удалось добавить reference');
             console.error(e);
         }
     };
 
+    /** удалить один reference и обновить таблицы */
+    const handleDeleteReference = async (wcId: number, tblColId: number) => {
+        if (!selectedWidget) return;
+        if (!confirm('Удалить связь столбца?')) return;
 
+        try {
+            await api.delete(
+                `/widgets/tables/references/${wcId}/${tblColId}`
+            );
+
+            /* 1) локально убираем из карты */
+            setReferencesMap(prev => ({
+                ...prev,
+                [wcId]: (prev[wcId] ?? []).filter(r => r.table_column.id !== tblColId)
+            }));
+
+            /* 2) чтобы агрегаты в первой таблице обновились — перезагрузим столбцы */
+            await loadColumnsWidget(selectedWidget.id);
+
+        } catch (e) {
+            console.warn('❌ не удалось удалить reference', e);
+            alert('Ошибка при удалении');
+        }
+    };
+
+    /* ─────────────────────────── UI ─────────────────────────── */
     return (
         <div className={s.tableWrapperWidget}>
-            <div style={{display: 'flex'}}>
+            {/* Верхние ссылки-триггеры */}
+            <div style={{display: 'flex', gap: 24}}>
                 <Typography
-                    onClick={openModal}
                     variant="h6"
+                    onClick={() => setModalOpen(true)}
                     gutterBottom
-                    sx={{ cursor: 'pointer', textDecoration: 'underline', color: '#8ac7ff',display:'flex', alignItems: 'center',gap:1, width:'15%' }}
+                    sx={{
+                        cursor: 'pointer',
+                        textDecoration: 'underline',
+                        color: '#8ac7ff',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1,
+                    }}
                 >
                     Посмотреть таблицу
-                    <Editicon />
+                    <Editicon/>
                 </Typography>
+
                 <Typography
-                    onClick={openWidgetModal}
                     variant="h6"
+                    onClick={() => setWidgetModalOpen(true)}
                     gutterBottom
-                    sx={{ cursor: 'pointer', textDecoration: 'underline', color: '#8ac7ff', display: 'flex', alignItems: 'center', gap: 1, width: '15%' }}
+                    sx={{
+                        cursor: 'pointer',
+                        textDecoration: 'underline',
+                        color: '#8ac7ff',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1,
+                    }}
                 >
                     Метаданные widget
-                    <Editicon />
+                    <Editicon/>
                 </Typography>
-
             </div>
 
+            {/* ───────── 1. Старая таблица ───────── */}
             <table className={s.tbl}>
                 <thead>
                 <tr>
@@ -280,96 +322,136 @@ export const WidgetColumnsOfTable = ({
                     <th></th>
                 </tr>
                 </thead>
+
                 <tbody>
-                {widgetColumns.map(wc => {
+                {widgetColumns.map((wc) => {
                     const isEd = editingWcId === wc.id;
 
-                    const colValues = (field: keyof Column) =>
-                        wc.reference.map(r => r.table_column?.[field] ?? '—').join(', ');
-
-                    const refValues = (field: 'primary' | 'visible') =>
-                        wc.reference.map(r => (r[field] ? '✔︎' : '')).join(', ');
-
+                    /* агрегаты по reference */
+                    const agg = (k: keyof Column) =>
+                        wc.reference.map((r) => r.table_column?.[k] ?? '—').join(', ');
+                    const refAgg = (k: 'primary' | 'visible') =>
+                        wc.reference.map((r) => (r[k] ? '✔︎' : '')).join(', ');
 
                     return (
                         <tr key={wc.id}>
                             <td>{wc.id}</td>
                             <td>{wc.widget_id}</td>
 
+                            {/* alias */}
                             <td>
                                 {isEd ? (
-                                    <input value={wcValues.alias ?? ''}
-                                           onChange={e => setWcValues(v => ({
-                                               ...v,
-                                               alias: e.target.value
-                                           }))}
-                                           className={s.inp}/>
-                                ) : wc.alias ?? '—'}
-                            </td>
-                            <td>
-                                {isEd ? (
-                                    <input value={wcValues.default ?? ''}
-                                           onChange={e => setWcValues(v => ({
-                                               ...v,
-                                               default: e.target.value
-                                           }))}
-                                           className={s.inp}/>
-                                ) : wc.default ?? '—'}
-                            </td>
-                            <td>
-                                {isEd ? (
-                                    <input value={wcValues.placeholder ?? ''}
-                                           onChange={e => setWcValues(v => ({
-                                               ...v,
-                                               placeholder: e.target.value
-                                           }))}
-                                           className={s.inp}/>
-                                ) : wc.placeholder ?? '—'}
-                            </td>
-                            <td>
-                                {isEd ? (
-                                    <input type="checkbox"
-                                           checked={wcValues.published ?? false}
-                                           onChange={e => setWcValues(v => ({
-                                               ...v,
-                                               published: e.target.checked
-                                           }))}/>
-                                ) : wc.published ? '✔︎' : ''}
-                            </td>
-                            <td>
-                                {isEd ? (
-                                    <input value={wcValues.type ?? ''}
-                                           onChange={e => setWcValues(v => ({
-                                               ...v,
-                                               type: e.target.value
-                                           }))}
-                                           className={s.inp}/>
-                                ) : wc.type ?? '—'}
+                                    <input
+                                        className={s.inp}
+                                        value={wcValues.alias ?? ''}
+                                        onChange={(e) =>
+                                            setWcValues((v) => ({...v, alias: e.target.value}))
+                                        }
+                                    />
+                                ) : (
+                                    wc.alias ?? '—'
+                                )}
                             </td>
 
-                            <td>{colValues('id')}</td>
-                            <td>{colValues('table_id')}</td>
-                            <td>{colValues('name')}</td>
-                            <td>{colValues('datatype')}</td>
-                            <td>{colValues('length')}</td>
-                            <td>{colValues('precision')}</td>
-                            <td>{refValues('primary')}</td>
-                            <td>{refValues('visible')}</td>
+                            {/* default */}
+                            <td>
+                                {isEd ? (
+                                    <input
+                                        className={s.inp}
+                                        value={wcValues.default ?? ''}
+                                        onChange={(e) =>
+                                            setWcValues((v) => ({...v, default: e.target.value}))
+                                        }
+                                    />
+                                ) : (
+                                    wc.default ?? '—'
+                                )}
+                            </td>
 
+                            {/* placeholder */}
+                            <td>
+                                {isEd ? (
+                                    <input
+                                        className={s.inp}
+                                        value={wcValues.placeholder ?? ''}
+                                        onChange={(e) =>
+                                            setWcValues((v) => ({...v, placeholder: e.target.value}))
+                                        }
+                                    />
+                                ) : (
+                                    wc.placeholder ?? '—'
+                                )}
+                            </td>
+
+                            {/* published */}
+                            <td style={{textAlign: 'center'}}>
+                                {isEd ? (
+                                    <input
+                                        type="checkbox"
+                                        checked={wcValues.published ?? false}
+                                        onChange={(e) =>
+                                            setWcValues((v) => ({...v, published: e.target.checked}))
+                                        }
+                                    />
+                                ) : wc.published ? (
+                                    '✔︎'
+                                ) : (
+                                    ''
+                                )}
+                            </td>
+
+                            {/* type */}
+                            <td>
+                                {isEd ? (
+                                    <input
+                                        className={s.inp}
+                                        value={wcValues.type ?? ''}
+                                        onChange={(e) =>
+                                            setWcValues((v) => ({...v, type: e.target.value}))
+                                        }
+                                    />
+                                ) : (
+                                    wc.type ?? '—'
+                                )}
+                            </td>
+
+                            {/* агрегированные reference-поля */}
+                            <td>{agg('id')}</td>
+                            <td>{agg('table_id')}</td>
+                            <td>{agg('name')}</td>
+                            <td>{agg('datatype')}</td>
+                            <td>{agg('length')}</td>
+                            <td>{agg('precision')}</td>
+                            <td>{refAgg('primary')}</td>
+                            <td>{agg('required')}</td>
+
+                            {/* actions */}
                             <td className={s.actionsCell}>
                                 {isEd ? (
                                     <>
-                                        <button className={s.okBtn} onClick={saveWcEdit}>✓</button>
-                                        <button className={s.cancelBtn} onClick={cancelWcEdit}>✕
+                                        <button className={s.okBtn} onClick={saveEdit}>
+                                            ✓
+                                        </button>
+                                        <button className={s.cancelBtn} onClick={cancelEdit}>
+                                            ✕
                                         </button>
                                     </>
                                 ) : (
                                     <>
-                                        <ConColumnIcon className={s.actionIcon} onClick={() => handleMerge(wc.id)}/>
-                                        <EditIcon className={s.actionIcon}
-                                                  onClick={() => startWcEdit(wc)}/>
-                                        <DeleteIcon className={s.actionIcon}
-                                                    onClick={() => confirm('Удалить?') && deleteColumnWidget(wc.id)}/>
+                                        <ConColumnIcon
+                                            className={s.actionIcon}
+                                            onClick={() => handleMerge(wc.id)}
+                                        />
+                                        <EditIcon
+                                            className={s.actionIcon}
+                                            onClick={() => startEdit(wc)}
+                                        />
+                                        <DeleteIcon
+                                            className={s.actionIcon}
+                                            onClick={() =>
+                                                confirm('Удалить?') && deleteColumnWidget(wc.id)
+                                            }
+                                        />
                                     </>
                                 )}
                             </td>
@@ -377,67 +459,147 @@ export const WidgetColumnsOfTable = ({
                     );
                 })}
                 </tbody>
+            </table>
 
-                <Modal open={modalOpen} onClose={closeModal}>
-                    <Box sx={modalStyle}>
-                        <h3 style={{marginBottom: '15px'}}>Таблица</h3>
-                        {columns?.length && updateTableColumn && deleteColumnTable ? (
-                            <TableColumn
-                                columns={columns}
-                                updateTableColumn={updateTableColumn}
-                                deleteColumnTable={deleteColumnTable}
-                            />
+            {/* ───────── 2. Reference-таблицы ───────── */}
+            <h3 style={{margin: '24px 0 8px'}}>References</h3>
+            <Typography
+                variant="h6"
+                gutterBottom
+                onClick={() => {}}      // 👈
+                sx={{
+                    cursor: 'pointer',
+                    textDecoration: 'underline',
+                    color: '#8ac7ff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1,
+                    width: '15%',
+                }}
+            >
+                Добавить
+                <Editicon />
+            </Typography>
+
+            {widgetColumns.map((wc) => {
+                const refs = referencesMap[wc.id] ?? [];
+                return (
+                    <div key={`ref-${wc.id}`} style={{marginBottom: 24}}>
+                        <h4 style={{marginBottom: 6}}>WidgetColumn&nbsp;{wc.id}</h4>
+                        {refs.length ? (
+                            <table className={s.tbl}>
+                                <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Datatype</th>
+                                    <th>Width</th>
+                                    <th>Visible</th>
+                                    <th>Primary</th>
+                                    <th></th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                {refs.map((r, i) => (
+                                    <tr key={i}>
+                                        <td>{r.table_column.name}</td>
+                                        <td>{r.table_column.datatype}</td>
+                                        <td>{r.width}</td>
+                                        <td style={{textAlign: 'center'}}>
+                                            {r.visible ? '✔' : ''}
+                                        </td>
+                                        <td style={{textAlign: 'center'}}>
+                                            {r.primary ? '✔' : ''}
+                                        </td>
+                                        <td style={{textAlign: 'center'}}>
+                                            <Editicon/>
+                                            <DeleteIcon
+                                                className={s.actionIcon}
+                                                onClick={() =>
+                                                    handleDeleteReference(wc.id, r.table_column.id)
+                                                }/>
+                                        </td>
+
+                                    </tr>
+                                ))}
+                                </tbody>
+                            </table>
                         ) : (
-                            <p>Нет данных для отображения</p>
+                            <p style={{fontStyle: 'italic', color: '#777'}}>
+                                reference не найдены
+                            </p>
                         )}
-                    </Box>
-                </Modal>
-                <ThemeProvider theme={dark}>
-                    <Dialog open={widgetModalOpen} onClose={closeWidgetModal} fullWidth maxWidth="sm">
-                        <form onSubmit={(e) => {
+                    </div>
+                );
+            })}
+
+            {/* ───────── Modal “Посмотреть таблицу” ───────── */}
+            <Modal open={modalOpen} onClose={() => setModalOpen(false)}>
+                <Box sx={modalStyle}>
+                    <h3 style={{marginBottom: 15}}>Таблица</h3>
+                    {columns.length ? (
+                        <TableColumn
+                            columns={columns}
+                            updateTableColumn={updateTableColumn}
+                            deleteColumnTable={deleteColumnTable}
+                        />
+                    ) : (
+                        <p>Нет данных для отображения</p>
+                    )}
+                </Box>
+            </Modal>
+
+            {/* ───────── Dialog “Метаданные widget” ───────── */}
+            <ThemeProvider theme={dark}>
+                <Dialog
+                    open={widgetModalOpen}
+                    onClose={() => setWidgetModalOpen(false)}
+                    fullWidth
+                    maxWidth="sm"
+                >
+                    <form
+                        onSubmit={(e) => {
                             e.preventDefault();
                             saveWidgetMeta();
-                        }}>
-
-                            <DialogTitle>Редактирование виджета</DialogTitle>
-
-                            <DialogContent dividers>
-                                <Stack spacing={2}>
-                                    <TextField
-                                        label="Название"
-                                        name="name"
-                                        size="small"
-                                        fullWidth
-                                        value={widgetMeta.name}
-                                        onChange={e => setWidgetMeta(v => ({...v, name: e.target.value}))}
-                                        required
-                                    />
-
-                                    <TextField
-                                        label="Описание"
-                                        name="description"
-                                        size="small"
-                                        fullWidth
-                                        multiline rows={3}
-                                        value={widgetMeta.description}
-                                        onChange={e => setWidgetMeta(v => ({...v, description: e.target.value}))}
-                                    />
-                                </Stack>
-                            </DialogContent>
-
-                            <DialogActions sx={{pr: 3, pb: 2}}>
-                                <Button onClick={closeWidgetModal}>Отмена</Button>
-                                <Button type="submit" variant="contained">
-                                    Сохранить
-                                </Button>
-                            </DialogActions>
-                        </form>
-                    </Dialog>
-                </ThemeProvider>
-
-
-            </table>
+                        }}
+                    >
+                        <DialogTitle>Редактирование виджета</DialogTitle>
+                        <DialogContent dividers>
+                            <Stack spacing={2}>
+                                <TextField
+                                    label="Название"
+                                    size="small"
+                                    fullWidth
+                                    value={widgetMeta.name}
+                                    onChange={(e) =>
+                                        setWidgetMeta((v) => ({...v, name: e.target.value}))
+                                    }
+                                    required
+                                />
+                                <TextField
+                                    label="Описание"
+                                    size="small"
+                                    fullWidth
+                                    multiline
+                                    rows={3}
+                                    value={widgetMeta.description}
+                                    onChange={(e) =>
+                                        setWidgetMeta((v) => ({
+                                            ...v,
+                                            description: e.target.value,
+                                        }))
+                                    }
+                                />
+                            </Stack>
+                        </DialogContent>
+                        <DialogActions sx={{pr: 3, pb: 2}}>
+                            <Button onClick={() => setWidgetModalOpen(false)}>Отмена</Button>
+                            <Button type="submit" variant="contained">
+                                Сохранить
+                            </Button>
+                        </DialogActions>
+                    </form>
+                </Dialog>
+            </ThemeProvider>
         </div>
     );
 };
-
