@@ -719,6 +719,7 @@ export const useWorkSpaces = () => {
         setWidgetsByTable,
         fetchReferences,
         deleteReference,
-        updateWidgetMeta
+        updateWidgetMeta,
+
     };
 };

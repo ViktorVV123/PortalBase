@@ -66,12 +66,18 @@ type Props = {
     updateTableMeta: (id: number, patch: Partial<DTable>) => void;
     setSelectedWidget: any
     setWidgetsByTable: React.Dispatch<React.SetStateAction<Record<number, Widget[]>>>
+    fetchReferences: any
+    deleteReference: any
+    updateWidgetMeta: any
 
 
 };
 
 export const SetOfTables: React.FC<Props> = ({
                                                  /* базовые */
+                                                 fetchReferences,
+                                                 deleteReference,
+                                                 updateWidgetMeta,
                                                  columns,
                                                  setWidgetsByTable,
                                                  tableName,
@@ -172,14 +178,14 @@ export const SetOfTables: React.FC<Props> = ({
                         ) : wColsError ? (
                             <p className={s.error}>{wColsError}</p>
                         ) : (
-                            <WidgetColumnsOfTable
+                            <WidgetColumnsOfTable updateWidgetColumn={updateWidgetColumn} deleteReference={deleteReference} fetchReferences={fetchReferences} updateWidgetMeta={updateWidgetMeta}
                                 setWidgetsByTable={setWidgetsByTable}
-                                                  setSelectedWidget={setSelectedWidget} columns={columns}
-                                                  updateTableColumn={updateTableColumn}
-                                                  deleteColumnTable={deleteColumnTable}
-                                                  deleteColumnWidget={deleteColumnWidget} addReference={addReference}
-                                                  updateWidgetColumn={updateWidgetColumn} widgetColumns={widgetColumns}
-                                                  loadColumnsWidget={loadColumnsWidget} selectedWidget={selectedWidget}/>
+                                setSelectedWidget={setSelectedWidget} columns={columns}
+                                updateTableColumn={updateTableColumn}
+                                deleteColumnTable={deleteColumnTable}
+                                deleteColumnWidget={deleteColumnWidget} addReference={addReference}
+                                 widgetColumns={widgetColumns}
+                                loadColumnsWidget={loadColumnsWidget} selectedWidget={selectedWidget}/>
                         )
                     )
 

@@ -207,6 +207,9 @@ export const Main = () => {
                              setSubDisplay={setSubDisplay}
                              selectedTable={selectedTable}
                              updateTableMeta={updateTableMeta}
+                             fetchReferences={fetchReferences}
+                             deleteReference={deleteReference}
+                             updateWidgetMeta={updateWidgetMeta}
 
                 />
             </div>
