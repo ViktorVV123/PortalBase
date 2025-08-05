@@ -43,11 +43,7 @@ interface Props {
 
     /* побочные действия */
     loadColumnsWidget: (widgetId: number) => void;
-    addReference: (
-        widgetColId: number,
-        tblColId: number,
-        payload: { width: number; visible: boolean; primary: boolean }
-    ) => Promise<void>;
+
 
     /* API-методы, перенесённые в useWorkSpaces */
     fetchReferences: (
@@ -113,7 +109,7 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                                                           columns,
                                                           /* workspace-api */
                                                           loadColumnsWidget,
-                                                          addReference,
+
                                                           fetchReferences,
                                                           deleteReference,
                                                           updateWidgetMeta,
@@ -220,31 +216,6 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
         setSelectedWidget,
     ]);
 
-    /* ───── merge column → reference ───── */
-    const handleMerge = async (wcId: number) => {
-        if (!selectedWidget) return;
-
-        const input = prompt('Введите *имя* столбца (name), который нужно привязать:');
-        if (!input) return;
-
-        const found = columns.find((c) => c.name === input.trim());
-        if (!found) {
-            alert(`Столбец "${input}" не найден`);
-            return;
-        }
-
-        try {
-            await addReference(wcId, found.id, {
-                width: 33,
-                visible: false,
-                primary: false,
-            });
-            await loadColumnsWidget(selectedWidget.id);
-        } catch (e) {
-            alert('Не удалось добавить reference');
-            console.error(e);
-        }
-    };
 
     /* ───── delete reference ───── */
     const handleDeleteReference = async (wcId: number, tblColId: number) => {
@@ -458,7 +429,7 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                                     <>
                                         <ConColumnIcon
                                             className={s.actionIcon}
-                                            onClick={() => handleMerge(wc.id)}
+                                            onClick={() => {}}
                                         />
                                         <EditIcon
                                             className={s.actionIcon}

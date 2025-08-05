@@ -49,11 +49,7 @@ type Props = {
     updateTableColumn: (id: number, p: Partial<Omit<Column, 'id'>>) => void;
     updateWidgetColumn: (id: number,
                          patch: Partial<Omit<WidgetColumn, 'id' | 'widget_id' | 'reference'>>) => void;
-    addReference: (widgetColId: number, tblColId: number, payload: {
-        width: number;
-        visible: boolean;
-        primary: boolean;
-    }) => Promise<void>;
+
     loadColumnsWidget: (widgetId: number) => void;
     formTrees: Record<number, FormTreeColumn[]>
     loadFilteredFormDisplay: (formId: number, filter: {
@@ -105,7 +101,6 @@ export const SetOfTables: React.FC<Props> = ({
                                                  deleteColumnWidget,
                                                  updateTableColumn,
                                                  updateWidgetColumn,
-                                                 addReference,
                                                  loadColumnsWidget,
                                                  formTrees,
                                                  loadFilteredFormDisplay,
@@ -183,7 +178,7 @@ export const SetOfTables: React.FC<Props> = ({
                                 setSelectedWidget={setSelectedWidget} columns={columns}
                                 updateTableColumn={updateTableColumn}
                                 deleteColumnTable={deleteColumnTable}
-                                deleteColumnWidget={deleteColumnWidget} addReference={addReference}
+                                deleteColumnWidget={deleteColumnWidget}
                                  widgetColumns={widgetColumns}
                                 loadColumnsWidget={loadColumnsWidget} selectedWidget={selectedWidget}/>
                         )
