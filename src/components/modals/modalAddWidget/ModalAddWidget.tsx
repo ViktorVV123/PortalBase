@@ -7,45 +7,53 @@ import {
 } from '@mui/material';
 
 import {api} from '@/services/api';
-import {DTable} from '@/shared/hooks/useWorkSpaces';
+import {DTable, Widget} from '@/shared/hooks/useWorkSpaces';
 
 const dark = createTheme({
     palette: {mode: 'dark', primary: {main: '#ffffff'}},
     components: {
-        MuiOutlinedInput: {styleOverrides: {root: {
+        MuiOutlinedInput: {
+            styleOverrides: {
+                root: {
                     '&.Mui-focused .MuiOutlinedInput-notchedOutline': {borderColor: '#fff'},
-                }}},
-        MuiInputLabel:    {styleOverrides: {root: {'&.Mui-focused': {color: '#fff'}}}},
+                }
+            }
+        },
+        MuiInputLabel: {styleOverrides: {root: {'&.Mui-focused': {color: '#fff'}}}},
     },
 });
 
 type Props = {
-    open: boolean;
-    table: DTable;                 // ← сюда передаём выбранную таблицу
-    onSuccess: () => void;
-    onCancel : () => void;
-};
+       open: boolean;
+       table: DTable;
+       onSuccess: (widget: Widget) => void;   // ⬅︎ передаём объект виджета
+       onCancel : () => void;
+     };
 
 export const ModalAddWidget = ({open, table, onSuccess, onCancel}: Props) => {
     const [form, setForm] = useState({name: '', description: ''});
     const [loading, setLoading] = useState(false);
-    const [error,   setError]   = useState<string|null>(null);
+    const [error, setError] = useState<string | null>(null);
 
     const handle = (e: ChangeEvent<HTMLInputElement>) =>
         setForm(prev => ({...prev, [e.target.name]: e.target.value}));
 
     const submit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!form.name.trim()) { setError('Введите имя виджета'); return; }
+        if (!form.name.trim()) {
+            setError('Введите имя виджета');
+            return;
+        }
 
-        setLoading(true); setError(null);
+        setLoading(true);
+        setError(null);
         try {
-            await api.post('/widgets/', {
-                table_id   : table.id,
-                name       : form.name,
-                description: form.description,
-            });
-            onSuccess();                       // сообщаем родителю
+            const { data } = await api.post<Widget>('/widgets/', {
+                   table_id   : table.id,
+                   name       : form.name,
+                   description: form.description,
+                 });
+             onSuccess(data);
         } catch {
             setError('Не удалось создать widget');
         } finally {

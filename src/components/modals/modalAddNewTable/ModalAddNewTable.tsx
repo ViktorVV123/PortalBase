@@ -8,6 +8,7 @@ import {
 
 import {api} from '@/services/api';
 import {WorkSpaceTypes} from '@/types/typesWorkSpaces';
+import {DTable} from "@/shared/hooks/useWorkSpaces";
 
 /* ——— единый «чёрно-белый» theme как в ModalAddWorkspace ——— */
 const dark = createTheme({
@@ -27,7 +28,7 @@ const dark = createTheme({
         },
         MuiInputLabel: {
             styleOverrides: {
-                root: { '&.Mui-focused': {color: '#ffffff'} },
+                root: {'&.Mui-focused': {color: '#ffffff'}},
             },
         },
     },
@@ -37,7 +38,7 @@ const dark = createTheme({
 type Props = {
     open: boolean;
     workspace: WorkSpaceTypes;
-    onSuccess: () => void;
+    onSuccess: (table: DTable) => void;   // ← отдаём таблицу!
     onCancel: () => void;
 };
 
@@ -46,30 +47,35 @@ export const ModalAddTable = ({
                               }: Props) => {
     /* ——— локальный стейт формы ——— */
     const [form, setForm] = useState({
-        name         : '',
-        description  : '',
-        select_query : '',
-        insert_query : '',
-        update_query : '',
-        delete_query : '',
+        name: '',
+        description: '',
+        select_query: '',
+        insert_query: '',
+        update_query: '',
+        delete_query: '',
     });
     const [loading, setLoading] = useState(false);
-    const [error,   setError]   = useState<string|null>(null);
+    const [error, setError] = useState<string | null>(null);
 
     const handle = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
         setForm(prev => ({...prev, [e.target.name]: e.target.value}));
 
     const submit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!form.name.trim()) { setError('Введите название таблицы'); return; }
+        if (!form.name.trim()) {
+            setError('Введите название таблицы');
+            return;
+        }
 
-        setLoading(true); setError(null);
+        setLoading(true);
+        setError(null);
         try {
-            await api.post('/tables/', {
-                workspace_id : workspace.id,
-                ...form,
-            });
-            onSuccess();                 // сообщаем родителю
+            const { data } = await api.post<DTable>('/tables/', {
+                   workspace_id : workspace.id,
+                   ...form,
+                 });
+
+                + onSuccess(data);
         } catch {
             setError('Не удалось создать таблицу');
         } finally {

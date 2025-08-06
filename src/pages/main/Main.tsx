@@ -244,12 +244,16 @@ export const Main = () => {
                 <ModalAddTable
                     open={showCreateTable}
                     workspace={createTblWs}
-                    onSuccess={async () => {
-                        setShowCreateTable(false);
-                        if (createTblWs) {
-                            await loadTables(createTblWs.id, true);   // <-- force reload
-                        }
-                    }}
+                    onSuccess={async (newTable) => {
+                             /* 1. закрываем модалку */
+                                 setShowCreateTable(false);
+
+                                 /* 2. перезагружаем список таблиц этого WS (чтобы кэш был актуален) */
+                                     await loadTables(newTable.workspace_id, true);
+
+                                 /* 3. и сразу выбираем только что созданную */
+                                     handleSelectTable(newTable);
+                           }}
                     onCancel={() => setShowCreateTable(false)}
                 />
             )}
@@ -258,10 +262,16 @@ export const Main = () => {
                 <ModalAddWidget
                     open={showCreateWidget}
                     table={createWidgetTable}
-                    onSuccess={async () => {
-                        setShowCreateWidget(false);
-                        await loadWidgetsForTable(createWidgetTable.id, true); // force refresh
-                    }}
+                    onSuccess={async (newWidget) => {
+                             /* 1. закрываем модалку */
+                                 setShowCreateWidget(false);
+
+                                 /* 2. обновляем кэш виджетов таблицы */
+                                     await loadWidgetsForTable(newWidget.table_id, true);
+
+                                 /* 3. сразу переключаемся на созданный виджет */
+                                     handleSelectWidget(newWidget);
+                           }}
                     onCancel={() => setShowCreateWidget(false)}
                 />
             )}

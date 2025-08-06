@@ -75,7 +75,7 @@ type Props = {
         visible: boolean;
         type: string;
         column_order: number;
-    }) => Promise<void>;
+    }) => Promise<WidgetColumn>;
 
 
 };
