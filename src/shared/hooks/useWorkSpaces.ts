@@ -420,6 +420,37 @@ export const useWorkSpaces = () => {
         [],
     );
 
+    /* сразу после updateTableMeta */
+    const publishTable = useCallback(
+        async (id: number): Promise<void> => {
+            try {
+                /* PATCH — сервер может вернуть 204 */
+                const res = await api.patch<DTable | ''>(`/tables/${id}/publish`);
+
+                /* если бэк вернул тело — используем его,
+                   иначе подтягиваем свежую таблицу */
+                const table: DTable = typeof res.data === 'object' && res.data !== null
+                    ? res.data
+                    : (await api.get<DTable>(`/tables/${id}`)).data;
+
+                /* синхронизируем кэши */
+                setTablesByWs(prev => {
+                    const wsId = table.workspace_id;
+                    return {
+                        ...prev,
+                        [wsId]: (prev[wsId] ?? []).map(t => t.id === id ? table : t),
+                    };
+                });
+                setSelTable(prev => (prev && prev.id === id ? table : prev));
+            } catch (err: any) {
+                if (err?.response?.status === 400) {
+                    throw new Error('Нужно указать хотя бы один PRIMARY KEY');
+                }
+                throw err;
+            }
+        },
+        [setTablesByWs, setSelTable],
+    );
     //НАЧАЛО WIDGET (удаление ,update b т.д)
 
     const [formsByWidget, setFormsByWidget] = useState<Record<number, WidgetForm>>({});
@@ -776,7 +807,7 @@ export const useWorkSpaces = () => {
         deleteReference,
         updateWidgetMeta,
         updateReference,
-        addWidgetColumn
-
+        addWidgetColumn,
+        publishTable
     };
 };

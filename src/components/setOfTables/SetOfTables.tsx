@@ -50,7 +50,7 @@ type Props = {
     updateWidgetColumn: (id: number,
                          patch: Partial<Omit<WidgetColumn, 'id' | 'widget_id' | 'reference'>>) => void;
     addReference: (widgetColId: number, tblColId: number, payload: {
-        width: number; combobox_visible: boolean; combobox_primary: boolean;ref_column_order:number
+        width: number; combobox_visible: boolean; combobox_primary: boolean; ref_column_order: number
     }) => Promise<void>;
     loadColumnsWidget: (widgetId: number) => void;
     formTrees: Record<number, FormTreeColumn[]>
@@ -76,8 +76,8 @@ type Props = {
         type: string;
         column_order: number;
     }) => Promise<WidgetColumn>;
-
-
+    tablesByWs: Record<number, DTable[]>;
+    publishTable: (id: number) => void
 };
 
 export const SetOfTables: React.FC<Props> = ({
@@ -121,7 +121,9 @@ export const SetOfTables: React.FC<Props> = ({
                                                  selectedTable,
                                                  updateTableMeta,
                                                  setSelectedWidget,
-                                                 addWidgetColumn
+                                                 addWidgetColumn,
+                                                 tablesByWs,
+                                                 publishTable,
 
                                              }) => {
 
@@ -185,14 +187,16 @@ export const SetOfTables: React.FC<Props> = ({
                         ) : wColsError ? (
                             <p className={s.error}>{wColsError}</p>
                         ) : (
-                            <WidgetColumnsOfTable addWidgetColumn={addWidgetColumn} updateWidgetColumn={updateWidgetColumn} deleteReference={deleteReference} fetchReferences={fetchReferences} updateWidgetMeta={updateWidgetMeta}
-                                setWidgetsByTable={setWidgetsByTable}
-                                setSelectedWidget={setSelectedWidget} columns={columns}
-                                updateTableColumn={updateTableColumn}
-                                deleteColumnTable={deleteColumnTable}
-                                deleteColumnWidget={deleteColumnWidget} addReference={addReference}
-                                 widgetColumns={widgetColumns}
-                                loadColumnsWidget={loadColumnsWidget} selectedWidget={selectedWidget}/>
+                            <WidgetColumnsOfTable addWidgetColumn={addWidgetColumn} updateWidgetColumn={updateWidgetColumn}
+                                                  deleteReference={deleteReference} fetchReferences={fetchReferences}
+                                                  updateWidgetMeta={updateWidgetMeta}
+                                                  setWidgetsByTable={setWidgetsByTable}
+                                                  setSelectedWidget={setSelectedWidget} columns={columns}
+                                                  updateTableColumn={updateTableColumn}
+                                                  deleteColumnTable={deleteColumnTable}
+                                                  deleteColumnWidget={deleteColumnWidget} addReference={addReference}
+                                                  widgetColumns={widgetColumns}
+                                                  loadColumnsWidget={loadColumnsWidget} selectedWidget={selectedWidget}/>
                         )
                     )
 
@@ -202,9 +206,10 @@ export const SetOfTables: React.FC<Props> = ({
                             ? <p>Нет выбранных форм</p>
                             : (
                                 <div>
-                                    <TableListView selectedTable={selectedTable} updateTableMeta={updateTableMeta}/>
+                                    <TableListView publishTable={publishTable} selectedTable={selectedTable}
+                                                   updateTableMeta={updateTableMeta}/>
                                     <TableColumn
-
+                                        tablesByWs={tablesByWs}
                                         updateTableColumn={updateTableColumn}
                                         columns={columns}
                                         deleteColumnTable={deleteColumnTable}/>

@@ -2,16 +2,17 @@ import React, {useState} from 'react';
 import * as s from "@/components/setOfTables/SetOfTables.module.scss";
 import EditIcon from "@/assets/image/EditIcon.svg";
 import DeleteIcon from "@/assets/image/DeleteIcon.svg";
-import {Column} from "@/shared/hooks/useWorkSpaces";
+import {Column, DTable} from "@/shared/hooks/useWorkSpaces";
 
 
 type tableColumnProps = {
     columns:Column[]
+    tablesByWs: Record<number, DTable[]>;
     deleteColumnTable:(id: number) => void;
     updateTableColumn: (id: number, p: Partial<Omit<Column, 'id'>>) => void;
 }
 
-export const TableColumn = ({columns,deleteColumnTable,updateTableColumn}:tableColumnProps) => {
+export const TableColumn = ({columns,deleteColumnTable,updateTableColumn,tablesByWs}:tableColumnProps) => {
 
     const [editingId, setEditingId] = useState<number | null>(null);
     const [editValues, setEditValues] = useState<Partial<Column>>({});
@@ -58,7 +59,6 @@ export const TableColumn = ({columns,deleteColumnTable,updateTableColumn}:tableC
 
     return (
         <div className={s.tableWrapper}>
-
             <table className={s.tbl}>
                 <thead>
                 <tr>
@@ -168,6 +168,7 @@ export const TableColumn = ({columns,deleteColumnTable,updateTableColumn}:tableC
                                     </>
                                 )}
                             </td>
+
                         </tr>
                     );
                 })}
