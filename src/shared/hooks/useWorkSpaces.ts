@@ -697,6 +697,36 @@ export const useWorkSpaces = () => {
     }, []);
 
 
+
+    // ↓ сразу после updateWidgetColumn
+    /* ↓ держим один-единственный аргумент – готовый payload */
+    const addWidgetColumn = useCallback(
+        async (payload: {
+            widget_id: number;
+            alias: string;
+            default: string;
+            placeholder: string;
+            visible: boolean;
+            type: string;
+            column_order: number;
+        }) => {
+            /* POST именно в коллекцию */
+            const { data } = await api.post<WidgetColumn>(
+                '/widgets/columns/',    // ← слэш на конце, как у всех остальных
+                payload,
+            );
+
+            /* подмешиваем сразу в стейт, чтобы не ждать доп. запроса */
+            setWidgetColumns(prev => [...prev, data].sort((a, b) => a.id - b.id));
+            return data;
+        },
+        [],
+    );
+
+
+
+
+
     return {
         workSpaces,
         loadWorkSpaces,
@@ -745,7 +775,8 @@ export const useWorkSpaces = () => {
         fetchReferences,
         deleteReference,
         updateWidgetMeta,
-        updateReference
+        updateReference,
+        addWidgetColumn
 
     };
 };

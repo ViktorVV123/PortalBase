@@ -67,6 +67,15 @@ type Props = {
     fetchReferences: any
     deleteReference: any
     updateWidgetMeta: any
+    addWidgetColumn: (payload: {
+        widget_id: number;
+        alias: string;
+        default: string;
+        placeholder: string;
+        visible: boolean;
+        type: string;
+        column_order: number;
+    }) => Promise<void>;
 
 
 };
@@ -112,7 +121,7 @@ export const SetOfTables: React.FC<Props> = ({
                                                  selectedTable,
                                                  updateTableMeta,
                                                  setSelectedWidget,
-
+                                                 addWidgetColumn
 
                                              }) => {
 
@@ -176,7 +185,7 @@ export const SetOfTables: React.FC<Props> = ({
                         ) : wColsError ? (
                             <p className={s.error}>{wColsError}</p>
                         ) : (
-                            <WidgetColumnsOfTable updateWidgetColumn={updateWidgetColumn} deleteReference={deleteReference} fetchReferences={fetchReferences} updateWidgetMeta={updateWidgetMeta}
+                            <WidgetColumnsOfTable addWidgetColumn={addWidgetColumn} updateWidgetColumn={updateWidgetColumn} deleteReference={deleteReference} fetchReferences={fetchReferences} updateWidgetMeta={updateWidgetMeta}
                                 setWidgetsByTable={setWidgetsByTable}
                                 setSelectedWidget={setSelectedWidget} columns={columns}
                                 updateTableColumn={updateTableColumn}

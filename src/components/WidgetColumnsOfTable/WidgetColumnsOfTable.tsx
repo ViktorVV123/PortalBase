@@ -63,6 +63,15 @@ interface Props {
     setWidgetsByTable: React.Dispatch<
         React.SetStateAction<Record<number, Widget[]>>
     >;
+    addWidgetColumn: (payload: {
+        widget_id: number;
+        alias: string;
+        default: string;
+        placeholder: string;
+        visible: boolean;
+        type: string;
+        column_order: number;
+    }) => Promise<void>;
 }
 
 /* стили модалки */
@@ -122,11 +131,22 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                                                           deleteColumnTable,
                                                           setSelectedWidget,
                                                           setWidgetsByTable,
+                                                          addWidgetColumn
                                                       }) => {
     /* ───── state: reference cache ───── */
     const [referencesMap, setReferencesMap] = useState<
         Record<number, WcReference[]>
     >({});
+
+    const [addOpen, setAddOpen] = useState(false);
+    const [newCol, setNewCol] = useState({
+        alias: '',
+        default: '',
+        placeholder: '',
+        visible: false,
+        type: '',
+        column_order: widgetColumns.length + 1, // по умолчанию самый конец
+    });
 
     /* загрузка reference-ов */
     useEffect(() => {
@@ -307,6 +327,23 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                     }}
                 >
                     Метаданные widget
+                    <Editicon/>
+                </Typography>
+
+                <Typography
+                    variant="h6"
+                    onClick={() => setAddOpen(true)}
+                    gutterBottom
+                    sx={{
+                        cursor: 'pointer',
+                        textDecoration: 'underline',
+                        color: '#8ac7ff',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1,
+                    }}
+                >
+                    Добавить столбец
                     <Editicon/>
                 </Typography>
             </div>
@@ -553,6 +590,121 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                     </form>
                 </Dialog>
             </ThemeProvider>
+
+            <ThemeProvider theme={dark}>
+                <Dialog
+                    open={addOpen}
+                    onClose={() => setAddOpen(false)}
+                    fullWidth
+                    maxWidth="sm"
+                >
+                    <form
+                        onSubmit={async e => {
+                            e.preventDefault();
+                            if (!selectedWidget) return;
+
+                            /* ① - отправляем payload сразу с widget_id */
+                            await addWidgetColumn({
+                                ...newCol,
+                                widget_id: selectedWidget.id,
+                            });
+
+                            /* ② (по желанию) подтягиваем свежий список столбцов */
+                            await loadColumnsWidget(selectedWidget.id);
+
+                            /* ③ сбрасываем форму и закрываем модалку */
+                            setNewCol({
+                                alias: '',
+                                default: '',
+                                placeholder: '',
+                                visible: false,
+                                type: '',
+                                column_order: widgetColumns.length + 1,
+                            });
+                            setAddOpen(false);
+                        }}
+                    >
+                        <DialogTitle>Новый столбец</DialogTitle>
+
+                        <DialogContent dividers>
+                            <Stack spacing={2}>
+                                <TextField
+                                    label="Alias"
+                                    size="small"
+                                    value={newCol.alias}
+                                    onChange={e =>
+                                        setNewCol(v => ({ ...v, alias: e.target.value }))
+                                    }
+                                    required
+                                />
+
+                                <TextField
+                                    label="Default"
+                                    size="small"
+                                    value={newCol.default}
+                                    onChange={e =>
+                                        setNewCol(v => ({ ...v, default: e.target.value }))
+                                    }
+                                />
+
+                                <TextField
+                                    label="Placeholder"
+                                    size="small"
+                                    value={newCol.placeholder}
+                                    onChange={e =>
+                                        setNewCol(v => ({ ...v, placeholder: e.target.value }))
+                                    }
+                                />
+
+                                <TextField
+                                    label="Тип"
+                                    size="small"
+                                    value={newCol.type}
+                                    onChange={e =>
+                                        setNewCol(v => ({ ...v, type: e.target.value }))
+                                    }
+                                    required
+                                />
+
+                                <TextField
+                                    label="Порядок (column_order)"
+                                    type="number"
+                                    size="small"
+                                    value={newCol.column_order}
+                                    onChange={e =>
+                                        setNewCol(v => ({
+                                            ...v,
+                                            column_order: Number(e.target.value),
+                                        }))
+                                    }
+                                    required
+                                />
+
+                                {/* visible */}
+                                <Stack direction="row" alignItems="center" spacing={1}>
+                                    <Typography>Visible</Typography>
+                                    <input
+                                        type="checkbox"
+                                        checked={newCol.visible}
+                                        onChange={e =>
+                                            setNewCol(v => ({ ...v, visible: e.target.checked }))
+                                        }
+                                    />
+                                </Stack>
+                            </Stack>
+                        </DialogContent>
+
+                        <DialogActions sx={{ pr: 3, pb: 2 }}>
+                            <Button onClick={() => setAddOpen(false)}>Отмена</Button>
+                            <Button type="submit" variant="contained">
+                                Сохранить
+                            </Button>
+                        </DialogActions>
+                    </form>
+                </Dialog>
+            </ThemeProvider>
+
+
         </div>
     );
 };
