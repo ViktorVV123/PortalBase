@@ -209,7 +209,6 @@ export const SetOfTables: React.FC<Props> = ({
                                     <TableListView publishTable={publishTable} selectedTable={selectedTable}
                                                    updateTableMeta={updateTableMeta}/>
                                     <TableColumn
-                                        tablesByWs={tablesByWs}
                                         updateTableColumn={updateTableColumn}
                                         columns={columns}
                                         deleteColumnTable={deleteColumnTable}/>

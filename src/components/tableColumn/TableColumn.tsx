@@ -7,12 +7,11 @@ import {Column, DTable} from "@/shared/hooks/useWorkSpaces";
 
 type tableColumnProps = {
     columns:Column[]
-    tablesByWs: Record<number, DTable[]>;
     deleteColumnTable:(id: number) => void;
     updateTableColumn: (id: number, p: Partial<Omit<Column, 'id'>>) => void;
 }
 
-export const TableColumn = ({columns,deleteColumnTable,updateTableColumn,tablesByWs}:tableColumnProps) => {
+export const TableColumn = ({columns,deleteColumnTable,updateTableColumn}:tableColumnProps) => {
 
     const [editingId, setEditingId] = useState<number | null>(null);
     const [editValues, setEditValues] = useState<Partial<Column>>({});

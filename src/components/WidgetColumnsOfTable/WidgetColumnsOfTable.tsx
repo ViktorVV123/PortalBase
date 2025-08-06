@@ -187,10 +187,18 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
         setEditingWcId(null);
         setWcValues({});
     };
-
     const saveEdit = async () => {
         if (editingWcId == null) return;
-        await updateWidgetColumn(editingWcId, wcValues);
+
+        /* берём текущие вводимые значения */
+        const patch: Partial<WidgetColumn> = { ...wcValues };
+
+        /* '' → null  (или можно удалить поле) */
+        (['alias', 'default', 'placeholder'] as const).forEach(f => {
+            if (patch[f] === '') patch[f] = null as any;   // или: delete patch[f];
+        });
+
+        await updateWidgetColumn(editingWcId, patch);
         if (selectedWidget) await loadColumnsWidget(selectedWidget.id);
         cancelEdit();
     };
