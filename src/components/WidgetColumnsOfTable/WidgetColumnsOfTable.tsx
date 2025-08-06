@@ -354,6 +354,7 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                 <tr>
                     <th>id</th>
                     <th>id widget</th>
+                    <th>column_order</th>
                     <th>alias</th>
                     <th>default</th>
                     <th>placeholder</th>
@@ -389,7 +390,19 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                         <tr key={wc.id}>
                             <td>{wc.id}</td>
                             <td>{wc.widget_id}</td>
-
+                            <td>
+                                {isEd ? (
+                                    <input
+                                        className={s.inp}
+                                        value={wcValues.column_order ?? ''}
+                                        onChange={(e) =>
+                                            setWcValues((v) => ({...v, column_order: Number(e.target.value)}))
+                                        }
+                                    />
+                                ) : (
+                                    wc.column_order ?? '—'
+                                )}
+                            </td>
                             {/* alias */}
                             <td>
                                 {isEd ? (

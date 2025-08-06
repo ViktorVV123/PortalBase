@@ -520,7 +520,7 @@ export const useWorkSpaces = () => {
             patch: Partial<Omit<WidgetColumn, 'id' | 'widget_id' | 'reference'>>
         ) => {
             const clean: any = {...patch};
-            ['alias', 'default', 'promt'].forEach(f => {
+            ['alias', 'default', 'promt','column_order'].forEach(f => {
                 if (clean[f] === '') delete clean[f];
             });
 
