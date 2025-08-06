@@ -11,6 +11,8 @@ import AddIcon from '@/assets/image/AddIcon.svg';   // ← ваш SVG-компо
 import {api} from '@/services/api';
 import {Connection} from '@/types/typesConnection';
 import * as styles from './ModalAddWorkspace.module.scss'
+import EditIcon from '@/assets/image/EditIcon.svg';
+import DeleteIcon from '@/assets/image/DeleteIcon.svg';
 
 const dark = createTheme({
     palette: {
@@ -48,10 +50,12 @@ type Props = {
     onCancel: () => void;
     setShowConnForm: (v: boolean) => void;
     open: boolean;             // ✔ лучше управлять диалогом снаружи
+    deleteConnection: (id: number) => void;
+
 };
 
-export const ModalAddWorkspace = ({
-                                      connections, onSuccess, onCancel, setShowConnForm, open,
+export const ModalAddWorkspace = ({deleteConnection,
+                                      connections, onSuccess, onCancel, setShowConnForm, open
                                   }: Props) => {
 
     /* ----- local state ----- */
@@ -63,6 +67,7 @@ export const ModalAddWorkspace = ({
     });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+
 
     const handle =
         (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
@@ -88,6 +93,16 @@ export const ModalAddWorkspace = ({
         }
     };
 
+    const handleDeleteConn = async (
+        e: React.MouseEvent,
+        id: number,
+    ) => {
+        e.stopPropagation();          // чтобы Select не закрылся/не выбрался
+        if (!confirm('Удалить подключение?')) return;
+
+        await deleteConnection(id);
+    };
+
     /* ----- render ----- */
     return (
         <ThemeProvider theme={dark}>
@@ -108,12 +123,20 @@ export const ModalAddWorkspace = ({
                                     label="Подключение"
                                     value={form.connection_id}
                                     onChange={handleSelect}
+                                    renderValue={(value) => {
+                                        const conn = connections.find(c => c.id === value);
+                                        return conn ? conn.name : '';
+                                    }}
                                     required
                                 >
                                     {connections.map(c => (
                                         <MenuItem style={{display: 'flex', flexDirection: 'column'}} key={c.id}
                                                   value={c.id}>
-                                            <span> {c.name}</span>
+                                            <span style={{display: 'flex', gap:10}}>
+                                              <span> {c.name}</span>
+                                         {/*   <EditIcon/>*/}
+                                            <DeleteIcon  onClick={e => handleDeleteConn(e, c.id)}/>
+                                            </span>
                                             <span className={styles.descriptionModal}>
                                                 {c.description === '' ?
                                                     <span><strong>Описание:</strong> {c.description},</span> : ''}

@@ -727,6 +727,19 @@ export const useWorkSpaces = () => {
         }
     }, []);
 
+    /* ↓ рядом с loadConnections connections delete */
+    const deleteConnection = useCallback(async (id: number) => {
+        try {
+            await api.delete(`/connections/${id}`);
+            setConnections(prev => prev.filter(c => c.id !== id));  // убираем из стейта
+        } catch {
+            alert('Не удалось удалить подключение');
+        }
+    }, []);
+
+
+
+
 
 
     // ↓ сразу после updateWidgetColumn
@@ -808,6 +821,8 @@ export const useWorkSpaces = () => {
         updateWidgetMeta,
         updateReference,
         addWidgetColumn,
-        publishTable
+        publishTable,
+        deleteConnection
+
     };
 };

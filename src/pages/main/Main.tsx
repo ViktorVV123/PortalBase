@@ -75,6 +75,7 @@ export const Main = () => {
         deleteReference,
         addWidgetColumn,
         publishTable,
+        deleteConnection,
     } = useWorkSpaces();
 
     useEffect(() => {
@@ -230,6 +231,8 @@ export const Main = () => {
             {/* ——— WORKSPACE ——— */}
             {showCreateForm && (
                 <ModalAddWorkspace
+
+                    deleteConnection={deleteConnection}
                     open={showCreateForm}                  /* ✔ правильный флаг */
                     setShowConnForm={setShowConnForm}
                     connections={connections}
