@@ -31,7 +31,7 @@ type Props = {
     }) => Promise<void>;
     setFormDisplay: (value: FormDisplay | null) => void;
     setSubDisplay: (value: SubDisplay | null) => void;
-
+    setShowAddRow: any
 };
 
 export const FormTable: React.FC<Props> = ({
@@ -44,7 +44,7 @@ export const FormTable: React.FC<Props> = ({
                                                formsByWidget,
                                                loadSubDisplay,
                                                formTrees,
-                                               loadFilteredFormDisplay, setFormDisplay,
+                                               loadFilteredFormDisplay, setFormDisplay, setShowAddRow,
                                                setSubDisplay
 
                                            }) => {
@@ -57,7 +57,6 @@ export const FormTable: React.FC<Props> = ({
     const [activeExpandedKey, setActiveExpandedKey] = useState<string | null>(null);
 
 
-
     useEffect(() => {
         if (!selectedWidget) return;
 
@@ -68,7 +67,7 @@ export const FormTable: React.FC<Props> = ({
 
         setActiveSubOrder(order0);
         setSubDisplay(null); // 👈 сбрасываем старый subDisplay
-        loadSubDisplay(widgetForm.form_id, order0, {});
+        /*loadSubDisplay(widgetForm.form_id, order0, {});*/
     }, [selectedWidget, formsByWidget, loadSubDisplay]);
 
     const handleRowClick = (rowPk: Record<string, unknown>) => {
@@ -85,38 +84,34 @@ export const FormTable: React.FC<Props> = ({
         if (!widgetForm) return;
 
         setActiveSubOrder(order);
+
+        // если строка ещё не выбрана – саб-таблицу не грузим
+        if (Object.keys(lastPrimary).length === 0) return;
+
+
         loadSubDisplay(widgetForm.form_id, order, lastPrimary);
     };
     const handleResetFilters = async () => {
         if (!selectedFormId || !selectedWidget) return;
 
+        /* 0. сброс локальных флагов/кэша */
         setActiveFilters([]);
-        setActiveExpandedKey(null)
+        setActiveExpandedKey(null);
+        setLastPrimary({});          // ⬅️ строка не выбрана
+        setSubDisplay(null);         // ⬅️ прячем SubWormTable
+        setActiveSubOrder(0);        // (или subOrder из widgetForm, если важно)
+
         try {
-            // 1. main таблица
-            const {data: mainData} = await api.post<FormDisplay>(
+            /* 1. main-таблица без фильтров */
+            const {data} = await api.post<FormDisplay>(
                 `/display/${selectedFormId}/main`,
-                []
+                [],
             );
-            setFormDisplay(mainData);
+            setFormDisplay(data);
 
-            // 2. sabDisplay — без primary_keys
-            const widgetForm = formsByWidget[selectedWidget.id];
-            const subOrder = widgetForm?.sub_widgets[0]?.widget_order ?? 0;
-
-            const {data: subData} = await api.post<SubDisplay>(
-                `/display/${selectedFormId}/sub`,
-                {primary_keys: {}},                         // сброс pk
-                {params: {sub_widget_order: subOrder}}
-            );
-            setSubDisplay(subData);
-
-            // 3. сброс активного саб-ордера
-            setActiveSubOrder(subOrder);
-
-            console.log('✅ Сброс фильтров + сабтаблицы выполнен');
+            console.log('✅ Фильтры сброшены, саб-таблица скрыта');
         } catch (e) {
-            console.warn('❌ Ошибка при полном сбросе:', e);
+            console.warn('❌ Ошибка при сбросе фильтров:', e);
         }
     };
 
@@ -193,15 +188,15 @@ export const FormTable: React.FC<Props> = ({
     };
 
 
-  /*  const groupedHeaders = formDisplay.columns.reduce((acc, col) => {
-        const last = acc[acc.length - 1];
-        if (last && last.name === col.column_name) {
-            last.count += 1;
-        } else {
-            acc.push({name: col.column_name, count: 1});
-        }
-        return acc;
-    }, [] as { name: string; count: number }[]);*/
+    /*  const groupedHeaders = formDisplay.columns.reduce((acc, col) => {
+          const last = acc[acc.length - 1];
+          if (last && last.name === col.column_name) {
+              last.count += 1;
+          } else {
+              acc.push({name: col.column_name, count: 1});
+          }
+          return acc;
+      }, [] as { name: string; count: number }[]);*/
 
     // 1. Сортируем по column_order, как есть
     const sortedColumns = [...formDisplay.columns].sort(
@@ -214,7 +209,7 @@ export const FormTable: React.FC<Props> = ({
         if (last && last.name === col.column_name) {
             last.cols.push(col);
         } else {
-            acc.push({ name: col.column_name, cols: [col] });
+            acc.push({name: col.column_name, cols: [col]});
         }
         return acc;
     }, []);
@@ -223,12 +218,14 @@ export const FormTable: React.FC<Props> = ({
 
     return (
         <div style={{display: 'flex', gap: 10}}>
+
             {/* TREE BLOCK */}
             <TreeFormTable tree={tree} widgetForm={widgetForm} activeExpandedKey={activeExpandedKey}
                            handleNestedValueClick={handleNestedValueClick} nestedTrees={nestedTrees}
                            handleTreeValueClick={handleTreeValueClick} handleResetFilters={handleResetFilters}/>
             {/* MAIN + SUB */}
             <div style={{display: 'flex', flexDirection: 'column', gap: 20}}>
+                <div onClick={() => setShowAddRow(true)}>Добавить столбец</div>
                 <table className={s.tbl}>
                     <thead>
                     <tr>
@@ -253,7 +250,7 @@ export const FormTable: React.FC<Props> = ({
                                         const idx = sortedColumns.indexOf(col); // 🟢 правильный индекс
                                         const val = row.values[idx];
                                         return (
-                                            <td key={`r${rowIdx}-c${col.column_order}`}>
+                                            <td key={`r${rowIdx}-c${col.column_order}-${idx}`}>
                                                 {val}
                                             </td>
                                         );
@@ -270,6 +267,7 @@ export const FormTable: React.FC<Props> = ({
                 <SubWormTable subLoading={subLoading} subError={subError} subDisplay={subDisplay}
                               handleTabClick={handleTabClick}/>
             </div>
+
         </div>
     );
 };
