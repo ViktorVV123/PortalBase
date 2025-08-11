@@ -31,7 +31,7 @@ type Props = {
     }) => Promise<void>;
     setFormDisplay: (value: FormDisplay | null) => void;
     setSubDisplay: (value: SubDisplay | null) => void;
-    setShowAddRow: any
+
 };
 
 export const FormTable: React.FC<Props> = ({
@@ -44,7 +44,7 @@ export const FormTable: React.FC<Props> = ({
                                                formsByWidget,
                                                loadSubDisplay,
                                                formTrees,
-                                               loadFilteredFormDisplay, setFormDisplay, setShowAddRow,
+                                               loadFilteredFormDisplay, setFormDisplay,
                                                setSubDisplay
 
                                            }) => {
@@ -225,7 +225,7 @@ export const FormTable: React.FC<Props> = ({
                            handleTreeValueClick={handleTreeValueClick} handleResetFilters={handleResetFilters}/>
             {/* MAIN + SUB */}
             <div style={{display: 'flex', flexDirection: 'column', gap: 20}}>
-                <div onClick={() => setShowAddRow(true)}>Добавить столбец</div>
+
                 <table className={s.tbl}>
                     <thead>
                     <tr>
