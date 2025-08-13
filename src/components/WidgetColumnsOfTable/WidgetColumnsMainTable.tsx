@@ -59,14 +59,16 @@ export const WidgetColumnsMainTable: React.FC<WidgetColumnsMainTableProps> = ({
     useEffect(() => {
         const next: Record<number, ReferenceItem[]> = {};
         orderedWc.forEach((wc) => {
-            const src =
-                (referencesMap[wc.id]?.length ? referencesMap[wc.id] : wc.reference) ?? [];
+            // важно: используем referencesMap, если ключ уже есть (даже если это [])
+            const hasKey = Object.prototype.hasOwnProperty.call(referencesMap, wc.id);
+            const src = hasKey ? (referencesMap[wc.id] ?? []) : (wc.reference ?? []);
             next[wc.id] = [...src].sort(
                 (a, b) => (a.ref_column_order ?? 0) - (b.ref_column_order ?? 0)
             );
         });
         setLocalRefs(next);
     }, [orderedWc, referencesMap]);
+
 
     // перемещение групп ↑/↓
     const moveGroup = async (wcId: number, dir: 'up' | 'down') => {
@@ -240,6 +242,7 @@ export const WidgetColumnsMainTable: React.FC<WidgetColumnsMainTableProps> = ({
                                 >
                                     ↓
                                 </button>
+                                <span>{wc.id}</span>
                             </div>
                         </div>
 
@@ -293,6 +296,7 @@ export const WidgetColumnsMainTable: React.FC<WidgetColumnsMainTableProps> = ({
                                                     />
                                                 ) : null}
                                             </td>
+
                                         </tr>
                                     );
                                 })

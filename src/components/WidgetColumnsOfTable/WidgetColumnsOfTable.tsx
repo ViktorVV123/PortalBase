@@ -397,7 +397,8 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
             <WidgetColumnsMainTable addReference={addReference} updateReference={updateReference}            // 👈 передаём PATCH для reference
                                     refreshReferences={async (wcId) => {
                                         const fresh = await fetchReferences(wcId);
-                                        setReferencesMap(prev => ({ ...prev, [wcId]: fresh }));
+                                        setReferencesMap(prev => ({ ...prev, [wcId]: fresh ?? [] }));
+                                        if (selectedWidget) await loadColumnsWidget(selectedWidget.id);
                                     }} updateWidgetColumn={updateWidgetColumn}
                                     widgetColumns={widgetColumns} handleDeleteReference={handleDeleteReference}
                                     referencesMap={referencesMap}/>
