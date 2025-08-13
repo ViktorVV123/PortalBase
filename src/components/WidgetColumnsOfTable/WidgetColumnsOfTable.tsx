@@ -1,7 +1,7 @@
-import React, {useCallback, useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import * as s from '@/components/setOfTables/SetOfTables.module.scss';
 import {
-    Column,
+    Column, useWorkSpaces,
     Widget,
     WidgetColumn,
 } from '@/shared/hooks/useWorkSpaces';
@@ -33,7 +33,6 @@ export type WcReference = WidgetColumn['reference'][number];
 
 interface Props {
     /* базовые CRUD по widget-columns */
-    updateWidgetColumn: any
     deleteColumnWidget: (id: number) => void;
 
     /* данные для отображения */
@@ -55,6 +54,10 @@ interface Props {
     ) => Promise<WidgetColumn['reference'][number][]>;
     deleteReference: (widgetColumnId: number, tableColumnId: number) => Promise<void>;
     updateWidgetMeta: (id: number, patch: Partial<Widget>) => Promise<Widget>;
+    updateWidgetColumn: (
+        id: number,
+        patch: Partial<Omit<WidgetColumn, 'id' | 'widget_id' | 'reference'>>
+    ) => Promise<void> | void;
 
     /* вспомогательные set-еры */
     updateTableColumn: (id: number, p: Partial<Omit<Column, 'id'>>) => void;
@@ -114,7 +117,7 @@ const dark = createTheme({
 
 export const WidgetColumnsOfTable: React.FC<Props> = ({
                                                           /* crud */
-                                                          updateWidgetColumn,
+
                                                           deleteColumnWidget,
                                                           /* data */
                                                           widgetColumns,
@@ -131,7 +134,8 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                                                           deleteColumnTable,
                                                           setSelectedWidget,
                                                           setWidgetsByTable,
-                                                          addWidgetColumn
+                                                          addWidgetColumn,
+                                                          updateWidgetColumn
                                                       }) => {
     /* ───── state: reference cache ───── */
     const [referencesMap, setReferencesMap] = useState<
@@ -179,7 +183,7 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
             default: wc.default ?? '',
             placeholder: wc.placeholder ?? '',
             visible: wc.visible,
-            type: wc.type,
+
         });
     };
 
@@ -191,7 +195,7 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
         if (editingWcId == null) return;
 
         /* берём текущие вводимые значения */
-        const patch: Partial<WidgetColumn> = { ...wcValues };
+        const patch: Partial<WidgetColumn> = {...wcValues};
 
         /* '' → null  (или можно удалить поле) */
         (['alias', 'default', 'placeholder'] as const).forEach(f => {
@@ -299,6 +303,35 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
         }
     };
 
+
+    const headerGroups = useMemo(() => {
+        // «эффективный» order и alias учитывают незасохранённые правки текущей строки
+        const items = widgetColumns.map((wc) => {
+            const effectiveOrder =
+                editingWcId === wc.id
+                    ? (wcValues.column_order ?? wc.column_order ?? 0)
+                    : (wc.column_order ?? 0);
+
+            const refs = referencesMap[wc.id] ?? wc.reference ?? [];
+            const span = Math.max(1, refs.length || 1);
+
+            const effectiveAlias =
+                (editingWcId === wc.id ? wcValues.alias : wc.alias)?.trim();
+
+            // Текст заголовка: alias → имя первого reference → fallback
+            const name =
+                effectiveAlias ||
+                refs[0]?.table_column?.name ||
+                `Колонка #${wc.id}`;
+
+            return {id: wc.id, order: effectiveOrder, name, span};
+        });
+
+        // сортируем, как FormTable: по column_order, затем по id
+        items.sort((a, b) => (a.order - b.order) || (a.id - b.id));
+        return items;
+    }, [widgetColumns, referencesMap, editingWcId, wcValues]);
+
     /* ─────────────────────────── UI ─────────────────────────── */
     return (
         <div className={s.tableWrapperWidget}>
@@ -356,191 +389,29 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                 </Typography>
             </div>
 
+
+            <div style={{margin: '12px 0 20px'}}>
+                <div style={{opacity: 0.8, fontSize: 12, marginBottom: 6}}>
+                    Шапка формы (превью)
+                </div>
+
+                <table className={s.tbl}>
+                    <thead>
+                    <tr>
+                        {headerGroups.map(g => (
+                            <th key={g.id} colSpan={g.span}>
+                                {g.name}
+                            </th>
+                        ))}
+                    </tr>
+                    </thead>
+                </table>
+            </div>
+
             {/* ───── таблица Widget-columns ───── */}
-            <table className={s.tbl}>
-                <thead>
-                <tr>
-                    <th>id</th>
-                    <th>id widget</th>
-                    <th>column_order</th>
-                    <th>alias</th>
-                    <th>default</th>
-                    <th>placeholder</th>
-                    <th>visible</th>
-                    <th>type</th>
-                    <th>id</th>
-                    <th>id table</th>
-                    <th>name</th>
-                    <th>datatype</th>
-                    <th>length</th>
-                    <th>precision</th>
-                    <th>primary(test)</th>
-                    <th>required</th>
-                    <th></th>
-                </tr>
-                </thead>
 
-                <tbody>
-                {widgetColumns.map((wc) => {
-                    const isEd = editingWcId === wc.id;
 
-                    /* агрегаты по reference */
-                    const agg = (k: keyof Column) =>
-                        wc.reference
-                            .map((r) => {
-                                const val = r.table_column?.[k];
-                                if (typeof val === 'boolean') return val ? '✔︎' : '';
-                                return val ?? '—';
-                            })
-                            .filter(Boolean)
-                            .join(', ');
-                    return (
-                        <tr key={wc.id}>
-                            <td>{wc.id}</td>
-                            <td>{wc.widget_id}</td>
-                            <td>
-                                {isEd ? (
-                                    <input
-                                        className={s.inp}
-                                        value={wcValues.column_order ?? ''}
-                                        onChange={(e) =>
-                                            setWcValues((v) => ({...v, column_order: Number(e.target.value)}))
-                                        }
-                                    />
-                                ) : (
-                                    wc.column_order ?? '—'
-                                )}
-                            </td>
-                            {/* alias */}
-                            <td>
-                                {isEd ? (
-                                    <input
-                                        className={s.inp}
-                                        value={wcValues.alias ?? ''}
-                                        onChange={(e) =>
-                                            setWcValues((v) => ({...v, alias: e.target.value}))
-                                        }
-                                    />
-                                ) : (
-                                    wc.alias ?? '—'
-                                )}
-                            </td>
-
-                            {/* default */}
-                            <td>
-                                {isEd ? (
-                                    <input
-                                        className={s.inp}
-                                        value={wcValues.default ?? ''}
-                                        onChange={(e) =>
-                                            setWcValues((v) => ({...v, default: e.target.value}))
-                                        }
-                                    />
-                                ) : (
-                                    wc.default ?? '—'
-                                )}
-                            </td>
-
-                            {/* placeholder */}
-                            <td>
-                                {isEd ? (
-                                    <input
-                                        className={s.inp}
-                                        value={wcValues.placeholder ?? ''}
-                                        onChange={(e) =>
-                                            setWcValues((v) => ({
-                                                ...v,
-                                                placeholder: e.target.value,
-                                            }))
-                                        }
-                                    />
-                                ) : (
-                                    wc.placeholder ?? '—'
-                                )}
-                            </td>
-
-                            {/* published */}
-                            <td style={{textAlign: 'center'}}>
-                                {isEd ? (
-                                    <input
-                                        type="checkbox"
-                                        checked={wcValues.visible ?? false}
-                                        onChange={(e) =>
-                                            setWcValues((v) => ({
-                                                ...v,
-                                                visible: e.target.checked,
-                                            }))
-                                        }
-                                    />
-                                ) : wc.visible ? (
-                                    '✔︎'
-                                ) : (
-                                    ''
-                                )}
-                            </td>
-
-                            {/* type */}
-                            <td>
-                                {isEd ? (
-                                    <input
-                                        className={s.inp}
-                                        value={wcValues.type ?? ''}
-                                        onChange={(e) =>
-                                            setWcValues((v) => ({...v, type: e.target.value}))
-                                        }
-                                    />
-                                ) : (
-                                    wc.type ?? '—'
-                                )}
-                            </td>
-
-                            {/* агрегированные reference-поля */}
-                            <td>{agg('id')}</td>
-                            <td>{agg('table_id')}</td>
-                            <td>{agg('name')}</td>
-                            <td>{agg('datatype')}</td>
-                            <td>{agg('length')}</td>
-                            <td>{agg('precision')}</td>
-                            <td>{agg('primary')}</td>
-                            <td>{agg('required')}</td>
-
-                            {/* actions */}
-                            <td className={s.actionsCell}>
-                                {isEd ? (
-                                    <>
-                                        <button className={s.okBtn} onClick={saveEdit}>
-                                            ✓
-                                        </button>
-                                        <button className={s.cancelBtn} onClick={cancelEdit}>
-                                            ✕
-                                        </button>
-                                    </>
-                                ) : (
-                                    <>
-                                        <ConColumnIcon
-                                            className={s.actionIcon}
-                                            onClick={() => handleMerge(wc.id)}
-                                        />
-                                        <EditIcon
-                                            className={s.actionIcon}
-                                            onClick={() => startEdit(wc)}
-                                        />
-                                        <DeleteIcon
-                                            className={s.actionIcon}
-                                            onClick={() =>
-                                                confirm('Удалить?') && deleteColumnWidget(wc.id)
-                                            }
-                                        />
-                                    </>
-                                )}
-                            </td>
-                        </tr>
-                    );
-                })}
-                </tbody>
-            </table>
-
-            <WidgetColumnsMainTable  widgetColumns={widgetColumns} handleDeleteReference={handleDeleteReference}
+            <WidgetColumnsMainTable updateWidgetColumn={updateWidgetColumn} widgetColumns={widgetColumns} handleDeleteReference={handleDeleteReference}
                                     referencesMap={referencesMap}/>
 
             {/* ───── Modal “Посмотреть таблицу” ───── */}
@@ -586,6 +457,8 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                                     }
                                     required
                                 />
+
+
                                 <TextField
                                     label="Описание"
                                     size="small"
@@ -654,17 +527,18 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                                     size="small"
                                     value={newCol.alias}
                                     onChange={e =>
-                                        setNewCol(v => ({ ...v, alias: e.target.value }))
+                                        setNewCol(v => ({...v, alias: e.target.value}))
                                     }
                                     required
                                 />
+
 
                                 <TextField
                                     label="Default"
                                     size="small"
                                     value={newCol.default}
                                     onChange={e =>
-                                        setNewCol(v => ({ ...v, default: e.target.value }))
+                                        setNewCol(v => ({...v, default: e.target.value}))
                                     }
                                 />
 
@@ -673,7 +547,7 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                                     size="small"
                                     value={newCol.placeholder}
                                     onChange={e =>
-                                        setNewCol(v => ({ ...v, placeholder: e.target.value }))
+                                        setNewCol(v => ({...v, placeholder: e.target.value}))
                                     }
                                 />
 
@@ -682,7 +556,7 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                                     size="small"
                                     value={newCol.type}
                                     onChange={e =>
-                                        setNewCol(v => ({ ...v, type: e.target.value }))
+                                        setNewCol(v => ({...v, type: e.target.value}))
                                     }
                                     required
                                 />
@@ -708,14 +582,14 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                                         type="checkbox"
                                         checked={newCol.visible}
                                         onChange={e =>
-                                            setNewCol(v => ({ ...v, visible: e.target.checked }))
+                                            setNewCol(v => ({...v, visible: e.target.checked}))
                                         }
                                     />
                                 </Stack>
                             </Stack>
                         </DialogContent>
 
-                        <DialogActions sx={{ pr: 3, pb: 2 }}>
+                        <DialogActions sx={{pr: 3, pb: 2}}>
                             <Button onClick={() => setAddOpen(false)}>Отмена</Button>
                             <Button type="submit" variant="contained">
                                 Сохранить
@@ -729,3 +603,175 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
         </div>
     );
 };
+
+
+/*
+<table className={s.tbl}>
+    <thead>
+    <tr>
+        <th>id</th>
+        <th>id widget</th>
+        <th>column_order</th>
+        <th>alias</th>
+        <th>default</th>
+        <th>placeholder</th>
+        <th>visible</th>
+        <th>id</th>
+        <th>id table</th>
+        <th>name</th>
+        <th>datatype</th>
+        <th>length</th>
+        <th>precision</th>
+        <th>primary(test)</th>
+        <th>required</th>
+        <th></th>
+    </tr>
+    </thead>
+
+    <tbody>
+    {widgetColumns.map((wc) => {
+        const isEd = editingWcId === wc.id;
+
+        /!* агрегаты по reference *!/
+        const agg = (k: keyof Column) =>
+            wc.reference
+                .map((r) => {
+                    const val = r.table_column?.[k];
+                    if (typeof val === 'boolean') return val ? '✔︎' : '';
+                    return val ?? '—';
+                })
+                .filter(Boolean)
+                .join(', ');
+        return (
+            <tr key={wc.id}>
+                <td>{wc.id}</td>
+                <td>{wc.widget_id}</td>
+                <td>
+                    {isEd ? (
+                        <input
+                            className={s.inp}
+                            value={wcValues.column_order ?? ''}
+                            onChange={(e) =>
+                                setWcValues((v) => ({...v, column_order: Number(e.target.value)}))
+                            }
+                        />
+                    ) : (
+                        wc.column_order ?? '—'
+                    )}
+                </td>
+                alias
+                <td>
+                    {isEd ? (
+                        <input
+                            className={s.inp}
+                            value={wcValues.alias ?? ''}
+                            onChange={(e) =>
+                                setWcValues((v) => ({...v, alias: e.target.value}))
+                            }
+                        />
+                    ) : (
+                        wc.alias ?? '—'
+                    )}
+                </td>
+
+                default
+                <td>
+                    {isEd ? (
+                        <input
+                            className={s.inp}
+                            value={wcValues.default ?? ''}
+                            onChange={(e) =>
+                                setWcValues((v) => ({...v, default: e.target.value}))
+                            }
+                        />
+                    ) : (
+                        wc.default ?? '—'
+                    )}
+                </td>
+
+                placeholder
+                <td>
+                    {isEd ? (
+                        <input
+                            className={s.inp}
+                            value={wcValues.placeholder ?? ''}
+                            onChange={(e) =>
+                                setWcValues((v) => ({
+                                    ...v,
+                                    placeholder: e.target.value,
+                                }))
+                            }
+                        />
+                    ) : (
+                        wc.placeholder ?? '—'
+                    )}
+                </td>
+
+                published
+                <td style={{textAlign: 'center'}}>
+                    {isEd ? (
+                        <input
+                            type="checkbox"
+                            checked={wcValues.visible ?? false}
+                            onChange={(e) =>
+                                setWcValues((v) => ({
+                                    ...v,
+                                    visible: e.target.checked,
+                                }))
+                            }
+                        />
+                    ) : wc.visible ? (
+                        '✔︎'
+                    ) : (
+                        ''
+                    )}
+                </td>
+
+                type
+
+
+                агрегированные reference-поля
+                <td>{agg('id')}</td>
+                <td>{agg('table_id')}</td>
+                <td>{agg('name')}</td>
+                <td>{agg('datatype')}</td>
+                <td>{agg('length')}</td>
+                <td>{agg('precision')}</td>
+                <td>{agg('primary')}</td>
+                <td>{agg('required')}</td>
+
+                actions
+                <td className={s.actionsCell}>
+                    {isEd ? (
+                        <>
+                            <button className={s.okBtn} onClick={saveEdit}>
+                                ✓
+                            </button>
+                            <button className={s.cancelBtn} onClick={cancelEdit}>
+                                ✕
+                            </button>
+                        </>
+                    ) : (
+                        <>
+                            <ConColumnIcon
+                                className={s.actionIcon}
+                                onClick={() => handleMerge(wc.id)}
+                            />
+                            <EditIcon
+                                className={s.actionIcon}
+                                onClick={() => startEdit(wc)}
+                            />
+                            <DeleteIcon
+                                className={s.actionIcon}
+                                onClick={() =>
+                                    confirm('Удалить?') && deleteColumnWidget(wc.id)
+                                }
+                            />
+                        </>
+                    )}
+                </td>
+            </tr>
+        );
+    })}
+    </tbody>
+</table>*/

@@ -42,30 +42,29 @@ export type Widget = {
 
 
 export type WidgetColumn = {
-    id: number;
+
     widget_id: number;
     alias: string | null;
     default: string | null;
     placeholder: string | null;
-    column_order: number,
     visible: boolean;
-    type: string;
+    column_order: number,
+    id: number;
     reference: {
-        width: number;
-        combobox_primary: boolean;
         ref_column_order: number,
-        combobox_visible: boolean;
+        ref_alias: string | null;
+        width: number;
+        type:string;
         table_column: {
             table_id: number;
-            id: number;
             name: string;
-            description: string | null;
             datatype: string;
-            length: number | null;
             precision: number | null;
-            primary: boolean;
             increment: boolean;
-            datetime: boolean;
+            id: number;
+            description: string | null;
+            length: number | null;
+            primary: boolean;
             required: boolean;
         };
     }[];
@@ -571,7 +570,7 @@ export const useWorkSpaces = () => {
         []
     );
 
-    const updateReference = useCallback(
+   /* const updateReference = useCallback(
         async (
             widgetColumnId: number,
             tableColumnId: number,
@@ -586,11 +585,11 @@ export const useWorkSpaces = () => {
                 `/widgets/tables/references/${widgetColumnId}/${tableColumnId}`,
                 patch,
             );
-            /* вернём свежие данные — решать наверху, как их подмешивать */
+            /!* вернём свежие данные — решать наверху, как их подмешивать *!/
             return data;
         },
         [],
-    );
+    );*/
 
 
     const addReference = useCallback(
@@ -819,7 +818,6 @@ export const useWorkSpaces = () => {
         fetchReferences,
         deleteReference,
         updateWidgetMeta,
-        updateReference,
         addWidgetColumn,
         publishTable,
         deleteConnection

@@ -47,8 +47,11 @@ type Props = {
     deleteColumnTable: (id: number) => void;
     deleteColumnWidget: (id: number) => void;
     updateTableColumn: (id: number, p: Partial<Omit<Column, 'id'>>) => void;
-    updateWidgetColumn: (id: number,
-                         patch: Partial<Omit<WidgetColumn, 'id' | 'widget_id' | 'reference'>>) => void;
+    updateWidgetColumn: (
+        id: number,
+        patch: Partial<Omit<WidgetColumn, 'id' | 'widget_id' | 'reference'>>
+    ) => Promise<void> | void;
+
     addReference: (widgetColId: number, tblColId: number, payload: {
         width: number; combobox_visible: boolean; combobox_primary: boolean; ref_column_order: number
     }) => Promise<void>;
@@ -65,6 +68,7 @@ type Props = {
     setSelectedWidget: any
     setWidgetsByTable: React.Dispatch<React.SetStateAction<Record<number, Widget[]>>>
     fetchReferences: any
+
     deleteReference: any
     updateWidgetMeta: any
     addWidgetColumn: (payload: {
@@ -187,7 +191,8 @@ export const SetOfTables: React.FC<Props> = ({
                         ) : wColsError ? (
                             <p className={s.error}>{wColsError}</p>
                         ) : (
-                            <WidgetColumnsOfTable addWidgetColumn={addWidgetColumn} updateWidgetColumn={updateWidgetColumn}
+                            <WidgetColumnsOfTable updateWidgetColumn={updateWidgetColumn}
+                addWidgetColumn={addWidgetColumn}
                                                   deleteReference={deleteReference} fetchReferences={fetchReferences}
                                                   updateWidgetMeta={updateWidgetMeta}
                                                   setWidgetsByTable={setWidgetsByTable}
