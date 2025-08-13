@@ -10,7 +10,7 @@ import {
 } from '@/shared/hooks/useWorkSpaces';
 import {FormTable} from "@/components/formTable/FormTable";
 import {TableColumn} from "@/components/tableColumn/TableColumn";
-import {WidgetColumnsOfTable} from '@/components/WidgetColumnsOfTable/WidgetColumnsOfTable'
+import {WcReference, WidgetColumnsOfTable} from '@/components/WidgetColumnsOfTable/WidgetColumnsOfTable'
 import {TableListView} from "@/components/tableColumn/TableListView";
 
 type Props = {
@@ -19,7 +19,17 @@ type Props = {
     workspaceName: string;
     loading: boolean;
     error: string | null;
+    updateReference: (
+        widgetColumnId: number,
+        tableColumnId: number,
+        patch: Partial<Pick<WcReference, 'width'|'ref_column_order'>>
+    ) => Promise<WcReference>;
 
+    addReference: (
+        widgetColId: number,
+        tblColId: number,
+        payload: { width: number; ref_column_order: number }
+    ) => Promise<void>;
     /* widget */
     widgetColumns: WidgetColumn[];
     wColsLoading: boolean;
@@ -52,9 +62,6 @@ type Props = {
         patch: Partial<Omit<WidgetColumn, 'id' | 'widget_id' | 'reference'>>
     ) => Promise<void> | void;
 
-    addReference: (widgetColId: number, tblColId: number, payload: {
-        width: number; combobox_visible: boolean; combobox_primary: boolean; ref_column_order: number
-    }) => Promise<void>;
     loadColumnsWidget: (widgetId: number) => void;
     formTrees: Record<number, FormTreeColumn[]>
     loadFilteredFormDisplay: (formId: number, filter: {
@@ -128,6 +135,7 @@ export const SetOfTables: React.FC<Props> = ({
                                                  addWidgetColumn,
                                                  tablesByWs,
                                                  publishTable,
+                                                 updateReference
 
                                              }) => {
 
@@ -191,7 +199,7 @@ export const SetOfTables: React.FC<Props> = ({
                         ) : wColsError ? (
                             <p className={s.error}>{wColsError}</p>
                         ) : (
-                            <WidgetColumnsOfTable updateWidgetColumn={updateWidgetColumn}
+                            <WidgetColumnsOfTable updateReference={updateReference} updateWidgetColumn={updateWidgetColumn}
                 addWidgetColumn={addWidgetColumn}
                                                   deleteReference={deleteReference} fetchReferences={fetchReferences}
                                                   updateWidgetMeta={updateWidgetMeta}

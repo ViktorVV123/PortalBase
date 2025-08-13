@@ -76,6 +76,7 @@ export const Main = () => {
         addWidgetColumn,
         publishTable,
         deleteConnection,
+        updateReference,
     } = useWorkSpaces();
 
     useEffect(() => {
@@ -175,7 +176,7 @@ export const Main = () => {
 
                 />
 
-                <SetOfTables publishTable={publishTable} tablesByWs={tablesByWs} addWidgetColumn={addWidgetColumn} setWidgetsByTable={setWidgetsByTable} setSelectedWidget={setSelectedWidget}
+                <SetOfTables updateReference={updateReference} publishTable={publishTable} tablesByWs={tablesByWs} addWidgetColumn={addWidgetColumn} setWidgetsByTable={setWidgetsByTable} setSelectedWidget={setSelectedWidget}
                              columns={columns}
                              formDisplay={formDisplay}
                              tableName={selectedTable?.name ?? ''}

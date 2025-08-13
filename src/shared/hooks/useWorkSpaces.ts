@@ -570,33 +570,25 @@ export const useWorkSpaces = () => {
         []
     );
 
-   /* const updateReference = useCallback(
-        async (
-            widgetColumnId: number,
-            tableColumnId: number,
-            patch: Partial<Pick<WcReference,
-                'width'            |
-                'combobox_visible' |
-                'combobox_primary' |
-                'ref_column_order'
-            >>
-        ) => {
+    const updateReference = useCallback(
+        async (widgetColumnId: number, tableColumnId: number, patch: { ref_column_order: number }) => {
+            const body = { ref_column_order: patch.ref_column_order };
             const { data } = await api.patch<WcReference>(
                 `/widgets/tables/references/${widgetColumnId}/${tableColumnId}`,
-                patch,
+                body,
             );
-            /!* вернём свежие данные — решать наверху, как их подмешивать *!/
             return data;
         },
         [],
-    );*/
+    );
+
 
 
     const addReference = useCallback(
         async (
             widgetColId: number,
             tblColId: number,
-            payload: { width: number; combobox_visible: boolean; combobox_primary: boolean;ref_column_order:number },
+            payload: { width: number;ref_column_order:number },
         ) => {
             await api.post(
                 `/widgets/tables/references/${widgetColId}/${tblColId}`,
@@ -820,7 +812,8 @@ export const useWorkSpaces = () => {
         updateWidgetMeta,
         addWidgetColumn,
         publishTable,
-        deleteConnection
+        deleteConnection,
+        updateReference
 
     };
 };
