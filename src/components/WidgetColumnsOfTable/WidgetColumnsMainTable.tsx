@@ -1,9 +1,8 @@
-import React, {useEffect, useMemo, useRef, useState, useCallback, useMemo as useMemoAlias} from 'react';
+import React, {useEffect, useMemo, useRef, useState, useCallback} from 'react';
 import * as s from '@/components/setOfTables/SetOfTables.module.scss';
 import DeleteIcon from '@/assets/image/DeleteIcon.svg';
 import {WidgetColumn} from '@/shared/hooks/useWorkSpaces';
 import debounce from 'lodash/debounce';
-import difference from 'lodash/difference';
 
 type ReferenceItem = WidgetColumn['reference'][number];
 
@@ -17,23 +16,20 @@ type WidgetColumnsMainTableProps = {
         patch: Partial<Omit<WidgetColumn, 'id' | 'widget_id' | 'reference'>>
     ) => Promise<void> | void;
 
-    // PATCH /widgets/tables/references/{widgetColumnId}/{tableColumnId}
     updateReference: (
         widgetColumnId: number,
         tableColumnId: number,
         patch: Partial<Pick<ReferenceItem, 'ref_column_order' | 'width'>>
     ) => Promise<ReferenceItem>;
 
-    // POST /widgets/tables/references/{widgetColId}/{tblColId}
     addReference: (
         widgetColId: number,
         tblColId: number,
         payload: { width: number; ref_column_order: number }
     ) => Promise<void>;
 
-    // опционально: подтянуть свежие references
     refreshReferences?: (wcId: number) => Promise<void> | void;
-    onRefsChange?: (refsMap: Record<number, ReferenceItem[]>) => void; // << добавили
+    onRefsChange?: (refsMap: Record<number, ReferenceItem[]>) => void;
 };
 
 export const WidgetColumnsMainTable: React.FC<WidgetColumnsMainTableProps> = ({
@@ -46,7 +42,7 @@ export const WidgetColumnsMainTable: React.FC<WidgetColumnsMainTableProps> = ({
                                                                                   refreshReferences,
                                                                                   onRefsChange
                                                                               }) => {
-    // показываем группы в порядке column_order
+    // группы в порядке column_order
     const orderedWc = useMemo(
         () =>
             [...widgetColumns].sort(
@@ -55,20 +51,23 @@ export const WidgetColumnsMainTable: React.FC<WidgetColumnsMainTableProps> = ({
         [widgetColumns]
     );
 
-    /** Локальный источник истины для reference-строк */
+    /** локальная истина по ссылкам */
     const [localRefs, setLocalRefs] = useState<Record<number, ReferenceItem[]>>({});
-
-    /** Текущий локальный state в useRef — чтобы debounce всегда видел актуальные данные */
     const localRefsRef = useRef<Record<number, ReferenceItem[]>>({});
     useEffect(() => {
         onRefsChange?.(localRefs);
         localRefsRef.current = localRefs;
-    }, [localRefs,onRefsChange]);
+    }, [localRefs, onRefsChange]);
 
-    /** Снапшот «подтверждённого бэком» состояния: карта wcId -> массив table_column.id по порядку */
+    /** снапшот подтверждённого сервером порядка (по id) */
     const snapshotRef = useRef<Record<number, number[]>>({});
 
-    /** Инициализация локального состояния и снапшота при изменении входных данных */
+    /** утилита: проставить корректный ref_column_order по текущему порядку */
+    const reindex = useCallback((arr: ReferenceItem[]) => {
+        return arr.map((r, idx) => ({ ...r, ref_column_order: idx }));
+    }, []);
+
+    /** первичная инициализация localRefs + snapshot */
     useEffect(() => {
         const next: Record<number, ReferenceItem[]> = {};
         const snap: Record<number, number[]> = {};
@@ -79,94 +78,85 @@ export const WidgetColumnsMainTable: React.FC<WidgetColumnsMainTableProps> = ({
             const sorted = [...src].sort(
                 (a, b) => (a.ref_column_order ?? 0) - (b.ref_column_order ?? 0)
             );
-            next[wc.id] = sorted;
-            snap[wc.id] = sorted.map((r) => r.table_column.id);
+            next[wc.id] = reindex(sorted);                 // ← локально нормализуем
+            snap[wc.id] = sorted.map(r => r.table_column.id);
         });
 
         setLocalRefs(next);
         snapshotRef.current = snap;
-    }, [orderedWc, referencesMap]);
+    }, [orderedWc, referencesMap, reindex]);
 
-    /** Безопасно перезаписать снапшот из локального состояния */
-    const setSnapshotFromLocal = useCallback((state: Record<number, ReferenceItem[]>) => {
-        const nextSnap: Record<number, number[]> = {};
-        for (const wcIdStr of Object.keys(state)) {
-            const wcId = Number(wcIdStr);
-            nextSnap[wcId] = (state[wcId] ?? []).map((r) => r.table_column.id);
-        }
-        snapshotRef.current = nextSnap;
+
+    /** стабильный дебаунс, живёт в ref, читает только .current */
+        // @ts-ignore
+    const queueSyncRef = useRef<ReturnType<typeof debounce>>();
+    if (!queueSyncRef.current) {
+        queueSyncRef.current = debounce(async () => {
+            const state = localRefsRef.current;
+            const snapshot = snapshotRef.current;
+
+            // console.debug('[sync] state', state, 'snapshot', snapshot);
+
+            // 1) cross‑add
+            for (const wcIdStr of Object.keys(state)) {
+                const wcId = Number(wcIdStr);
+                const nextOrder = (state[wcId] ?? []).map(r => r.table_column.id);
+                const prevOrder = snapshot[wcId] ?? [];
+
+                const addedIds = nextOrder.filter(id => !prevOrder.includes(id));
+                for (const id of addedIds) {
+                    const toIdx = nextOrder.indexOf(id);
+                    const refObj = (state[wcId] ?? [])[toIdx];
+                    const width = refObj?.width ?? 1;
+                    // console.debug('[sync:add]', { wcId, id, toIdx, width });
+                    try {
+                        await addReference(wcId, id, { width, ref_column_order: toIdx });
+                    } catch (e) {
+                        console.warn('[sync:addReference] wc=', wcId, 'col=', id, e);
+                    }
+                }
+            }
+
+            // 2) reorder внутри — только общие id
+            for (const wcIdStr of Object.keys(state)) {
+                const wcId = Number(wcIdStr);
+                const nextOrder = (state[wcId] ?? []).map(r => r.table_column.id);
+                const prevOrder = snapshot[wcId] ?? [];
+                const commonIds = nextOrder.filter(id => prevOrder.includes(id));
+
+                for (const id of commonIds) {
+                    const newIdx = nextOrder.indexOf(id);
+                    const oldIdx = prevOrder.indexOf(id);
+                    if (newIdx !== oldIdx) {
+                        // console.debug('[sync:patch]', { wcId, id, newIdx });
+                        try {
+                            await updateReference(wcId, id, { ref_column_order: newIdx });
+                        } catch (e) {
+                            console.warn('[sync:updateReference] wc=', wcId, 'col=', id, e);
+                        }
+                    }
+                }
+            }
+
+            // 3) обновляем снапшот
+            const nextSnap: Record<number, number[]> = {};
+            for (const wcIdStr of Object.keys(state)) {
+                const wcId = Number(wcIdStr);
+                nextSnap[wcId] = (state[wcId] ?? []).map(r => r.table_column.id);
+            }
+            snapshotRef.current = nextSnap;
+
+            // по желанию подтянуть с сервера:
+            // await Promise.all(Object.keys(state).map(id => refreshReferences?.(Number(id))));
+        }, 250);
+    }
+
+    useEffect(() => {
+        const q = queueSyncRef.current!;
+        return () => q.cancel(); // на размонтировании
     }, []);
 
-    /** Debounce‑очередь синхронизации: вычисляет дифф относительно snapshotRef и отправляет только минимальные изменения */
-        // было (старый queueSync) — УДАЛИ полностью
-
-// стало (новый queueSync) — ВСТАВЬ
-    const queueSync = useMemo(() =>
-                debounce(async () => {
-                    const state = localRefsRef.current;               // локальная истина
-                    const snapshot = snapshotRef.current;             // подтверждённый бэком вид
-
-                    // 1) Сначала добавления (cross‑move в новые группы)
-                    for (const wcIdStr of Object.keys(state)) {
-                        const wcId = Number(wcIdStr);
-                        const nextOrder = (state[wcId] ?? []).map(r => r.table_column.id);
-                        const prevOrder = snapshot[wcId] ?? [];
-
-                        // новые id, которых не было в этой группе
-                        const addedIds = nextOrder.filter(id => !prevOrder.includes(id));
-                        for (const id of addedIds) {
-                            const toIdx = nextOrder.indexOf(id);
-                            const refObj = (state[wcId] ?? [])[toIdx];
-                            const width = refObj?.width ?? 1;
-
-                            try {
-                                await addReference(wcId, id, { width, ref_column_order: toIdx });
-                            } catch (e) {
-                                console.warn('[sync:addReference] wc=', wcId, 'col=', id, '→ 404?', e);
-                            }
-                        }
-                    }
-
-                    // 2) Затем внутригрупповое переупорядочивание ТОЛЬКО для общих ID
-                    for (const wcIdStr of Object.keys(state)) {
-                        const wcId = Number(wcIdStr);
-                        const nextOrder = (state[wcId] ?? []).map(r => r.table_column.id);
-                        const prevOrder = snapshot[wcId] ?? [];
-
-                        // общие id, присутствующие и раньше, и сейчас
-                        const commonIds = nextOrder.filter(id => prevOrder.includes(id));
-
-                        for (const id of commonIds) {
-                            const newIdx = nextOrder.indexOf(id);
-                            const oldIdx = prevOrder.indexOf(id);
-                            if (newIdx !== oldIdx) {
-                                try {
-                                    await updateReference(wcId, id, { ref_column_order: newIdx });
-                                } catch (e) {
-                                    console.warn('[sync:updateReference] wc=', wcId, 'col=', id, '→ 404?', e);
-                                }
-                            }
-                        }
-                    }
-
-                    // 3) Всё успешно — обновляем снапшот под текущее локальное состояние
-                    const nextSnap: Record<number, number[]> = {};
-                    for (const wcIdStr of Object.keys(state)) {
-                        const wcId = Number(wcIdStr);
-                        nextSnap[wcId] = (state[wcId] ?? []).map(r => r.table_column.id);
-                    }
-                    snapshotRef.current = nextSnap;
-
-                    // (опционально) refreshReferences для визуального «подтягивания» с бэка:
-                    // await Promise.all(Object.keys(state).map(id => refreshReferences?.(Number(id))));
-                }, 250),
-            [addReference, updateReference]);
-
-
-    // Чистим debounce при размонтировании
-    useEffect(() => () => queueSync.cancel(), [queueSync]);
-
-    // ───────────────── Группы ↑/↓ (WC) ─────────────────
+    // ───────── перемещение групп (WC) ─────────
     const moveGroup = async (wcId: number, dir: 'up' | 'down') => {
         const list = orderedWc;
         const i = list.findIndex((w) => w.id === wcId);
@@ -180,7 +170,7 @@ export const WidgetColumnsMainTable: React.FC<WidgetColumnsMainTableProps> = ({
         ]);
     };
 
-    // ───────────────────── DnD ─────────────────────
+    // ───────── DnD ─────────
     type DragData = { srcWcId: number; fromIdx: number; tableColumnId: number };
     const [drag, setDrag] = useState<DragData | null>(null);
 
@@ -215,6 +205,8 @@ export const WidgetColumnsMainTable: React.FC<WidgetColumnsMainTableProps> = ({
         } finally {
             try { e.dataTransfer.clearData(); } catch {}
             setDrag(null);
+            // отправляем немедленно
+            try { queueSyncRef.current!.flush(); } catch {}
         }
     };
 
@@ -233,22 +225,24 @@ export const WidgetColumnsMainTable: React.FC<WidgetColumnsMainTableProps> = ({
         await applyCrossReorder(data, { dstWcId, toIdx });
         try { e.dataTransfer.clearData(); } catch {}
         setDrag(null);
+        // отправляем немедленно
+        try { queueSyncRef.current!.flush(); } catch {}
     };
 
-    // ───────────────────── Перестановки ─────────────────────
-    // ВНУТРИ группы — только локально + постановка синка
+    // ───────── перестановки ─────────
+    // внутри группы
     const reorderInside = async (wcId: number, fromIdx: number, toIdx: number) => {
         setLocalRefs(prev => {
             const src = prev[wcId] ?? [];
             const next = [...src];
             const [rm] = next.splice(fromIdx, 1);
             next.splice(toIdx, 0, rm);
-            return { ...prev, [wcId]: next };
+            return { ...prev, [wcId]: reindex(next) };  // ← сразу обновили ref_column_order
         });
-        queueSync();
+        queueSyncRef.current!();
     };
 
-    // МЕЖДУ группами — только локально + постановка синка
+    // между группами
     const moveAcross = async (srcWcId: number, fromIdx: number, dstWcId: number, toIdx: number) => {
         setLocalRefs(prev => {
             const src = prev[srcWcId] ?? [];
@@ -259,9 +253,14 @@ export const WidgetColumnsMainTable: React.FC<WidgetColumnsMainTableProps> = ({
 
             const nextSrc = [...src]; nextSrc.splice(fromIdx, 1);
             const nextDst = [...dst]; nextDst.splice(toIdx, 0, moved);
-            return { ...prev, [srcWcId]: nextSrc, [dstWcId]: nextDst };
+
+            return {
+                ...prev,
+                [srcWcId]: reindex(nextSrc),
+                [dstWcId]: reindex(nextDst),
+            };
         });
-        queueSync();
+        queueSyncRef.current!();
     };
 
     const applyCrossReorder = async (d: DragData, target: { dstWcId: number; toIdx: number }) => {
