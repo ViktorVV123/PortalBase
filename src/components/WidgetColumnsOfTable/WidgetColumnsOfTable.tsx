@@ -37,7 +37,7 @@ interface Props {
     addReference: (
         widgetColId: number,
         tblColId: number,
-        payload: { width: number; combobox_visible: boolean; combobox_primary: boolean; ref_column_order: number }
+        payload: { width: number; ref_column_order: number }
     ) => Promise<void>;
 
     updateReference: (
@@ -118,6 +118,9 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                                                           updateReference,
                                                       }) => {
     const [referencesMap, setReferencesMap] = useState<Record<number, WcReference[]>>({});
+    // состояние для актуальных ссылок с фронта
+    const [liveRefsForHeader, setLiveRefsForHeader] = useState<Record<number, WcReference[]> | null>(null);
+
 
     const [addOpen, setAddOpen] = useState(false);
     const [newCol, setNewCol] = useState({
@@ -225,19 +228,23 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                     ? (wcValues.column_order ?? wc.column_order ?? 0)
                     : (wc.column_order ?? 0);
 
-            const refs = referencesMap[wc.id] ?? wc.reference ?? [];
+            // >>> главный источник: liveRefsForHeader (актуальная локальная сортировка)
+            const refs =
+                liveRefsForHeader?.[wc.id] ??
+                referencesMap[wc.id] ??
+                wc.reference ??
+                [];
+
             const span = Math.max(1, refs.length || 1);
 
             const effectiveAlias = (editingWcId === wc.id ? wcValues.alias : wc.alias)?.trim();
             const title = effectiveAlias || refs[0]?.table_column?.name || `Колонка #${wc.id}`;
 
             // подписи под группой: ref_alias → table_column.name → '—'
+            // здесь порядок берём КАК ЕСТЬ из refs (это уже «живая» сортировка)
             const labels =
                 refs.length > 0
-                    ? refs
-                        .slice() // на всякий случай не мутируем
-                        .sort((a, b) => (a.ref_column_order ?? 0) - (b.ref_column_order ?? 0))
-                        .map(r => r.ref_alias || r.table_column?.name || '—')
+                    ? refs.map(r => r.ref_alias || r.table_column?.name || '—')
                     : ['—'];
 
             return { id: wc.id, order: effectiveOrder, title, span, labels };
@@ -245,7 +252,8 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
 
         items.sort((a, b) => (a.order - b.order) || (a.id - b.id));
         return items;
-    }, [widgetColumns, referencesMap, editingWcId, wcValues]);
+    }, [widgetColumns, referencesMap, liveRefsForHeader, editingWcId, wcValues]);
+
 
 
     return (
@@ -310,10 +318,10 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
             </div>
 
             {/* Основная таблица */}
-            <WidgetColumnsMainTable
+            <WidgetColumnsMainTable onRefsChange={setLiveRefsForHeader}
                 addReference={(wcId, tblColId, payloadMin) =>
                     // если на твоём бэке обязательны combobox-поля — можешь обернуть здесь
-                    addReference(wcId, tblColId, {...payloadMin, combobox_visible: true, combobox_primary: false})
+                    addReference(wcId, tblColId, {...payloadMin})
                 }
                 updateReference={updateReference}
                 refreshReferences={async (wcId) => {

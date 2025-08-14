@@ -33,6 +33,7 @@ type WidgetColumnsMainTableProps = {
 
     // опционально: подтянуть свежие references
     refreshReferences?: (wcId: number) => Promise<void> | void;
+    onRefsChange?: (refsMap: Record<number, ReferenceItem[]>) => void; // << добавили
 };
 
 export const WidgetColumnsMainTable: React.FC<WidgetColumnsMainTableProps> = ({
@@ -43,6 +44,7 @@ export const WidgetColumnsMainTable: React.FC<WidgetColumnsMainTableProps> = ({
                                                                                   updateReference,
                                                                                   addReference,
                                                                                   refreshReferences,
+                                                                                  onRefsChange
                                                                               }) => {
     // показываем группы в порядке column_order
     const orderedWc = useMemo(
@@ -59,8 +61,9 @@ export const WidgetColumnsMainTable: React.FC<WidgetColumnsMainTableProps> = ({
     /** Текущий локальный state в useRef — чтобы debounce всегда видел актуальные данные */
     const localRefsRef = useRef<Record<number, ReferenceItem[]>>({});
     useEffect(() => {
+        onRefsChange?.(localRefs);
         localRefsRef.current = localRefs;
-    }, [localRefs]);
+    }, [localRefs,onRefsChange]);
 
     /** Снапшот «подтверждённого бэком» состояния: карта wcId -> массив table_column.id по порядку */
     const snapshotRef = useRef<Record<number, number[]>>({});
