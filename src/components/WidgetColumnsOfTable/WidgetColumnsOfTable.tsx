@@ -323,6 +323,7 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                     // если на твоём бэке обязательны combobox-поля — можешь обернуть здесь
                     addReference(wcId, tblColId, {...payloadMin})
                 }
+                                    deleteColumnWidget={deleteColumnWidget}
                 updateReference={updateReference}
                 refreshReferences={async (wcId) => {
                     const fresh = await fetchReferences(wcId);

@@ -30,6 +30,7 @@ type WidgetColumnsMainTableProps = {
 
     refreshReferences?: (wcId: number) => Promise<void> | void;
     onRefsChange?: (refsMap: Record<number, ReferenceItem[]>) => void;
+    deleteColumnWidget: (id: number) => void;
 };
 
 export const WidgetColumnsMainTable: React.FC<WidgetColumnsMainTableProps> = ({
@@ -40,7 +41,8 @@ export const WidgetColumnsMainTable: React.FC<WidgetColumnsMainTableProps> = ({
                                                                                   updateReference,
                                                                                   addReference,
                                                                                   refreshReferences,
-                                                                                  onRefsChange
+                                                                                  onRefsChange,
+                                                                                  deleteColumnWidget
                                                                               }) => {
     // группы в порядке column_order
     const orderedWc = useMemo(
@@ -287,7 +289,7 @@ export const WidgetColumnsMainTable: React.FC<WidgetColumnsMainTableProps> = ({
                         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
                             <h4 style={{ margin: 0 }}>{wc.alias ?? `Колонка #${wc.id}`}</h4>
                             <span style={{ color: 'grey' }}>({wc.column_order ?? 0})</span>
-                            <div style={{ display: 'flex', gap: 6, marginLeft: 8 }}>
+                            <div style={{ display: 'flex', gap: 6, marginLeft: 8, alignItems: 'center' }}>
                                 <button
                                     title="Переместить вверх"
                                     disabled={isFirst}
@@ -305,6 +307,8 @@ export const WidgetColumnsMainTable: React.FC<WidgetColumnsMainTableProps> = ({
                                     ↓
                                 </button>
                                 <span>{wc.id}</span>
+                                    <DeleteIcon onClick={()=>
+                                        deleteColumnWidget(wc.id)}/>
                             </div>
                         </div>
 
