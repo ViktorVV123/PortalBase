@@ -221,38 +221,52 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
     };
 
     // ───────── Заголовок-превью ─────────
+// ───────── Заголовок-превью ─────────
     const headerGroups = useMemo(() => {
-        const items = widgetColumns.map((wc) => {
-            const effectiveOrder =
-                editingWcId === wc.id
-                    ? (wcValues.column_order ?? wc.column_order ?? 0)
-                    : (wc.column_order ?? 0);
+        const items = widgetColumns
+            .map((wc) => {
+                // учёт незасохранённых правок
+                const effectiveOrder =
+                    editingWcId === wc.id
+                        ? (wcValues.column_order ?? wc.column_order ?? 0)
+                        : (wc.column_order ?? 0);
 
-            // >>> главный источник: liveRefsForHeader (актуальная локальная сортировка)
-            const refs =
-                liveRefsForHeader?.[wc.id] ??
-                referencesMap[wc.id] ??
-                wc.reference ??
-                [];
+                const effectiveVisible =
+                    editingWcId === wc.id
+                        ? (wcValues.visible ?? wc.visible)
+                        : wc.visible;
 
-            const span = Math.max(1, refs.length || 1);
+                // если группа скрыта — вообще не участвует в шапке
+                if (!effectiveVisible) return null;
 
-            const effectiveAlias = (editingWcId === wc.id ? wcValues.alias : wc.alias)?.trim();
-            const title = effectiveAlias || refs[0]?.table_column?.name || `Колонка #${wc.id}`;
+                // источник ссылок: сперва «живые» (локальные), потом загруженные
+                const refs =
+                    liveRefsForHeader?.[wc.id] ??
+                    referencesMap[wc.id] ??
+                    wc.reference ??
+                    [];
 
-            // подписи под группой: ref_alias → table_column.name → '—'
-            // здесь порядок берём КАК ЕСТЬ из refs (это уже «живая» сортировка)
-            const labels =
-                refs.length > 0
-                    ? refs.map(r => r.ref_alias || r.table_column?.name || '—')
-                    : ['—'];
+                const span = Math.max(1, refs.length || 1);
 
-            return { id: wc.id, order: effectiveOrder, title, span, labels };
-        });
+                const effectiveAlias = (editingWcId === wc.id ? wcValues.alias : wc.alias)?.trim();
+                const title = effectiveAlias || refs[0]?.table_column?.name || `Колонка #${wc.id}`;
 
+                // подписи под группой (по текущему локальному порядку)
+                const labels =
+                    refs.length > 0
+                        ? refs.map(r => r.ref_alias || r.table_column?.name || '—')
+                        : ['—'];
+
+                return { id: wc.id, order: effectiveOrder, title, span, labels };
+            })
+            // убираем скрытые (null)
+            .filter((x): x is { id: number; order: number; title: string; span: number; labels: string[] } => !!x);
+
+        // сортировка по column_order, затем по id
         items.sort((a, b) => (a.order - b.order) || (a.id - b.id));
         return items;
     }, [widgetColumns, referencesMap, liveRefsForHeader, editingWcId, wcValues]);
+
 
 
 
@@ -295,7 +309,6 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                 <div style={{opacity: 0.8, fontSize: 12, marginBottom: 6}}>Шапка формы (превью)</div>
                 <table className={s.tbl}>
                     <thead>
-                    {/* верхняя строка — названия групп */}
                     <tr>
                         {headerGroups.map(g => (
                             <th key={`g-top-${g.id}`} colSpan={g.span}>
@@ -303,8 +316,6 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                             </th>
                         ))}
                     </tr>
-
-                    {/* нижняя строка — подписи для каждой reference (ref_alias / name) */}
                     <tr>
                         {headerGroups.map(g =>
                             g.labels.map((label, idx) => (
@@ -319,10 +330,10 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
 
             {/* Основная таблица */}
             <WidgetColumnsMainTable onRefsChange={setLiveRefsForHeader}
-                addReference={(wcId, tblColId, payloadMin) =>
-                    // если на твоём бэке обязательны combobox-поля — можешь обернуть здесь
-                    addReference(wcId, tblColId, {...payloadMin})
-                }
+                                    addReference={(wcId, tblColId, payloadMin) =>
+                                        // если на твоём бэке обязательны combobox-поля — можешь обернуть здесь
+                                        addReference(wcId, tblColId, {...payloadMin})
+                                    }
                                     deleteColumnWidget={deleteColumnWidget}
                 updateReference={updateReference}
                 refreshReferences={async (wcId) => {

@@ -494,6 +494,9 @@ export const WidgetColumnsMainTable: React.FC<WidgetColumnsMainTableProps> = ({
                         <TextField type="number" label="width (REF)" size="small"
                                    value={edit.ref_width}
                                    onChange={e => setEdit(v => ({...v, ref_width: Number(e.target.value)}))}/>
+                        <TextField type="number" label="order (REF)" size="small"
+                                   value={edit.ref_order}
+                                   onChange={e => setEdit(v => ({...v, ref_order: Number(e.target.value)}))}/>
 
                     </Stack>
                 </DialogContent>
