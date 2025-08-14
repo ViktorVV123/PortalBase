@@ -229,12 +229,24 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
             const span = Math.max(1, refs.length || 1);
 
             const effectiveAlias = (editingWcId === wc.id ? wcValues.alias : wc.alias)?.trim();
-            const name = effectiveAlias || refs[0]?.table_column?.name || `Колонка #${wc.id}`;
-            return { id: wc.id, order: effectiveOrder, name, span };
+            const title = effectiveAlias || refs[0]?.table_column?.name || `Колонка #${wc.id}`;
+
+            // подписи под группой: ref_alias → table_column.name → '—'
+            const labels =
+                refs.length > 0
+                    ? refs
+                        .slice() // на всякий случай не мутируем
+                        .sort((a, b) => (a.ref_column_order ?? 0) - (b.ref_column_order ?? 0))
+                        .map(r => r.ref_alias || r.table_column?.name || '—')
+                    : ['—'];
+
+            return { id: wc.id, order: effectiveOrder, title, span, labels };
         });
+
         items.sort((a, b) => (a.order - b.order) || (a.id - b.id));
         return items;
     }, [widgetColumns, referencesMap, editingWcId, wcValues]);
+
 
     return (
         <div className={s.tableWrapperWidget}>
@@ -275,20 +287,33 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                 <div style={{opacity: 0.8, fontSize: 12, marginBottom: 6}}>Шапка формы (превью)</div>
                 <table className={s.tbl}>
                     <thead>
+                    {/* верхняя строка — названия групп */}
                     <tr>
                         {headerGroups.map(g => (
-                            <th key={g.id} colSpan={g.span}>{g.name}</th>
+                            <th key={`g-top-${g.id}`} colSpan={g.span}>
+                                {g.title}
+                            </th>
                         ))}
+                    </tr>
+
+                    {/* нижняя строка — подписи для каждой reference (ref_alias / name) */}
+                    <tr>
+                        {headerGroups.map(g =>
+                            g.labels.map((label, idx) => (
+                                <th key={`g-sub-${g.id}-${idx}`}>{label}</th>
+                            ))
+                        )}
                     </tr>
                     </thead>
                 </table>
+
             </div>
 
             {/* Основная таблица */}
             <WidgetColumnsMainTable
                 addReference={(wcId, tblColId, payloadMin) =>
                     // если на твоём бэке обязательны combobox-поля — можешь обернуть здесь
-                    addReference(wcId, tblColId, { ...payloadMin, combobox_visible: true, combobox_primary: false })
+                    addReference(wcId, tblColId, {...payloadMin, combobox_visible: true, combobox_primary: false})
                 }
                 updateReference={updateReference}
                 refreshReferences={async (wcId) => {
