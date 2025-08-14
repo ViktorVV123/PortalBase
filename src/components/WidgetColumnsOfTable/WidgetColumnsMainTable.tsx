@@ -1,10 +1,31 @@
 import React, {useEffect, useMemo, useRef, useState, useCallback} from 'react';
 import * as s from '@/components/setOfTables/SetOfTables.module.scss';
 import DeleteIcon from '@/assets/image/DeleteIcon.svg';
+import EditIcon from '@/assets/image/EditIcon.svg';
 import {WidgetColumn} from '@/shared/hooks/useWorkSpaces';
+import type { DebouncedFunc } from 'lodash';
 import debounce from 'lodash/debounce';
+import {
+    Dialog, DialogTitle, DialogContent, DialogActions,
+    Button, Stack, TextField, FormControlLabel, Checkbox, createTheme, ThemeProvider
+} from '@mui/material';
 
 type ReferenceItem = WidgetColumn['reference'][number];
+
+const dark = createTheme({
+    palette: {mode: 'dark', primary: {main: '#ffffff'}},
+    components: {
+        MuiOutlinedInput: {
+            styleOverrides: {
+                root: {
+                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#ffffff' },
+                },
+            },
+        },
+        MuiInputLabel: { styleOverrides: { root: { '&.Mui-focused': { color: '#ffffff' } } } },
+        MuiSelect: { styleOverrides: { icon: { color: '#ffffff' } } },
+    },
+});
 
 type WidgetColumnsMainTableProps = {
     widgetColumns: WidgetColumn[];
@@ -16,10 +37,11 @@ type WidgetColumnsMainTableProps = {
         patch: Partial<Omit<WidgetColumn, 'id' | 'widget_id' | 'reference'>>
     ) => Promise<void> | void;
 
+    // расширенный патч
     updateReference: (
         widgetColumnId: number,
         tableColumnId: number,
-        patch: Partial<Pick<ReferenceItem, 'ref_column_order' | 'width'>>
+        patch: Partial<Pick<ReferenceItem, 'ref_column_order' | 'width' | 'type' | 'ref_alias'>>
     ) => Promise<ReferenceItem>;
 
     addReference: (
@@ -44,7 +66,6 @@ export const WidgetColumnsMainTable: React.FC<WidgetColumnsMainTableProps> = ({
                                                                                   onRefsChange,
                                                                                   deleteColumnWidget
                                                                               }) => {
-    // группы в порядке column_order
     const orderedWc = useMemo(
         () =>
             [...widgetColumns].sort(
@@ -53,7 +74,6 @@ export const WidgetColumnsMainTable: React.FC<WidgetColumnsMainTableProps> = ({
         [widgetColumns]
     );
 
-    /** локальная истина по ссылкам */
     const [localRefs, setLocalRefs] = useState<Record<number, ReferenceItem[]>>({});
     const localRefsRef = useRef<Record<number, ReferenceItem[]>>({});
     useEffect(() => {
@@ -61,15 +81,12 @@ export const WidgetColumnsMainTable: React.FC<WidgetColumnsMainTableProps> = ({
         localRefsRef.current = localRefs;
     }, [localRefs, onRefsChange]);
 
-    /** снапшот подтверждённого сервером порядка (по id) */
     const snapshotRef = useRef<Record<number, number[]>>({});
 
-    /** утилита: проставить корректный ref_column_order по текущему порядку */
     const reindex = useCallback((arr: ReferenceItem[]) => {
         return arr.map((r, idx) => ({ ...r, ref_column_order: idx }));
     }, []);
 
-    /** первичная инициализация localRefs + snapshot */
     useEffect(() => {
         const next: Record<number, ReferenceItem[]> = {};
         const snap: Record<number, number[]> = {};
@@ -80,7 +97,7 @@ export const WidgetColumnsMainTable: React.FC<WidgetColumnsMainTableProps> = ({
             const sorted = [...src].sort(
                 (a, b) => (a.ref_column_order ?? 0) - (b.ref_column_order ?? 0)
             );
-            next[wc.id] = reindex(sorted);                 // ← локально нормализуем
+            next[wc.id] = reindex(sorted);
             snap[wc.id] = sorted.map(r => r.table_column.id);
         });
 
@@ -88,29 +105,24 @@ export const WidgetColumnsMainTable: React.FC<WidgetColumnsMainTableProps> = ({
         snapshotRef.current = snap;
     }, [orderedWc, referencesMap, reindex]);
 
+    // стабильный debounce в ref
 
-    /** стабильный дебаунс, живёт в ref, читает только .current */
-        // @ts-ignore
-    const queueSyncRef = useRef<ReturnType<typeof debounce>>();
+    const queueSyncRef = useRef<DebouncedFunc<() => Promise<void>> | null>(null);
     if (!queueSyncRef.current) {
         queueSyncRef.current = debounce(async () => {
             const state = localRefsRef.current;
             const snapshot = snapshotRef.current;
 
-            // console.debug('[sync] state', state, 'snapshot', snapshot);
-
-            // 1) cross‑add
+            // 1) add new
             for (const wcIdStr of Object.keys(state)) {
                 const wcId = Number(wcIdStr);
                 const nextOrder = (state[wcId] ?? []).map(r => r.table_column.id);
                 const prevOrder = snapshot[wcId] ?? [];
-
                 const addedIds = nextOrder.filter(id => !prevOrder.includes(id));
                 for (const id of addedIds) {
                     const toIdx = nextOrder.indexOf(id);
                     const refObj = (state[wcId] ?? [])[toIdx];
                     const width = refObj?.width ?? 1;
-                    // console.debug('[sync:add]', { wcId, id, toIdx, width });
                     try {
                         await addReference(wcId, id, { width, ref_column_order: toIdx });
                     } catch (e) {
@@ -119,18 +131,16 @@ export const WidgetColumnsMainTable: React.FC<WidgetColumnsMainTableProps> = ({
                 }
             }
 
-            // 2) reorder внутри — только общие id
+            // 2) reorder common
             for (const wcIdStr of Object.keys(state)) {
                 const wcId = Number(wcIdStr);
                 const nextOrder = (state[wcId] ?? []).map(r => r.table_column.id);
                 const prevOrder = snapshot[wcId] ?? [];
                 const commonIds = nextOrder.filter(id => prevOrder.includes(id));
-
                 for (const id of commonIds) {
                     const newIdx = nextOrder.indexOf(id);
                     const oldIdx = prevOrder.indexOf(id);
                     if (newIdx !== oldIdx) {
-                        // console.debug('[sync:patch]', { wcId, id, newIdx });
                         try {
                             await updateReference(wcId, id, { ref_column_order: newIdx });
                         } catch (e) {
@@ -140,39 +150,19 @@ export const WidgetColumnsMainTable: React.FC<WidgetColumnsMainTableProps> = ({
                 }
             }
 
-            // 3) обновляем снапшот
+            // 3) refresh snapshot
             const nextSnap: Record<number, number[]> = {};
             for (const wcIdStr of Object.keys(state)) {
                 const wcId = Number(wcIdStr);
                 nextSnap[wcId] = (state[wcId] ?? []).map(r => r.table_column.id);
             }
             snapshotRef.current = nextSnap;
-
-            // по желанию подтянуть с сервера:
-            // await Promise.all(Object.keys(state).map(id => refreshReferences?.(Number(id))));
         }, 250);
     }
 
-    useEffect(() => {
-        const q = queueSyncRef.current!;
-        return () => q.cancel(); // на размонтировании
-    }, []);
+    useEffect(() => () => queueSyncRef.current?.cancel(), []);
 
-    // ───────── перемещение групп (WC) ─────────
-    const moveGroup = async (wcId: number, dir: 'up' | 'down') => {
-        const list = orderedWc;
-        const i = list.findIndex((w) => w.id === wcId);
-        if (i < 0) return;
-        const j = dir === 'up' ? i - 1 : i + 1;
-        if (j < 0 || j >= list.length) return;
-        const A = list[i], B = list[j];
-        await Promise.all([
-            updateWidgetColumn(A.id, { column_order: B.column_order ?? 0 }),
-            updateWidgetColumn(B.id, { column_order: A.column_order ?? 0 }),
-        ]);
-    };
-
-    // ───────── DnD ─────────
+    // ── DnD ── (как было)
     type DragData = { srcWcId: number; fromIdx: number; tableColumnId: number };
     const [drag, setDrag] = useState<DragData | null>(null);
 
@@ -207,8 +197,7 @@ export const WidgetColumnsMainTable: React.FC<WidgetColumnsMainTableProps> = ({
         } finally {
             try { e.dataTransfer.clearData(); } catch {}
             setDrag(null);
-            // отправляем немедленно
-            try { queueSyncRef.current!.flush(); } catch {}
+            queueSyncRef.current?.flush();
         }
     };
 
@@ -227,24 +216,20 @@ export const WidgetColumnsMainTable: React.FC<WidgetColumnsMainTableProps> = ({
         await applyCrossReorder(data, { dstWcId, toIdx });
         try { e.dataTransfer.clearData(); } catch {}
         setDrag(null);
-        // отправляем немедленно
-        try { queueSyncRef.current!.flush(); } catch {}
+        queueSyncRef.current?.flush();
     };
 
-    // ───────── перестановки ─────────
-    // внутри группы
     const reorderInside = async (wcId: number, fromIdx: number, toIdx: number) => {
         setLocalRefs(prev => {
             const src = prev[wcId] ?? [];
             const next = [...src];
             const [rm] = next.splice(fromIdx, 1);
             next.splice(toIdx, 0, rm);
-            return { ...prev, [wcId]: reindex(next) };  // ← сразу обновили ref_column_order
+            return { ...prev, [wcId]: reindex(next) };
         });
-        queueSyncRef.current!();
+        queueSyncRef.current?.();
     };
 
-    // между группами
     const moveAcross = async (srcWcId: number, fromIdx: number, dstWcId: number, toIdx: number) => {
         setLocalRefs(prev => {
             const src = prev[srcWcId] ?? [];
@@ -252,17 +237,15 @@ export const WidgetColumnsMainTable: React.FC<WidgetColumnsMainTableProps> = ({
             const moved = src[fromIdx];
             if (!moved) return prev;
             if (dst.some(r => r.table_column.id === moved.table_column.id)) return prev;
-
             const nextSrc = [...src]; nextSrc.splice(fromIdx, 1);
             const nextDst = [...dst]; nextDst.splice(toIdx, 0, moved);
-
             return {
                 ...prev,
                 [srcWcId]: reindex(nextSrc),
                 [dstWcId]: reindex(nextDst),
             };
         });
-        queueSyncRef.current!();
+        queueSyncRef.current?.();
     };
 
     const applyCrossReorder = async (d: DragData, target: { dstWcId: number; toIdx: number }) => {
@@ -273,6 +256,114 @@ export const WidgetColumnsMainTable: React.FC<WidgetColumnsMainTableProps> = ({
         } else {
             await moveAcross(srcWcId, fromIdx, dstWcId, toIdx);
         }
+    };
+
+    // ───────── МОДАЛКА ПРАВКИ СТРОКИ ─────────
+    type EditState = {
+        open: boolean;
+        wcId: number | null;
+        rowIdx: number | null;
+        // WC fields
+        wc_alias: string;
+        wc_default: string;
+        wc_placeholder: string;
+        wc_visible: boolean;
+        wc_column_order: number;
+        // REF fields
+        ref_alias: string;
+        ref_type: string;
+        ref_width: number;
+        ref_order: number;
+    };
+    const [edit, setEdit] = useState<EditState>({
+        open: false, wcId: null, rowIdx: null,
+        wc_alias: '', wc_default: '', wc_placeholder: '', wc_visible: false, wc_column_order: 0,
+        ref_alias: '', ref_type: '', ref_width: 1, ref_order: 0,
+    });
+
+    const openEdit = (wc: WidgetColumn, r: ReferenceItem, rowIdx: number) => {
+        setEdit({
+            open: true, wcId: wc.id, rowIdx,
+            wc_alias: wc.alias ?? '',
+            wc_default: wc.default ?? '',
+            wc_placeholder: wc.placeholder ?? '',
+            wc_visible: !!wc.visible,
+            wc_column_order: wc.column_order ?? 0,
+            ref_alias: r.ref_alias ?? '',
+            ref_type: r.type ?? '',
+            ref_width: Number(r.width ?? 1),
+            ref_order: r.ref_column_order ?? rowIdx,
+        });
+    };
+
+    const closeEdit = () => setEdit(e => ({ ...e, open: false }));
+
+    const saveEdit = async () => {
+        if (edit.wcId == null || edit.rowIdx == null) return;
+        const wcId = edit.wcId;
+        const current = localRefs[wcId]?.[edit.rowIdx];
+        if (!current?.table_column?.id) { closeEdit(); return; }
+        const tableColumnId = current.table_column.id;
+
+        // 1) отправляем PATCH-ы параллельно
+        await Promise.all([
+            updateWidgetColumn(wcId, {
+                alias: edit.wc_alias || null,
+                default: edit.wc_default || null,
+                placeholder: edit.wc_placeholder || null,
+                visible: edit.wc_visible,
+                column_order: edit.wc_column_order,
+            }),
+            updateReference(wcId, tableColumnId, {
+                ref_alias: edit.ref_alias || null,
+                type: edit.ref_type || null,
+                width: Number(edit.ref_width) || 1,
+                ref_column_order: Number(edit.ref_order) || 0,
+            }),
+        ]);
+
+        // 2) оптимистично обновляем локальное состояние
+        setLocalRefs(prev => {
+            const list = [...(prev[wcId] ?? [])];
+            // обновляем поля
+            list[edit.rowIdx!] = {
+                ...list[edit.rowIdx!],
+                ref_alias: edit.ref_alias || null,
+                type: edit.ref_type || null,
+                width: Number(edit.ref_width) || 1,
+                ref_column_order: Number(edit.ref_order) || 0,
+            };
+
+            let next = list;
+
+            // если ref_order изменили вручную → переставим элемент
+            const desiredIdx = Number(edit.ref_order) || 0;
+            if (desiredIdx >= 0 && desiredIdx < list.length) {
+                const [moved] = list.splice(edit.rowIdx!, 1);
+                list.splice(desiredIdx, 0, moved);
+                next = list;
+            }
+
+            return { ...prev, [wcId]: reindex(next) };
+        });
+
+        // (опционально можно подёрнуть refreshReferences(wcId))
+        // await refreshReferences?.(wcId);
+
+        closeEdit();
+    };
+
+    const moveGroup = async (wcId: number, dir: 'up' | 'down') => {
+        const list = orderedWc;
+        const i = list.findIndex((w) => w.id === wcId);
+        if (i < 0) return;
+        const j = dir === 'up' ? i - 1 : i + 1;
+        if (j < 0 || j >= list.length) return;
+        const A = list[i], B = list[j];
+        await Promise.all([
+            updateWidgetColumn(A.id, { column_order: B.column_order ?? 0 }),
+            updateWidgetColumn(B.id, { column_order: A.column_order ?? 0 }),
+        ]);
     };
 
     return (
@@ -290,25 +381,14 @@ export const WidgetColumnsMainTable: React.FC<WidgetColumnsMainTableProps> = ({
                             <h4 style={{ margin: 0 }}>{wc.alias ?? `Колонка #${wc.id}`}</h4>
                             <span style={{ color: 'grey' }}>({wc.column_order ?? 0})</span>
                             <div style={{ display: 'flex', gap: 6, marginLeft: 8, alignItems: 'center' }}>
-                                <button
-                                    title="Переместить вверх"
-                                    disabled={isFirst}
-                                    onClick={() => moveGroup(wc.id, 'up')}
-                                    style={{ opacity: isFirst ? 0.4 : 1 }}
-                                >
-                                    ↑
-                                </button>
-                                <button
-                                    title="Переместить вниз"
-                                    disabled={isLast}
-                                    onClick={() => moveGroup(wc.id, 'down')}
-                                    style={{ opacity: isLast ? 0.4 : 1 }}
-                                >
-                                    ↓
-                                </button>
+                                <button title="Переместить вверх" disabled={isFirst}
+                                        onClick={() => moveGroup(wc.id, 'up')}
+                                        style={{ opacity: isFirst ? 0.4 : 1 }}>↑</button>
+                                <button title="Переместить вниз" disabled={isLast}
+                                        onClick={() => moveGroup(wc.id, 'down')}
+                                        style={{ opacity: isLast ? 0.4 : 1 }}>↓</button>
                                 <span>{wc.id}</span>
-                                    <DeleteIcon onClick={()=>
-                                        deleteColumnWidget(wc.id)}/>
+                                <DeleteIcon className={s.actionIcon} onClick={() => deleteColumnWidget(wc.id)} />
                             </div>
                         </div>
 
@@ -356,10 +436,12 @@ export const WidgetColumnsMainTable: React.FC<WidgetColumnsMainTableProps> = ({
                                             <td>{r.ref_column_order ?? rowIdx}</td>
                                             <td>
                                                 {tblCol?.id ? (
-                                                    <DeleteIcon
-                                                        className={s.actionIcon}
-                                                        onClick={() => handleDeleteReference(wc.id, tblCol.id!)}
-                                                    />
+                                                    <div style={{display:'flex', alignItems:'center', justifyContent:'center', gap:10}}>
+                                                        <EditIcon className={s.actionIcon}
+                                                                  onClick={() => openEdit(wc, r, rowIdx)} />
+                                                        <DeleteIcon className={s.actionIcon}
+                                                                    onClick={() => handleDeleteReference(wc.id, tblCol.id!)} />
+                                                    </div>
                                                 ) : null}
                                             </td>
                                         </tr>
@@ -377,6 +459,50 @@ export const WidgetColumnsMainTable: React.FC<WidgetColumnsMainTableProps> = ({
                     </div>
                 );
             })}
+
+            {/* ── Диалог правки строки ── */}
+        <ThemeProvider theme={dark}>
+            <Dialog open={edit.open} onClose={closeEdit} fullWidth maxWidth="sm">
+                <DialogTitle>Правка столбца/связи</DialogTitle>
+                <DialogContent dividers>
+                    <Stack spacing={2}>
+                        {/* WidgetColumn (group) */}
+                        <TextField label="Alias (WC)" size="small"
+                                   value={edit.wc_alias}
+                                   onChange={e => setEdit(v => ({...v, wc_alias: e.target.value}))}/>
+                        <TextField label="Default (WC)" size="small"
+                                   value={edit.wc_default}
+                                   onChange={e => setEdit(v => ({...v, wc_default: e.target.value}))}/>
+                        <TextField label="Placeholder (WC)" size="small"
+                                   value={edit.wc_placeholder}
+                                   onChange={e => setEdit(v => ({...v, wc_placeholder: e.target.value}))}/>
+                        <FormControlLabel control={
+                            <Checkbox checked={edit.wc_visible}
+                                      onChange={e => setEdit(v => ({...v, wc_visible: e.target.checked}))}/>
+                        } label="Visible (WC)"/>
+                        <TextField type="number" label="column_order (WC)" size="small"
+                                   value={edit.wc_column_order}
+                                   onChange={e => setEdit(v => ({...v, wc_column_order: Number(e.target.value)}))}/>
+
+                        {/* Reference (row) */}
+                        <TextField label="ref_alias (REF)" size="small"
+                                   value={edit.ref_alias}
+                                   onChange={e => setEdit(v => ({...v, ref_alias: e.target.value}))}/>
+                        <TextField label="type (REF)" size="small"
+                                   value={edit.ref_type}
+                                   onChange={e => setEdit(v => ({...v, ref_type: e.target.value}))}/>
+                        <TextField type="number" label="width (REF)" size="small"
+                                   value={edit.ref_width}
+                                   onChange={e => setEdit(v => ({...v, ref_width: Number(e.target.value)}))}/>
+
+                    </Stack>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={closeEdit}>Отмена</Button>
+                    <Button variant="contained" onClick={saveEdit}>Сохранить</Button>
+                </DialogActions>
+            </Dialog>
+        </ThemeProvider>
         </div>
     );
 };

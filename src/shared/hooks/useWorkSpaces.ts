@@ -570,9 +570,14 @@ export const useWorkSpaces = () => {
         []
     );
 
+    // useWorkSpaces.ts
     const updateReference = useCallback(
-        async (widgetColumnId: number, tableColumnId: number, patch: { ref_column_order: number }) => {
-            const body = { ref_column_order: patch.ref_column_order };
+        async (
+            widgetColumnId: number,
+            tableColumnId: number,
+            patch: Partial<Pick<WcReference, 'ref_column_order' | 'width' | 'type' | 'ref_alias'>>
+        ) => {
+            const body = { ...patch };
             const { data } = await api.patch<WcReference>(
                 `/widgets/tables/references/${widgetColumnId}/${tableColumnId}`,
                 body,
@@ -581,6 +586,7 @@ export const useWorkSpaces = () => {
         },
         [],
     );
+
 
 
 
