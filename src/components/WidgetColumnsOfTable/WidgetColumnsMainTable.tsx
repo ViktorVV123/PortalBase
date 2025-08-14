@@ -1,7 +1,9 @@
-import React, {useEffect, useMemo, useState} from 'react';
+import React, {useEffect, useMemo, useRef, useState, useCallback, useMemo as useMemoAlias} from 'react';
 import * as s from '@/components/setOfTables/SetOfTables.module.scss';
 import DeleteIcon from '@/assets/image/DeleteIcon.svg';
 import {WidgetColumn} from '@/shared/hooks/useWorkSpaces';
+import debounce from 'lodash/debounce';
+import difference from 'lodash/difference';
 
 type ReferenceItem = WidgetColumn['reference'][number];
 
@@ -16,7 +18,6 @@ type WidgetColumnsMainTableProps = {
     ) => Promise<void> | void;
 
     // PATCH /widgets/tables/references/{widgetColumnId}/{tableColumnId}
-    // меняем только ref_column_order (и при желании width)
     updateReference: (
         widgetColumnId: number,
         tableColumnId: number,
@@ -24,14 +25,13 @@ type WidgetColumnsMainTableProps = {
     ) => Promise<ReferenceItem>;
 
     // POST /widgets/tables/references/{widgetColId}/{tblColId}
-    // для кросс-переноса добавляем связь с width и ref_column_order
     addReference: (
         widgetColId: number,
         tblColId: number,
         payload: { width: number; ref_column_order: number }
     ) => Promise<void>;
 
-    // Притянуть свежие reference для wc (если нужно)
+    // опционально: подтянуть свежие references
     refreshReferences?: (wcId: number) => Promise<void> | void;
 };
 
@@ -53,46 +53,138 @@ export const WidgetColumnsMainTable: React.FC<WidgetColumnsMainTableProps> = ({
         [widgetColumns]
     );
 
-    // локальная копия reference для мгновенного отклика UI
+    /** Локальный источник истины для reference-строк */
     const [localRefs, setLocalRefs] = useState<Record<number, ReferenceItem[]>>({});
 
+    /** Текущий локальный state в useRef — чтобы debounce всегда видел актуальные данные */
+    const localRefsRef = useRef<Record<number, ReferenceItem[]>>({});
+    useEffect(() => {
+        localRefsRef.current = localRefs;
+    }, [localRefs]);
+
+    /** Снапшот «подтверждённого бэком» состояния: карта wcId -> массив table_column.id по порядку */
+    const snapshotRef = useRef<Record<number, number[]>>({});
+
+    /** Инициализация локального состояния и снапшота при изменении входных данных */
     useEffect(() => {
         const next: Record<number, ReferenceItem[]> = {};
+        const snap: Record<number, number[]> = {};
+
         orderedWc.forEach((wc) => {
-            // важно: используем referencesMap, если ключ уже есть (даже если это [])
             const hasKey = Object.prototype.hasOwnProperty.call(referencesMap, wc.id);
             const src = hasKey ? (referencesMap[wc.id] ?? []) : (wc.reference ?? []);
-            next[wc.id] = [...src].sort(
+            const sorted = [...src].sort(
                 (a, b) => (a.ref_column_order ?? 0) - (b.ref_column_order ?? 0)
             );
+            next[wc.id] = sorted;
+            snap[wc.id] = sorted.map((r) => r.table_column.id);
         });
+
         setLocalRefs(next);
+        snapshotRef.current = snap;
     }, [orderedWc, referencesMap]);
 
+    /** Безопасно перезаписать снапшот из локального состояния */
+    const setSnapshotFromLocal = useCallback((state: Record<number, ReferenceItem[]>) => {
+        const nextSnap: Record<number, number[]> = {};
+        for (const wcIdStr of Object.keys(state)) {
+            const wcId = Number(wcIdStr);
+            nextSnap[wcId] = (state[wcId] ?? []).map((r) => r.table_column.id);
+        }
+        snapshotRef.current = nextSnap;
+    }, []);
 
-    // перемещение групп ↑/↓
+    /** Debounce‑очередь синхронизации: вычисляет дифф относительно snapshotRef и отправляет только минимальные изменения */
+        // было (старый queueSync) — УДАЛИ полностью
+
+// стало (новый queueSync) — ВСТАВЬ
+    const queueSync = useMemo(() =>
+                debounce(async () => {
+                    const state = localRefsRef.current;               // локальная истина
+                    const snapshot = snapshotRef.current;             // подтверждённый бэком вид
+
+                    // 1) Сначала добавления (cross‑move в новые группы)
+                    for (const wcIdStr of Object.keys(state)) {
+                        const wcId = Number(wcIdStr);
+                        const nextOrder = (state[wcId] ?? []).map(r => r.table_column.id);
+                        const prevOrder = snapshot[wcId] ?? [];
+
+                        // новые id, которых не было в этой группе
+                        const addedIds = nextOrder.filter(id => !prevOrder.includes(id));
+                        for (const id of addedIds) {
+                            const toIdx = nextOrder.indexOf(id);
+                            const refObj = (state[wcId] ?? [])[toIdx];
+                            const width = refObj?.width ?? 1;
+
+                            try {
+                                await addReference(wcId, id, { width, ref_column_order: toIdx });
+                            } catch (e) {
+                                console.warn('[sync:addReference] wc=', wcId, 'col=', id, '→ 404?', e);
+                            }
+                        }
+                    }
+
+                    // 2) Затем внутригрупповое переупорядочивание ТОЛЬКО для общих ID
+                    for (const wcIdStr of Object.keys(state)) {
+                        const wcId = Number(wcIdStr);
+                        const nextOrder = (state[wcId] ?? []).map(r => r.table_column.id);
+                        const prevOrder = snapshot[wcId] ?? [];
+
+                        // общие id, присутствующие и раньше, и сейчас
+                        const commonIds = nextOrder.filter(id => prevOrder.includes(id));
+
+                        for (const id of commonIds) {
+                            const newIdx = nextOrder.indexOf(id);
+                            const oldIdx = prevOrder.indexOf(id);
+                            if (newIdx !== oldIdx) {
+                                try {
+                                    await updateReference(wcId, id, { ref_column_order: newIdx });
+                                } catch (e) {
+                                    console.warn('[sync:updateReference] wc=', wcId, 'col=', id, '→ 404?', e);
+                                }
+                            }
+                        }
+                    }
+
+                    // 3) Всё успешно — обновляем снапшот под текущее локальное состояние
+                    const nextSnap: Record<number, number[]> = {};
+                    for (const wcIdStr of Object.keys(state)) {
+                        const wcId = Number(wcIdStr);
+                        nextSnap[wcId] = (state[wcId] ?? []).map(r => r.table_column.id);
+                    }
+                    snapshotRef.current = nextSnap;
+
+                    // (опционально) refreshReferences для визуального «подтягивания» с бэка:
+                    // await Promise.all(Object.keys(state).map(id => refreshReferences?.(Number(id))));
+                }, 250),
+            [addReference, updateReference]);
+
+
+    // Чистим debounce при размонтировании
+    useEffect(() => () => queueSync.cancel(), [queueSync]);
+
+    // ───────────────── Группы ↑/↓ (WC) ─────────────────
     const moveGroup = async (wcId: number, dir: 'up' | 'down') => {
         const list = orderedWc;
         const i = list.findIndex((w) => w.id === wcId);
         if (i < 0) return;
         const j = dir === 'up' ? i - 1 : i + 1;
         if (j < 0 || j >= list.length) return;
-        const A = list[i],
-            B = list[j];
+        const A = list[i], B = list[j];
         await Promise.all([
-            updateWidgetColumn(A.id, {column_order: B.column_order ?? 0}),
-            updateWidgetColumn(B.id, {column_order: A.column_order ?? 0}),
+            updateWidgetColumn(A.id, { column_order: B.column_order ?? 0 }),
+            updateWidgetColumn(B.id, { column_order: A.column_order ?? 0 }),
         ]);
     };
 
-    // ─── DnD ───
+    // ───────────────────── DnD ─────────────────────
     type DragData = { srcWcId: number; fromIdx: number; tableColumnId: number };
     const [drag, setDrag] = useState<DragData | null>(null);
 
     const onDragStart =
         (srcWcId: number, fromIdx: number, tableColumnId: number) =>
             (e: React.DragEvent) => {
-                const payload: DragData = {srcWcId, fromIdx, tableColumnId};
+                const payload: DragData = { srcWcId, fromIdx, tableColumnId };
                 e.dataTransfer.setData('application/json', JSON.stringify(payload));
                 e.dataTransfer.effectAllowed = 'move';
                 setDrag(payload);
@@ -100,108 +192,78 @@ export const WidgetColumnsMainTable: React.FC<WidgetColumnsMainTableProps> = ({
 
     const onDragOver = (e: React.DragEvent) => {
         e.preventDefault();
+        e.stopPropagation();
         e.dataTransfer.dropEffect = 'move';
     };
 
-    // drop на строку (вставить ПЕРЕД этой строкой)
     const onDropRow = (dstWcId: number, toIdx: number) => async (e: React.DragEvent) => {
         e.preventDefault();
+        e.stopPropagation();
         let data = drag;
         try {
             if (!data) {
                 const raw = e.dataTransfer.getData('application/json');
                 if (raw) data = JSON.parse(raw);
             }
-        } catch {
-        }
+        } catch {}
         if (!data) return;
         try {
-            await applyCrossReorder(data, {dstWcId, toIdx});
-        } catch (err) {
-            console.warn('DnD row failed', err);
+            await applyCrossReorder(data, { dstWcId, toIdx });
         } finally {
+            try { e.dataTransfer.clearData(); } catch {}
             setDrag(null);
         }
     };
 
-    // drop на пустую таблицу / в конец
-    const onDropTbodyEnd =
-        (dstWcId: number) => async (e: React.DragEvent) => {
-            e.preventDefault();
-            let data: DragData | null = drag;
-            try {
-                if (!data) {
-                    const raw = e.dataTransfer.getData('application/json');
-                    if (raw) data = JSON.parse(raw);
-                }
-            } catch {
-            }
-            if (!data) return;
-
-            const toIdx = localRefs[dstWcId]?.length ?? 0;
-            await applyCrossReorder(data, {dstWcId, toIdx});
-            setDrag(null);
-        };
-
-    // внутри одной группы: переупорядочиваем и PATCH-им ТОЛЬКО ref_column_order
-    // было: const patches = ...; await Promise.all(patches.map(...))
-
-    const reorderInside = async (wcId: number, fromIdx: number, toIdx: number) => {
-        const src = localRefs[wcId] ?? [];
-        const next = [...src];
-        const [rm] = next.splice(fromIdx, 1);
-        next.splice(toIdx, 0, rm);
-        setLocalRefs(prev => ({...prev, [wcId]: next}));
-
-        // последовательно, только тем кто реально сдвинулся
-        for (let idx = 0; idx < next.length; idx += 1) {
-            const r = next[idx];
-            if ((r.ref_column_order ?? 0) !== idx) {
-                await updateReference(wcId, r.table_column.id, {ref_column_order: idx});
-            }
-        }
-        await refreshReferences?.(wcId);
-    };
-
-
-    // между группами: создаём связь в целевой группе и обновляем оба списка
-    const moveAcross = async (srcWcId: number, fromIdx: number, dstWcId: number, toIdx: number) => {
-        const src = localRefs[srcWcId] ?? [];
-        const dst = localRefs[dstWcId] ?? [];
-        const moved = src[fromIdx];
-        if (!moved || !moved.table_column?.id) return;
-        if (dst.some(r => r.table_column.id === moved.table_column.id)) return;
-
-        // оптимистичный UI
-        const nextSrc = [...src];
-        nextSrc.splice(fromIdx, 1);
-        const nextDst = [...dst];
-        nextDst.splice(toIdx, 0, moved);
-        setLocalRefs(prev => ({...prev, [srcWcId]: nextSrc, [dstWcId]: nextDst}));
-
+    const onDropTbodyEnd = (dstWcId: number) => async (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        let data: DragData | null = drag;
         try {
-            await addReference(dstWcId, moved.table_column.id, {
-                width: moved.width ?? 1,
-                ref_column_order: toIdx,
-            });
-
-            // сервер сам удалит в источнике и переиндексирует
-            await Promise.all([refreshReferences?.(srcWcId), refreshReferences?.(dstWcId)]);
-        } catch (e) {
-            // откат UI, если не вышло
-            setLocalRefs(prev => ({...prev, [srcWcId]: src, [dstWcId]: dst}));
-            console.warn('moveAcross failed', e);
-        }
+            if (!data) {
+                const raw = e.dataTransfer.getData('application/json');
+                if (raw) data = JSON.parse(raw);
+            }
+        } catch {}
+        if (!data) return;
+        const toIdx = localRefs[dstWcId]?.length ?? 0;
+        await applyCrossReorder(data, { dstWcId, toIdx });
+        try { e.dataTransfer.clearData(); } catch {}
+        setDrag(null);
     };
 
+    // ───────────────────── Перестановки ─────────────────────
+    // ВНУТРИ группы — только локально + постановка синка
+    const reorderInside = async (wcId: number, fromIdx: number, toIdx: number) => {
+        setLocalRefs(prev => {
+            const src = prev[wcId] ?? [];
+            const next = [...src];
+            const [rm] = next.splice(fromIdx, 1);
+            next.splice(toIdx, 0, rm);
+            return { ...prev, [wcId]: next };
+        });
+        queueSync();
+    };
 
-    // единая точка
-    const applyCrossReorder = async (
-        d: DragData,
-        target: { dstWcId: number; toIdx: number }
-    ) => {
-        const {srcWcId, fromIdx} = d;
-        const {dstWcId, toIdx} = target;
+    // МЕЖДУ группами — только локально + постановка синка
+    const moveAcross = async (srcWcId: number, fromIdx: number, dstWcId: number, toIdx: number) => {
+        setLocalRefs(prev => {
+            const src = prev[srcWcId] ?? [];
+            const dst = prev[dstWcId] ?? [];
+            const moved = src[fromIdx];
+            if (!moved) return prev;
+            if (dst.some(r => r.table_column.id === moved.table_column.id)) return prev;
+
+            const nextSrc = [...src]; nextSrc.splice(fromIdx, 1);
+            const nextDst = [...dst]; nextDst.splice(toIdx, 0, moved);
+            return { ...prev, [srcWcId]: nextSrc, [dstWcId]: nextDst };
+        });
+        queueSync();
+    };
+
+    const applyCrossReorder = async (d: DragData, target: { dstWcId: number; toIdx: number }) => {
+        const { srcWcId, fromIdx } = d;
+        const { dstWcId, toIdx } = target;
         if (srcWcId === dstWcId) {
             await reorderInside(srcWcId, fromIdx, toIdx);
         } else {
@@ -211,7 +273,7 @@ export const WidgetColumnsMainTable: React.FC<WidgetColumnsMainTableProps> = ({
 
     return (
         <div>
-            <h3 style={{margin: '24px 0 8px'}}>References</h3>
+            <h3 style={{ margin: '24px 0 8px' }}>References</h3>
 
             {orderedWc.map((wc, idx) => {
                 const refs = localRefs[wc.id] ?? [];
@@ -219,26 +281,24 @@ export const WidgetColumnsMainTable: React.FC<WidgetColumnsMainTableProps> = ({
                 const isLast = idx === orderedWc.length - 1;
 
                 return (
-                    <div key={wc.id} style={{marginBottom: 24}}>
-                        <div style={{display: 'flex', gap: 10, alignItems: 'center'}}>
-                            <h4 style={{margin: 0}}>{wc.alias ?? `Колонка #${wc.id}`}</h4>
-                            <span style={{color: 'grey'}}>({wc.column_order ?? 0})</span>
-                            <div style={{display: 'flex', gap: 6, marginLeft: 8}}>
+                    <div key={wc.id} style={{ marginBottom: 24 }}>
+                        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                            <h4 style={{ margin: 0 }}>{wc.alias ?? `Колонка #${wc.id}`}</h4>
+                            <span style={{ color: 'grey' }}>({wc.column_order ?? 0})</span>
+                            <div style={{ display: 'flex', gap: 6, marginLeft: 8 }}>
                                 <button
-
                                     title="Переместить вверх"
                                     disabled={isFirst}
                                     onClick={() => moveGroup(wc.id, 'up')}
-                                    style={{opacity: isFirst ? 0.4 : 1}}
+                                    style={{ opacity: isFirst ? 0.4 : 1 }}
                                 >
                                     ↑
                                 </button>
                                 <button
-
                                     title="Переместить вниз"
                                     disabled={isLast}
                                     onClick={() => moveGroup(wc.id, 'down')}
-                                    style={{opacity: isLast ? 0.4 : 1}}
+                                    style={{ opacity: isLast ? 0.4 : 1 }}
                                 >
                                     ↓
                                 </button>
@@ -246,10 +306,10 @@ export const WidgetColumnsMainTable: React.FC<WidgetColumnsMainTableProps> = ({
                             </div>
                         </div>
 
-                        <table className={s.tbl} style={{marginTop: 8}}>
+                        <table className={s.tbl} style={{ marginTop: 8 }}>
                             <thead>
                             <tr>
-                                <th style={{width: 28}}/>
+                                <th style={{ width: 28 }} />
                                 <th>name</th>
                                 <th>ref_alias</th>
                                 <th>type</th>
@@ -266,25 +326,25 @@ export const WidgetColumnsMainTable: React.FC<WidgetColumnsMainTableProps> = ({
                             {refs.length > 0 ? (
                                 refs.map((r, rowIdx) => {
                                     const tblCol = r.table_column;
+                                    const tblColId = tblCol?.id;
                                     const type = r.type ?? tblCol?.datatype ?? '—';
+                                    const rowKey = tblColId != null ? `${wc.id}-${tblColId}` : `${wc.id}-idx-${rowIdx}`;
                                     return (
                                         <tr
-                                            key={`${wc.id}-${tblCol?.id ?? 'x'}`} // стабильный key
+                                            key={rowKey}
                                             draggable
-                                            onDragStart={onDragStart(wc.id, rowIdx, tblCol.id)}
+                                            onDragStart={onDragStart(wc.id, rowIdx, tblCol?.id ?? -1)}
                                             onDrop={onDropRow(wc.id, rowIdx)}
-                                            style={{cursor: 'move'}}
+                                            style={{ cursor: 'move' }}
                                         >
-                                            <td style={{textAlign: 'center', opacity: 0.6}}>⋮⋮</td>
+                                            <td style={{ textAlign: 'center', opacity: 0.6 }}>⋮⋮</td>
                                             <td>{tblCol?.name ?? '—'}</td>
                                             <td>{r.ref_alias ?? '—'}</td>
                                             <td>{type}</td>
                                             <td>{r.width ?? '—'}</td>
                                             <td>{orderedWc.find((w) => w.id === wc.id)?.default ?? '—'}</td>
-                                            <td>
-                                                {orderedWc.find((w) => w.id === wc.id)?.placeholder ?? '—'}
-                                            </td>
-                                            <td style={{textAlign: 'center'}}>
+                                            <td>{orderedWc.find((w) => w.id === wc.id)?.placeholder ?? '—'}</td>
+                                            <td style={{ textAlign: 'center' }}>
                                                 {orderedWc.find((w) => w.id === wc.id)?.visible ? '✔︎' : ''}
                                             </td>
                                             <td>{r.ref_column_order ?? rowIdx}</td>
@@ -292,17 +352,16 @@ export const WidgetColumnsMainTable: React.FC<WidgetColumnsMainTableProps> = ({
                                                 {tblCol?.id ? (
                                                     <DeleteIcon
                                                         className={s.actionIcon}
-                                                        onClick={() => handleDeleteReference(wc.id, tblCol.id)}
+                                                        onClick={() => handleDeleteReference(wc.id, tblCol.id!)}
                                                     />
                                                 ) : null}
                                             </td>
-
                                         </tr>
                                     );
                                 })
                             ) : (
                                 <tr>
-                                    <td colSpan={10} style={{textAlign: 'center', opacity: 0.7}}>
+                                    <td colSpan={10} style={{ textAlign: 'center', opacity: 0.7 }}>
                                         Нет связей — перетащите сюда строку из другого блока
                                     </td>
                                 </tr>
@@ -315,4 +374,3 @@ export const WidgetColumnsMainTable: React.FC<WidgetColumnsMainTableProps> = ({
         </div>
     );
 };
-
