@@ -170,6 +170,14 @@ export interface FormTreeColumn {
     values: (string | number | null)[];
 }
 
+export type HeaderGroup = {
+    id: number;
+    order: number;
+    title: string;
+    span: number;
+    labels: string[];
+};
+
 
 // shared/hooks/useWorkSpaces.ts
 export const useWorkSpaces = () => {

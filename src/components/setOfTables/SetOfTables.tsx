@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useMemo, useState} from 'react';
 import * as s from './SetOfTables.module.scss';
 import {
     Column, DTable,
@@ -139,6 +139,70 @@ export const SetOfTables: React.FC<Props> = ({
 
                                              }) => {
 
+    const [editingWcId, setEditingWcId] = useState<number | null>(null);
+    const [wcValues, setWcValues] = useState<Partial<WidgetColumn>>({});
+    const [referencesMap, setReferencesMap] = useState<Record<number, WcReference[]>>({});
+    // состояние для актуальных ссылок с фронта
+    const [liveRefsForHeader, setLiveRefsForHeader] = useState<Record<number, WcReference[]> | null>(null);
+
+
+    const startEdit = (wc: WidgetColumn) => {
+        setEditingWcId(wc.id);
+        setWcValues({
+            alias: wc.alias ?? '',
+            default: wc.default ?? '',
+            placeholder: wc.placeholder ?? '',
+            visible: wc.visible,
+        });
+    };
+
+    // ───────── Заголовок-превью ─────────
+// ───────── Заголовок-превью ─────────
+    const headerGroups = useMemo(() => {
+        const items = widgetColumns
+            .map((wc) => {
+                // учёт незасохранённых правок
+                const effectiveOrder =
+                    editingWcId === wc.id
+                        ? (wcValues.column_order ?? wc.column_order ?? 0)
+                        : (wc.column_order ?? 0);
+
+                const effectiveVisible =
+                    editingWcId === wc.id
+                        ? (wcValues.visible ?? wc.visible)
+                        : wc.visible;
+
+                // если группа скрыта — вообще не участвует в шапке
+                if (!effectiveVisible) return null;
+
+                // источник ссылок: сперва «живые» (локальные), потом загруженные
+                const refs =
+                    liveRefsForHeader?.[wc.id] ??
+                    referencesMap[wc.id] ??
+                    wc.reference ??
+                    [];
+
+                const span = Math.max(1, refs.length || 1);
+
+                const effectiveAlias = (editingWcId === wc.id ? wcValues.alias : wc.alias)?.trim();
+                const title = effectiveAlias || refs[0]?.table_column?.name || `Колонка #${wc.id}`;
+
+                // подписи под группой (по текущему локальному порядку)
+                const labels =
+                    refs.length > 0
+                        ? refs.map(r => r.ref_alias || r.table_column?.name || '—')
+                        : ['—'];
+
+                return { id: wc.id, order: effectiveOrder, title, span, labels };
+            })
+            // убираем скрытые (null)
+            .filter((x): x is { id: number; order: number; title: string; span: number; labels: string[] } => !!x);
+
+        // сортировка по column_order, затем по id
+        items.sort((a, b) => (a.order - b.order) || (a.id - b.id));
+        return items;
+    }, [widgetColumns, referencesMap, liveRefsForHeader, editingWcId, wcValues]);
+
 
     if (loading) return <p>Загрузка…</p>;
     if (error) return <p className={s.error}>{error}</p>;
@@ -184,7 +248,7 @@ export const SetOfTables: React.FC<Props> = ({
                     ) : formError ? (
                         <p className={s.error}>{formError}</p>
                     ) : formDisplay ? (
-                        <FormTable setSubDisplay={setSubDisplay} formTrees={formTrees} selectedFormId={selectedFormId}
+                        <FormTable headerGroups={headerGroups}  setSubDisplay={setSubDisplay} formTrees={formTrees} selectedFormId={selectedFormId}
                                    subDisplay={subDisplay} subError={subError} subLoading={subLoading}
                                    selectedWidget={selectedWidget} formsByWidget={formsByWidget}
                                    loadFilteredFormDisplay={loadFilteredFormDisplay} setFormDisplay={setFormDisplay}
@@ -199,7 +263,7 @@ export const SetOfTables: React.FC<Props> = ({
                         ) : wColsError ? (
                             <p className={s.error}>{wColsError}</p>
                         ) : (
-                            <WidgetColumnsOfTable updateReference={updateReference} updateWidgetColumn={updateWidgetColumn}
+                            <WidgetColumnsOfTable headerGroups={headerGroups} referencesMap={referencesMap} setLiveRefsForHeader={setLiveRefsForHeader} setReferencesMap={setReferencesMap} updateReference={updateReference} updateWidgetColumn={updateWidgetColumn}
                 addWidgetColumn={addWidgetColumn}
                                                   deleteReference={deleteReference} fetchReferences={fetchReferences}
                                                   updateWidgetMeta={updateWidgetMeta}

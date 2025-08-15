@@ -1,7 +1,7 @@
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import * as s from '@/components/setOfTables/SetOfTables.module.scss';
 import {
-    Column,
+    Column, HeaderGroup,
     Widget,
     WidgetColumn,
 } from '@/shared/hooks/useWorkSpaces';
@@ -43,7 +43,7 @@ interface Props {
     updateReference: (
         widgetColumnId: number,
         tableColumnId: number,
-        patch: Partial<Pick<WcReference, 'width'|'ref_column_order'>>
+        patch: Partial<Pick<WcReference, 'width' | 'ref_column_order'>>
     ) => Promise<WcReference>;
 
     fetchReferences: (widgetColumnId: number) => Promise<WcReference[]>;
@@ -67,6 +67,10 @@ interface Props {
         type: string;
         column_order: number;
     }) => Promise<WidgetColumn>;
+    setLiveRefsForHeader: React.Dispatch<React.SetStateAction<Record<number, WcReference[]>>>;
+    setReferencesMap: React.Dispatch<React.SetStateAction<Record<number, WcReference[]>>>;
+    referencesMap: Record<number, WcReference[]>;
+    headerGroups: HeaderGroup[];
 }
 
 const modalStyle = {
@@ -90,12 +94,12 @@ const dark = createTheme({
         MuiOutlinedInput: {
             styleOverrides: {
                 root: {
-                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#ffffff' },
+                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {borderColor: '#ffffff'},
                 },
             },
         },
-        MuiInputLabel: { styleOverrides: { root: { '&.Mui-focused': { color: '#ffffff' } } } },
-        MuiSelect: { styleOverrides: { icon: { color: '#ffffff' } } },
+        MuiInputLabel: {styleOverrides: {root: {'&.Mui-focused': {color: '#ffffff'}}}},
+        MuiSelect: {styleOverrides: {icon: {color: '#ffffff'}}},
     },
 });
 
@@ -116,10 +120,11 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                                                           addWidgetColumn,
                                                           updateWidgetColumn,
                                                           updateReference,
+                                                          setLiveRefsForHeader,
+                                                          setReferencesMap,
+                                                          referencesMap,
+                                                          headerGroups
                                                       }) => {
-    const [referencesMap, setReferencesMap] = useState<Record<number, WcReference[]>>({});
-    // состояние для актуальных ссылок с фронта
-    const [liveRefsForHeader, setLiveRefsForHeader] = useState<Record<number, WcReference[]> | null>(null);
 
 
     const [addOpen, setAddOpen] = useState(false);
@@ -139,8 +144,12 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
             const map: Record<number, WcReference[]> = {};
             await Promise.all(
                 widgetColumns.map(async (wc) => {
-                    try { map[wc.id] = await fetchReferences(wc.id); }
-                    catch (e) { console.warn(`reference load error (wc ${wc.id})`, e); map[wc.id] = []; }
+                    try {
+                        map[wc.id] = await fetchReferences(wc.id);
+                    } catch (e) {
+                        console.warn(`reference load error (wc ${wc.id})`, e);
+                        map[wc.id] = [];
+                    }
                 })
             );
             setReferencesMap(map);
@@ -148,30 +157,7 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
     }, [widgetColumns, fetchReferences]);
 
     // ───────── Редактирование WC (alias/default/placeholder/visible) ─────────
-    const [editingWcId, setEditingWcId] = useState<number | null>(null);
-    const [wcValues, setWcValues] = useState<Partial<WidgetColumn>>({});
 
-    const startEdit = (wc: WidgetColumn) => {
-        setEditingWcId(wc.id);
-        setWcValues({
-            alias: wc.alias ?? '',
-            default: wc.default ?? '',
-            placeholder: wc.placeholder ?? '',
-            visible: wc.visible,
-        });
-    };
-    const cancelEdit = () => { setEditingWcId(null); setWcValues({}); };
-
-    const saveEdit = async () => {
-        if (editingWcId == null) return;
-        const patch: Partial<WidgetColumn> = { ...wcValues };
-        (['alias', 'default', 'placeholder'] as const).forEach(f => {
-            if (patch[f] === '') patch[f] = null as any;
-        });
-        await updateWidgetColumn(editingWcId, patch);
-        if (selectedWidget) await loadColumnsWidget(selectedWidget.id);
-        cancelEdit();
-    };
 
     // ───────── Метаданные виджета ─────────
     const [modalOpen, setModalOpen] = useState(false);
@@ -194,7 +180,7 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
             setWidgetsByTable(prev => {
                 const tblId = upd.table_id;
                 const updated = (prev[tblId] ?? []).map(w => w.id === upd.id ? upd : w);
-                return { ...prev, [tblId]: updated };
+                return {...prev, [tblId]: updated};
             });
             await loadColumnsWidget(upd.id);
             setWidgetModalOpen(false);
@@ -220,55 +206,6 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
         }
     };
 
-    // ───────── Заголовок-превью ─────────
-// ───────── Заголовок-превью ─────────
-    const headerGroups = useMemo(() => {
-        const items = widgetColumns
-            .map((wc) => {
-                // учёт незасохранённых правок
-                const effectiveOrder =
-                    editingWcId === wc.id
-                        ? (wcValues.column_order ?? wc.column_order ?? 0)
-                        : (wc.column_order ?? 0);
-
-                const effectiveVisible =
-                    editingWcId === wc.id
-                        ? (wcValues.visible ?? wc.visible)
-                        : wc.visible;
-
-                // если группа скрыта — вообще не участвует в шапке
-                if (!effectiveVisible) return null;
-
-                // источник ссылок: сперва «живые» (локальные), потом загруженные
-                const refs =
-                    liveRefsForHeader?.[wc.id] ??
-                    referencesMap[wc.id] ??
-                    wc.reference ??
-                    [];
-
-                const span = Math.max(1, refs.length || 1);
-
-                const effectiveAlias = (editingWcId === wc.id ? wcValues.alias : wc.alias)?.trim();
-                const title = effectiveAlias || refs[0]?.table_column?.name || `Колонка #${wc.id}`;
-
-                // подписи под группой (по текущему локальному порядку)
-                const labels =
-                    refs.length > 0
-                        ? refs.map(r => r.ref_alias || r.table_column?.name || '—')
-                        : ['—'];
-
-                return { id: wc.id, order: effectiveOrder, title, span, labels };
-            })
-            // убираем скрытые (null)
-            .filter((x): x is { id: number; order: number; title: string; span: number; labels: string[] } => !!x);
-
-        // сортировка по column_order, затем по id
-        items.sort((a, b) => (a.order - b.order) || (a.id - b.id));
-        return items;
-    }, [widgetColumns, referencesMap, liveRefsForHeader, editingWcId, wcValues]);
-
-
-
 
     return (
         <div className={s.tableWrapperWidget}>
@@ -278,7 +215,14 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                     variant="h6"
                     onClick={() => setModalOpen(true)}
                     gutterBottom
-                    sx={{ cursor: 'pointer', textDecoration: 'underline', color: '#8ac7ff', display: 'flex', alignItems: 'center', gap: 1 }}
+                    sx={{
+                        cursor: 'pointer',
+                        textDecoration: 'underline',
+                        color: '#8ac7ff',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1
+                    }}
                 >
                     Посмотреть таблицу
                     <Editicon/>
@@ -288,7 +232,14 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                     variant="h6"
                     onClick={() => setWidgetModalOpen(true)}
                     gutterBottom
-                    sx={{ cursor: 'pointer', textDecoration: 'underline', color: '#8ac7ff', display: 'flex', alignItems: 'center', gap: 1 }}
+                    sx={{
+                        cursor: 'pointer',
+                        textDecoration: 'underline',
+                        color: '#8ac7ff',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1
+                    }}
                 >
                     Метаданные widget
                     <Editicon/>
@@ -298,7 +249,14 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                     variant="h6"
                     onClick={() => setAddOpen(true)}
                     gutterBottom
-                    sx={{ cursor: 'pointer', textDecoration: 'underline', color: '#8ac7ff', display: 'flex', alignItems: 'center', gap: 1 }}
+                    sx={{
+                        cursor: 'pointer',
+                        textDecoration: 'underline',
+                        color: '#8ac7ff',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1
+                    }}
                 >
                     Добавить столбец
                     <Editicon/>
@@ -335,16 +293,16 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                                         addReference(wcId, tblColId, {...payloadMin})
                                     }
                                     deleteColumnWidget={deleteColumnWidget}
-                updateReference={updateReference}
-                refreshReferences={async (wcId) => {
-                    const fresh = await fetchReferences(wcId);
-                    setReferencesMap(prev => ({ ...prev, [wcId]: fresh ?? [] }));
-                    if (selectedWidget) await loadColumnsWidget(selectedWidget.id);
-                }}
-                updateWidgetColumn={updateWidgetColumn}
-                widgetColumns={widgetColumns}
-                handleDeleteReference={handleDeleteReference}
-                referencesMap={referencesMap}
+                                    updateReference={updateReference}
+                                    refreshReferences={async (wcId) => {
+                                        const fresh = await fetchReferences(wcId);
+                                        setReferencesMap(prev => ({...prev, [wcId]: fresh ?? []}));
+                                        if (selectedWidget) await loadColumnsWidget(selectedWidget.id);
+                                    }}
+                                    updateWidgetColumn={updateWidgetColumn}
+                                    widgetColumns={widgetColumns}
+                                    handleDeleteReference={handleDeleteReference}
+                                    referencesMap={referencesMap}
             />
 
             {/* Modal «Посмотреть таблицу» */}
@@ -366,17 +324,20 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
             {/* Dialog «Метаданные widget» */}
             <ThemeProvider theme={dark}>
                 <Dialog open={widgetModalOpen} onClose={() => setWidgetModalOpen(false)} fullWidth maxWidth="sm">
-                    <form onSubmit={(e) => { e.preventDefault(); saveWidgetMeta(); }}>
+                    <form onSubmit={(e) => {
+                        e.preventDefault();
+                        saveWidgetMeta();
+                    }}>
                         <DialogTitle>Редактирование виджета</DialogTitle>
                         <DialogContent dividers>
                             <Stack spacing={2}>
                                 <TextField label="Название" size="small" fullWidth required
                                            value={widgetMeta.name}
-                                           onChange={(e) => setWidgetMeta(v => ({ ...v, name: e.target.value }))}
+                                           onChange={(e) => setWidgetMeta(v => ({...v, name: e.target.value}))}
                                 />
                                 <TextField label="Описание" size="small" fullWidth multiline rows={3}
                                            value={widgetMeta.description ?? ''}
-                                           onChange={(e) => setWidgetMeta(v => ({ ...v, description: e.target.value }))}
+                                           onChange={(e) => setWidgetMeta(v => ({...v, description: e.target.value}))}
                                 />
                             </Stack>
                         </DialogContent>
@@ -395,7 +356,7 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                         onSubmit={async e => {
                             e.preventDefault();
                             if (!selectedWidget) return;
-                            await addWidgetColumn({ ...newCol, widget_id: selectedWidget.id });
+                            await addWidgetColumn({...newCol, widget_id: selectedWidget.id});
                             await loadColumnsWidget(selectedWidget.id);
                             setNewCol({
                                 alias: '',
@@ -429,7 +390,10 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                                 />
                                 <TextField label="Порядок (column_order)" type="number" size="small" required
                                            value={newCol.column_order}
-                                           onChange={e => setNewCol(v => ({...v, column_order: Number(e.target.value)}))}
+                                           onChange={e => setNewCol(v => ({
+                                               ...v,
+                                               column_order: Number(e.target.value)
+                                           }))}
                                 />
                                 <Stack direction="row" alignItems="center" spacing={1}>
                                     <Typography>Visible</Typography>
