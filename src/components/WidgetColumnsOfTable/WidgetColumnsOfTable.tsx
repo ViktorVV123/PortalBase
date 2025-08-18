@@ -156,7 +156,8 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
         })();
     }, [widgetColumns, fetchReferences]);
 
-    // ───────── Редактирование WC (alias/default/placeholder/visible) ─────────
+
+
 
 
     // ───────── Метаданные виджета ─────────

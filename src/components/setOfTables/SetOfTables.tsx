@@ -146,22 +146,11 @@ export const SetOfTables: React.FC<Props> = ({
     const [liveRefsForHeader, setLiveRefsForHeader] = useState<Record<number, WcReference[]> | null>(null);
 
 
-    const startEdit = (wc: WidgetColumn) => {
-        setEditingWcId(wc.id);
-        setWcValues({
-            alias: wc.alias ?? '',
-            default: wc.default ?? '',
-            placeholder: wc.placeholder ?? '',
-            visible: wc.visible,
-        });
-    };
-
     // ───────── Заголовок-превью ─────────
 // ───────── Заголовок-превью ─────────
     const headerGroups = useMemo(() => {
         const items = widgetColumns
             .map((wc) => {
-                // учёт незасохранённых правок
                 const effectiveOrder =
                     editingWcId === wc.id
                         ? (wcValues.column_order ?? wc.column_order ?? 0)
@@ -172,10 +161,8 @@ export const SetOfTables: React.FC<Props> = ({
                         ? (wcValues.visible ?? wc.visible)
                         : wc.visible;
 
-                // если группа скрыта — вообще не участвует в шапке
                 if (!effectiveVisible) return null;
 
-                // источник ссылок: сперва «живые» (локальные), потом загруженные
                 const refs =
                     liveRefsForHeader?.[wc.id] ??
                     referencesMap[wc.id] ??
@@ -183,25 +170,30 @@ export const SetOfTables: React.FC<Props> = ({
                     [];
 
                 const span = Math.max(1, refs.length || 1);
-
                 const effectiveAlias = (editingWcId === wc.id ? wcValues.alias : wc.alias)?.trim();
                 const title = effectiveAlias || refs[0]?.table_column?.name || `Колонка #${wc.id}`;
 
-                // подписи под группой (по текущему локальному порядку)
                 const labels =
                     refs.length > 0
                         ? refs.map(r => r.ref_alias || r.table_column?.name || '—')
                         : ['—'];
 
-                return { id: wc.id, order: effectiveOrder, title, span, labels };
-            })
-            // убираем скрытые (null)
-            .filter((x): x is { id: number; order: number; title: string; span: number; labels: string[] } => !!x);
+                // ⬅️ ДОБАВЛЕНО: порядок reference по table_column_id
+                const refIds =
+                    refs.length > 0
+                        ? refs.map(r => r.table_column?.id).filter((id): id is number => !!id)
+                        : [];
 
-        // сортировка по column_order, затем по id
+                return { id: wc.id, order: effectiveOrder, title, span, labels, refIds };
+            })
+            .filter(Boolean) as {
+            id: number; order: number; title: string; span: number; labels: string[]; refIds: number[];
+        }[];
+
         items.sort((a, b) => (a.order - b.order) || (a.id - b.id));
         return items;
     }, [widgetColumns, referencesMap, liveRefsForHeader, editingWcId, wcValues]);
+
 
 
     if (loading) return <p>Загрузка…</p>;
@@ -248,7 +240,7 @@ export const SetOfTables: React.FC<Props> = ({
                     ) : formError ? (
                         <p className={s.error}>{formError}</p>
                     ) : formDisplay ? (
-                        <FormTable headerGroups={headerGroups}  setSubDisplay={setSubDisplay} formTrees={formTrees} selectedFormId={selectedFormId}
+                        <FormTable  headerGroups={headerGroups}  setSubDisplay={setSubDisplay} formTrees={formTrees} selectedFormId={selectedFormId}
                                    subDisplay={subDisplay} subError={subError} subLoading={subLoading}
                                    selectedWidget={selectedWidget} formsByWidget={formsByWidget}
                                    loadFilteredFormDisplay={loadFilteredFormDisplay} setFormDisplay={setFormDisplay}

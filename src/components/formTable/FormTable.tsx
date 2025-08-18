@@ -12,10 +12,12 @@ import {TreeFormTable} from "@/components/formTable/TreeFormTable";
 
 /** Модель шапки, приходящая из WidgetColumnsOfTable (твой headerGroups) */
 export type HeaderModelItem = {
-    id: number;              // widget_column_id
-    title: string;           // заголовок группы (alias/fallback)
-    labels: string[];        // подписи для каждой reference в группе (ref_alias / name)
-    visible?: boolean;       // видимость группы (WC.visible)
+    id: number;          // widget_column_id
+    title: string;       // заголовок группы (alias/fallback)
+    labels: string[];    // подписи для каждой reference в группе (ref_alias / name)
+    visible?: boolean;   // видимость группы (WC.visible)
+    /** порядок reference внутри группы по table_column_id (опц.) */
+    refIds?: number[];
 };
 
 type Props = {
@@ -151,18 +153,31 @@ export const FormTable: React.FC<Props> = ({
         // 1) берём только видимые группы
         const visibleGroups = headerGroups.filter(g => g.visible !== false);
 
-        // 2) строим структуру: какие реальные колонки попадают в каждую группу сейчас
         const planned = visibleGroups.map(g => {
-            const cols = byWcId[g.id] ?? [];
-            // если лейблов больше/меньше чем реальных колонок — приводим размеры
+            // исходные «реальные» колонки для этой группы
+            let cols = (byWcId[g.id] ?? []).slice();
+
+            // ⬅️ НОВОЕ: если есть порядок refIds — применяем его
+            if (g.refIds && g.refIds.length) {
+                const pos = new Map<number, number>();
+                g.refIds.forEach((id, i) => pos.set(id, i));
+
+                cols.sort((a, b) => {
+                    const ai = pos.has(a.table_column_id) ? pos.get(a.table_column_id)! : Number.MAX_SAFE_INTEGER;
+                    const bi = pos.has(b.table_column_id) ? pos.get(b.table_column_id)! : Number.MAX_SAFE_INTEGER;
+                    return ai - bi;
+                });
+            }
+
+            // приводим labels к длине cols
             const labels = (g.labels ?? []).slice(0, cols.length);
             while (labels.length < cols.length) labels.push('—');
+
             return { id: g.id, title: g.title, labels, cols };
         });
 
         return planned;
-    }, [headerGroups, sortedColumns, byWcId]);
-
+    }, [headerGroups, byWcId, sortedColumns]);
     /** Плоский порядок колонок для рендера тела таблицы */
     const flatColumnsInRenderOrder = useMemo(
         () => headerPlan.flatMap(g => g.cols),
@@ -171,6 +186,16 @@ export const FormTable: React.FC<Props> = ({
 
     const tree = selectedFormId ? formTrees[selectedFormId] : null;
     const widgetForm = selectedWidget ? formsByWidget[selectedWidget.id] : null;
+
+    // Карта: "wcId:tableColId" -> индекс в row.values
+    const valueIndexByKey = useMemo(() => {
+        const map = new Map<string, number>();
+        formDisplay.columns.forEach((c, i) => {
+            const k = `${c.widget_column_id}:${c.table_column_id ?? -1}`;
+            map.set(k, i);
+        });
+        return map;
+    }, [formDisplay.columns]);
 
     return (
         <div style={{display: 'flex', gap: 10}}>
@@ -240,27 +265,26 @@ export const FormTable: React.FC<Props> = ({
                     </thead>
 
                     <tbody>
-                    {formDisplay.data.map((row, rowIdx) => {
-                        return (
-                            <tr key={rowIdx} onClick={() => {
-                                const pkObj = Object.fromEntries(
-                                    Object.entries(row.primary_keys).map(([k, v]) => [k, String(v)])
+                    {formDisplay.data.map((row, rowIdx) => (
+                        <tr key={rowIdx} onClick={() => {
+                            const pkObj = Object.fromEntries(
+                                Object.entries(row.primary_keys).map(([k, v]) => [k, String(v)])
+                            );
+                            handleRowClick(pkObj);
+                        }}>
+                            {flatColumnsInRenderOrder.map(col => {
+                                const key = `${col.widget_column_id}:${col.table_column_id ?? -1}`;
+                                const idx = valueIndexByKey.get(key);
+
+                                const val = idx != null ? row.values[idx] : ''; // если нет индекса — пусто/фолбэк
+                                return (
+                                    <td key={`r${rowIdx}-wc${col.widget_column_id}-tc${col.table_column_id}`}>
+                                        {val}
+                                    </td>
                                 );
-                                handleRowClick(pkObj);
-                            }}>
-                                {flatColumnsInRenderOrder.map(col => {
-                                    // найти индекс этого столбца в исходном sortedColumns → взять значение
-                                    const idx = sortedColumns.indexOf(col);
-                                    const val = row.values[idx];
-                                    return (
-                                        <td key={`r${rowIdx}-wc${col.widget_column_id}-co${col.column_order}`}>
-                                            {val}
-                                        </td>
-                                    );
-                                })}
-                            </tr>
-                        );
-                    })}
+                            })}
+                        </tr>
+                    ))}
                     </tbody>
                 </table>
 

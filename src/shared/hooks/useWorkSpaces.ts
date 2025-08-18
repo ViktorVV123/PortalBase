@@ -109,8 +109,7 @@ export interface FormColumn {
     required: boolean;
     width: number;
     widget_column_id: number;
-
-
+    table_column_id:number
 }
 
 /** Одна строка данных */
