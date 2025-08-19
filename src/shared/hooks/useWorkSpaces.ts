@@ -149,6 +149,8 @@ export interface SubFormColumn {
     published: boolean;
     required: boolean;
     width: number;
+    widget_column_id:number;
+    table_column_id:number;
 }
 
 export interface SubFormRow {
