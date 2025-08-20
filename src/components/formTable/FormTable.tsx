@@ -9,6 +9,8 @@ import {
 import {api} from "@/services/api";
 import {SubWormTable} from "@/components/formTable/SubFormTable";
 import {TreeFormTable} from "@/components/formTable/TreeFormTable";
+import EditIcon from '@/assets/image/EditIcon.svg'
+import DeleteIcon from '@/assets/image/DeleteIcon.svg'
 
 /** Модель шапки, приходящая из WidgetColumnsOfTable (твой headerGroups) */
 export type HeaderModelItem = {
@@ -143,7 +145,8 @@ export const FormTable: React.FC<Props> = ({
                 while (i < sortedColumns.length &&
                 sortedColumns[i].column_name === name &&
                 sortedColumns[i].widget_column_id === wcId) {
-                    cols.push(sortedColumns[i]); i++;
+                    cols.push(sortedColumns[i]);
+                    i++;
                 }
                 groups.push({
                     id: wcId,
@@ -174,7 +177,7 @@ export const FormTable: React.FC<Props> = ({
             const labels = (g.labels ?? []).slice(0, cols.length);
             while (labels.length < cols.length) labels.push('—');
 
-            return { id: g.id, title: g.title, labels, cols };
+            return {id: g.id, title: g.title, labels, cols};
         });
 
         return planned;
@@ -217,30 +220,30 @@ export const FormTable: React.FC<Props> = ({
 
     // ───── ДОБАВЬ рядом c локальным состоянием добавления ─────
     const preflightInsert = async (): Promise<{ ok: boolean; formId?: number }> => {
-        if (!selectedWidget) return { ok: false };
+        if (!selectedWidget) return {ok: false};
 
         // 1) берём form_id именно от main-виджета
         const wf = formsByWidget[selectedWidget.id];
         const insertFormId = wf?.form_id ?? selectedFormId;
         if (!insertFormId) {
             alert('Не найден form_id для вставки: у виджета нет связанной формы');
-            return { ok: false };
+            return {ok: false};
         }
 
         try {
             // 2) проверяем, что у таблицы настроен insert_query
             // у Widget есть table_id → можно спросить таблицу
-            const { data: table } = await api.get<DTable>(`/tables/${selectedWidget.table_id}`);
+            const {data: table} = await api.get<DTable>(`/tables/${selectedWidget.table_id}`);
             if (!table?.insert_query || !table.insert_query.trim()) {
                 alert('Для этой таблицы не настроен INSERT QUERY. Задайте его в метаданных таблицы.');
-                return { ok: false };
+                return {ok: false};
             }
         } catch (e) {
             // если не смогли проверить — не блокируем, но предупредим
             console.warn('Не удалось проверить insert_query у таблицы:', e);
         }
 
-        return { ok: true, formId: insertFormId };
+        return {ok: true, formId: insertFormId};
     };
 
 
@@ -260,7 +263,7 @@ export const FormTable: React.FC<Props> = ({
                     value: String(value),
                 }));
 
-            const body = { pk: {}, values }; // pk пустой — это ок
+            const body = {pk: {}, values}; // pk пустой — это ок
             const url = `/data/${pf.formId}/${selectedWidget.id}`;
 
             try {
@@ -283,7 +286,7 @@ export const FormTable: React.FC<Props> = ({
             }
 
             // перезагрузка main c текущими фильтрами, чтобы не сбивались
-            const { data } = await api.post<FormDisplay>(`/display/${pf.formId}/main`, activeFilters);
+            const {data} = await api.post<FormDisplay>(`/display/${pf.formId}/main`, activeFilters);
             setFormDisplay(data);
 
             setIsAdding(false);
@@ -301,6 +304,19 @@ export const FormTable: React.FC<Props> = ({
         setIsAdding(false);
         setDraft({});
     };
+
+
+    // внутри FormTable (после вычисления widgetForm)
+    const subWidgetIdByOrder = useMemo(() => {
+        const map: Record<number, number> = {};
+        const wf = widgetForm;
+        wf?.sub_widgets.forEach(sw => {
+            map[sw.widget_order] = sw.sub_widget_id;
+        });
+        return map;
+    }, [widgetForm]);
+
+    const formIdForSub = widgetForm?.form_id ?? selectedFormId ?? null;
 
     return (
         <div style={{display: 'flex', gap: 10}}>
@@ -351,10 +367,9 @@ export const FormTable: React.FC<Props> = ({
             {/* MAIN + SUB */}
             <div style={{display: 'flex', flexDirection: 'column', gap: 20, flex: 1}}>
                 {/* Кнопки добавления */}
-                <div style={{display:'flex', gap:10, marginBottom:8}}>
+                <div style={{display: 'flex', gap: 10, marginBottom: 8}}>
                     {!isAdding ? (
                         <button
-                            className={s.btn}
                             onClick={startAdd}
                             disabled={!selectedFormId || !selectedWidget}
                             title={!selectedFormId || !selectedWidget ? 'Выбери форму и виджет' : 'Добавить строку'}
@@ -364,14 +379,14 @@ export const FormTable: React.FC<Props> = ({
                     ) : (
                         <>
                             <button
-                                className={s.btn}
+
                                 onClick={submitAdd}
                                 disabled={saving}
                             >
                                 {saving ? 'Сохранение…' : 'Сохранить'}
                             </button>
                             <button
-                                className={s.btnSecondary}
+
                                 onClick={cancelAdd}
                                 disabled={saving}
                             >
@@ -390,6 +405,7 @@ export const FormTable: React.FC<Props> = ({
                                 {g.title}
                             </th>
                         ))}
+                        <th></th>
                     </tr>
 
                     {/* нижняя строка — подписи для каждой «реальной» колонки в группе */}
@@ -399,17 +415,17 @@ export const FormTable: React.FC<Props> = ({
                                 <th key={`g-sub-${g.id}-${idx}`}>{label}</th>
                             ))
                         )}
+                        <th></th>
                     </tr>
                     </thead>
 
                     <tbody>
                     {/* Инлайн-строка ввода при добавлении */}
                     {isAdding && (
-                        <tr className={s.addRow}>
+                        <tr >
                             {flatColumnsInRenderOrder.map(col => (
-                                <td key={`add-wc${col.widget_column_id}-tc${col.table_column_id}`}>
+                                <td style={{textAlign: 'center'}}  key={`add-wc${col.widget_column_id}-tc${col.table_column_id}`}>
                                     <input
-                                        className={s.input}
                                         value={draft[col.table_column_id] ?? ''}
                                         onChange={e => {
                                             const v = e.target.value;
@@ -418,8 +434,10 @@ export const FormTable: React.FC<Props> = ({
                                         placeholder={col.placeholder ?? col.column_name}
                                         // можно добавить min/max/тип по col.type, если понадобится
                                     />
+
                                 </td>
                             ))}
+                            <td></td>
                         </tr>
                     )}
 
@@ -440,12 +458,18 @@ export const FormTable: React.FC<Props> = ({
                                     </td>
                                 );
                             })}
+                            <td style={{textAlign: 'center'}}>
+                                <EditIcon style={{marginRight:10}} className={s.actionIcon}/>
+                                <DeleteIcon className={s.actionIcon}/>
+                            </td>
                         </tr>
                     ))}
                     </tbody>
                 </table>
 
-                <SubWormTable subLoading={subLoading} subError={subError} subDisplay={subDisplay}
+                <SubWormTable formId={formIdForSub}
+                              subWidgetIdByOrder={subWidgetIdByOrder} subLoading={subLoading} subError={subError}
+                              subDisplay={subDisplay}
                               handleTabClick={handleTabClick}/>
             </div>
         </div>

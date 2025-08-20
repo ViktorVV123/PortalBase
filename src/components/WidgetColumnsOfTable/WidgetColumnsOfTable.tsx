@@ -21,7 +21,7 @@ import {
     Typography,
 } from '@mui/material';
 import {WidgetColumnsMainTable} from "@/components/WidgetColumnsOfTable/WidgetColumnsMainTable";
-import Editicon from '@/assets/image/EditIcon.svg';
+import EditIcon from '@/assets/image/EditIcon.svg';
 
 export type WcReference = WidgetColumn['reference'][number];
 
@@ -226,7 +226,7 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                     }}
                 >
                     Посмотреть таблицу
-                    <Editicon/>
+                    <EditIcon/>
                 </Typography>
 
                 <Typography
@@ -243,7 +243,7 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                     }}
                 >
                     Метаданные widget
-                    <Editicon/>
+                    <EditIcon/>
                 </Typography>
 
                 <Typography
@@ -260,7 +260,7 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                     }}
                 >
                     Добавить столбец
-                    <Editicon/>
+                    <EditIcon/>
                 </Typography>
             </div>
 
