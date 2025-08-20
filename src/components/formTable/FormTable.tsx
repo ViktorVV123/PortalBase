@@ -76,6 +76,129 @@ export const FormTable: React.FC<Props> = ({
     const [draft, setDraft] = useState<Record<number, string>>({});
     const [saving, setSaving] = useState(false);
 
+    // ✦ Редактирование строки
+    const [editingRowIdx, setEditingRowIdx] = useState<number | null>(null);
+    const [editDraft, setEditDraft] = useState<Record<number, string>>({});
+    const [editSaving, setEditSaving] = useState(false);
+
+
+    // корректный form_id для текущего main-виджета
+    const getEffectiveFormId = (): number | null => {
+        if (!selectedWidget) return null;
+        const wf = formsByWidget[selectedWidget.id];
+        return wf?.form_id ?? selectedFormId ?? null;
+    };
+
+// префлайт: должен быть настроен UPDATE QUERY у таблицы
+    const preflightUpdate = async (): Promise<{ ok: boolean; formId?: number }> => {
+        if (!selectedWidget) return { ok: false };
+        const formId = getEffectiveFormId();
+        if (!formId) {
+            alert('Не найден form_id для обновления');
+            return { ok: false };
+        }
+        try {
+            const { data: table } = await api.get<DTable>(`/tables/${selectedWidget.table_id}`);
+            if (!table?.update_query || !table.update_query.trim()) {
+                alert('Для этой таблицы не настроен UPDATE QUERY. Задайте его в метаданных таблицы.');
+                return { ok: false };
+            }
+        } catch (e) {
+            console.warn('Не удалось проверить update_query у таблицы:', e);
+        }
+        return { ok: true, formId };
+    };
+
+// старт редактирования конкретной строки
+    const startEdit = async (rowIdx: number) => {
+        const pf = await preflightUpdate();
+        if (!pf.ok) return;
+
+        // выключаем режим добавления, если был
+        setIsAdding(false);
+
+        const row = formDisplay.data[rowIdx];
+        const init: Record<number, string> = {};
+        flatColumnsInRenderOrder.forEach(col => {
+            const k = `${col.widget_column_id}:${col.table_column_id ?? -1}`;
+            const idx = valueIndexByKey.get(k);
+            const val = idx != null ? row.values[idx] : '';
+            if (col.table_column_id != null) {
+                init[col.table_column_id] = (val ?? '').toString();
+            }
+        });
+
+        setEditingRowIdx(rowIdx);
+        setEditDraft(init);
+    };
+
+    const cancelEdit = () => {
+        setEditingRowIdx(null);
+        setEditDraft({});
+        setEditSaving(false);
+    };
+
+// PATCH сохранение изменений
+    const submitEdit = async () => {
+        if (editingRowIdx == null || !selectedWidget) return;
+
+        const pf = await preflightUpdate();
+        if (!pf.ok || !pf.formId) return;
+
+        setEditSaving(true);
+        try {
+            const row = formDisplay.data[editingRowIdx];
+
+            const values = Object.entries(editDraft)
+                .filter(([, v]) => v !== '' && v !== undefined && v !== null)
+                .map(([table_column_id, value]) => ({
+                    table_column_id: Number(table_column_id),
+                    value: String(value),
+                }));
+
+            const body = {
+                pk: {
+                    primary_keys: Object.fromEntries(
+                        Object.entries(row.primary_keys).map(([k, v]) => [k, String(v)])
+                    ),
+                },
+                values,
+            };
+
+            const url = `/data/${pf.formId}/${selectedWidget.id}`;
+            try {
+                await api.patch(url, body);
+            } catch (err: any) {
+                const status = err?.response?.status;
+                const detail = err?.response?.data?.detail ?? err?.response?.data ?? err?.message;
+
+                if (status === 404 && String(detail).includes('Update query not found')) {
+                    alert('Для этой формы/таблицы не настроен UPDATE QUERY. Задайте его и повторите.');
+                    return;
+                }
+                if (status === 404) {
+                    // редкий случай роутера со слэшем
+                    await api.patch(`${url}/`, body);
+                } else {
+                    throw err;
+                }
+            }
+
+            // перезагружаем main с текущими фильтрами
+            const { data } = await api.post<FormDisplay>(`/display/${pf.formId}/main`, activeFilters);
+            setFormDisplay(data);
+
+            cancelEdit();
+        } catch (e: any) {
+            const status = e?.response?.status;
+            const msg = e?.response?.data ?? e?.message;
+            alert(`Не удалось обновить строку: ${status ?? ''} ${typeof msg === 'string' ? msg : JSON.stringify(msg)}`);
+        } finally {
+            setEditSaving(false);
+        }
+    };
+
+
     useEffect(() => {
         if (!selectedWidget) return;
         const widgetForm = formsByWidget[selectedWidget.id];
@@ -441,29 +564,88 @@ export const FormTable: React.FC<Props> = ({
                         </tr>
                     )}
 
-                    {formDisplay.data.map((row, rowIdx) => (
-                        <tr key={rowIdx} onClick={() => {
-                            const pkObj = Object.fromEntries(
-                                Object.entries(row.primary_keys).map(([k, v]) => [k, String(v)])
-                            );
-                            handleRowClick(pkObj);
-                        }}>
-                            {flatColumnsInRenderOrder.map(col => {
-                                const key = `${col.widget_column_id}:${col.table_column_id ?? -1}`;
-                                const idx = valueIndexByKey.get(key);
-                                const val = idx != null ? row.values[idx] : ''; // если нет индекса — пусто/фолбэк
-                                return (
-                                    <td key={`r${rowIdx}-wc${col.widget_column_id}-tc${col.table_column_id}`}>
-                                        {val}
-                                    </td>
-                                );
-                            })}
-                            <td style={{textAlign: 'center'}}>
-                                <EditIcon style={{marginRight:10}} className={s.actionIcon}/>
-                                <DeleteIcon className={s.actionIcon}/>
-                            </td>
-                        </tr>
-                    ))}
+                    {formDisplay.data.map((row, rowIdx) => {
+                        const isEditing = editingRowIdx === rowIdx;
+
+                        return (
+                            <tr
+                                key={rowIdx}
+                                onClick={() => {
+                                    if (isEditing) return; // чтобы не открывать саб-виджеты во время редактирования
+                                    const pkObj = Object.fromEntries(
+                                        Object.entries(row.primary_keys).map(([k, v]) => [k, String(v)])
+                                    );
+                                    handleRowClick(pkObj);
+                                }}
+                            >
+                                {flatColumnsInRenderOrder.map(col => {
+                                    const key = `${col.widget_column_id}:${col.table_column_id ?? -1}`;
+                                    const idx = valueIndexByKey.get(key);
+                                    const val = idx != null ? row.values[idx] : '';
+
+                                    if (isEditing) {
+                                        return (
+                                            <td key={`edit-r${rowIdx}-wc${col.widget_column_id}-tc${col.table_column_id}`}>
+                                                <input
+                                                    value={editDraft[col.table_column_id] ?? ''}
+                                                    onChange={e =>
+                                                        setEditDraft(prev => ({ ...prev, [col.table_column_id]: e.target.value }))
+                                                    }
+                                                    onClick={e => e.stopPropagation()}
+                                                    placeholder={col.placeholder ?? col.column_name}
+                                                />
+                                            </td>
+                                        );
+                                    }
+
+                                    return (
+                                        <td key={`r${rowIdx}-wc${col.widget_column_id}-tc${col.table_column_id}`}>
+                                            {val}
+                                        </td>
+                                    );
+                                })}
+
+                                {/* actions */}
+                                <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
+                                    {isEditing ? (
+                                        <>
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); submitEdit(); }}
+                                                disabled={editSaving}
+                                            >
+                                                {editSaving ? 'Сохр.' : 'Сохранить'}
+                                            </button>
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); cancelEdit(); }}
+                                                disabled={editSaving}
+                                                style={{ marginLeft: 8 }}
+                                            >
+                                                Отменить
+                                            </button>
+                                        </>
+                                    ) : (
+                                        <>
+            <span
+                style={{ display: 'inline-flex', cursor: 'pointer', marginRight: 10 }}
+                onClick={(e) => { e.stopPropagation(); startEdit(rowIdx); }}
+                title="Редактировать"
+            >
+              <EditIcon className={s.actionIcon} />
+            </span>
+                                            <span
+                                                style={{ display: 'inline-flex', cursor: 'not-allowed', opacity: 0.5 }}
+                                                title="Удаление позже"
+                                                onClick={(e) => e.stopPropagation()}
+                                            >
+              <DeleteIcon className={s.actionIcon} />
+            </span>
+                                        </>
+                                    )}
+                                </td>
+                            </tr>
+                        );
+                    })}
+
                     </tbody>
                 </table>
 
