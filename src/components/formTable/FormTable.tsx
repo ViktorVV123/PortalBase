@@ -81,6 +81,92 @@ export const FormTable: React.FC<Props> = ({
     const [editDraft, setEditDraft] = useState<Record<number, string>>({});
     const [editSaving, setEditSaving] = useState(false);
 
+    const [deletingRowIdx, setDeletingRowIdx] = useState<number | null>(null);
+
+
+
+    // префлайт: должен быть настроен DELETE QUERY у таблицы
+    const preflightDelete = async (): Promise<{ ok: boolean; formId?: number }> => {
+        if (!selectedWidget) return { ok: false };
+        const wf = formsByWidget[selectedWidget.id];
+        const formId = wf?.form_id ?? selectedFormId ?? null;
+        if (!formId) {
+            alert('Не найден form_id для удаления');
+            return { ok: false };
+        }
+        try {
+            const { data: table } = await api.get<DTable>(`/tables/${selectedWidget.table_id}`);
+            if (!table?.delete_query || !table.delete_query.trim()) {
+                alert('Для этой таблицы не настроен DELETE QUERY. Задайте его в метаданных таблицы.');
+                return { ok: false };
+            }
+        } catch (e) {
+            console.warn('Не удалось проверить delete_query у таблицы:', e);
+        }
+        return { ok: true, formId };
+    };
+
+    const deleteRow = async (rowIdx: number) => {
+        if (!selectedWidget) return;
+
+        const pf = await preflightDelete();
+        if (!pf.ok || !pf.formId) return;
+
+        const row = formDisplay.data[rowIdx];
+        const pkObj = Object.fromEntries(
+            Object.entries(row.primary_keys).map(([k, v]) => [k, String(v)])
+        );
+        const pkLabel = Object.entries(pkObj).map(([k, v]) => `${k}=${v}`).join(', ');
+
+        if (!window.confirm(`Удалить запись (${pkLabel})?`)) return;
+
+        setDeletingRowIdx(rowIdx);
+        try {
+            const body = { primary_keys: pkObj };
+            const url = `/data/${pf.formId}/${selectedWidget.id}`;
+
+            try {
+                // axios: DELETE с телом → передаём { data: body }
+                await api.delete(url, { data: body });
+                await reloadTree();          // ← обновили левый список
+                setNestedTrees({});          // сброс вложенных веток
+                setActiveExpandedKey(null);
+            } catch (err: any) {
+                const status = err?.response?.status;
+                const detail = err?.response?.data?.detail ?? err?.response?.data ?? err?.message;
+
+                if (status === 404 && String(detail).includes('Delete query not found')) {
+                    alert('Для этой формы/таблицы не настроен DELETE QUERY. Задайте его и повторите.');
+                    return;
+                }
+                // на случай конфигурации роутера со слэшем
+                if (status === 404) {
+                    await api.delete(`${url}/`, { data: body });
+                } else {
+                    throw err;
+                }
+            }
+
+            // перезагружаем main с текущими фильтрами
+            const { data } = await api.post<FormDisplay>(`/display/${pf.formId}/main`, activeFilters);
+            setFormDisplay(data);
+
+
+            // если была открыта саб-форма по этой строке — сбросим
+            if (JSON.stringify(lastPrimary) === JSON.stringify(row.primary_keys)) {
+                setLastPrimary({});
+                setSubDisplay(null);
+            }
+        } catch (e: any) {
+            const status = e?.response?.status;
+            const msg = e?.response?.data ?? e?.message;
+            alert(`Не удалось удалить строку: ${status ?? ''} ${typeof msg === 'string' ? msg : JSON.stringify(msg)}`);
+        } finally {
+            setDeletingRowIdx(null);
+        }
+    };
+
+
 
     // корректный form_id для текущего main-виджета
     const getEffectiveFormId = (): number | null => {
@@ -188,6 +274,13 @@ export const FormTable: React.FC<Props> = ({
             const { data } = await api.post<FormDisplay>(`/display/${pf.formId}/main`, activeFilters);
             setFormDisplay(data);
 
+            await reloadTree();
+            setNestedTrees({});
+            setActiveExpandedKey(null);
+
+            setIsAdding(false);
+            setDraft({});
+
             cancelEdit();
         } catch (e: any) {
             const status = e?.response?.status;
@@ -234,6 +327,7 @@ export const FormTable: React.FC<Props> = ({
         try {
             const {data} = await api.post<FormDisplay>(`/display/${selectedFormId}/main`, []);
             setFormDisplay(data);
+            await reloadTree();
         } catch (e) {
             console.warn('❌ Ошибка при сбросе фильтров:', e);
         }
@@ -412,8 +506,13 @@ export const FormTable: React.FC<Props> = ({
             const {data} = await api.post<FormDisplay>(`/display/${pf.formId}/main`, activeFilters);
             setFormDisplay(data);
 
+            await reloadTree();
+            setNestedTrees({});
+            setActiveExpandedKey(null);
+
             setIsAdding(false);
             setDraft({});
+
         } catch (e: any) {
             const status = e?.response?.status;
             const msg = e?.response?.data ?? e?.message;
@@ -441,11 +540,35 @@ export const FormTable: React.FC<Props> = ({
 
     const formIdForSub = widgetForm?.form_id ?? selectedFormId ?? null;
 
+
+    // ✦ Локальное дерево, чтобы можно было принудительно обновлять
+    const [liveTree, setLiveTree] = useState<FormTreeColumn[] | null>(null);
+
+    useEffect(() => {
+        // синхронизуем с приходящим из родителя tree при первом рендере / смене формы
+        setLiveTree(tree ?? null);
+    }, [tree, selectedFormId]);
+
+// перезагрузка дерева из API
+    const reloadTree = async () => {
+        const formId = selectedFormId ?? widgetForm?.form_id ?? null;
+        if (!formId) return;
+        try {
+            const { data } = await api.post<FormTreeColumn[] | FormTreeColumn>(`/display/${formId}/tree`);
+            const normalized = Array.isArray(data) ? data : [data];
+            setLiveTree(normalized);
+        } catch (e) {
+            console.warn('Не удалось обновить справочники (tree):', e);
+        }
+    };
+
+
     return (
         <div style={{display: 'flex', gap: 10}}>
             {/* TREE BLOCK */}
             <TreeFormTable
-                tree={tree}
+
+                tree={liveTree}
                 widgetForm={widgetForm}
                 activeExpandedKey={activeExpandedKey}
                 handleNestedValueClick={async (table_column_id, value) => {
@@ -589,7 +712,10 @@ export const FormTable: React.FC<Props> = ({
                                                 <input
                                                     value={editDraft[col.table_column_id] ?? ''}
                                                     onChange={e =>
-                                                        setEditDraft(prev => ({ ...prev, [col.table_column_id]: e.target.value }))
+                                                        setEditDraft(prev => ({
+                                                            ...prev,
+                                                            [col.table_column_id]: e.target.value
+                                                        }))
                                                     }
                                                     onClick={e => e.stopPropagation()}
                                                     placeholder={col.placeholder ?? col.column_name}
@@ -606,42 +732,60 @@ export const FormTable: React.FC<Props> = ({
                                 })}
 
                                 {/* actions */}
-                                <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
+                                <td style={{textAlign: 'center', whiteSpace: 'nowrap'}}>
                                     {isEditing ? (
                                         <>
                                             <button
-                                                onClick={(e) => { e.stopPropagation(); submitEdit(); }}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    submitEdit();
+                                                }}
                                                 disabled={editSaving}
                                             >
                                                 {editSaving ? 'Сохр.' : 'Сохранить'}
                                             </button>
                                             <button
-                                                onClick={(e) => { e.stopPropagation(); cancelEdit(); }}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    cancelEdit();
+                                                }}
                                                 disabled={editSaving}
-                                                style={{ marginLeft: 8 }}
+                                                style={{marginLeft: 8}}
                                             >
                                                 Отменить
                                             </button>
                                         </>
                                     ) : (
                                         <>
-            <span
-                style={{ display: 'inline-flex', cursor: 'pointer', marginRight: 10 }}
-                onClick={(e) => { e.stopPropagation(); startEdit(rowIdx); }}
-                title="Редактировать"
-            >
-              <EditIcon className={s.actionIcon} />
-            </span>
+      <span
+          style={{display: 'inline-flex', cursor: 'pointer', marginRight: 10}}
+          onClick={(e) => {
+              e.stopPropagation();
+              startEdit(rowIdx);
+          }}
+          title="Редактировать"
+      >
+        <EditIcon className={s.actionIcon}/>
+      </span>
+
                                             <span
-                                                style={{ display: 'inline-flex', cursor: 'not-allowed', opacity: 0.5 }}
-                                                title="Удаление позже"
-                                                onClick={(e) => e.stopPropagation()}
+                                                style={{
+                                                    display: 'inline-flex',
+                                                    cursor: deletingRowIdx === rowIdx ? 'progress' : 'pointer',
+                                                    opacity: deletingRowIdx === rowIdx ? 0.6 : 1
+                                                }}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    if (deletingRowIdx == null) deleteRow(rowIdx);
+                                                }}
+                                                title="Удалить"
                                             >
-              <DeleteIcon className={s.actionIcon} />
-            </span>
+        <DeleteIcon className={s.actionIcon}/>
+      </span>
                                         </>
                                     )}
                                 </td>
+
                             </tr>
                         );
                     })}
