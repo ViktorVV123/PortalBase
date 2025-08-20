@@ -4,7 +4,7 @@ import {
     FormDisplay,
     SubDisplay,
     WidgetForm,
-    FormTreeColumn, Widget
+    FormTreeColumn, Widget, DTable
 } from '@/shared/hooks/useWorkSpaces';
 import {api} from "@/services/api";
 import {SubWormTable} from "@/components/formTable/SubFormTable";
@@ -67,6 +67,12 @@ export const FormTable: React.FC<Props> = ({
     >([]);
     const [nestedTrees, setNestedTrees] = useState<Record<string, FormTreeColumn[]>>({});
     const [activeExpandedKey, setActiveExpandedKey] = useState<string | null>(null);
+
+    /* ───────── добавление строки ───────── */
+    const [isAdding, setIsAdding] = useState(false);
+    /** значения ввода по table_column_id */
+    const [draft, setDraft] = useState<Record<number, string>>({});
+    const [saving, setSaving] = useState(false);
 
     useEffect(() => {
         if (!selectedWidget) return;
@@ -150,18 +156,14 @@ export const FormTable: React.FC<Props> = ({
         }
 
         // нормальный путь: используем headerModel
-        // 1) берём только видимые группы
         const visibleGroups = headerGroups.filter(g => g.visible !== false);
 
         const planned = visibleGroups.map(g => {
-            // исходные «реальные» колонки для этой группы
             let cols = (byWcId[g.id] ?? []).slice();
 
-            // ⬅️ НОВОЕ: если есть порядок refIds — применяем его
             if (g.refIds && g.refIds.length) {
                 const pos = new Map<number, number>();
                 g.refIds.forEach((id, i) => pos.set(id, i));
-
                 cols.sort((a, b) => {
                     const ai = pos.has(a.table_column_id) ? pos.get(a.table_column_id)! : Number.MAX_SAFE_INTEGER;
                     const bi = pos.has(b.table_column_id) ? pos.get(b.table_column_id)! : Number.MAX_SAFE_INTEGER;
@@ -169,7 +171,6 @@ export const FormTable: React.FC<Props> = ({
                 });
             }
 
-            // приводим labels к длине cols
             const labels = (g.labels ?? []).slice(0, cols.length);
             while (labels.length < cols.length) labels.push('—');
 
@@ -178,6 +179,7 @@ export const FormTable: React.FC<Props> = ({
 
         return planned;
     }, [headerGroups, byWcId, sortedColumns]);
+
     /** Плоский порядок колонок для рендера тела таблицы */
     const flatColumnsInRenderOrder = useMemo(
         () => headerPlan.flatMap(g => g.cols),
@@ -197,6 +199,109 @@ export const FormTable: React.FC<Props> = ({
         return map;
     }, [formDisplay.columns]);
 
+    /* ───────── хэндлеры добавления ───────── */
+
+// ЗАМЕНИ startAdd на префлайтовый вариант
+    const startAdd = async () => {
+        const pf = await preflightInsert();
+        if (!pf.ok) return;
+
+        setIsAdding(true);
+        const init: Record<number, string> = {};
+        flatColumnsInRenderOrder.forEach(c => {
+            if (c.table_column_id != null) init[c.table_column_id] = '';
+        });
+        setDraft(init);
+    };
+
+
+    // ───── ДОБАВЬ рядом c локальным состоянием добавления ─────
+    const preflightInsert = async (): Promise<{ ok: boolean; formId?: number }> => {
+        if (!selectedWidget) return { ok: false };
+
+        // 1) берём form_id именно от main-виджета
+        const wf = formsByWidget[selectedWidget.id];
+        const insertFormId = wf?.form_id ?? selectedFormId;
+        if (!insertFormId) {
+            alert('Не найден form_id для вставки: у виджета нет связанной формы');
+            return { ok: false };
+        }
+
+        try {
+            // 2) проверяем, что у таблицы настроен insert_query
+            // у Widget есть table_id → можно спросить таблицу
+            const { data: table } = await api.get<DTable>(`/tables/${selectedWidget.table_id}`);
+            if (!table?.insert_query || !table.insert_query.trim()) {
+                alert('Для этой таблицы не настроен INSERT QUERY. Задайте его в метаданных таблицы.');
+                return { ok: false };
+            }
+        } catch (e) {
+            // если не смогли проверить — не блокируем, но предупредим
+            console.warn('Не удалось проверить insert_query у таблицы:', e);
+        }
+
+        return { ok: true, formId: insertFormId };
+    };
+
+
+    // ЗАМЕНИ submitAdd на версию с корректным form_id и явной обработкой 404
+    const submitAdd = async () => {
+        if (!selectedWidget) return;
+
+        const pf = await preflightInsert();
+        if (!pf.ok || !pf.formId) return;
+
+        setSaving(true);
+        try {
+            const values = Object.entries(draft)
+                .filter(([, v]) => v !== '' && v !== undefined && v !== null)
+                .map(([table_column_id, value]) => ({
+                    table_column_id: Number(table_column_id),
+                    value: String(value),
+                }));
+
+            const body = { pk: {}, values }; // pk пустой — это ок
+            const url = `/data/${pf.formId}/${selectedWidget.id}`;
+
+            try {
+                await api.post(url, body);
+            } catch (err: any) {
+                const status = err?.response?.status;
+                const detail = err?.response?.data?.detail ?? err?.response?.data ?? err?.message;
+
+                // если ровно та ошибка — говорим, что нужен insert_query
+                if (status === 404 && String(detail).includes('Insert query not found')) {
+                    alert('Для этой формы/таблицы не настроен INSERT QUERY. Задайте его в метаданных таблицы и повторите.');
+                    return;
+                }
+                // попробуем со слэшем на случай конфигурации роутера
+                if (status === 404) {
+                    await api.post(`${url}/`, body);
+                } else {
+                    throw err;
+                }
+            }
+
+            // перезагрузка main c текущими фильтрами, чтобы не сбивались
+            const { data } = await api.post<FormDisplay>(`/display/${pf.formId}/main`, activeFilters);
+            setFormDisplay(data);
+
+            setIsAdding(false);
+            setDraft({});
+        } catch (e: any) {
+            const status = e?.response?.status;
+            const msg = e?.response?.data ?? e?.message;
+            alert(`Не удалось добавить строку: ${status ?? ''} ${typeof msg === 'string' ? msg : JSON.stringify(msg)}`);
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const cancelAdd = () => {
+        setIsAdding(false);
+        setDraft({});
+    };
+
     return (
         <div style={{display: 'flex', gap: 10}}>
             {/* TREE BLOCK */}
@@ -214,6 +319,7 @@ export const FormTable: React.FC<Props> = ({
                     try {
                         const {data} = await api.post<FormDisplay>(`/display/${selectedFormId}/main`, filters);
                         setFormDisplay(data);
+                        setActiveFilters(filters);
                     } catch (e) {
                         console.warn('❌ Ошибка nested фильтра:', e);
                     }
@@ -225,6 +331,7 @@ export const FormTable: React.FC<Props> = ({
                     try {
                         const {data: mainData} = await api.post<FormDisplay>(`/display/${selectedFormId}/main`, filters);
                         setFormDisplay(mainData);
+                        setActiveFilters(filters);
 
                         const {data} = await api.post<FormTreeColumn[] | FormTreeColumn>(
                             `/display/${selectedFormId}/tree`,
@@ -242,7 +349,38 @@ export const FormTable: React.FC<Props> = ({
             />
 
             {/* MAIN + SUB */}
-            <div style={{display: 'flex', flexDirection: 'column', gap: 20}}>
+            <div style={{display: 'flex', flexDirection: 'column', gap: 20, flex: 1}}>
+                {/* Кнопки добавления */}
+                <div style={{display:'flex', gap:10, marginBottom:8}}>
+                    {!isAdding ? (
+                        <button
+                            className={s.btn}
+                            onClick={startAdd}
+                            disabled={!selectedFormId || !selectedWidget}
+                            title={!selectedFormId || !selectedWidget ? 'Выбери форму и виджет' : 'Добавить строку'}
+                        >
+                            Добавить ---
+                        </button>
+                    ) : (
+                        <>
+                            <button
+                                className={s.btn}
+                                onClick={submitAdd}
+                                disabled={saving}
+                            >
+                                {saving ? 'Сохранение…' : 'Сохранить'}
+                            </button>
+                            <button
+                                className={s.btnSecondary}
+                                onClick={cancelAdd}
+                                disabled={saving}
+                            >
+                                Отменить
+                            </button>
+                        </>
+                    )}
+                </div>
+
                 <table className={s.tbl}>
                     <thead>
                     {/* верхняя строка — названия групп */}
@@ -265,6 +403,26 @@ export const FormTable: React.FC<Props> = ({
                     </thead>
 
                     <tbody>
+                    {/* Инлайн-строка ввода при добавлении */}
+                    {isAdding && (
+                        <tr className={s.addRow}>
+                            {flatColumnsInRenderOrder.map(col => (
+                                <td key={`add-wc${col.widget_column_id}-tc${col.table_column_id}`}>
+                                    <input
+                                        className={s.input}
+                                        value={draft[col.table_column_id] ?? ''}
+                                        onChange={e => {
+                                            const v = e.target.value;
+                                            setDraft(prev => ({...prev, [col.table_column_id]: v}));
+                                        }}
+                                        placeholder={col.placeholder ?? col.column_name}
+                                        // можно добавить min/max/тип по col.type, если понадобится
+                                    />
+                                </td>
+                            ))}
+                        </tr>
+                    )}
+
                     {formDisplay.data.map((row, rowIdx) => (
                         <tr key={rowIdx} onClick={() => {
                             const pkObj = Object.fromEntries(
@@ -275,7 +433,6 @@ export const FormTable: React.FC<Props> = ({
                             {flatColumnsInRenderOrder.map(col => {
                                 const key = `${col.widget_column_id}:${col.table_column_id ?? -1}`;
                                 const idx = valueIndexByKey.get(key);
-
                                 const val = idx != null ? row.values[idx] : ''; // если нет индекса — пусто/фолбэк
                                 return (
                                     <td key={`r${rowIdx}-wc${col.widget_column_id}-tc${col.table_column_id}`}>
