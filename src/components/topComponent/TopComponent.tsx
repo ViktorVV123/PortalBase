@@ -46,7 +46,7 @@ type Props = {
     setNavOpen: (value: boolean) => void;
     navOpen: boolean;
     setShowCreateForm: (value: boolean) => void;
-    openForm: (widgetId: number, formId: number) => void;
+
     deleteWidget: (widgetId: number, tableId: number) => void;
     loadFormTree: (formId: number) => Promise<void>;
     loadWorkSpaces:() =>void
@@ -77,7 +77,7 @@ export const TopComponent: React.FC<Props> = ({
                                                   navOpen,
                                                   setShowCreateForm,
                                                   deleteWidget,
-                                                  openForm,
+
                                                   loadFormTree,
                                                   loadWorkSpaces
                                               }) => {
@@ -127,6 +127,41 @@ export const TopComponent: React.FC<Props> = ({
         }
     };
 
+    // Типы с полями, которые нам нужны из API
+    type ApiWidget = Widget & { table_id: number };
+    type ApiTable  = DTable  & { workspace_id: number }; // если у тебя другое имя поля — подставь его
+
+    const openFormWithPreload = async (widgetId: number, formId: number) => {
+        try {
+            // 1) тянем метаданные виджета и таблицы
+            const { data: widget } = await api.get<ApiWidget>(`/widgets/${widgetId}`);
+            const { data: table  } = await api.get<ApiTable>(`/tables/${widget.table_id}`);
+
+            // 2) заранее грузим таблицы ВП и виджеты таблицы — чтобы выпадашка имела данные
+            await loadTables(table.workspace_id, true);   // force=true, если у тебя есть такая опция
+            await loadWidgetsForTable(table.id);
+
+            // 3) выставляем выбранные сущности
+            handleSelectTable(table);
+            handleSelectWidget(widget);
+            handleSelectForm(formId);
+
+            // (опц.) сразу загрузить дерево формы
+            await loadFormTree(formId);
+
+            // (опц.) можно подготовить ховеры, если меню уже открыто
+            // setWsHover(table.workspace_id);
+            // setTblHover(table.id);
+        } catch (e) {
+            console.warn('openFormWithPreload error:', e);
+        } finally {
+            // Закрыть все выпадашки/сайдбар, чтобы состояние было чистым
+            setNavOpen(false);
+            closeMenu();
+        }
+    };
+
+
 
     return (
         <div className={s.bar}>
@@ -144,7 +179,7 @@ export const TopComponent: React.FC<Props> = ({
                             open={navOpen}
                             toggle={toogleOpenSide}
                             formsByWidget={formsByWidget}
-                            openForm={openForm}
+                            openForm={openFormWithPreload}
                         />
 
                     </div>

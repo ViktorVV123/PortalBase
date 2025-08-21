@@ -170,7 +170,6 @@ export const Main = () => {
                               navOpen={navOpen}
                               setNavOpen={setNavOpen}
                               setShowCreateForm={setShowCreateForm}
-                              openForm={openForm}
                               deleteWidget={deleteWidget}
                               loadFormTree={loadFormTree}
 

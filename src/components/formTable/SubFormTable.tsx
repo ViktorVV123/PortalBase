@@ -1,65 +1,9 @@
-/*
-import React from 'react';
-import * as s from "@/components/setOfTables/SetOfTables.module.scss";
-import {SubDisplay} from "@/shared/hooks/useWorkSpaces";
-
-type SubformProps = {
-    subDisplay:SubDisplay | null;
-    handleTabClick:(order: number) => void;
-    subLoading:any
-    subError:any
-}
-
-export const SubWormTable = ({subDisplay,handleTabClick,subLoading,subError}:SubformProps) => {
-    return (
-        <div>
-            {subDisplay?.sub_widgets.length > 0 && (
-                <ul className={s.tabs}>
-                    {subDisplay.sub_widgets.map(sw => {
-                        const isActive = sw.widget_order === subDisplay.displayed_widget.widget_order;
-                        return (
-                            <li key={sw.widget_order}>
-                                <button
-                                    className={isActive ? s.tabActive : s.tab}
-                                    onClick={() => handleTabClick(sw.widget_order)}
-                                >
-                                    {sw.name}
-                                </button>
-                            </li>
-                        );
-                    })}
-                </ul>
-            )}
-
-            {subDisplay && (
-                subLoading ? (
-                    <p>Загрузка sub-виджета…</p>
-                ) : subError ? (
-                    <p className={s.error}>{subError}</p>
-                ) : (
-                    <table className={s.tbl}>
-                        <thead>
-                        <tr>{subDisplay.columns.map(c => <th key={c.column_name}>{c.column_name}</th>)}</tr>
-                        </thead>
-                        <tbody>
-                        {subDisplay.data.map((r, i) => (
-                            <tr key={i}>{r.values.map((v, j) => <td key={j}>{v}</td>)}</tr>
-                        ))}
-                        </tbody>
-                    </table>
-                )
-            )}
-        </div>
-    );
-};
-*/
-
-
-
 import React, { useMemo, useState } from 'react';
 import * as s from "@/components/setOfTables/SetOfTables.module.scss";
 import { SubDisplay, DTable, Widget } from "@/shared/hooks/useWorkSpaces";
 import { api } from "@/services/api";
+import EditIcon from '@/assets/image/EditIcon.svg';
+import DeleteIcon from '@/assets/image/DeleteIcon.svg';
 
 type SubformProps = {
     subDisplay: SubDisplay | null;
@@ -67,10 +11,10 @@ type SubformProps = {
     subLoading: any;
     subError: any;
 
-    /** 🔹 нужен для POST /data/{form_id}/{widget_id} */
+    /** form_id активной формы (тот же, что ты прокидываешь из FormTable) */
     formId: number | null;
 
-    /** 🔹 маппинг: widget_order -> sub_widget_id (берём из WidgetForm.sub_widgets) */
+    /** маппинг «widget_order → sub_widget_id» */
     subWidgetIdByOrder: Record<number, number>;
 };
 
@@ -139,22 +83,22 @@ export const SubWormTable = ({
         return map;
     }, [subDisplay?.columns]);
 
-    // ───────── добавление строки (инлайн) ─────────
-    const [isAdding, setIsAdding] = useState(false);
-    const [draft, setDraft] = useState<Record<number, string>>({});
-    const [saving, setSaving] = useState(false);
-
+    // текущая вкладка → sub_widget_id
     const currentOrder = subDisplay?.displayed_widget?.widget_order ?? null;
     const currentWidgetId =
         currentOrder != null ? subWidgetIdByOrder[currentOrder] : undefined;
+
+    // ───────── ДОБАВЛЕНИЕ (инлайн) ─────────
+    const [isAdding, setIsAdding] = useState(false);
+    const [draft, setDraft] = useState<Record<number, string>>({});
+    const [saving, setSaving] = useState(false);
 
     const startAdd = async () => {
         if (!formId || !currentWidgetId) {
             alert("Нет formId или sub_widget_id для вставки");
             return;
         }
-
-        // (опциональный префлайт insert_query у таблицы саб-виджета)
+        // префлайт INSERT (не блокируем при ошибке запроса метаданных)
         try {
             const { data: widget } = await api.get<Widget>(`/widgets/${currentWidgetId}`);
             const { data: table } = await api.get<DTable>(`/tables/${widget.table_id}`);
@@ -163,8 +107,7 @@ export const SubWormTable = ({
                 return;
             }
         } catch (e) {
-            // не блокируем — просто предупредили
-            console.warn("preflight (sub) failed:", e);
+            console.warn("preflight (sub/insert) failed:", e);
         }
 
         setIsAdding(true);
@@ -199,7 +142,6 @@ export const SubWormTable = ({
             } catch (err: any) {
                 const status = err?.response?.status;
                 const detail = err?.response?.data?.detail ?? err?.response?.data ?? err?.message;
-
                 if (status === 404 && String(detail).includes("Insert query not found")) {
                     alert("Для саб-формы не настроен INSERT QUERY. Задайте его и повторите.");
                     return;
@@ -211,21 +153,179 @@ export const SubWormTable = ({
                 }
             }
 
-            // перезагрузим активную вкладку
-            if (currentOrder != null) {
-                handleTabClick(currentOrder);
-            }
+            // мгновенно перезагружаем текущую вкладку
+            if (currentOrder != null) handleTabClick(currentOrder);
 
             setIsAdding(false);
             setDraft({});
         } catch (e: any) {
             const status = e?.response?.status;
             const msg = e?.response?.data ?? e?.message;
-            alert(`Не удалось добавить строку в саб-виджет: ${status ?? ""} ${
-                typeof msg === "string" ? msg : JSON.stringify(msg)
-            }`);
+            alert(`Не удалось добавить строку: ${status ?? ""} ${typeof msg === "string" ? msg : JSON.stringify(msg)}`);
         } finally {
             setSaving(false);
+        }
+    };
+
+    // ───────── РЕДАКТИРОВАНИЕ ─────────
+    const [editingRowIdx, setEditingRowIdx] = useState<number | null>(null);
+    const [editDraft, setEditDraft] = useState<Record<number, string>>({});
+    const [editSaving, setEditSaving] = useState(false);
+
+    const preflightUpdate = async (): Promise<{ ok: boolean }> => {
+        if (!currentWidgetId) return { ok: false };
+        try {
+            const { data: widget } = await api.get<Widget>(`/widgets/${currentWidgetId}`);
+            const { data: table } = await api.get<DTable>(`/tables/${widget.table_id}`);
+            if (!table?.update_query || !table.update_query.trim()) {
+                alert("Для таблицы саб-виджета не настроен UPDATE QUERY.");
+                return { ok: false };
+            }
+        } catch (e) {
+            console.warn("preflight (sub/update) failed:", e);
+        }
+        return { ok: true };
+    };
+
+    const startEdit = async (rowIdx: number) => {
+        if (!formId || !currentWidgetId) return;
+        const pf = await preflightUpdate();
+        if (!pf.ok) return;
+
+        setIsAdding(false);
+
+        const row = subDisplay!.data[rowIdx];
+        const init: Record<number, string> = {};
+        flatColumnsInRenderOrder.forEach((col) => {
+            const k = `${col.widget_column_id}:${col.table_column_id ?? -1}`;
+            const idx = valueIndexByKey.get(k);
+            const val = idx != null ? row.values[idx] : "";
+            if (col.table_column_id != null) init[col.table_column_id] = (val ?? "").toString();
+        });
+
+        setEditingRowIdx(rowIdx);
+        setEditDraft(init);
+    };
+
+    const cancelEdit = () => {
+        setEditingRowIdx(null);
+        setEditDraft({});
+        setEditSaving(false);
+    };
+
+    const submitEdit = async () => {
+        if (editingRowIdx == null || !formId || !currentWidgetId) return;
+        const pf = await preflightUpdate();
+        if (!pf.ok) return;
+
+        setEditSaving(true);
+        try {
+            const row = subDisplay!.data[editingRowIdx];
+
+            const values = Object.entries(editDraft)
+                .filter(([, v]) => v !== "" && v !== undefined && v !== null)
+                .map(([table_column_id, value]) => ({
+                    table_column_id: Number(table_column_id),
+                    value: String(value),
+                }));
+
+            const body = {
+                pk: {
+                    primary_keys: Object.fromEntries(
+                        Object.entries(row.primary_keys).map(([k, v]) => [k, String(v)])
+                    ),
+                },
+                values,
+            };
+
+            const url = `/data/${formId}/${currentWidgetId}`;
+            try {
+                await api.patch(url, body);
+            } catch (err: any) {
+                const status = err?.response?.status;
+                const detail = err?.response?.data?.detail ?? err?.response?.data ?? err?.message;
+                if (status === 404 && String(detail).includes("Update query not found")) {
+                    alert("Для саб-формы не настроен UPDATE QUERY. Задайте его и повторите.");
+                    return;
+                }
+                if (status === 404) {
+                    await api.patch(`${url}/`, body);
+                } else {
+                    throw err;
+                }
+            }
+
+            if (currentOrder != null) handleTabClick(currentOrder);
+            cancelEdit();
+        } catch (e: any) {
+            const status = e?.response?.status;
+            const msg = e?.response?.data ?? e?.message;
+            alert(`Не удалось обновить строку: ${status ?? ""} ${typeof msg === "string" ? msg : JSON.stringify(msg)}`);
+        } finally {
+            setEditSaving(false);
+        }
+    };
+
+    // ───────── УДАЛЕНИЕ ─────────
+    const [deletingRowIdx, setDeletingRowIdx] = useState<number | null>(null);
+
+    const preflightDelete = async (): Promise<{ ok: boolean }> => {
+        if (!currentWidgetId) return { ok: false };
+        try {
+            const { data: widget } = await api.get<Widget>(`/widgets/${currentWidgetId}`);
+            const { data: table } = await api.get<DTable>(`/tables/${widget.table_id}`);
+            if (!table?.delete_query || !table.delete_query.trim()) {
+                alert("Для таблицы саб-виджета не настроен DELETE QUERY.");
+                return { ok: false };
+            }
+        } catch (e) {
+            console.warn("preflight (sub/delete) failed:", e);
+        }
+        return { ok: true };
+    };
+
+    const deleteRow = async (rowIdx: number) => {
+        if (!formId || !currentWidgetId) return;
+        const pf = await preflightDelete();
+        if (!pf.ok) return;
+
+        const row = subDisplay!.data[rowIdx];
+        const pkObj = Object.fromEntries(
+            Object.entries(row.primary_keys).map(([k, v]) => [k, String(v)])
+        );
+        const pkLabel = Object.entries(pkObj).map(([k, v]) => `${k}=${v}`).join(", ");
+
+        if (!window.confirm(`Удалить запись (${pkLabel})?`)) return;
+
+        setDeletingRowIdx(rowIdx);
+        try {
+            const body = { primary_keys: pkObj };
+            const url = `/data/${formId}/${currentWidgetId}`;
+
+            try {
+                await api.delete(url, { data: body });
+            } catch (err: any) {
+                const status = err?.response?.status;
+                const detail = err?.response?.data?.detail ?? err?.response?.data ?? err?.message;
+                if (status === 404 && String(detail).includes("Delete query not found")) {
+                    alert("Для саб-формы не настроен DELETE QUERY. Задайте его и повторите.");
+                    return;
+                }
+                if (status === 404) {
+                    await api.delete(`${url}/`, { data: body });
+                } else {
+                    throw err;
+                }
+            }
+
+            if (currentOrder != null) handleTabClick(currentOrder);
+            if (editingRowIdx === rowIdx) cancelEdit();
+        } catch (e: any) {
+            const status = e?.response?.status;
+            const msg = e?.response?.data ?? e?.message;
+            alert(`Не удалось удалить строку: ${status ?? ""} ${typeof msg === "string" ? msg : JSON.stringify(msg)}`);
+        } finally {
+            setDeletingRowIdx(null);
         }
     };
 
@@ -234,8 +334,7 @@ export const SubWormTable = ({
             {hasTabs && (
                 <ul className={s.tabs}>
                     {subDisplay!.sub_widgets.map((sw) => {
-                        const isActive =
-                            sw.widget_order === subDisplay!.displayed_widget.widget_order;
+                        const isActive = sw.widget_order === subDisplay!.displayed_widget.widget_order;
                         return (
                             <li key={sw.widget_order}>
                                 <button
@@ -285,6 +384,7 @@ export const SubWormTable = ({
                                 {g.title}
                             </th>
                         ))}
+                        <th /> {/* actions */}
                     </tr>
                     <tr>
                         {headerPlan.map((g) =>
@@ -292,6 +392,7 @@ export const SubWormTable = ({
                                 <th key={`sub-g-sub-${g.id}-${idx}`}>{label}</th>
                             ))
                         )}
+                        <th />
                     </tr>
                     </thead>
 
@@ -311,23 +412,80 @@ export const SubWormTable = ({
                                     />
                                 </td>
                             ))}
+                            <td />
                         </tr>
                     )}
 
-                    {subDisplay.data.map((row, rowIdx) => (
-                        <tr key={rowIdx}>
-                            {flatColumnsInRenderOrder.map((col) => {
-                                const key = `${col.widget_column_id}:${col.table_column_id ?? -1}`;
-                                const idx = valueIndexByKey.get(key);
-                                const val = idx != null ? row.values[idx] : "";
-                                return (
-                                    <td key={`sub-r${rowIdx}-wc${col.widget_column_id}-tc${col.table_column_id}`}>
-                                        {val}
-                                    </td>
-                                );
-                            })}
-                        </tr>
-                    ))}
+                    {subDisplay.data.map((row, rowIdx) => {
+                        const isEditing = editingRowIdx === rowIdx;
+
+                        return (
+                            <tr key={rowIdx}>
+                                {flatColumnsInRenderOrder.map((col) => {
+                                    const key = `${col.widget_column_id}:${col.table_column_id ?? -1}`;
+                                    const idx = valueIndexByKey.get(key);
+                                    const val = idx != null ? row.values[idx] : "";
+
+                                    if (isEditing) {
+                                        return (
+                                            <td key={`sub-edit-r${rowIdx}-wc${col.widget_column_id}-tc${col.table_column_id}`}>
+                                                <input
+                                                    value={editDraft[col.table_column_id] ?? ""}
+                                                    onChange={(e) =>
+                                                        setEditDraft((prev) => ({ ...prev, [col.table_column_id]: e.target.value }))
+                                                    }
+                                                    placeholder={col.placeholder ?? col.column_name}
+                                                />
+                                            </td>
+                                        );
+                                    }
+
+                                    return (
+                                        <td key={`sub-r${rowIdx}-wc${col.widget_column_id}-tc${col.table_column_id}`}>
+                                            {val}
+                                        </td>
+                                    );
+                                })}
+
+                                {/* actions */}
+                                <td style={{ textAlign: "center", whiteSpace: "nowrap" }}>
+                                    {isEditing ? (
+                                        <>
+                                            <button onClick={submitEdit} disabled={editSaving}>
+                                                {editSaving ? "Сохр." : "Сохранить"}
+                                            </button>
+                                            <button onClick={cancelEdit} disabled={editSaving} style={{ marginLeft: 8 }}>
+                                                Отменить
+                                            </button>
+                                        </>
+                                    ) : (
+                                        <>
+                        <span
+                            style={{ display: "inline-flex", cursor: "pointer", marginRight: 10 }}
+                            onClick={() => startEdit(rowIdx)}
+                            title="Редактировать"
+                        >
+                          <EditIcon className={s.actionIcon} />
+                        </span>
+                                            <span
+                                                style={{
+                                                    display: "inline-flex",
+                                                    cursor: deletingRowIdx === rowIdx ? "progress" : "pointer",
+                                                    opacity: deletingRowIdx === rowIdx ? 0.6 : 1,
+                                                }}
+                                                onClick={() => {
+                                                    if (deletingRowIdx == null) deleteRow(rowIdx);
+                                                }}
+                                                title="Удалить"
+                                            >
+                          <DeleteIcon className={s.actionIcon} />
+                        </span>
+                                        </>
+                                    )}
+                                </td>
+                            </tr>
+                        );
+                    })}
                     </tbody>
                 </table>
             )}

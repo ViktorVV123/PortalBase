@@ -84,26 +84,25 @@ export const FormTable: React.FC<Props> = ({
     const [deletingRowIdx, setDeletingRowIdx] = useState<number | null>(null);
 
 
-
     // префлайт: должен быть настроен DELETE QUERY у таблицы
     const preflightDelete = async (): Promise<{ ok: boolean; formId?: number }> => {
-        if (!selectedWidget) return { ok: false };
+        if (!selectedWidget) return {ok: false};
         const wf = formsByWidget[selectedWidget.id];
         const formId = wf?.form_id ?? selectedFormId ?? null;
         if (!formId) {
             alert('Не найден form_id для удаления');
-            return { ok: false };
+            return {ok: false};
         }
         try {
-            const { data: table } = await api.get<DTable>(`/tables/${selectedWidget.table_id}`);
+            const {data: table} = await api.get<DTable>(`/tables/${selectedWidget.table_id}`);
             if (!table?.delete_query || !table.delete_query.trim()) {
                 alert('Для этой таблицы не настроен DELETE QUERY. Задайте его в метаданных таблицы.');
-                return { ok: false };
+                return {ok: false};
             }
         } catch (e) {
             console.warn('Не удалось проверить delete_query у таблицы:', e);
         }
-        return { ok: true, formId };
+        return {ok: true, formId};
     };
 
     const deleteRow = async (rowIdx: number) => {
@@ -122,12 +121,12 @@ export const FormTable: React.FC<Props> = ({
 
         setDeletingRowIdx(rowIdx);
         try {
-            const body = { primary_keys: pkObj };
+            const body = {primary_keys: pkObj};
             const url = `/data/${pf.formId}/${selectedWidget.id}`;
 
             try {
                 // axios: DELETE с телом → передаём { data: body }
-                await api.delete(url, { data: body });
+                await api.delete(url, {data: body});
                 await reloadTree();          // ← обновили левый список
                 setNestedTrees({});          // сброс вложенных веток
                 setActiveExpandedKey(null);
@@ -141,14 +140,14 @@ export const FormTable: React.FC<Props> = ({
                 }
                 // на случай конфигурации роутера со слэшем
                 if (status === 404) {
-                    await api.delete(`${url}/`, { data: body });
+                    await api.delete(`${url}/`, {data: body});
                 } else {
                     throw err;
                 }
             }
 
             // перезагружаем main с текущими фильтрами
-            const { data } = await api.post<FormDisplay>(`/display/${pf.formId}/main`, activeFilters);
+            const {data} = await api.post<FormDisplay>(`/display/${pf.formId}/main`, activeFilters);
             setFormDisplay(data);
 
 
@@ -167,7 +166,6 @@ export const FormTable: React.FC<Props> = ({
     };
 
 
-
     // корректный form_id для текущего main-виджета
     const getEffectiveFormId = (): number | null => {
         if (!selectedWidget) return null;
@@ -177,22 +175,22 @@ export const FormTable: React.FC<Props> = ({
 
 // префлайт: должен быть настроен UPDATE QUERY у таблицы
     const preflightUpdate = async (): Promise<{ ok: boolean; formId?: number }> => {
-        if (!selectedWidget) return { ok: false };
+        if (!selectedWidget) return {ok: false};
         const formId = getEffectiveFormId();
         if (!formId) {
             alert('Не найден form_id для обновления');
-            return { ok: false };
+            return {ok: false};
         }
         try {
-            const { data: table } = await api.get<DTable>(`/tables/${selectedWidget.table_id}`);
+            const {data: table} = await api.get<DTable>(`/tables/${selectedWidget.table_id}`);
             if (!table?.update_query || !table.update_query.trim()) {
                 alert('Для этой таблицы не настроен UPDATE QUERY. Задайте его в метаданных таблицы.');
-                return { ok: false };
+                return {ok: false};
             }
         } catch (e) {
             console.warn('Не удалось проверить update_query у таблицы:', e);
         }
-        return { ok: true, formId };
+        return {ok: true, formId};
     };
 
 // старт редактирования конкретной строки
@@ -271,7 +269,7 @@ export const FormTable: React.FC<Props> = ({
             }
 
             // перезагружаем main с текущими фильтрами
-            const { data } = await api.post<FormDisplay>(`/display/${pf.formId}/main`, activeFilters);
+            const {data} = await api.post<FormDisplay>(`/display/${pf.formId}/main`, activeFilters);
             setFormDisplay(data);
 
             await reloadTree();
@@ -554,7 +552,7 @@ export const FormTable: React.FC<Props> = ({
         const formId = selectedFormId ?? widgetForm?.form_id ?? null;
         if (!formId) return;
         try {
-            const { data } = await api.post<FormTreeColumn[] | FormTreeColumn>(`/display/${formId}/tree`);
+            const {data} = await api.post<FormTreeColumn[] | FormTreeColumn>(`/display/${formId}/tree`);
             const normalized = Array.isArray(data) ? data : [data];
             setLiveTree(normalized);
         } catch (e) {
@@ -594,6 +592,8 @@ export const FormTable: React.FC<Props> = ({
                         const {data: mainData} = await api.post<FormDisplay>(`/display/${selectedFormId}/main`, filters);
                         setFormDisplay(mainData);
                         setActiveFilters(filters);
+                        setSubDisplay(null);
+
 
                         const {data} = await api.post<FormTreeColumn[] | FormTreeColumn>(
                             `/display/${selectedFormId}/tree`,
@@ -668,9 +668,10 @@ export const FormTable: React.FC<Props> = ({
                     <tbody>
                     {/* Инлайн-строка ввода при добавлении */}
                     {isAdding && (
-                        <tr >
+                        <tr>
                             {flatColumnsInRenderOrder.map(col => (
-                                <td style={{textAlign: 'center'}}  key={`add-wc${col.widget_column_id}-tc${col.table_column_id}`}>
+                                <td style={{textAlign: 'center'}}
+                                    key={`add-wc${col.widget_column_id}-tc${col.table_column_id}`}>
                                     <input
                                         value={draft[col.table_column_id] ?? ''}
                                         onChange={e => {
