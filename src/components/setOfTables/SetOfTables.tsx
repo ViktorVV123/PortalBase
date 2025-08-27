@@ -1,4 +1,4 @@
-import React, {useMemo, useState} from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
 import * as s from './SetOfTables.module.scss';
 import {
     Column, DTable,
@@ -12,6 +12,8 @@ import {FormTable} from "@/components/formTable/FormTable";
 import {TableColumn} from "@/components/tableColumn/TableColumn";
 import {WcReference, WidgetColumnsOfTable} from '@/components/WidgetColumnsOfTable/WidgetColumnsOfTable'
 import {TableListView} from "@/components/tableColumn/TableListView";
+import {buildHeaderGroupsFromWidgetColumns, HeaderGroup} from "@/shared/headerGroups";
+import {api} from "@/services/api";
 
 type Props = {
     columns: Column[];
@@ -144,6 +146,21 @@ export const SetOfTables: React.FC<Props> = ({
     const [referencesMap, setReferencesMap] = useState<Record<number, WcReference[]>>({});
     // состояние для актуальных ссылок с фронта
     const [liveRefsForHeader, setLiveRefsForHeader] = useState<Record<number, WcReference[]> | null>(null);
+    const [subHeaderGroups, setSubHeaderGroups] = useState<HeaderGroup[] | null>(null);
+
+    const subWidgetIdByOrder = useMemo(() => {
+        const map: Record<number, number> = {};
+        const wf = selectedWidget ? formsByWidget[selectedWidget.id] : undefined;
+        wf?.sub_widgets.forEach(sw => {
+            map[sw.widget_order] = sw.sub_widget_id;
+        });
+        return map;
+    }, [selectedWidget, formsByWidget]);
+
+    const currentSubOrder = subDisplay?.displayed_widget?.widget_order ?? null;
+    const currentSubWidgetId = currentSubOrder != null ? subWidgetIdByOrder[currentSubOrder] : null;
+
+
 
 
     // ───────── Заголовок-превью ─────────
@@ -194,6 +211,36 @@ export const SetOfTables: React.FC<Props> = ({
         return items;
     }, [widgetColumns, referencesMap, liveRefsForHeader, editingWcId, wcValues]);
 
+    useEffect(() => {
+        let aborted = false;
+
+        async function loadSubHeaderGroups() {
+            if (!currentSubWidgetId) { setSubHeaderGroups(null); return; }
+
+            // 1) колонки саб-виджета
+            // предполагаемый эндпойнт; если у тебя другой — подставь свой
+            const { data: widgetColumns } = await api.get(`/widgets/${currentSubWidgetId}/columns`);
+
+            // 2) refs для каждой wc (используем твой fetchReferences)
+            const referencesMap: Record<number, any[]> = {};
+            for (const wc of widgetColumns) {
+                try {
+                    // ожидаем, что fetchReferences(wc.id) вернёт массив ссылок (WcReference[])
+                    referencesMap[wc.id] = await fetchReferences(wc.id);
+                } catch (e) {
+                    referencesMap[wc.id] = wc.reference ?? [];
+                }
+            }
+
+            if (aborted) return;
+            setSubHeaderGroups(buildHeaderGroupsFromWidgetColumns(widgetColumns, referencesMap));
+        }
+
+        loadSubHeaderGroups().catch(console.warn);
+        return () => { aborted = true; };
+    }, [currentSubWidgetId, fetchReferences]);
+
+
     if (loading) return <p>Загрузка…</p>;
     if (error) return <p className={s.error}>{error}</p>;
 
@@ -238,7 +285,7 @@ export const SetOfTables: React.FC<Props> = ({
                     ) : formError ? (
                         <p className={s.error}>{formError}</p>
                     ) : formDisplay ? (
-                        <FormTable  headerGroups={headerGroups}  setSubDisplay={setSubDisplay} formTrees={formTrees} selectedFormId={selectedFormId}
+                        <FormTable subHeaderGroups={subHeaderGroups || undefined}  headerGroups={headerGroups}  setSubDisplay={setSubDisplay} formTrees={formTrees} selectedFormId={selectedFormId}
                                    subDisplay={subDisplay} subError={subError} subLoading={subLoading}
                                    selectedWidget={selectedWidget} formsByWidget={formsByWidget}
                                    loadFilteredFormDisplay={loadFilteredFormDisplay} setFormDisplay={setFormDisplay}

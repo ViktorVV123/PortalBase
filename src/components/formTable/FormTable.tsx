@@ -45,6 +45,7 @@ type Props = {
         table_column_id: number;
         value: string | number
     }) => Promise<void>;
+    subHeaderGroups:HeaderModelItem[]
     setFormDisplay: (value: FormDisplay | null) => void;
     setSubDisplay: (value: SubDisplay | null) => void;
 
@@ -67,6 +68,7 @@ export const FormTable: React.FC<Props> = ({
                                                setFormDisplay,
                                                setSubDisplay,
                                                headerGroups,
+                                               subHeaderGroups
                                            }) => {
     const [lastPrimary, setLastPrimary] = useState<Record<string, unknown>>({});
     const [activeSubOrder, setActiveSubOrder] = useState<number>(0);
@@ -783,7 +785,7 @@ export const FormTable: React.FC<Props> = ({
                         </tbody>
                     </table>
 
-                    <SubWormTable  selectedFormId={selectedFormId} selectedWidget={selectedWidget} formId={formIdForSub}
+                    <SubWormTable   subHeaderGroups={subHeaderGroups}   selectedFormId={selectedFormId} selectedWidget={selectedWidget} formId={formIdForSub}
                                   subWidgetIdByOrder={subWidgetIdByOrder} subLoading={subLoading} subError={subError}
                                   subDisplay={subDisplay}
                                   handleTabClick={handleTabClick}/>

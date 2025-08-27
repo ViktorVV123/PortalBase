@@ -7,6 +7,7 @@ import DeleteIcon from '@/assets/image/DeleteIcon.svg';
 import {ButtonForm} from "@/shared/buttonForm/ButtonForm";
 import * as styles from "@/components/formTable/AllFormStyle.module.scss";
 import {TextField} from "@mui/material";
+import {HeaderModelItem} from "@/components/formTable/FormTable";
 
 type SubformProps = {
     subDisplay: SubDisplay | null;
@@ -21,6 +22,7 @@ type SubformProps = {
     subWidgetIdByOrder: Record<number, number>;
     selectedWidget: Widget | null;
     selectedFormId: number | null;
+    subHeaderGroups?: HeaderModelItem[]
 };
 
 export const SubWormTable = ({
@@ -32,6 +34,7 @@ export const SubWormTable = ({
                                  subWidgetIdByOrder,
                                  selectedWidget,
                                  selectedFormId,
+                                 subHeaderGroups
                              }: SubformProps) => {
     const hasTabs = (subDisplay?.sub_widgets?.length ?? 0) > 0;
 
@@ -42,39 +45,48 @@ export const SubWormTable = ({
     }, [subDisplay?.columns]);
 
     const headerPlan = useMemo(() => {
-        const groups: {
-            id: number;
-            title: string;
-            labels: string[];
-            cols: typeof sortedColumns;
-        }[] = [];
+        if (subHeaderGroups && subHeaderGroups.length) {
+            // сопоставляем группам реальные колонки subDisplay по widget_column_id
+            return subHeaderGroups.map(g => {
+                let cols = sortedColumns.filter(c => c.widget_column_id === g.id);
 
+                // упорядочим референсы согласно refIds (если переданы)
+                if (g.refIds && g.refIds.length) {
+                    const pos = new Map<number, number>();
+                    g.refIds.forEach((id, i) => pos.set(id, i));
+                    cols = [...cols].sort((a, b) => {
+                        const ai = pos.get(a.table_column_id) ?? Number.MAX_SAFE_INTEGER;
+                        const bi = pos.get(b.table_column_id) ?? Number.MAX_SAFE_INTEGER;
+                        return ai - bi;
+                    });
+                }
+
+                // подписи берём строго из пришедших labels, подрезаем под фактическое число колонок
+                const labels = g.labels.slice(0, cols.length);
+                while (labels.length < cols.length) labels.push('—');
+
+                return {id: g.id, title: g.title, labels, cols};
+            });
+        }
+
+        // фолбэк: старая группировка по column_name/widget_column_id
+        const groups: { id: number; title: string; labels: string[]; cols: any[] }[] = [];
         let i = 0;
         while (i < sortedColumns.length) {
             const name = sortedColumns[i].column_name;
             const wcId = sortedColumns[i].widget_column_id;
-            const cols: typeof sortedColumns = [];
-
-            while (
-                i < sortedColumns.length &&
-                sortedColumns[i].column_name === name &&
-                sortedColumns[i].widget_column_id === wcId
-                ) {
+            const cols: any[] = [];
+            while (i < sortedColumns.length &&
+            sortedColumns[i].column_name === name &&
+            sortedColumns[i].widget_column_id === wcId) {
                 cols.push(sortedColumns[i]);
                 i++;
             }
-
-            const labels = cols.map((c: any) => c.ref_alias ?? "—");
-
-            groups.push({
-                id: wcId,
-                title: name ?? `Колонка #${wcId}`,
-                labels,
-                cols,
-            });
+            groups.push({id: wcId, title: name ?? `Колонка #${wcId}`, labels: cols.map(() => '—'), cols});
         }
         return groups;
-    }, [sortedColumns]);
+    }, [subHeaderGroups, sortedColumns]);
+
 
     const flatColumnsInRenderOrder = useMemo(
         () => headerPlan.flatMap((g) => g.cols),
@@ -336,6 +348,7 @@ export const SubWormTable = ({
         }
     };
 
+
     return (
         <div style={{position: 'relative'}}>
 
@@ -365,100 +378,99 @@ export const SubWormTable = ({
             ) : subError ? (
                 <p className={s.error}>{subError}</p>
             ) : (
-                <table className={s.tbl}>
+                <>
                     <div className={styles.floatActions} style={{top: '15%'}}>
                         <ButtonForm cancelAdd={cancelAdd} startAdd={startAdd} isAdding={isAdding} submitAdd={submitAdd}
                                     saving={saving} selectedWidget={selectedWidget} selectedFormId={selectedFormId}/>
                     </div>
-                    <thead>
-                    {/* верхняя строка — названия групп */}
-                    <tr style={{padding: 25}}>
-                        {headerPlan.map(g => (
-                            <th key={`g-top-${g.id}`} colSpan={g.cols.length || 1}>
-                                {g.title}
-                            </th>
-                        ))}
-                        <th></th>
-                    </tr>
+                    <table className={s.tbl}>
 
-                    {/* нижняя строка — подписи для каждой «реальной» колонки в группе */}
-                    <tr>
-                        {headerPlan.map(g =>
-                            g.labels.slice(0, g.cols.length).map((label, idx) => (
-                                <th key={`g-sub-${g.id}-${idx}`}>{label}</th>
-                            ))
-                        )}
-                        <th></th>
-                    </tr>
-                    </thead>
-
-                    <tbody>
-                    {/* инлайн-строка ввода */}
-                    {isAdding && (
+                        <thead>
                         <tr>
-                            {flatColumnsInRenderOrder.map((col) => (
-                                <td key={`sub-add-wc${col.widget_column_id}-tc${col.table_column_id}`}>
-                                    <TextField size={"small"}
-                                               value={draft[col.table_column_id] ?? ""}
-                                               onChange={(e) => {
-                                                   const v = e.target.value;
-                                                   setDraft((prev) => ({...prev, [col.table_column_id]: v}));
-                                               }}
-                                               placeholder={col.placeholder ?? col.column_name}
-                                    />
-                                </td>
+                            {headerPlan.map(g => (
+                                <th key={`sub-g-top-${g.id}`} colSpan={g.cols.length || 1}>{g.title}</th>
                             ))}
-                            <td/>
+                            <th/>
                         </tr>
-                    )}
 
-                    {subDisplay.data.map((row, rowIdx) => {
-                        const isEditing = editingRowIdx === rowIdx;
+                        <tr>
+                            {headerPlan.flatMap(g =>
+                                g.labels.slice(0, g.cols.length).map((label, idx) => (
+                                    <th key={`sub-g-sub-${g.id}-${idx}`}>{label}</th>
+                                ))
+                            )}
+                            <th/>
+                        </tr>
+                        </thead>
 
-                        return (
-                            <tr key={rowIdx}>
-                                {flatColumnsInRenderOrder.map((col) => {
-                                    const key = `${col.widget_column_id}:${col.table_column_id ?? -1}`;
-                                    const idx = valueIndexByKey.get(key);
-                                    const val = idx != null ? row.values[idx] : "";
+                        <tbody>
+                        {/* инлайн-строка ввода */}
+                        {isAdding && (
+                            <tr>
+                                {flatColumnsInRenderOrder.map((col) => (
+                                    <td key={`sub-add-wc${col.widget_column_id}-tc${col.table_column_id}`}>
+                                        <TextField size={"small"}
+                                                   value={draft[col.table_column_id] ?? ""}
+                                                   onChange={(e) => {
+                                                       const v = e.target.value;
+                                                       setDraft((prev) => ({...prev, [col.table_column_id]: v}));
+                                                   }}
+                                                   placeholder={col.placeholder ?? col.column_name}
+                                        />
+                                    </td>
+                                ))}
+                                <td/>
+                            </tr>
+                        )}
 
-                                    if (isEditing) {
+                        {subDisplay.data.map((row, rowIdx) => {
+                            const isEditing = editingRowIdx === rowIdx;
+
+                            return (
+                                <tr key={rowIdx}>
+                                    {flatColumnsInRenderOrder.map((col) => {
+                                        const key = `${col.widget_column_id}:${col.table_column_id ?? -1}`;
+                                        const idx = valueIndexByKey.get(key);
+                                        const val = idx != null ? row.values[idx] : "";
+
+                                        if (isEditing) {
+                                            return (
+                                                <td key={`sub-edit-r${rowIdx}-wc${col.widget_column_id}-tc${col.table_column_id}`}>
+                                                    <input
+                                                        value={editDraft[col.table_column_id] ?? ""}
+                                                        onChange={(e) =>
+                                                            setEditDraft((prev) => ({
+                                                                ...prev,
+                                                                [col.table_column_id]: e.target.value
+                                                            }))
+                                                        }
+                                                        placeholder={col.placeholder ?? col.column_name}
+                                                    />
+                                                </td>
+                                            );
+                                        }
+
                                         return (
-                                            <td key={`sub-edit-r${rowIdx}-wc${col.widget_column_id}-tc${col.table_column_id}`}>
-                                                <input
-                                                    value={editDraft[col.table_column_id] ?? ""}
-                                                    onChange={(e) =>
-                                                        setEditDraft((prev) => ({
-                                                            ...prev,
-                                                            [col.table_column_id]: e.target.value
-                                                        }))
-                                                    }
-                                                    placeholder={col.placeholder ?? col.column_name}
-                                                />
+                                            <td key={`sub-r${rowIdx}-wc${col.widget_column_id}-tc${col.table_column_id}`}>
+                                                {val}
                                             </td>
                                         );
-                                    }
+                                    })}
 
-                                    return (
-                                        <td key={`sub-r${rowIdx}-wc${col.widget_column_id}-tc${col.table_column_id}`}>
-                                            {val}
-                                        </td>
-                                    );
-                                })}
-
-                                {/* actions */}
-                                <td style={{textAlign: "center", whiteSpace: "nowrap"}}>
-                                    {isEditing ? (
-                                        <>
-                                            <button onClick={submitEdit} disabled={editSaving}>
-                                                {editSaving ? "Сохр." : "✓"}
-                                            </button>
-                                            <button onClick={cancelEdit} disabled={editSaving} style={{marginLeft: 8}}>
-                                                x
-                                            </button>
-                                        </>
-                                    ) : (
-                                        <>
+                                    {/* actions */}
+                                    <td style={{textAlign: "center", whiteSpace: "nowrap"}}>
+                                        {isEditing ? (
+                                            <>
+                                                <button onClick={submitEdit} disabled={editSaving}>
+                                                    {editSaving ? "Сохр." : "✓"}
+                                                </button>
+                                                <button onClick={cancelEdit} disabled={editSaving}
+                                                        style={{marginLeft: 8}}>
+                                                    x
+                                                </button>
+                                            </>
+                                        ) : (
+                                            <>
                         <span
                             style={{display: "inline-flex", cursor: "pointer", marginRight: 10}}
                             onClick={() => startEdit(rowIdx)}
@@ -466,28 +478,31 @@ export const SubWormTable = ({
                         >
                           <EditIcon className={s.actionIcon}/>
                         </span>
-                                            <span
-                                                style={{
-                                                    display: "inline-flex",
-                                                    cursor: deletingRowIdx === rowIdx ? "progress" : "pointer",
-                                                    opacity: deletingRowIdx === rowIdx ? 0.6 : 1,
-                                                }}
-                                                onClick={() => {
-                                                    if (deletingRowIdx == null) deleteRow(rowIdx);
-                                                }}
-                                                title="Удалить"
-                                            >
+                                                <span
+                                                    style={{
+                                                        display: "inline-flex",
+                                                        cursor: deletingRowIdx === rowIdx ? "progress" : "pointer",
+                                                        opacity: deletingRowIdx === rowIdx ? 0.6 : 1,
+                                                    }}
+                                                    onClick={() => {
+                                                        if (deletingRowIdx == null) deleteRow(rowIdx);
+                                                    }}
+                                                    title="Удалить"
+                                                >
                           <DeleteIcon className={s.actionIcon}/>
                         </span>
-                                        </>
-                                    )}
-                                </td>
-                            </tr>
-                        );
-                    })}
-                    </tbody>
-                </table>
-            )}
+                                            </>
+                                        )}
+                                    </td>
+                                </tr>
+                            );
+                        })}
+                        </tbody>
+                    </table>
+                </>
+            )
+            }
         </div>
-    );
+    )
+        ;
 };
