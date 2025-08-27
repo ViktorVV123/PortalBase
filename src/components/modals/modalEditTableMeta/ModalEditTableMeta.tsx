@@ -5,25 +5,8 @@ import {
 } from '@mui/material';
 import { useState } from 'react';
 import { DTable } from "@/shared/hooks/useWorkSpaces";
-import Editicon from "@/assets/image/EditIcon.svg";
+import {dark} from "@/shared/themeUI/themeModal/ThemeModalUI";
 
-const dark = createTheme({
-    palette: { mode: 'dark', primary: { main: '#ffffff' } },
-    components: {
-        MuiOutlinedInput: {
-            styleOverrides: {
-                root: {
-                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#fff' },
-                },
-            },
-        },
-        MuiInputLabel: {
-            styleOverrides: {
-                root: { '&.Mui-focused': { color: '#fff' } },
-            },
-        },
-    },
-});
 
 type Props = {
     open: boolean;

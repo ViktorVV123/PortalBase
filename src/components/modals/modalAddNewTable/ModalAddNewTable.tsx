@@ -9,30 +9,7 @@ import {
 import {api} from '@/services/api';
 import {WorkSpaceTypes} from '@/types/typesWorkSpaces';
 import {DTable} from "@/shared/hooks/useWorkSpaces";
-
-/* ——— единый «чёрно-белый» theme как в ModalAddWorkspace ——— */
-const dark = createTheme({
-    palette: {
-        mode: 'dark',
-        primary: {main: '#ffffff'},
-    },
-    components: {
-        MuiOutlinedInput: {
-            styleOverrides: {
-                root: {
-                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                        borderColor: '#ffffff',
-                    },
-                },
-            },
-        },
-        MuiInputLabel: {
-            styleOverrides: {
-                root: {'&.Mui-focused': {color: '#ffffff'}},
-            },
-        },
-    },
-});
+import {dark} from "@/shared/themeUI/themeModal/ThemeModalUI";
 
 /* ——— типы пропсов ——— */
 type Props = {

@@ -4,46 +4,17 @@ import {
     Dialog, DialogTitle, DialogContent, DialogActions,
     TextField, Button, IconButton,
     FormControl, InputLabel, Select, MenuItem, Stack,
-    CircularProgress, ThemeProvider, CssBaseline, createTheme, SelectChangeEvent,
+    CircularProgress, ThemeProvider, SelectChangeEvent,
 } from '@mui/material';
 
 import AddIcon from '@/assets/image/AddIcon.svg';   // ← ваш SVG-компонент
 import {api} from '@/services/api';
 import {Connection} from '@/types/typesConnection';
 import * as styles from './ModalAddWorkspace.module.scss'
-import EditIcon from '@/assets/image/EditIcon.svg';
 import DeleteIcon from '@/assets/image/DeleteIcon.svg';
+import {dark} from "@/shared/themeUI/themeModal/ThemeModalUI";
 
-const dark = createTheme({
-    palette: {
-        mode: 'dark',
-        primary: {main: '#ffffff'},  // ← чтобы все focus-ring были белые
-    },
-    components: {
-        /* белый бордер при фокусе */
-        MuiOutlinedInput: {
-            styleOverrides: {
-                root: {
-                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                        borderColor: '#ffffff',
-                    },
-                },
-            },
-        },
-        /* белая подпись (label) в фокусе */
-        MuiInputLabel: {
-            styleOverrides: {
-                root: {
-                    '&.Mui-focused': {color: '#ffffff'},
-                },
-            },
-        },
-        /* белая стрелочка у Select */
-        MuiSelect: {
-            styleOverrides: {icon: {color: '#ffffff'}},
-        },
-    },
-});
+
 type Props = {
     connections: Connection[];
     onSuccess: () => void;

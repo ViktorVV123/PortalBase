@@ -3,11 +3,12 @@ import { useState } from 'react';
 import {
     Dialog, DialogTitle, DialogContent, DialogActions,
     TextField, Button, CircularProgress, CssBaseline,
-    ThemeProvider, createTheme, Box, Stack,
+    ThemeProvider, Box, Stack,
 } from '@mui/material';
 
 import { api } from '@/services/api';
 import { CreateConnectionDto } from '@/types/typesCreateConnections';
+import {dark} from "@/shared/themeUI/themeModal/ThemeModalUI";
 
 type Props = {
 open: boolean;
@@ -15,18 +16,6 @@ open: boolean;
     onCancel : () => void;
 };
 
-/* ── dark + белый фокус ── */
-const dark = createTheme({
-    palette:{ mode:'dark', primary:{ main:'#ffffff' } },
-    components:{
-        MuiOutlinedInput:{ styleOverrides:{ root:{
-                    '&.Mui-focused .MuiOutlinedInput-notchedOutline':{ borderColor:'#ffffff' }
-                }}},
-        MuiInputLabel:{ styleOverrides:{ root:{
-                    '&.Mui-focused':{ color:'#ffffff' }
-                }}},
-    },
-});
 
 export const ModalAddConnection = ({  open,onSuccess, onCancel }: Props) => {
     const [form, setForm] = useState<CreateConnectionDto>({

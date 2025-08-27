@@ -6,8 +6,9 @@ import {
     DialogContent,
     DialogActions,
     Button,
-    TextField, createTheme, ThemeProvider
+    TextField, ThemeProvider
 } from '@mui/material';
+import {dark} from "@/shared/themeUI/themeModal/ThemeModalUI";
 
 type Props = {
     open: boolean;
@@ -17,18 +18,7 @@ type Props = {
     defaultDescription: string;
 };
 
-/* ── dark + белый фокус ── */
-const dark = createTheme({
-    palette:{ mode:'dark', primary:{ main:'#ffffff' } },
-    components:{
-        MuiOutlinedInput:{ styleOverrides:{ root:{
-                    '&.Mui-focused .MuiOutlinedInput-notchedOutline':{ borderColor:'#ffffff' }
-                }}},
-        MuiInputLabel:{ styleOverrides:{ root:{
-                    '&.Mui-focused':{ color:'#ffffff' }
-                }}},
-    },
-});
+
 
 export const EditWorkspaceModal: React.FC<Props> = ({
                                                         open,

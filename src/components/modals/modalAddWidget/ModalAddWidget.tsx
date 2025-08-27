@@ -3,25 +3,12 @@ import {useState, ChangeEvent} from 'react';
 import {
     Dialog, DialogTitle, DialogContent, DialogActions,
     TextField, Button, Stack, CircularProgress,
-    ThemeProvider, CssBaseline, createTheme,
+    ThemeProvider,
 } from '@mui/material';
 
 import {api} from '@/services/api';
 import {DTable, Widget} from '@/shared/hooks/useWorkSpaces';
-
-const dark = createTheme({
-    palette: {mode: 'dark', primary: {main: '#ffffff'}},
-    components: {
-        MuiOutlinedInput: {
-            styleOverrides: {
-                root: {
-                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {borderColor: '#fff'},
-                }
-            }
-        },
-        MuiInputLabel: {styleOverrides: {root: {'&.Mui-focused': {color: '#fff'}}}},
-    },
-});
+import {dark} from "@/shared/themeUI/themeModal/ThemeModalUI";
 
 type Props = {
        open: boolean;

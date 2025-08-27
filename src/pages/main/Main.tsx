@@ -175,7 +175,9 @@ export const Main = () => {
 
                 />
 
-                <SetOfTables updateReference={updateReference} publishTable={publishTable} tablesByWs={tablesByWs} addWidgetColumn={addWidgetColumn} setWidgetsByTable={setWidgetsByTable} setSelectedWidget={setSelectedWidget}
+                <SetOfTables updateReference={updateReference} publishTable={publishTable} tablesByWs={tablesByWs}
+                             addWidgetColumn={addWidgetColumn} setWidgetsByTable={setWidgetsByTable}
+                             setSelectedWidget={setSelectedWidget}
                              columns={columns}
                              formDisplay={formDisplay}
                              tableName={selectedTable?.name ?? ''}
@@ -249,15 +251,15 @@ export const Main = () => {
                     open={showCreateTable}
                     workspace={createTblWs}
                     onSuccess={async (newTable) => {
-                             /* 1. закрываем модалку */
-                                 setShowCreateTable(false);
+                        /* 1. закрываем модалку */
+                        setShowCreateTable(false);
 
-                                 /* 2. перезагружаем список таблиц этого WS (чтобы кэш был актуален) */
-                                     await loadTables(newTable.workspace_id, true);
+                        /* 2. перезагружаем список таблиц этого WS (чтобы кэш был актуален) */
+                        await loadTables(newTable.workspace_id, true);
 
-                                 /* 3. и сразу выбираем только что созданную */
-                                     handleSelectTable(newTable);
-                           }}
+                        /* 3. и сразу выбираем только что созданную */
+                        handleSelectTable(newTable);
+                    }}
                     onCancel={() => setShowCreateTable(false)}
                 />
             )}
@@ -267,15 +269,15 @@ export const Main = () => {
                     open={showCreateWidget}
                     table={createWidgetTable}
                     onSuccess={async (newWidget) => {
-                             /* 1. закрываем модалку */
-                                 setShowCreateWidget(false);
+                        /* 1. закрываем модалку */
+                        setShowCreateWidget(false);
 
-                                 /* 2. обновляем кэш виджетов таблицы */
-                                     await loadWidgetsForTable(newWidget.table_id, true);
+                        /* 2. обновляем кэш виджетов таблицы */
+                        await loadWidgetsForTable(newWidget.table_id, true);
 
-                                 /* 3. сразу переключаемся на созданный виджет */
-                                     handleSelectWidget(newWidget);
-                           }}
+                        /* 3. сразу переключаемся на созданный виджет */
+                        handleSelectWidget(newWidget);
+                    }}
                     onCancel={() => setShowCreateWidget(false)}
                 />
             )}

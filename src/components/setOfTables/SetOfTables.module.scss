@@ -51,6 +51,7 @@ h2 {
 
 /* ───── таблица ───── */
 .tbl {
+  text-align: center;
   width: 100%;
   max-height: calc(100vh - 200px); // подстрой под свою высоту хедера/фильтров
   overflow-y: auto;
@@ -200,6 +201,7 @@ td {
   fill: #fff;
   color: #fff;
   cursor: pointer;
+
 }
 
 
@@ -232,6 +234,7 @@ td {
   border: 1px solid var(--header-color);
   border-radius: 4px;
 
+
   /* Кастомный скролл для WebKit (Chrome, Safari, Edge) */
   .scenarioWrapper::-webkit-scrollbar {
     height: 5px; /* Высота скроллбара */
@@ -253,6 +256,7 @@ td {
   overflow-y: auto;
   overflow-x: auto;
   border-radius: 4px;
+  text-align: center;
 
 
   /* Кастомный скролл для WebKit (Chrome, Safari, Edge) */

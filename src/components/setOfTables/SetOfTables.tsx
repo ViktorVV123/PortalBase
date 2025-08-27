@@ -133,14 +133,14 @@ export const SetOfTables: React.FC<Props> = ({
                                                  updateTableMeta,
                                                  setSelectedWidget,
                                                  addWidgetColumn,
-                                                 tablesByWs,
+
                                                  publishTable,
                                                  updateReference
 
                                              }) => {
 
-    const [editingWcId, setEditingWcId] = useState<number | null>(null);
-    const [wcValues, setWcValues] = useState<Partial<WidgetColumn>>({});
+    const [editingWcId] = useState<number | null>(null);
+    const [wcValues] = useState<Partial<WidgetColumn>>({});
     const [referencesMap, setReferencesMap] = useState<Record<number, WcReference[]>>({});
     // состояние для актуальных ссылок с фронта
     const [liveRefsForHeader, setLiveRefsForHeader] = useState<Record<number, WcReference[]> | null>(null);
@@ -175,7 +175,7 @@ export const SetOfTables: React.FC<Props> = ({
 
                 const labels =
                     refs.length > 0
-                        ? refs.map(r => r.ref_alias || r.table_column?.name || '—')
+                        ? refs.map(r => r.ref_alias || '')
                         : ['—'];
 
                 // ⬅️ ДОБАВЛЕНО: порядок reference по table_column_id
@@ -193,8 +193,6 @@ export const SetOfTables: React.FC<Props> = ({
         items.sort((a, b) => (a.order - b.order) || (a.id - b.id));
         return items;
     }, [widgetColumns, referencesMap, liveRefsForHeader, editingWcId, wcValues]);
-
-
 
     if (loading) return <p>Загрузка…</p>;
     if (error) return <p className={s.error}>{error}</p>;
