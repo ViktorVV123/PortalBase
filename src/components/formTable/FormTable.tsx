@@ -783,7 +783,7 @@ export const FormTable: React.FC<Props> = ({
                         </tbody>
                     </table>
 
-                    <SubWormTable selectedFormId={selectedFormId} selectedWidget={selectedWidget} formId={formIdForSub}
+                    <SubWormTable  selectedFormId={selectedFormId} selectedWidget={selectedWidget} formId={formIdForSub}
                                   subWidgetIdByOrder={subWidgetIdByOrder} subLoading={subLoading} subError={subError}
                                   subDisplay={subDisplay}
                                   handleTabClick={handleTabClick}/>

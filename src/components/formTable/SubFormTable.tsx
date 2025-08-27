@@ -1,9 +1,12 @@
-import React, { useMemo, useState } from 'react';
+import React, {useMemo, useState} from 'react';
 import * as s from "@/components/setOfTables/SetOfTables.module.scss";
-import { SubDisplay, DTable, Widget } from "@/shared/hooks/useWorkSpaces";
-import { api } from "@/services/api";
+import {SubDisplay, DTable, Widget} from "@/shared/hooks/useWorkSpaces";
+import {api} from "@/services/api";
 import EditIcon from '@/assets/image/EditIcon.svg';
 import DeleteIcon from '@/assets/image/DeleteIcon.svg';
+import {ButtonForm} from "@/shared/buttonForm/ButtonForm";
+import * as styles from "@/components/formTable/AllFormStyle.module.scss";
+import {TextField} from "@mui/material";
 
 type SubformProps = {
     subDisplay: SubDisplay | null;
@@ -16,6 +19,8 @@ type SubformProps = {
 
     /** маппинг «widget_order → sub_widget_id» */
     subWidgetIdByOrder: Record<number, number>;
+    selectedWidget: Widget | null;
+    selectedFormId: number | null;
 };
 
 export const SubWormTable = ({
@@ -25,6 +30,8 @@ export const SubWormTable = ({
                                  subError,
                                  formId,
                                  subWidgetIdByOrder,
+                                 selectedWidget,
+                                 selectedFormId,
                              }: SubformProps) => {
     const hasTabs = (subDisplay?.sub_widgets?.length ?? 0) > 0;
 
@@ -57,7 +64,7 @@ export const SubWormTable = ({
                 i++;
             }
 
-            const labels = cols.map((c: any) => c.subcolumn_name ?? "—");
+            const labels = cols.map((c: any) => c.ref_alias ?? "—");
 
             groups.push({
                 id: wcId,
@@ -100,8 +107,8 @@ export const SubWormTable = ({
         }
         // префлайт INSERT (не блокируем при ошибке запроса метаданных)
         try {
-            const { data: widget } = await api.get<Widget>(`/widgets/${currentWidgetId}`);
-            const { data: table } = await api.get<DTable>(`/tables/${widget.table_id}`);
+            const {data: widget} = await api.get<Widget>(`/widgets/${currentWidgetId}`);
+            const {data: table} = await api.get<DTable>(`/tables/${widget.table_id}`);
             if (!table?.insert_query || !table.insert_query.trim()) {
                 alert("Для таблицы саб-виджета не настроен INSERT QUERY.");
                 return;
@@ -134,7 +141,7 @@ export const SubWormTable = ({
                     value: String(value),
                 }));
 
-            const body = { pk: {}, values };
+            const body = {pk: {}, values};
             const url = `/data/${formId}/${currentWidgetId}`;
 
             try {
@@ -173,18 +180,18 @@ export const SubWormTable = ({
     const [editSaving, setEditSaving] = useState(false);
 
     const preflightUpdate = async (): Promise<{ ok: boolean }> => {
-        if (!currentWidgetId) return { ok: false };
+        if (!currentWidgetId) return {ok: false};
         try {
-            const { data: widget } = await api.get<Widget>(`/widgets/${currentWidgetId}`);
-            const { data: table } = await api.get<DTable>(`/tables/${widget.table_id}`);
+            const {data: widget} = await api.get<Widget>(`/widgets/${currentWidgetId}`);
+            const {data: table} = await api.get<DTable>(`/tables/${widget.table_id}`);
             if (!table?.update_query || !table.update_query.trim()) {
                 alert("Для таблицы саб-виджета не настроен UPDATE QUERY.");
-                return { ok: false };
+                return {ok: false};
             }
         } catch (e) {
             console.warn("preflight (sub/update) failed:", e);
         }
-        return { ok: true };
+        return {ok: true};
     };
 
     const startEdit = async (rowIdx: number) => {
@@ -270,18 +277,18 @@ export const SubWormTable = ({
     const [deletingRowIdx, setDeletingRowIdx] = useState<number | null>(null);
 
     const preflightDelete = async (): Promise<{ ok: boolean }> => {
-        if (!currentWidgetId) return { ok: false };
+        if (!currentWidgetId) return {ok: false};
         try {
-            const { data: widget } = await api.get<Widget>(`/widgets/${currentWidgetId}`);
-            const { data: table } = await api.get<DTable>(`/tables/${widget.table_id}`);
+            const {data: widget} = await api.get<Widget>(`/widgets/${currentWidgetId}`);
+            const {data: table} = await api.get<DTable>(`/tables/${widget.table_id}`);
             if (!table?.delete_query || !table.delete_query.trim()) {
                 alert("Для таблицы саб-виджета не настроен DELETE QUERY.");
-                return { ok: false };
+                return {ok: false};
             }
         } catch (e) {
             console.warn("preflight (sub/delete) failed:", e);
         }
-        return { ok: true };
+        return {ok: true};
     };
 
     const deleteRow = async (rowIdx: number) => {
@@ -299,11 +306,11 @@ export const SubWormTable = ({
 
         setDeletingRowIdx(rowIdx);
         try {
-            const body = { primary_keys: pkObj };
+            const body = {primary_keys: pkObj};
             const url = `/data/${formId}/${currentWidgetId}`;
 
             try {
-                await api.delete(url, { data: body });
+                await api.delete(url, {data: body});
             } catch (err: any) {
                 const status = err?.response?.status;
                 const detail = err?.response?.data?.detail ?? err?.response?.data ?? err?.message;
@@ -312,7 +319,7 @@ export const SubWormTable = ({
                     return;
                 }
                 if (status === 404) {
-                    await api.delete(`${url}/`, { data: body });
+                    await api.delete(`${url}/`, {data: body});
                 } else {
                     throw err;
                 }
@@ -330,7 +337,8 @@ export const SubWormTable = ({
     };
 
     return (
-        <div>
+        <div style={{position: 'relative'}}>
+
             {hasTabs && (
                 <ul className={s.tabs}>
                     {subDisplay!.sub_widgets.map((sw) => {
@@ -349,27 +357,8 @@ export const SubWormTable = ({
                 </ul>
             )}
 
+
             {/* панель действий */}
-            <div style={{ display: "flex", gap: 10, margin: "8px 0" }}>
-                {!isAdding ? (
-                    <button
-                        onClick={startAdd}
-                        disabled={!formId || !currentWidgetId || subLoading}
-                        title={!formId || !currentWidgetId ? "Нет formId или sub_widget_id" : "Добавить строку"}
-                    >
-                        Добавить ---
-                    </button>
-                ) : (
-                    <>
-                        <button onClick={submitAdd} disabled={saving}>
-                            {saving ? "Сохранение…" : "Сохранить"}
-                        </button>
-                        <button onClick={cancelAdd} disabled={saving}>
-                            Отменить
-                        </button>
-                    </>
-                )}
-            </div>
 
             {!subDisplay ? null : subLoading ? (
                 <p>Загрузка sub-виджета…</p>
@@ -377,22 +366,29 @@ export const SubWormTable = ({
                 <p className={s.error}>{subError}</p>
             ) : (
                 <table className={s.tbl}>
+                    <div className={styles.floatActions} style={{top: '15%'}}>
+                        <ButtonForm cancelAdd={cancelAdd} startAdd={startAdd} isAdding={isAdding} submitAdd={submitAdd}
+                                    saving={saving} selectedWidget={selectedWidget} selectedFormId={selectedFormId}/>
+                    </div>
                     <thead>
-                    <tr>
-                        {headerPlan.map((g) => (
-                            <th key={`sub-g-top-${g.id}`} colSpan={g.cols.length || 1}>
+                    {/* верхняя строка — названия групп */}
+                    <tr style={{padding: 25}}>
+                        {headerPlan.map(g => (
+                            <th key={`g-top-${g.id}`} colSpan={g.cols.length || 1}>
                                 {g.title}
                             </th>
                         ))}
-                        <th /> {/* actions */}
+                        <th></th>
                     </tr>
+
+                    {/* нижняя строка — подписи для каждой «реальной» колонки в группе */}
                     <tr>
-                        {headerPlan.map((g) =>
+                        {headerPlan.map(g =>
                             g.labels.slice(0, g.cols.length).map((label, idx) => (
-                                <th key={`sub-g-sub-${g.id}-${idx}`}>{label}</th>
+                                <th key={`g-sub-${g.id}-${idx}`}>{label}</th>
                             ))
                         )}
-                        <th />
+                        <th></th>
                     </tr>
                     </thead>
 
@@ -402,17 +398,17 @@ export const SubWormTable = ({
                         <tr>
                             {flatColumnsInRenderOrder.map((col) => (
                                 <td key={`sub-add-wc${col.widget_column_id}-tc${col.table_column_id}`}>
-                                    <input
-                                        value={draft[col.table_column_id] ?? ""}
-                                        onChange={(e) => {
-                                            const v = e.target.value;
-                                            setDraft((prev) => ({ ...prev, [col.table_column_id]: v }));
-                                        }}
-                                        placeholder={col.placeholder ?? col.column_name}
+                                    <TextField size={"small"}
+                                               value={draft[col.table_column_id] ?? ""}
+                                               onChange={(e) => {
+                                                   const v = e.target.value;
+                                                   setDraft((prev) => ({...prev, [col.table_column_id]: v}));
+                                               }}
+                                               placeholder={col.placeholder ?? col.column_name}
                                     />
                                 </td>
                             ))}
-                            <td />
+                            <td/>
                         </tr>
                     )}
 
@@ -432,7 +428,10 @@ export const SubWormTable = ({
                                                 <input
                                                     value={editDraft[col.table_column_id] ?? ""}
                                                     onChange={(e) =>
-                                                        setEditDraft((prev) => ({ ...prev, [col.table_column_id]: e.target.value }))
+                                                        setEditDraft((prev) => ({
+                                                            ...prev,
+                                                            [col.table_column_id]: e.target.value
+                                                        }))
                                                     }
                                                     placeholder={col.placeholder ?? col.column_name}
                                                 />
@@ -448,24 +447,24 @@ export const SubWormTable = ({
                                 })}
 
                                 {/* actions */}
-                                <td style={{ textAlign: "center", whiteSpace: "nowrap" }}>
+                                <td style={{textAlign: "center", whiteSpace: "nowrap"}}>
                                     {isEditing ? (
                                         <>
                                             <button onClick={submitEdit} disabled={editSaving}>
-                                                {editSaving ? "Сохр." : "Сохранить"}
+                                                {editSaving ? "Сохр." : "✓"}
                                             </button>
-                                            <button onClick={cancelEdit} disabled={editSaving} style={{ marginLeft: 8 }}>
-                                                Отменить
+                                            <button onClick={cancelEdit} disabled={editSaving} style={{marginLeft: 8}}>
+                                                x
                                             </button>
                                         </>
                                     ) : (
                                         <>
                         <span
-                            style={{ display: "inline-flex", cursor: "pointer", marginRight: 10 }}
+                            style={{display: "inline-flex", cursor: "pointer", marginRight: 10}}
                             onClick={() => startEdit(rowIdx)}
                             title="Редактировать"
                         >
-                          <EditIcon className={s.actionIcon} />
+                          <EditIcon className={s.actionIcon}/>
                         </span>
                                             <span
                                                 style={{
@@ -478,7 +477,7 @@ export const SubWormTable = ({
                                                 }}
                                                 title="Удалить"
                                             >
-                          <DeleteIcon className={s.actionIcon} />
+                          <DeleteIcon className={s.actionIcon}/>
                         </span>
                                         </>
                                     )}
