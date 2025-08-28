@@ -12,7 +12,7 @@ import {FormTable} from "@/components/formTable/FormTable";
 import {TableColumn} from "@/components/tableColumn/TableColumn";
 import {WcReference, WidgetColumnsOfTable} from '@/components/WidgetColumnsOfTable/WidgetColumnsOfTable'
 import {TableListView} from "@/components/tableColumn/TableListView";
-import {buildHeaderGroupsFromWidgetColumns, HeaderGroup} from "@/shared/headerGroups";
+import {buildHeaderGroupsFromWidgetColumns, HeaderGroup} from "@/shared/utils/headerGroups";
 import {api} from "@/services/api";
 
 type Props = {
