@@ -179,6 +179,13 @@ export type HeaderGroup = {
     labels: string[];
 };
 
+export type NewFormPayload = {
+    main_widget_id: number;
+    name: string;
+    description?: string | null;
+    path?: string | null;
+};
+
 
 // shared/hooks/useWorkSpaces.ts
 export const useWorkSpaces = () => {
@@ -462,22 +469,91 @@ export const useWorkSpaces = () => {
     //НАЧАЛО WIDGET (удаление ,update b т.д)
 
     const [formsByWidget, setFormsByWidget] = useState<Record<number, WidgetForm>>({});
+    const [formsListByWidget, setFormsListByWidget] =
+        useState<Record<number, WidgetForm[]>>({});
 
 
     /* ─ загружаем все формы один раз ─ */
     const loadWidgetForms = useCallback(async () => {
-        if (Object.keys(formsByWidget).length) return;      // уже загружено
-        const {data} = await api.get<WidgetForm[]>('/forms');
-        const map: Record<number, WidgetForm> = {};
-        data.forEach(f => {
-            const sortedSubs = [...f.sub_widgets].sort(
-                (a, b) => a.widget_order - b.widget_order
-            );
+        if (Object.keys(formsByWidget).length) return; // уже загружено
 
-            map[f.main_widget_id] = {...f, sub_widgets: sortedSubs};
-        });       // сохраняем OBJECT
-        setFormsByWidget(map);
+        const { data } = await api.get<WidgetForm[]>('/forms');
+
+        const one: Record<number, WidgetForm> = {};
+        const list: Record<number, WidgetForm[]> = {};
+
+        data.forEach((f) => {
+            const sortedSubs = [...f.sub_widgets].sort((a, b) => a.widget_order - b.widget_order);
+            const normalized = { ...f, sub_widgets: sortedSubs };
+
+            // копим все формы по виджету
+            (list[f.main_widget_id] ??= []).push(normalized);
+
+            // для обратной совместимости — выбираем "основную"
+            one[f.main_widget_id] = normalized; // можно взять последнюю или первую
+        });
+
+        setFormsByWidget(one);          // старое поведение сохраняем
+        setFormsListByWidget(list);     // новое — для меню
     }, [formsByWidget]);
+
+
+    // ⬇️ форс-перезагрузка форм (всегда тянем заново)
+    const reloadWidgetForms = useCallback(async () => {
+        const { data } = await api.get<WidgetForm[]>('/forms');
+
+        const one: Record<number, WidgetForm> = {};
+        const list: Record<number, WidgetForm[]> = {};
+
+        data.forEach((f) => {
+            const sortedSubs = [...f.sub_widgets].sort((a, b) => a.widget_order - b.widget_order);
+            const normalized = { ...f, sub_widgets: sortedSubs };
+            (list[f.main_widget_id] ??= []).push(normalized);
+            one[f.main_widget_id] = normalized;
+        });
+
+        setFormsByWidget(one);
+        setFormsListByWidget(list);
+    }, []);
+
+
+    // ⬇️ создание формы
+    const addForm = useCallback(async (payload: NewFormPayload) => {
+        const { data } = await api.post<WidgetForm>('/forms/', { form: payload });
+        const normalized = {
+            ...data,
+            sub_widgets: [...data.sub_widgets].sort((a,b)=>a.widget_order-b.widget_order),
+        };
+
+        // обновляем «одиночную» карту (совместимость)
+        setFormsByWidget(prev => ({ ...prev, [data.main_widget_id]: normalized }));
+
+        // обновляем список форм по виджету
+        setFormsListByWidget(prev => ({
+            ...prev,
+            [data.main_widget_id]: [ ...(prev[data.main_widget_id] ?? []), normalized ],
+        }));
+
+        // на всякий — подтягиваем всё с бэка
+        await reloadWidgetForms();
+        return data;
+    }, [reloadWidgetForms]);
+
+    // ⬇️ НОВОЕ: удаление формы
+    const deleteForm = useCallback(async (formId: number) => {
+        try {
+            await api.delete(`/forms/${formId}`);
+        } catch (err: any) {
+            // на случай, если роут ожидает слэш
+            if (err?.response?.status === 404) {
+                await api.delete(`/forms/${formId}/`);
+            } else {
+                throw err;
+            }
+        }
+        await reloadWidgetForms(); // синхронизируем меню
+    }, [reloadWidgetForms]);
+
 
 
 
@@ -828,7 +904,13 @@ export const useWorkSpaces = () => {
         addWidgetColumn,
         publishTable,
         deleteConnection,
-        updateReference
+        updateReference,
+        addForm,
+        reloadWidgetForms,
+        formsListByWidget,     // ← НОВОЕ
+        deleteForm,
+
+
 
     };
 };

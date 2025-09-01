@@ -1,8 +1,8 @@
 // components/headerComponent/TopComponent.tsx
-import React, {useEffect, useRef, useState} from 'react';
+import React, {useEffect, useMemo, useRef, useState} from 'react';
 import * as s from './TopComponent.module.scss';
 import {WorkSpaceTypes} from '@/types/typesWorkSpaces';
-import {DTable, Widget} from '@/shared/hooks/useWorkSpaces';
+import {DTable, NewFormPayload, Widget, WidgetForm} from '@/shared/hooks/useWorkSpaces';
 
 import WorkspacesIcon from '@/assets/image/WorkspacesIcon.svg';
 import TableIcon from '@/assets/image/TableIcon.svg';
@@ -49,12 +49,22 @@ type Props = {
 
     deleteWidget: (widgetId: number, tableId: number) => void;
     loadFormTree: (formId: number) => Promise<void>;
-    loadWorkSpaces:() =>void
+    loadWorkSpaces: () => void
+    addForm: (payload: NewFormPayload) => Promise<WidgetForm>;
+    reloadWidgetForms: () => Promise<void>;
+    setShowCreateFormModal: (v: boolean) => void;
+    setCreateFormWidget: (w: Widget) => void;
+    formsListByWidget: Record<number, WidgetForm[]>;
+    deleteForm: (formId: number) => Promise<void>;
 
 };
 
 export const TopComponent: React.FC<Props> = ({
                                                   workSpaces,
+                                                  addForm,
+                                                  setShowCreateFormModal,
+                                                  setCreateFormWidget,
+                                                  reloadWidgetForms,
                                                   tablesByWs,
                                                   loadTables,
                                                   handleSelectTable,
@@ -77,9 +87,10 @@ export const TopComponent: React.FC<Props> = ({
                                                   navOpen,
                                                   setShowCreateForm,
                                                   deleteWidget,
-
+                                                  formsListByWidget,
                                                   loadFormTree,
-                                                  loadWorkSpaces
+                                                  loadWorkSpaces,
+                                                  deleteForm
                                               }) => {
 
     const [open, setOpen] = useState(false);
@@ -129,13 +140,13 @@ export const TopComponent: React.FC<Props> = ({
 
     // Типы с полями, которые нам нужны из API
     type ApiWidget = Widget & { table_id: number };
-    type ApiTable  = DTable  & { workspace_id: number }; // если у тебя другое имя поля — подставь его
+    type ApiTable = DTable & { workspace_id: number }; // если у тебя другое имя поля — подставь его
 
     const openFormWithPreload = async (widgetId: number, formId: number) => {
         try {
             // 1) тянем метаданные виджета и таблицы
-            const { data: widget } = await api.get<ApiWidget>(`/widgets/${widgetId}`);
-            const { data: table  } = await api.get<ApiTable>(`/tables/${widget.table_id}`);
+            const {data: widget} = await api.get<ApiWidget>(`/widgets/${widgetId}`);
+            const {data: table} = await api.get<ApiTable>(`/tables/${widget.table_id}`);
 
             // 2) заранее грузим таблицы ВП и виджеты таблицы — чтобы выпадашка имела данные
             await loadTables(table.workspace_id, true);   // force=true, если у тебя есть такая опция
@@ -162,6 +173,55 @@ export const TopComponent: React.FC<Props> = ({
     };
 
 
+    // внутри компонента TopComponent
+    const handleCreateForm = async (w: Widget) => {
+        // простое диалоговое окошко — без отдельной модалки (по аналогии с пунктами «создать» выше)
+        const name = prompt('Название формы', 'Новая форма');
+        if (!name) return;
+
+        const description = prompt('Описание (необязательно)', '') || null;
+        const path = prompt('Path (необязательно)', '') || null;
+
+        try {
+            const created = await addForm({
+                main_widget_id: w.id,
+                name,
+                description,
+                path,
+            });
+
+            // сразу откроем созданную форму пользователю
+            handleSelectWidget(w);
+            handleSelectForm(created.form_id);
+            await loadFormTree(created.form_id);
+
+            closeMenu();
+        } catch (e) {
+            console.warn('Не удалось создать форму:', e);
+            alert('Не удалось создать форму');
+        }
+    };
+    const allFormsMap = useMemo(() => {
+        const map: Record<number, { form_id: number; name: string; main_widget_id: number }> = {};
+
+        if (formsListByWidget && Object.keys(formsListByWidget).length) {
+            Object.values(formsListByWidget).forEach(formsArr => {
+                formsArr.forEach(f => {
+                    map[f.form_id] = {form_id: f.form_id, name: f.name, main_widget_id: f.main_widget_id};
+                });
+            });
+        } else {
+            // fallback: старый объект с одной формой на виджет — положим что есть
+            Object.values(formsByWidget).forEach((f: any) => {
+                if (!f) return;
+                map[f.form_id] = {form_id: f.form_id, name: f.name, main_widget_id: f.main_widget_id};
+            });
+        }
+
+        return map;
+    }, [formsListByWidget, formsByWidget]);
+
+    const clip = (s: string, n = 5) => s.length > n ? s.slice(0, n) + '…' : s;
 
     return (
         <div className={s.bar}>
@@ -178,7 +238,7 @@ export const TopComponent: React.FC<Props> = ({
                         <SideNav
                             open={navOpen}
                             toggle={toogleOpenSide}
-                            formsByWidget={formsByWidget}
+                            formsByWidget={allFormsMap}
                             openForm={openFormWithPreload}
                         />
 
@@ -217,10 +277,11 @@ export const TopComponent: React.FC<Props> = ({
                                             {/* текст — отдельный элемент, чтобы управлять flex-свойствами */}
                                             <span className={s.wsName}>{ws.name}</span>
 
-                                            <span className={s.tooltip}><strong>Описание:</strong>{ws.description}</span>
+                                            <span
+                                                className={s.tooltip}><strong>Описание:</strong>{ws.description}</span>
 
 
-                                            <div style={{display: 'flex', gap:4, alignItems:'center'}}>
+                                            <div style={{display: 'flex', gap: 4, alignItems: 'center'}}>
                                                 <EditIcon
                                                     className={s.actionIcon}
                                                     onClick={(e) => {
@@ -288,7 +349,7 @@ export const TopComponent: React.FC<Props> = ({
                                                     <div className={s.spaceWN}>
                                                         <TableIcon className={s.actionIcon} width={16} height={16}/>
                                                         <span className={s.wsName}>{t.name}</span>
-                                                        <div style={{display: 'flex', gap:4, alignItems:'center'}}>
+                                                        <div style={{display: 'flex', gap: 4, alignItems: 'center'}}>
                                                             <DeleteIcon
                                                                 style={{cursor: 'pointer'}}
                                                                 onClick={e => {
@@ -364,24 +425,62 @@ export const TopComponent: React.FC<Props> = ({
                                                                             <ul className={s.menuLv3}>
                                                                                 <span
                                                                                     className={s.spanName}>Формы</span>
+
                                                                                 <li
-                                                                                    className={formObj ? '' : s.disabled}
-                                                                                    onClick={async e => {
+                                                                                    className={s.disabled}
+                                                                                    onClick={(e) => {
                                                                                         e.stopPropagation();
-                                                                                        if (!formObj) return;
-
-                                                                                        handleSelectTable(t);
-                                                                                        handleSelectWidget(w);
-                                                                                        handleSelectForm(formObj.form_id);
-                                                                                        await loadFormTree(formObj.form_id); // ← загружаем справочники
-
+                                                                                        setCreateFormWidget(w);
+                                                                                        setShowCreateFormModal(true);
                                                                                         closeMenu();
                                                                                     }}
                                                                                 >
-                                                                                    <FormIcon
-                                                                                        className={s.actionIcon}/>
-                                                                                    {formName}
+                                                                                    <AddIcon className={s.actionIcon}
+                                                                                             width={16}
+                                                                                             height={16}/> создать
                                                                                 </li>
+
+                                                                                {(formsListByWidget[w.id] ?? []).map(form => {
+
+                                                                                    const onDelete = async (e: React.MouseEvent) => {
+                                                                                        e.stopPropagation();
+                                                                                        if (confirm(`Удалить форму «${form.name}»?`)) {
+                                                                                            await deleteForm(form.form_id);
+                                                                                            // опционально: если хочешь закрыть меню после удаления:
+                                                                                            // closeMenu();
+                                                                                        }
+                                                                                    };
+
+                                                                                    return (
+                                                                                        <li
+                                                                                            key={form.form_id}
+                                                                                            onClick={async e => {
+                                                                                                e.stopPropagation();
+                                                                                                handleSelectTable(t);
+                                                                                                handleSelectWidget(w);
+                                                                                                handleSelectForm(form.form_id);
+                                                                                                await loadFormTree(form.form_id);
+                                                                                                closeMenu();
+                                                                                            }}
+                                                                                        >
+                                                                                            <div className={s.spaceWN}>
+                                                                                                <FormIcon
+                                                                                                    className={s.actionIcon}/>
+                                                                                                <span
+                                                                                                    className={s.wsName}
+                                                                                                    title={form.name}>{clip(form.name, 15)}</span>
+
+                                                                                               {/* <EditIcon className={s.actionIcon}/>*/}
+                                                                                                <DeleteIcon onClick={onDelete} className={s.actionIcon}/>
+                                                                                            </div>
+
+                                                                                        </li>
+                                                                                    )
+                                                                                })}
+                                                                                {(formsListByWidget[w.id]?.length ?? 0) === 0 && (
+                                                                                    <li className={s.disabled}>нет
+                                                                                        форм</li>
+                                                                                )}
                                                                             </ul>
                                                                         )}
                                                                     </li>
@@ -405,7 +504,7 @@ export const TopComponent: React.FC<Props> = ({
                     onClose={() => setEditModalOpen(false)}
                     defaultName={selectedWS.name}
                     defaultDescription={selectedWS.description}
-                    onSubmit={async ({ name, description }) => {
+                    onSubmit={async ({name, description}) => {
                         try {
                             await api.patch(`/workspaces/${selectedWS.id}`, {
                                 name,

@@ -1,5 +1,5 @@
 import React, {useEffect, useState} from 'react';
-import {DTable, useWorkSpaces, Widget} from '@/shared/hooks/useWorkSpaces';
+import {DTable, useWorkSpaces, Widget, WidgetForm} from '@/shared/hooks/useWorkSpaces';
 
 import * as styles from './Main.module.scss'
 import {SetOfTables} from "@/components/setOfTables/SetOfTables";
@@ -9,6 +9,7 @@ import {ModalAddConnection} from "@/components/modals/modalAddConnection/ModalAd
 import {WorkSpaceTypes} from "@/types/typesWorkSpaces";
 import {ModalAddTable} from "@/components/modals/modalAddNewTable/ModalAddNewTable";
 import {ModalAddWidget} from "@/components/modals/modalAddWidget/ModalAddWidget";
+import {ModalAddForm} from "@/components/modals/modalAddForm/ModalAddForm";
 
 
 export const Main = () => {
@@ -24,6 +25,8 @@ export const Main = () => {
     const [createTblWs, setCreateTblWs] = useState<WorkSpaceTypes | null>(null)
     const [showCreateWidget, setShowCreateWidget] = useState(false);
     const [createWidgetTable, setCreateWidgetTable] = useState<DTable | null>(null);
+    const [showCreateFormModal, setShowCreateFormModal] = useState(false);
+    const [createFormWidget, setCreateFormWidget] = useState<Widget | null>(null);
 
 
     const {
@@ -77,6 +80,10 @@ export const Main = () => {
         publishTable,
         deleteConnection,
         updateReference,
+        addForm,
+        reloadWidgetForms,
+        formsListByWidget,
+        deleteForm
     } = useWorkSpaces();
 
     useEffect(() => {
@@ -153,7 +160,11 @@ export const Main = () => {
         <div className={styles.layout}>
 
             <div className={styles.container}>
-                <TopComponent loadWorkSpaces={loadWorkSpaces} deleteWorkspace={deleteWorkspace}
+                <TopComponent
+                    addForm={addForm}
+                    deleteForm={deleteForm}
+                    reloadWidgetForms={reloadWidgetForms}
+                    loadWorkSpaces={loadWorkSpaces} deleteWorkspace={deleteWorkspace}
                               formsByWidget={formsByWidget} setWsHover={setWsHover}
                               tblHover={tblHover}
                               setTblHover={setTblHover} wsHover={wsHover}
@@ -172,6 +183,9 @@ export const Main = () => {
                               setShowCreateForm={setShowCreateForm}
                               deleteWidget={deleteWidget}
                               loadFormTree={loadFormTree}
+                    setShowCreateFormModal={setShowCreateFormModal}
+                    setCreateFormWidget={setCreateFormWidget}
+                    formsListByWidget={formsListByWidget}
 
                 />
 
@@ -281,6 +295,25 @@ export const Main = () => {
                     onCancel={() => setShowCreateWidget(false)}
                 />
             )}
+            {showCreateFormModal && createFormWidget && (
+                <ModalAddForm
+                    open={showCreateFormModal}
+                    widget={createFormWidget}
+                    onSuccess={async (newForm) => {
+                        setShowCreateFormModal(false);
+
+                        // ⬅️ форсим актуализацию списка форм (обновит formsByWidget в hook)
+                        await reloadWidgetForms();
+
+                        // сразу открываем созданную форму
+                        handleSelectWidget(createFormWidget);
+                        handleSelectForm(newForm.form_id);
+                        await loadFormTree(newForm.form_id);
+                    }}
+                    onCancel={() => setShowCreateFormModal(false)}
+                />
+            )}
+
 
 
         </div>
