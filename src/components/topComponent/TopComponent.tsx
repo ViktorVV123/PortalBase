@@ -240,7 +240,7 @@ export const TopComponent: React.FC<Props> = ({
                         <SideNav
                             open={navOpen}
                             toggle={toogleOpenSide}
-                            formsByWidget={allFormsMap}
+
                             forms={Object.values(formsById)}
                             openForm={openFormWithPreload}
                         />

@@ -161,7 +161,7 @@ export const Main = () => {
         <div className={styles.layout}>
 
             <div className={styles.container}>
-                <TopComponent formsById={formsById}
+                <TopComponent  formsById={formsById}
                     addForm={addForm}
                     deleteForm={deleteForm}
                     reloadWidgetForms={reloadWidgetForms}
