@@ -471,6 +471,7 @@ export const TopComponent: React.FC<Props> = ({
                                                                                                     title={form.name}>{clip(form.name, 15)}</span>
 
                                                                                                {/* <EditIcon className={s.actionIcon}/>*/}
+                                                                                                <EditIcon className={s.actionIcon}/>
                                                                                                 <DeleteIcon onClick={onDelete} className={s.actionIcon}/>
                                                                                             </div>
 

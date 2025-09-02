@@ -186,6 +186,24 @@ export type NewFormPayload = {
     path?: string | null;
 };
 
+export type NewSubWidgetItem = {
+    widget_order: number;
+    where_conditional?: string | null;
+    sub_widget_id: number;
+};
+
+export type NewTreeFieldItem = {
+    column_order: number;
+    table_column_id: number;
+};
+
+export type AddFormRequest = {
+    form: NewFormPayload;
+    sub_widgets_lst?: NewSubWidgetItem[];
+    tree_fields_lst?: NewTreeFieldItem[];
+};
+
+
 
 // shared/hooks/useWorkSpaces.ts
 export const useWorkSpaces = () => {
@@ -518,26 +536,27 @@ export const useWorkSpaces = () => {
 
 
     // ⬇️ создание формы
-    const addForm = useCallback(async (payload: NewFormPayload) => {
-        const { data } = await api.post<WidgetForm>('/forms/', { form: payload });
-        const normalized = {
-            ...data,
-            sub_widgets: [...data.sub_widgets].sort((a,b)=>a.widget_order-b.widget_order),
-        };
+    const addForm = useCallback(
+        async (payload: NewFormPayload | AddFormRequest) => {
+            // поддерживаем старый вызов: addForm({ main_widget_id, name, ... })
+            const body: AddFormRequest = 'form' in payload ? payload : { form: payload };
 
-        // обновляем «одиночную» карту (совместимость)
-        setFormsByWidget(prev => ({ ...prev, [data.main_widget_id]: normalized }));
+            const { data } = await api.post<WidgetForm>('/forms/', body);
 
-        // обновляем список форм по виджету
-        setFormsListByWidget(prev => ({
-            ...prev,
-            [data.main_widget_id]: [ ...(prev[data.main_widget_id] ?? []), normalized ],
-        }));
+            // аккуратно обновим кеш (если у тебя один form на widget — оставляем как есть)
+            setFormsByWidget(prev => ({
+                ...prev,
+                [data.main_widget_id]: {
+                    ...data,
+                    sub_widgets: [...data.sub_widgets].sort((a,b)=>a.widget_order-b.widget_order)
+                }
+            }));
 
-        // на всякий — подтягиваем всё с бэка
-        await reloadWidgetForms();
-        return data;
-    }, [reloadWidgetForms]);
+            await reloadWidgetForms();
+            return data;
+        },
+        [reloadWidgetForms]
+    );
 
     // ⬇️ НОВОЕ: удаление формы
     const deleteForm = useCallback(async (formId: number) => {
