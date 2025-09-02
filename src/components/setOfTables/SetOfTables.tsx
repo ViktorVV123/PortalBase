@@ -91,6 +91,7 @@ type Props = {
     }) => Promise<WidgetColumn>;
     tablesByWs: Record<number, DTable[]>;
     publishTable: (id: number) => void
+    formsById: Record<number, WidgetForm>;
 };
 
 export const SetOfTables: React.FC<Props> = ({
@@ -135,7 +136,7 @@ export const SetOfTables: React.FC<Props> = ({
                                                  updateTableMeta,
                                                  setSelectedWidget,
                                                  addWidgetColumn,
-
+                                                 formsById,
                                                  publishTable,
                                                  updateReference
 
@@ -285,7 +286,7 @@ export const SetOfTables: React.FC<Props> = ({
                     ) : formError ? (
                         <p className={s.error}>{formError}</p>
                     ) : formDisplay ? (
-                        <FormTable subHeaderGroups={subHeaderGroups || undefined}  headerGroups={headerGroups}  setSubDisplay={setSubDisplay} formTrees={formTrees} selectedFormId={selectedFormId}
+                        <FormTable formsById={formsById} subHeaderGroups={subHeaderGroups || undefined}  headerGroups={headerGroups}  setSubDisplay={setSubDisplay} formTrees={formTrees} selectedFormId={selectedFormId}
                                    subDisplay={subDisplay} subError={subError} subLoading={subLoading}
                                    selectedWidget={selectedWidget} formsByWidget={formsByWidget}
                                    loadFilteredFormDisplay={loadFilteredFormDisplay} setFormDisplay={setFormDisplay}

@@ -486,52 +486,42 @@ export const useWorkSpaces = () => {
     );
     //НАЧАЛО WIDGET (удаление ,update b т.д)
 
+    // useWorkSpaces.ts
     const [formsByWidget, setFormsByWidget] = useState<Record<number, WidgetForm>>({});
-    const [formsListByWidget, setFormsListByWidget] =
-        useState<Record<number, WidgetForm[]>>({});
+    const [formsById, setFormsById] = useState<Record<number, WidgetForm>>({});
+    const [formsListByWidget, setFormsListByWidget] = useState<Record<number, WidgetForm[]>>({});
 
+// общий нормалайзер
+    const normalizeForms = (data: WidgetForm[]) => {
+        const byWidget: Record<number, WidgetForm> = {};
+        const byId: Record<number, WidgetForm> = {};
+        const listByWidget: Record<number, WidgetForm[]> = {};
 
-    /* ─ загружаем все формы один раз ─ */
-    const loadWidgetForms = useCallback(async () => {
-        if (Object.keys(formsByWidget).length) return; // уже загружено
-
-        const { data } = await api.get<WidgetForm[]>('/forms');
-
-        const one: Record<number, WidgetForm> = {};
-        const list: Record<number, WidgetForm[]> = {};
-
-        data.forEach((f) => {
-            const sortedSubs = [...f.sub_widgets].sort((a, b) => a.widget_order - b.widget_order);
+        data.forEach(f => {
+            const sortedSubs = [...f.sub_widgets].sort((a,b)=>a.widget_order-b.widget_order);
             const normalized = { ...f, sub_widgets: sortedSubs };
 
-            // копим все формы по виджету
-            (list[f.main_widget_id] ??= []).push(normalized);
+            byId[f.form_id] = normalized;
+            (listByWidget[f.main_widget_id] ??= []).push(normalized);
 
-            // для обратной совместимости — выбираем "основную"
-            one[f.main_widget_id] = normalized; // можно взять последнюю или первую
+            // «дефолт» форма для совместимости (первая встреченная)
+            if (!byWidget[f.main_widget_id]) byWidget[f.main_widget_id] = normalized;
         });
 
-        setFormsByWidget(one);          // старое поведение сохраняем
-        setFormsListByWidget(list);     // новое — для меню
-    }, [formsByWidget]);
+        setFormsByWidget(byWidget);
+        setFormsById(byId);
+        setFormsListByWidget(listByWidget);
+    };
 
+    const loadWidgetForms = useCallback(async () => {
+        if (Object.keys(formsById).length) return;       // уже загружено
+        const { data } = await api.get<WidgetForm[]>('/forms');
+        normalizeForms(data);
+    }, [formsById]);
 
-    // ⬇️ форс-перезагрузка форм (всегда тянем заново)
     const reloadWidgetForms = useCallback(async () => {
         const { data } = await api.get<WidgetForm[]>('/forms');
-
-        const one: Record<number, WidgetForm> = {};
-        const list: Record<number, WidgetForm[]> = {};
-
-        data.forEach((f) => {
-            const sortedSubs = [...f.sub_widgets].sort((a, b) => a.widget_order - b.widget_order);
-            const normalized = { ...f, sub_widgets: sortedSubs };
-            (list[f.main_widget_id] ??= []).push(normalized);
-            one[f.main_widget_id] = normalized;
-        });
-
-        setFormsByWidget(one);
-        setFormsListByWidget(list);
+        normalizeForms(data);
     }, []);
 
 
@@ -928,6 +918,7 @@ export const useWorkSpaces = () => {
         reloadWidgetForms,
         formsListByWidget,     // ← НОВОЕ
         deleteForm,
+        formsById
 
 
 

@@ -56,6 +56,7 @@ type Props = {
     setCreateFormWidget: (w: Widget) => void;
     formsListByWidget: Record<number, WidgetForm[]>;
     deleteForm: (formId: number) => Promise<void>;
+    formsById: Record<number, WidgetForm>;
 
 };
 
@@ -90,7 +91,8 @@ export const TopComponent: React.FC<Props> = ({
                                                   formsListByWidget,
                                                   loadFormTree,
                                                   loadWorkSpaces,
-                                                  deleteForm
+                                                  deleteForm,
+                                                  formsById
                                               }) => {
 
     const [open, setOpen] = useState(false);
@@ -239,6 +241,7 @@ export const TopComponent: React.FC<Props> = ({
                             open={navOpen}
                             toggle={toogleOpenSide}
                             formsByWidget={allFormsMap}
+                            forms={Object.values(formsById)}
                             openForm={openFormWithPreload}
                         />
 

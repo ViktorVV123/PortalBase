@@ -83,7 +83,8 @@ export const Main = () => {
         addForm,
         reloadWidgetForms,
         formsListByWidget,
-        deleteForm
+        deleteForm,
+        formsById
     } = useWorkSpaces();
 
     useEffect(() => {
@@ -160,7 +161,7 @@ export const Main = () => {
         <div className={styles.layout}>
 
             <div className={styles.container}>
-                <TopComponent
+                <TopComponent formsById={formsById}
                     addForm={addForm}
                     deleteForm={deleteForm}
                     reloadWidgetForms={reloadWidgetForms}
@@ -229,6 +230,7 @@ export const Main = () => {
                              fetchReferences={fetchReferences}
                              deleteReference={deleteReference}
                              updateWidgetMeta={updateWidgetMeta}
+                             formsById={formsById}
 
                 />
             </div>

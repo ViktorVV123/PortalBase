@@ -51,6 +51,8 @@ type Props = {
 
     /** ⬅️ новое: живая модель шапки (из WidgetColumnsOfTable.headerGroups) */
     headerGroups?: HeaderModelItem[];
+    formsById: Record<number, WidgetForm>;
+
 };
 
 
@@ -68,7 +70,8 @@ export const FormTable: React.FC<Props> = ({
                                                setFormDisplay,
                                                setSubDisplay,
                                                headerGroups,
-                                               subHeaderGroups
+                                               subHeaderGroups,
+                                               formsById
                                            }) => {
     const [lastPrimary, setLastPrimary] = useState<Record<string, unknown>>({});
     const [activeSubOrder, setActiveSubOrder] = useState<number>(0);
@@ -90,6 +93,34 @@ export const FormTable: React.FC<Props> = ({
     const [editSaving, setEditSaving] = useState(false);
 
     const [deletingRowIdx, setDeletingRowIdx] = useState<number | null>(null);
+
+
+
+    const currentForm: WidgetForm | null =
+        selectedFormId != null
+            ? (formsById[selectedFormId] ?? null)
+            : (selectedWidget ? (formsByWidget[selectedWidget.id] ?? null) : null);
+
+    // sub-widget id by order — ТОЛЬКО из текущей формы
+    const subWidgetIdByOrder = useMemo(() => {
+        const map: Record<number, number> = {};
+        currentForm?.sub_widgets.forEach(sw => {
+            map[sw.widget_order] = sw.sub_widget_id;
+        });
+        return map;
+    }, [currentForm]);
+
+    // formId для сабов — приоритет выбранной форме
+    const formIdForSub = selectedFormId ?? currentForm?.form_id ?? null;
+
+    // инициализация активной вкладки — из текущей формы
+    useEffect(() => {
+        const order0 = currentForm?.sub_widgets[0]?.widget_order ?? 0;
+        setActiveSubOrder(order0);
+        setSubDisplay(null);
+    }, [currentForm, setSubDisplay]);
+
+
 
 
     // префлайт: должен быть настроен DELETE QUERY у таблицы
@@ -307,21 +338,6 @@ export const FormTable: React.FC<Props> = ({
         setSubDisplay(null);
     }, [selectedWidget, formsByWidget, loadSubDisplay, setSubDisplay]);
 
-    const handleRowClick = (rowPk: Record<string, unknown>) => {
-        const widgetForm = formsByWidget[selectedWidget!.id];
-        if (!widgetForm) return;
-        setLastPrimary(rowPk);
-        loadSubDisplay(widgetForm.form_id, activeSubOrder, rowPk);
-    };
-
-    const handleTabClick = (order: number) => {
-        if (order === activeSubOrder) return;
-        const widgetForm = formsByWidget[selectedWidget!.id];
-        if (!widgetForm) return;
-        setActiveSubOrder(order);
-        if (Object.keys(lastPrimary).length === 0) return;
-        loadSubDisplay(widgetForm.form_id, order, lastPrimary);
-    };
 
     const handleResetFilters = async () => {
         if (!selectedFormId || !selectedWidget) return;
@@ -534,19 +550,6 @@ export const FormTable: React.FC<Props> = ({
     };
 
 
-    // внутри FormTable (после вычисления widgetForm)
-    const subWidgetIdByOrder = useMemo(() => {
-        const map: Record<number, number> = {};
-        const wf = widgetForm;
-        wf?.sub_widgets.forEach(sw => {
-            map[sw.widget_order] = sw.sub_widget_id;
-        });
-        return map;
-    }, [widgetForm]);
-
-    const formIdForSub = widgetForm?.form_id ?? selectedFormId ?? null;
-
-
     // ✦ Локальное дерево, чтобы можно было принудительно обновлять
     const [liveTree, setLiveTree] = useState<FormTreeColumn[] | null>(null);
 
@@ -567,6 +570,23 @@ export const FormTable: React.FC<Props> = ({
             console.warn('Не удалось обновить справочники (tree):', e);
         }
     };
+
+
+    // клик по строке main → грузим sub для ТОЙ ЖЕ формы
+    const handleRowClick = (rowPk: Record<string, unknown>) => {
+        if (!formIdForSub) return;
+        setLastPrimary(rowPk);
+        loadSubDisplay(formIdForSub, activeSubOrder, rowPk);
+    };
+
+    // переключение вкладок sub
+    const handleTabClick = (order: number) => {
+        if (order === activeSubOrder) return;
+        setActiveSubOrder(order);
+        if (!formIdForSub || Object.keys(lastPrimary).length === 0) return;
+        loadSubDisplay(formIdForSub, order, lastPrimary);
+    };
+
 
 
     return (
