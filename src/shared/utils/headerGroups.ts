@@ -1,40 +1,54 @@
-// src/shared/headerGroups.ts
+// utils/headerGroups.ts
+import {WidgetColumn} from "@/shared/hooks/useWorkSpaces";
+
 export type HeaderGroup = {
-    id: number;            // widget_column_id
+    id: number;
     title: string;
-    labels: string[];      // ref_alias'ы (или fallback)
-    refIds: number[];      // порядок reference по table_column_id
+    labels: string[];
+    refIds: number[];
+    span: number;
+    order: number;
 };
 
-type Wc = { id: number; alias?: string|null; visible: boolean; column_order?: number; reference?: any[] };
+type Wc = WidgetColumn;           // если у тебя алиас
+type WcReference = WidgetColumn['reference'][number];
 
 export function buildHeaderGroupsFromWidgetColumns(
     widgetColumns: Wc[],
-    referencesMap: Record<number, any[]>   // wc.id -> refs[]
+    referencesMap: Record<number, WcReference[]>, // wc.id -> refs[]
 ): HeaderGroup[] {
     const items = widgetColumns
-        .filter(wc => wc.visible !== false)
         .map((wc) => {
             const refs = referencesMap[wc.id] ?? wc.reference ?? [];
+
+            // Группа видима, если есть хотя бы один "видимый" ref
+            const groupVisible = refs.some(r => r.visible !== false);
+            if (!groupVisible) return null;
 
             const title =
                 (wc.alias ?? '').trim() ||
                 refs[0]?.table_column?.name ||
                 `Колонка #${wc.id}`;
 
-            const labels =
-                refs.length > 0
-                    ? refs.map((r: any) => r.ref_alias || '')
-                    : ['—'];
+            const labels = refs.length
+                ? refs.map(r => r.ref_alias || '')
+                : ['—'];
 
-            const refIds =
-                refs.length > 0
-                    ? refs.map((r: any) => r.table_column?.id).filter(Boolean)
-                    : [];
+            const refIds = refs
+                .map(r => r.table_column?.id)
+                .filter((id): id is number => !!id);
 
-            return { id: wc.id, title, labels, refIds };
-        });
+            return {
+                id: wc.id,
+                title,
+                labels,
+                refIds,
+                span: Math.max(1, refs.length || 1),
+                order: wc.column_order ?? 0,
+            };
+        })
+        .filter(Boolean) as HeaderGroup[];
 
-    // порядок пусть задаётся по column_order, если нужно — добавь сортировку тут
+    items.sort((a, b) => (a.order - b.order) || (a.id - b.id));
     return items;
 }

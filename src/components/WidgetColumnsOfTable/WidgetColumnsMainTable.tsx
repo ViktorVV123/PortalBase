@@ -7,7 +7,8 @@ import type { DebouncedFunc } from 'lodash';
 import debounce from 'lodash/debounce';
 import {
     Dialog, DialogTitle, DialogContent, DialogActions,
-    Button, Stack, TextField, FormControlLabel, Checkbox, createTheme, ThemeProvider
+    Button, Stack, TextField, FormControlLabel, Checkbox,
+    createTheme, ThemeProvider
 } from '@mui/material';
 
 type ReferenceItem = WidgetColumn['reference'][number];
@@ -15,13 +16,7 @@ type ReferenceItem = WidgetColumn['reference'][number];
 const dark = createTheme({
     palette: {mode: 'dark', primary: {main: '#ffffff'}},
     components: {
-        MuiOutlinedInput: {
-            styleOverrides: {
-                root: {
-                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#ffffff' },
-                },
-            },
-        },
+        MuiOutlinedInput: { styleOverrides: { root: { '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#ffffff' } } } },
         MuiInputLabel: { styleOverrides: { root: { '&.Mui-focused': { color: '#ffffff' } } } },
         MuiSelect: { styleOverrides: { icon: { color: '#ffffff' } } },
     },
@@ -32,16 +27,19 @@ type WidgetColumnsMainTableProps = {
     referencesMap: Record<number, ReferenceItem[]>;
     handleDeleteReference: (wcId: number, tblColId: number) => void;
 
+    // (оставляем для перемещения групп ↑/↓, это меняет column_order у WC)
     updateWidgetColumn: (
         id: number,
         patch: Partial<Omit<WidgetColumn, 'id' | 'widget_id' | 'reference'>>
     ) => Promise<void> | void;
 
-    // расширенный патч
+    // PATCH только по reference
     updateReference: (
         widgetColumnId: number,
         tableColumnId: number,
-        patch: Partial<Pick<ReferenceItem, 'ref_column_order' | 'width' | 'type' | 'ref_alias'>>
+        patch: Partial<Pick<ReferenceItem,
+            'ref_column_order' | 'width' | 'type' | 'ref_alias' | 'default' | 'placeholder' | 'visible'
+        >>
     ) => Promise<ReferenceItem>;
 
     addReference: (
@@ -67,12 +65,31 @@ export const WidgetColumnsMainTable: React.FC<WidgetColumnsMainTableProps> = ({
                                                                                   deleteColumnWidget
                                                                               }) => {
     const orderedWc = useMemo(
-        () =>
-            [...widgetColumns].sort(
-                (a, b) => (a.column_order ?? 0) - (b.column_order ?? 0) || a.id - b.id
-            ),
+        () => [...widgetColumns].sort((a, b) => (a.column_order ?? 0) - (b.column_order ?? 0) || a.id - b.id),
         [widgetColumns]
     );
+
+
+    const [aliasOverrides, setAliasOverrides] = useState<Record<number, string | null>>({});
+
+    const [aliasDlg, setAliasDlg] = useState<{ open: boolean; wcId: number | null; value: string }>({
+        open: false, wcId: null, value: '',
+    });
+
+    const openAliasDialog = (wc: WidgetColumn) => {
+        setAliasDlg({ open: true, wcId: wc.id, value: wc.alias ?? '' });
+    };
+
+    const closeAliasDialog = () => setAliasDlg(a => ({ ...a, open: false }));
+
+    const saveAlias = async () => {
+        if (aliasDlg.wcId == null) return;
+        const val = aliasDlg.value.trim();
+        await updateWidgetColumn(aliasDlg.wcId, { alias: val || null });
+        // локально обновим, чтобы UI сразу показал новое значение
+        setAliasOverrides(prev => ({ ...prev, [aliasDlg.wcId!]: val || null }));
+        closeAliasDialog();
+    };
 
     const [localRefs, setLocalRefs] = useState<Record<number, ReferenceItem[]>>({});
     const localRefsRef = useRef<Record<number, ReferenceItem[]>>({});
@@ -94,9 +111,7 @@ export const WidgetColumnsMainTable: React.FC<WidgetColumnsMainTableProps> = ({
         orderedWc.forEach((wc) => {
             const hasKey = Object.prototype.hasOwnProperty.call(referencesMap, wc.id);
             const src = hasKey ? (referencesMap[wc.id] ?? []) : (wc.reference ?? []);
-            const sorted = [...src].sort(
-                (a, b) => (a.ref_column_order ?? 0) - (b.ref_column_order ?? 0)
-            );
+            const sorted = [...src].sort((a, b) => (a.ref_column_order ?? 0) - (b.ref_column_order ?? 0));
             next[wc.id] = reindex(sorted);
             snap[wc.id] = sorted.map(r => r.table_column.id);
         });
@@ -105,8 +120,7 @@ export const WidgetColumnsMainTable: React.FC<WidgetColumnsMainTableProps> = ({
         snapshotRef.current = snap;
     }, [orderedWc, referencesMap, reindex]);
 
-    // стабильный debounce в ref
-
+    // устойчивый debounce
     const queueSyncRef = useRef<DebouncedFunc<() => Promise<void>> | null>(null);
     if (!queueSyncRef.current) {
         queueSyncRef.current = debounce(async () => {
@@ -162,7 +176,7 @@ export const WidgetColumnsMainTable: React.FC<WidgetColumnsMainTableProps> = ({
 
     useEffect(() => () => queueSyncRef.current?.cancel(), []);
 
-    // ── DnD ── (как было)
+    // ── DnD ──
     type DragData = { srcWcId: number; fromIdx: number; tableColumnId: number };
     const [drag, setDrag] = useState<DragData | null>(null);
 
@@ -258,41 +272,35 @@ export const WidgetColumnsMainTable: React.FC<WidgetColumnsMainTableProps> = ({
         }
     };
 
-    // ───────── МОДАЛКА ПРАВКИ СТРОКИ ─────────
+    // ───────── МОДАЛКА ПРАВКИ СТРОКИ (только reference) ─────────
     type EditState = {
         open: boolean;
         wcId: number | null;
         rowIdx: number | null;
-        // WC fields
-        wc_alias: string;
-        wc_default: string;
-        wc_placeholder: string;
-        wc_visible: boolean;
-        wc_column_order: number;
-        // REF fields
         ref_alias: string;
         ref_type: string;
         ref_width: number;
         ref_order: number;
+        ref_default: string;
+        ref_placeholder: string;
+        ref_visible: boolean;
     };
     const [edit, setEdit] = useState<EditState>({
         open: false, wcId: null, rowIdx: null,
-        wc_alias: '', wc_default: '', wc_placeholder: '', wc_visible: false, wc_column_order: 0,
         ref_alias: '', ref_type: '', ref_width: 1, ref_order: 0,
+        ref_default: '', ref_placeholder: '', ref_visible: true,
     });
 
     const openEdit = (wc: WidgetColumn, r: ReferenceItem, rowIdx: number) => {
         setEdit({
             open: true, wcId: wc.id, rowIdx,
-            wc_alias: wc.alias ?? '',
-            wc_default: wc.default ?? '',
-            wc_placeholder: wc.placeholder ?? '',
-            wc_visible: !!wc.visible,
-            wc_column_order: wc.column_order ?? 0,
             ref_alias: r.ref_alias ?? '',
             ref_type: r.type ?? '',
             ref_width: Number(r.width ?? 1),
             ref_order: r.ref_column_order ?? rowIdx,
+            ref_default: r.default ?? '',
+            ref_placeholder: r.placeholder ?? '',
+            ref_visible: r.visible !== false,
         });
     };
 
@@ -305,38 +313,31 @@ export const WidgetColumnsMainTable: React.FC<WidgetColumnsMainTableProps> = ({
         if (!current?.table_column?.id) { closeEdit(); return; }
         const tableColumnId = current.table_column.id;
 
-        // 1) отправляем PATCH-ы параллельно
-        await Promise.all([
-            updateWidgetColumn(wcId, {
-                alias: edit.wc_alias || null,
-                default: edit.wc_default || null,
-                placeholder: edit.wc_placeholder || null,
-                visible: edit.wc_visible,
-                column_order: edit.wc_column_order,
-            }),
-            updateReference(wcId, tableColumnId, {
-                ref_alias: edit.ref_alias || null,
-                type: edit.ref_type || null,
-                width: Number(edit.ref_width) || 1,
-                ref_column_order: Number(edit.ref_order) || 0,
-            }),
-        ]);
+        await updateReference(wcId, tableColumnId, {
+            ref_alias: edit.ref_alias || null,
+            type: edit.ref_type || null,
+            width: Number(edit.ref_width) || 1,
+            ref_column_order: Number(edit.ref_order) || 0,
+            default: edit.ref_default || null,
+            placeholder: edit.ref_placeholder || null,
+            visible: !!edit.ref_visible,
+        });
 
-        // 2) оптимистично обновляем локальное состояние
+        // оптимистично обновляем локальное состояние
         setLocalRefs(prev => {
             const list = [...(prev[wcId] ?? [])];
-            // обновляем поля
             list[edit.rowIdx!] = {
                 ...list[edit.rowIdx!],
                 ref_alias: edit.ref_alias || null,
                 type: edit.ref_type || null,
                 width: Number(edit.ref_width) || 1,
                 ref_column_order: Number(edit.ref_order) || 0,
+                default: edit.ref_default || null,
+                placeholder: edit.ref_placeholder || null,
+                visible: !!edit.ref_visible,
             };
 
             let next = list;
-
-            // если ref_order изменили вручную → переставим элемент
             const desiredIdx = Number(edit.ref_order) || 0;
             if (desiredIdx >= 0 && desiredIdx < list.length) {
                 const [moved] = list.splice(edit.rowIdx!, 1);
@@ -347,12 +348,11 @@ export const WidgetColumnsMainTable: React.FC<WidgetColumnsMainTableProps> = ({
             return { ...prev, [wcId]: reindex(next) };
         });
 
-        // (опционально можно подёрнуть refreshReferences(wcId))
-        // await refreshReferences?.(wcId);
-
+        // опционально: await refreshReferences?.(wcId);
         closeEdit();
     };
 
+    // перемещение ГРУПП (WC) — оставляем (меняет column_order у WidgetColumn)
     const moveGroup = async (wcId: number, dir: 'up' | 'down') => {
         const list = orderedWc;
         const i = list.findIndex((w) => w.id === wcId);
@@ -374,28 +374,34 @@ export const WidgetColumnsMainTable: React.FC<WidgetColumnsMainTableProps> = ({
                 const refs = localRefs[wc.id] ?? [];
                 const isFirst = idx === 0;
                 const isLast = idx === orderedWc.length - 1;
+                const displayAlias = aliasOverrides[wc.id] ?? wc.alias;
 
                 return (
-                    <div key={wc.id} style={{ marginBottom: 24 }}>
-                        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                            <h4 style={{ margin: 0 }}>{wc.alias ?? `Колонка #${wc.id}`}</h4>
-                            <span style={{ color: 'grey' }}>({wc.column_order ?? 0})</span>
-                            <div style={{ display: 'flex', gap: 6, marginLeft: 8, alignItems: 'center' }}>
+                    <div key={wc.id} style={{marginBottom: 24}}>
+                        <div style={{display: 'flex', gap: 10, alignItems: 'center'}}>
+                            <h4 style={{margin: 0}}>{displayAlias ?? `Колонка #${wc.id}`}</h4>
+                            <span style={{color: 'grey'}}>({wc.column_order ?? 0})</span>
+                            <div style={{display: 'flex', gap: 6, marginLeft: 8, alignItems: 'center'}}>
                                 <button title="Переместить вверх" disabled={isFirst}
                                         onClick={() => moveGroup(wc.id, 'up')}
-                                        style={{ opacity: isFirst ? 0.4 : 1 }}>↑</button>
+                                        style={{opacity: isFirst ? 0.4 : 1}}>↑
+                                </button>
                                 <button title="Переместить вниз" disabled={isLast}
                                         onClick={() => moveGroup(wc.id, 'down')}
-                                        style={{ opacity: isLast ? 0.4 : 1 }}>↓</button>
-                                <span>{wc.id}</span>
-                                <DeleteIcon className={s.actionIcon} onClick={() => deleteColumnWidget(wc.id)} />
+                                        style={{opacity: isLast ? 0.4 : 1}}>↓
+                                </button>
+
+                                {/* ← редактирование alias */}
+                                <EditIcon className={s.actionIcon} onClick={() => openAliasDialog(wc)}/>
+
+                                <DeleteIcon className={s.actionIcon} onClick={() => deleteColumnWidget(wc.id)}/>
                             </div>
                         </div>
 
-                        <table className={s.tbl} style={{ marginTop: 8 }}>
+                        <table className={s.tbl} style={{marginTop: 8}}>
                             <thead>
                             <tr>
-                                <th style={{ width: 28 }} />
+                                <th style={{width: 28}}/>
                                 <th>name</th>
                                 <th>ref_alias</th>
                                 <th>type</th>
@@ -421,26 +427,29 @@ export const WidgetColumnsMainTable: React.FC<WidgetColumnsMainTableProps> = ({
                                             draggable
                                             onDragStart={onDragStart(wc.id, rowIdx, tblCol?.id ?? -1)}
                                             onDrop={onDropRow(wc.id, rowIdx)}
-                                            style={{ cursor: 'move' }}
+                                            style={{cursor: 'move'}}
                                         >
-                                            <td style={{ textAlign: 'center', opacity: 0.6 }}>⋮⋮</td>
+                                            <td style={{textAlign: 'center', opacity: 0.6}}>⋮⋮</td>
                                             <td>{tblCol?.name ?? '—'}</td>
                                             <td>{r.ref_alias ?? '—'}</td>
                                             <td>{type}</td>
                                             <td>{r.width ?? '—'}</td>
-                                            <td>{orderedWc.find((w) => w.id === wc.id)?.default ?? '—'}</td>
-                                            <td>{orderedWc.find((w) => w.id === wc.id)?.placeholder ?? '—'}</td>
-                                            <td style={{ textAlign: 'center' }}>
-                                                {orderedWc.find((w) => w.id === wc.id)?.visible ? '✔︎' : ''}
-                                            </td>
+                                            <td>{r.default ?? '—'}</td>
+                                            <td>{r.placeholder ?? '—'}</td>
+                                            <td style={{textAlign: 'center'}}>{r.visible ? '✔︎' : ''}</td>
                                             <td>{r.ref_column_order ?? rowIdx}</td>
                                             <td>
                                                 {tblCol?.id ? (
-                                                    <div style={{display:'flex', alignItems:'center', justifyContent:'center', gap:10}}>
+                                                    <div style={{
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        gap: 10
+                                                    }}>
                                                         <EditIcon className={s.actionIcon}
-                                                                  onClick={() => openEdit(wc, r, rowIdx)} />
+                                                                  onClick={() => openEdit(wc, r, rowIdx)}/>
                                                         <DeleteIcon className={s.actionIcon}
-                                                                    onClick={() => handleDeleteReference(wc.id, tblCol.id!)} />
+                                                                    onClick={() => handleDeleteReference(wc.id, tblCol.id!)}/>
                                                     </div>
                                                 ) : null}
                                             </td>
@@ -449,7 +458,7 @@ export const WidgetColumnsMainTable: React.FC<WidgetColumnsMainTableProps> = ({
                                 })
                             ) : (
                                 <tr>
-                                    <td colSpan={10} style={{ textAlign: 'center', opacity: 0.7 }}>
+                                    <td colSpan={10} style={{textAlign: 'center', opacity: 0.7}}>
                                         Нет связей — перетащите сюда строку из другого блока
                                     </td>
                                 </tr>
@@ -460,52 +469,65 @@ export const WidgetColumnsMainTable: React.FC<WidgetColumnsMainTableProps> = ({
                 );
             })}
 
-            {/* ── Диалог правки строки ── */}
-        <ThemeProvider theme={dark}>
-            <Dialog open={edit.open} onClose={closeEdit} fullWidth maxWidth="sm">
-                <DialogTitle>Правка столбца/связи</DialogTitle>
+            {/* Диалог правки (только reference) */}
+            <ThemeProvider theme={dark}>
+                <Dialog open={edit.open} onClose={closeEdit} fullWidth maxWidth="sm">
+                    <DialogTitle>Правка reference</DialogTitle>
+                    <DialogContent dividers>
+                        <Stack spacing={2}>
+                            <TextField label="ref_alias" size="small"
+                                       value={edit.ref_alias}
+                                       onChange={e => setEdit(v => ({...v, ref_alias: e.target.value}))}/>
+                            <TextField label="type" size="small"
+                                       value={edit.ref_type}
+                                       onChange={e => setEdit(v => ({...v, ref_type: e.target.value}))}/>
+                            <TextField type="number" label="width" size="small"
+                                       value={edit.ref_width}
+                                       onChange={e => setEdit(v => ({...v, ref_width: Number(e.target.value)}))}/>
+                            <TextField label="default" size="small"
+                                       value={edit.ref_default}
+                                       onChange={e => setEdit(v => ({...v, ref_default: e.target.value}))}/>
+                            <TextField label="placeholder" size="small"
+                                       value={edit.ref_placeholder}
+                                       onChange={e => setEdit(v => ({...v, ref_placeholder: e.target.value}))}/>
+                            <FormControlLabel control={
+                                <Checkbox checked={edit.ref_visible}
+                                          onChange={e => setEdit(v => ({...v, ref_visible: e.target.checked}))}/>
+                            } label="visible"/>
+                            <TextField type="number" label="ref_column_order" size="small"
+                                       value={edit.ref_order}
+                                       onChange={e => setEdit(v => ({...v, ref_order: Number(e.target.value)}))}/>
+                        </Stack>
+                    </DialogContent>
+                    <DialogActions>
+                        <Button onClick={closeEdit}>Отмена</Button>
+                        <Button variant="contained" onClick={saveEdit}>Сохранить</Button>
+                    </DialogActions>
+                </Dialog>
+            </ThemeProvider>
+
+            <ThemeProvider theme={dark}>
+            <Dialog open={aliasDlg.open} onClose={closeAliasDialog} fullWidth maxWidth="xs">
+                <DialogTitle>Изменить alias</DialogTitle>
                 <DialogContent dividers>
-                    <Stack spacing={2}>
-                        {/* WidgetColumn (group) */}
-                        <TextField label="Alias (WC)" size="small"
-                                   value={edit.wc_alias}
-                                   onChange={e => setEdit(v => ({...v, wc_alias: e.target.value}))}/>
-                        <TextField label="Default (WC)" size="small"
-                                   value={edit.wc_default}
-                                   onChange={e => setEdit(v => ({...v, wc_default: e.target.value}))}/>
-                        <TextField label="Placeholder (WC)" size="small"
-                                   value={edit.wc_placeholder}
-                                   onChange={e => setEdit(v => ({...v, wc_placeholder: e.target.value}))}/>
-                        <FormControlLabel control={
-                            <Checkbox checked={edit.wc_visible}
-                                      onChange={e => setEdit(v => ({...v, wc_visible: e.target.checked}))}/>
-                        } label="Visible (WC)"/>
-                        <TextField type="number" label="column_order (WC)" size="small"
-                                   value={edit.wc_column_order}
-                                   onChange={e => setEdit(v => ({...v, wc_column_order: Number(e.target.value)}))}/>
-
-                        {/* Reference (row) */}
-                        <TextField label="ref_alias (REF)" size="small"
-                                   value={edit.ref_alias}
-                                   onChange={e => setEdit(v => ({...v, ref_alias: e.target.value}))}/>
-                        <TextField label="type (REF)" size="small"
-                                   value={edit.ref_type}
-                                   onChange={e => setEdit(v => ({...v, ref_type: e.target.value}))}/>
-                        <TextField type="number" label="width (REF)" size="small"
-                                   value={edit.ref_width}
-                                   onChange={e => setEdit(v => ({...v, ref_width: Number(e.target.value)}))}/>
-                        <TextField type="number" label="order (REF)" size="small"
-                                   value={edit.ref_order}
-                                   onChange={e => setEdit(v => ({...v, ref_order: Number(e.target.value)}))}/>
-
-                    </Stack>
+                    <TextField
+                        autoFocus
+                        fullWidth
+                        size="small"
+                        label="Alias"
+                        value={aliasDlg.value}
+                        onChange={e => setAliasDlg(v => ({ ...v, value: e.target.value }))}
+                        placeholder="Пусто = сбросить alias"
+                    />
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={closeEdit}>Отмена</Button>
-                    <Button variant="contained" onClick={saveEdit}>Сохранить</Button>
+                    <Button onClick={closeAliasDialog}>Отмена</Button>
+                    <Button onClick={saveAlias} variant="contained">Сохранить</Button>
                 </DialogActions>
             </Dialog>
-        </ThemeProvider>
+            </ThemeProvider>
+
+
         </div>
     );
 };

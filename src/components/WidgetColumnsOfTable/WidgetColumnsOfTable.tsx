@@ -61,10 +61,6 @@ interface Props {
     addWidgetColumn: (payload: {
         widget_id: number;
         alias: string;
-        default: string;
-        placeholder: string;
-        visible: boolean;
-        type: string;
         column_order: number;
     }) => Promise<WidgetColumn>;
     setLiveRefsForHeader: React.Dispatch<React.SetStateAction<Record<number, WcReference[]>>>;
@@ -130,10 +126,6 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
     const [addOpen, setAddOpen] = useState(false);
     const [newCol, setNewCol] = useState({
         alias: '',
-        default: '',
-        placeholder: '',
-        visible: false,
-        type: '',
         column_order: widgetColumns.length + 1,
     });
 
@@ -361,10 +353,6 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                             await loadColumnsWidget(selectedWidget.id);
                             setNewCol({
                                 alias: '',
-                                default: '',
-                                placeholder: '',
-                                visible: false,
-                                type: '',
                                 column_order: widgetColumns.length + 1,
                             });
                             setAddOpen(false);
@@ -377,7 +365,7 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                                            value={newCol.alias}
                                            onChange={e => setNewCol(v => ({...v, alias: e.target.value}))}
                                 />
-                                <TextField label="Default" size="small"
+                                {/*<TextField label="Default" size="small"
                                            value={newCol.default}
                                            onChange={e => setNewCol(v => ({...v, default: e.target.value}))}
                                 />
@@ -388,7 +376,7 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                                 <TextField label="Тип" size="small" required
                                            value={newCol.type}
                                            onChange={e => setNewCol(v => ({...v, type: e.target.value}))}
-                                />
+                                />*/}
                                 <TextField label="Порядок (column_order)" type="number" size="small" required
                                            value={newCol.column_order}
                                            onChange={e => setNewCol(v => ({
@@ -396,14 +384,14 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                                                column_order: Number(e.target.value)
                                            }))}
                                 />
-                                <Stack direction="row" alignItems="center" spacing={1}>
+                                {/*<Stack direction="row" alignItems="center" spacing={1}>
                                     <Typography>Visible</Typography>
                                     <input
                                         type="checkbox"
                                         checked={newCol.visible}
                                         onChange={e => setNewCol(v => ({...v, visible: e.target.checked}))}
                                     />
-                                </Stack>
+                                </Stack>*/}
                             </Stack>
                         </DialogContent>
                         <DialogActions sx={{pr: 3, pb: 2}}>

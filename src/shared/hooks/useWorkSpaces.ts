@@ -42,19 +42,21 @@ export type Widget = {
 
 
 export type WidgetColumn = {
-
     widget_id: number;
     alias: string | null;
-    default: string | null;
-    placeholder: string | null;
-    visible: boolean;
-    column_order: number,
+    column_order: number;
     id: number;
     reference: {
-        ref_column_order: number,
+        ref_column_order: number;
         ref_alias: string | null;
+
+        // ↓ эти поля теперь на уровне reference
+        placeholder: string | null;
         width: number;
-        type:string;
+        type: string | null;
+        default: string | null;
+        visible: boolean;
+
         table_column: {
             table_id: number;
             name: string;

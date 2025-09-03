@@ -174,18 +174,15 @@ export const SetOfTables: React.FC<Props> = ({
                         ? (wcValues.column_order ?? wc.column_order ?? 0)
                         : (wc.column_order ?? 0);
 
-                const effectiveVisible =
-                    editingWcId === wc.id
-                        ? (wcValues.visible ?? wc.visible)
-                        : wc.visible;
-
-                if (!effectiveVisible) return null;
-
+                // теперь visible берём с уровня reference
                 const refs =
                     liveRefsForHeader?.[wc.id] ??
                     referencesMap[wc.id] ??
                     wc.reference ??
                     [];
+
+                const groupVisible = refs.some(r => r.visible !== false);
+                if (!groupVisible) return null;
 
                 const span = Math.max(1, refs.length || 1);
                 const effectiveAlias = (editingWcId === wc.id ? wcValues.alias : wc.alias)?.trim();
@@ -196,10 +193,11 @@ export const SetOfTables: React.FC<Props> = ({
                         ? refs.map(r => r.ref_alias || '')
                         : ['—'];
 
-                // ⬅️ ДОБАВЛЕНО: порядок reference по table_column_id
                 const refIds =
                     refs.length > 0
-                        ? refs.map(r => r.table_column?.id).filter((id): id is number => !!id)
+                        ? refs
+                            .map(r => r.table_column?.id)
+                            .filter((id): id is number => !!id)
                         : [];
 
                 return { id: wc.id, order: effectiveOrder, title, span, labels, refIds };
