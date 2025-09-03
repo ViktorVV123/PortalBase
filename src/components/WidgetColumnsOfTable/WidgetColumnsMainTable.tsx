@@ -132,16 +132,28 @@ export const WidgetColumnsMainTable: React.FC<WidgetColumnsMainTableProps> = ({
                 const wcId = Number(wcIdStr);
                 const nextOrder = (state[wcId] ?? []).map(r => r.table_column.id);
                 const prevOrder = snapshot[wcId] ?? [];
+
                 const addedIds = nextOrder.filter(id => !prevOrder.includes(id));
                 for (const id of addedIds) {
                     const toIdx = nextOrder.indexOf(id);
                     const refObj = (state[wcId] ?? [])[toIdx];
-                    const width = refObj?.width ?? 1;
-                    try {
-                        await addReference(wcId, id, { width, ref_column_order: toIdx });
-                    } catch (e) {
-                        console.warn('[sync:addReference] wc=', wcId, 'col=', id, e);
-                    }
+
+                    // создаём запись
+                    await addReference(wcId, id, {
+                        width: refObj?.width ?? 1,
+                        ref_column_order: toIdx,
+                    });
+
+                    // сразу восстанавливаем все мета-поля, чтобы бэк не оставил null
+                    await updateReference(wcId, id, {
+                        ref_alias: refObj?.ref_alias ?? null,
+                        type: refObj?.type ?? null,
+                        default: refObj?.default ?? null,
+                        placeholder: refObj?.placeholder ?? null,
+                        visible: refObj?.visible !== false,
+                        width: refObj?.width ?? 1,
+                        ref_column_order: toIdx,
+                    });
                 }
             }
 
