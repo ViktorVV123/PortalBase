@@ -861,6 +861,21 @@ export const useWorkSpaces = () => {
     );
 
 
+    const deleteSubWidgetFromForm = useCallback(
+        async (formId: number, subWidgetId: number) => {
+            await api.delete(`/forms/${formId}/sub/${subWidgetId}`);
+        },
+        []
+    );
+
+    const deleteTreeFieldFromForm = useCallback(
+        async (formId: number, tableColumnId: number) => {
+            await api.delete(`/forms/${formId}/tree/${tableColumnId}`);
+        },
+        []
+    );
+
+
 
 
 
@@ -920,7 +935,9 @@ export const useWorkSpaces = () => {
         reloadWidgetForms,
         formsListByWidget,     // ← НОВОЕ
         deleteForm,
-        formsById
+        formsById,
+        deleteSubWidgetFromForm,
+        deleteTreeFieldFromForm
 
 
 

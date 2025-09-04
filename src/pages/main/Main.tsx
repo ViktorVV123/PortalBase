@@ -88,7 +88,7 @@ export const Main = () => {
         reloadWidgetForms,
         formsListByWidget,
         deleteForm,
-        formsById
+        formsById, deleteTreeFieldFromForm, deleteSubWidgetFromForm
     } = useWorkSpaces();
 
     useEffect(() => {
@@ -322,6 +322,8 @@ export const Main = () => {
 
             {formToEdit && (
                 <ModalEditForm
+                    deleteSubWidgetFromForm={deleteSubWidgetFromForm}
+                    deleteTreeFieldFromForm={deleteTreeFieldFromForm}
                     open={editFormOpen}
                     onClose={() => setEditFormOpen(false)}
                     form={formToEdit}
