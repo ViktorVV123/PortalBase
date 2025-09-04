@@ -14,6 +14,7 @@ import {SideNav} from "@/components/sideNav/SideNav";
 import EditIcon from "@/assets/image/EditIcon.svg";
 import {EditWorkspaceModal} from "@/components/modals/editWorkspaceModal/EditWorkspaceModal";
 import {api} from "@/services/api";
+import {ModalEditForm} from "@/components/modals/modalEditForm/ModalEditForm";
 
 type Props = {
     workSpaces: WorkSpaceTypes[];
@@ -57,12 +58,16 @@ type Props = {
     formsListByWidget: Record<number, WidgetForm[]>;
     deleteForm: (formId: number) => Promise<void>;
     formsById: Record<number, WidgetForm>;
+    setFormToEdit:any;
+    setEditFormOpen:any;
 
 };
 
 export const TopComponent: React.FC<Props> = ({
                                                   workSpaces,
                                                   addForm,
+                                                  setFormToEdit,
+                                                  setEditFormOpen,
                                                   setShowCreateFormModal,
                                                   setCreateFormWidget,
                                                   reloadWidgetForms,
@@ -99,6 +104,7 @@ export const TopComponent: React.FC<Props> = ({
     const [wHover, setWHover] = useState<number | null>(null);
     const [editModalOpen, setEditModalOpen] = useState(false);
     const [selectedWS, setSelectedWS] = useState<WorkSpaceTypes | null>(null);
+
 
 
     const menuRef = useRef<HTMLDivElement>(null);
@@ -474,7 +480,17 @@ export const TopComponent: React.FC<Props> = ({
                                                                                                     title={form.name}>{clip(form.name, 15)}</span>
 
                                                                                                {/* <EditIcon className={s.actionIcon}/>*/}
-                                                                                                <EditIcon className={s.actionIcon}/>
+                                                                                                <EditIcon
+                                                                                                    className={s.actionIcon}
+                                                                                                    onClick={(e) => {
+                                                                                                        e.stopPropagation();
+                                                                                                        // берём объект формы целиком из текущего итератора — в formsListByWidget он уже WidgetForm
+                                                                                                        setFormToEdit(form);
+                                                                                                        setEditFormOpen(true);
+                                                                                                        // можно закрыть выпадашки, если хочешь:
+                                                                                                        closeMenu();
+                                                                                                    }}
+                                                                                                />
                                                                                                 <DeleteIcon onClick={onDelete} className={s.actionIcon}/>
                                                                                             </div>
 
@@ -501,6 +517,7 @@ export const TopComponent: React.FC<Props> = ({
                         })}
                     </ul>
                 )}
+
             </div>
             {selectedWS && (
                 <EditWorkspaceModal

@@ -10,6 +10,7 @@ import {WorkSpaceTypes} from "@/types/typesWorkSpaces";
 import {ModalAddTable} from "@/components/modals/modalAddNewTable/ModalAddNewTable";
 import {ModalAddWidget} from "@/components/modals/modalAddWidget/ModalAddWidget";
 import {ModalAddForm} from "@/components/modals/modalAddForm/ModalAddForm";
+import {ModalEditForm} from "@/components/modals/modalEditForm/ModalEditForm";
 
 
 export const Main = () => {
@@ -28,6 +29,8 @@ export const Main = () => {
     const [createWidgetTable, setCreateWidgetTable] = useState<DTable | null>(null);
     const [showCreateFormModal, setShowCreateFormModal] = useState(false);
     const [createFormWidget, setCreateFormWidget] = useState<Widget | null>(null);
+    const [editFormOpen, setEditFormOpen] = useState(false);
+    const [formToEdit, setFormToEdit] = useState<WidgetForm | null>(null);
 
 
     const {
@@ -162,7 +165,7 @@ export const Main = () => {
         <div className={styles.layout}>
 
             <div className={styles.container}>
-                <TopComponent  formsById={formsById}
+                <TopComponent setEditFormOpen={setEditFormOpen} setFormToEdit={setFormToEdit}  formsById={formsById}
                     addForm={addForm}
                     deleteForm={deleteForm}
                     reloadWidgetForms={reloadWidgetForms}
@@ -314,6 +317,15 @@ export const Main = () => {
                         await loadFormTree(newForm.form_id);
                     }}
                     onCancel={() => setShowCreateFormModal(false)}
+                />
+            )}
+
+            {formToEdit && (
+                <ModalEditForm
+                    open={editFormOpen}
+                    onClose={() => setEditFormOpen(false)}
+                    form={formToEdit}
+                    reloadWidgetForms={reloadWidgetForms}
                 />
             )}
 
