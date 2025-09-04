@@ -17,6 +17,7 @@ export const Main = () => {
     const [navOpen, setNavOpen] = useState(false);
     const [selectedWidget, setSelectedWidget] = useState<Widget | null>(null);
     const [selectedFormId, setSelectedFormId] = useState<number | null>(null);
+    const clearFormSelection = () => setSelectedFormId(null);
     const [wsHover, setWsHover] = useState<number | null>(null);
     const [tblHover, setTblHover] = useState<number | null>(null);
     const [showConnForm, setShowConnForm] = useState(false);
@@ -190,7 +191,7 @@ export const Main = () => {
 
                 />
 
-                <SetOfTables updateReference={updateReference} publishTable={publishTable} tablesByWs={tablesByWs}
+                <SetOfTables clearFormSelection={clearFormSelection} updateReference={updateReference} publishTable={publishTable} tablesByWs={tablesByWs}
                              addWidgetColumn={addWidgetColumn} setWidgetsByTable={setWidgetsByTable}
                              setSelectedWidget={setSelectedWidget}
                              columns={columns}

@@ -41,6 +41,7 @@ type Props = {
     handleSelectWidget: (widget: Widget | null) => void;   // ← добавили
     /* form */
     selectedFormId: number | null;
+    clearFormSelection: () => void;
     formDisplay: FormDisplay
     formLoading: boolean;
     formError: string | null;
@@ -138,7 +139,8 @@ export const SetOfTables: React.FC<Props> = ({
                                                  addWidgetColumn,
                                                  formsById,
                                                  publishTable,
-                                                 updateReference
+                                                 updateReference,
+                                                 clearFormSelection,
 
                                              }) => {
 
@@ -149,17 +151,22 @@ export const SetOfTables: React.FC<Props> = ({
     const [liveRefsForHeader, setLiveRefsForHeader] = useState<Record<number, WcReference[]> | null>(null);
     const [subHeaderGroups, setSubHeaderGroups] = useState<HeaderGroup[] | null>(null);
 
+    const currentForm: WidgetForm | null =
+        selectedFormId != null
+            ? (formsById[selectedFormId] ?? null)
+            : (selectedWidget ? (formsByWidget[selectedWidget.id] ?? null) : null);
+
     const subWidgetIdByOrder = useMemo(() => {
         const map: Record<number, number> = {};
-        const wf = selectedWidget ? formsByWidget[selectedWidget.id] : undefined;
-        wf?.sub_widgets.forEach(sw => {
+        currentForm?.sub_widgets.forEach(sw => {
             map[sw.widget_order] = sw.sub_widget_id;
         });
         return map;
-    }, [selectedWidget, formsByWidget]);
+    }, [currentForm]);
 
     const currentSubOrder = subDisplay?.displayed_widget?.widget_order ?? null;
     const currentSubWidgetId = currentSubOrder != null ? subWidgetIdByOrder[currentSubOrder] : null;
+
 
 
 
@@ -212,32 +219,52 @@ export const SetOfTables: React.FC<Props> = ({
 
     useEffect(() => {
         let aborted = false;
-
         async function loadSubHeaderGroups() {
             if (!currentSubWidgetId) { setSubHeaderGroups(null); return; }
 
-            // 1) колонки саб-виджета
-            // предполагаемый эндпойнт; если у тебя другой — подставь свой
             const { data: widgetColumns } = await api.get(`/widgets/${currentSubWidgetId}/columns`);
 
-            // 2) refs для каждой wc (используем твой fetchReferences)
             const referencesMap: Record<number, any[]> = {};
             for (const wc of widgetColumns) {
                 try {
-                    // ожидаем, что fetchReferences(wc.id) вернёт массив ссылок (WcReference[])
                     referencesMap[wc.id] = await fetchReferences(wc.id);
-                } catch (e) {
+                } catch {
                     referencesMap[wc.id] = wc.reference ?? [];
                 }
             }
-
-            if (aborted) return;
-            setSubHeaderGroups(buildHeaderGroupsFromWidgetColumns(widgetColumns, referencesMap));
+            if (!aborted) setSubHeaderGroups(buildHeaderGroupsFromWidgetColumns(widgetColumns, referencesMap));
         }
-
         loadSubHeaderGroups().catch(console.warn);
         return () => { aborted = true; };
-    }, [currentSubWidgetId, fetchReferences]);
+    }, [currentSubWidgetId, fetchReferences, selectedFormId]);
+
+
+// внутри SetOfTables
+    const goToTable = () => {
+        // полностью выйти в таблицу
+        setSubDisplay(null);
+        setFormDisplay(null);
+        handleClearWidget();         // ← был у тебя
+    };
+
+    const goToWidget = () => {
+        if (!selectedWidget) return;
+        // выйти из формы, но остаться в виджете
+        clearFormSelection();        // ← новый проп из п.1 (сбрасывает selectedFormId)
+        setSubDisplay(null);
+        setFormDisplay(null);
+        loadColumnsWidget(selectedWidget.id); // гарантируем «виджетный» режим
+    };
+
+    const widgetTitle = selectedWidget?.name ?? 'Виджет';
+    const formTitle =
+        selectedFormId != null ? (formsById[selectedFormId]?.name ?? `Форма #${selectedFormId}`) : null;
+    const subTitle = subDisplay?.displayed_widget?.name ?? null;
+
+
+
+
+
 
 
     if (loading) return <p>Загрузка…</p>;
@@ -247,27 +274,29 @@ export const SetOfTables: React.FC<Props> = ({
     return (
         <div className={s.wrapper}>
             {/* ─── breadcrumb ─── */}
+            {/* ─── breadcrumb ─── */}
             <div className={s.headRow}>
                 <div className={s.breadcrumb}>
                     {workspaceName} <span className={s.arrow}>→</span>
 
                     {selectedWidget ? (
                         <>
-                            <span onClick={handleClearWidget}>{tableName}</span>
+                            <span className={s.link} onClick={goToTable}>{tableName}</span>
                             <span className={s.arrow}>→</span>
-                            {selectedFormId ? (
-                                <span onClick={() => handleClearWidget()}>
-       {selectedWidget.name}
-                                         </span>
-                            ) : (
-                                <span>{selectedWidget.name}</span>
-                            )}
 
+                            <span className={s.link} onClick={goToWidget}>{widgetTitle}</span>
 
-                            {formName && (
+                            {formTitle && (
                                 <>
                                     <span className={s.arrow}>→</span>
-                                    <span>{formName}</span>
+                                    <span>{formTitle}</span>
+                                </>
+                            )}
+
+                            {subTitle && (
+                                <>
+                                    <span className={s.arrow}>→</span>
+                                    <span>{subTitle}</span>
                                 </>
                             )}
                         </>
@@ -275,7 +304,9 @@ export const SetOfTables: React.FC<Props> = ({
                         <span>{tableName}</span>
                     )}
                 </div>
+
             </div>
+
 
             {/* ─── PRIORITY 1 : FORM ─── */}
             {selectedFormId ? (
@@ -284,7 +315,9 @@ export const SetOfTables: React.FC<Props> = ({
                     ) : formError ? (
                         <p className={s.error}>{formError}</p>
                     ) : formDisplay ? (
-                        <FormTable formsById={formsById} subHeaderGroups={subHeaderGroups || undefined}  headerGroups={headerGroups}  setSubDisplay={setSubDisplay} formTrees={formTrees} selectedFormId={selectedFormId}
+                        <FormTable formsById={formsById} subHeaderGroups={subHeaderGroups || undefined}
+                                   headerGroups={headerGroups} setSubDisplay={setSubDisplay} formTrees={formTrees}
+                                   selectedFormId={selectedFormId}
                                    subDisplay={subDisplay} subError={subError} subLoading={subLoading}
                                    selectedWidget={selectedWidget} formsByWidget={formsByWidget}
                                    loadFilteredFormDisplay={loadFilteredFormDisplay} setFormDisplay={setFormDisplay}

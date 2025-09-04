@@ -379,7 +379,7 @@ export const SubWormTable = ({
                 <p className={s.error}>{subError}</p>
             ) : (
                 <>
-                    <div className={styles.floatActions} style={{top: '15%'}}>
+                    <div className={styles.floatActions} style={{top: '15%',right: '0%'}}>
                         <ButtonForm cancelAdd={cancelAdd} startAdd={startAdd} isAdding={isAdding} submitAdd={submitAdd}
                                     saving={saving} selectedWidget={selectedWidget} selectedFormId={selectedFormId}/>
                     </div>

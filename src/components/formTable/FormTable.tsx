@@ -45,7 +45,7 @@ type Props = {
         table_column_id: number;
         value: string | number
     }) => Promise<void>;
-    subHeaderGroups:HeaderModelItem[]
+    subHeaderGroups: HeaderModelItem[]
     setFormDisplay: (value: FormDisplay | null) => void;
     setSubDisplay: (value: SubDisplay | null) => void;
 
@@ -95,7 +95,6 @@ export const FormTable: React.FC<Props> = ({
     const [deletingRowIdx, setDeletingRowIdx] = useState<number | null>(null);
 
 
-
     const currentForm: WidgetForm | null =
         selectedFormId != null
             ? (formsById[selectedFormId] ?? null)
@@ -119,8 +118,6 @@ export const FormTable: React.FC<Props> = ({
         setActiveSubOrder(order0);
         setSubDisplay(null);
     }, [currentForm, setSubDisplay]);
-
-
 
 
     // префлайт: должен быть настроен DELETE QUERY у таблицы
@@ -338,22 +335,6 @@ export const FormTable: React.FC<Props> = ({
         setSubDisplay(null);
     }, [selectedWidget, formsByWidget, loadSubDisplay, setSubDisplay]);
 
-
-    const handleResetFilters = async () => {
-        if (!selectedFormId || !selectedWidget) return;
-        setActiveFilters([]);
-        setActiveExpandedKey(null);
-        setLastPrimary({});
-        setSubDisplay(null);
-        setActiveSubOrder(0);
-        try {
-            const {data} = await api.post<FormDisplay>(`/display/${selectedFormId}/main`, []);
-            setFormDisplay(data);
-            await reloadTree();
-        } catch (e) {
-            console.warn('❌ Ошибка при сбросе фильтров:', e);
-        }
-    };
 
     // сортировка исходных колонок так же, как раньше
     const sortedColumns = useMemo(
@@ -573,202 +554,246 @@ export const FormTable: React.FC<Props> = ({
 
 
     // клик по строке main → грузим sub для ТОЙ ЖЕ формы
+
+
+    // FormTable.tsx (добавь рядом с currentForm)
+    const availableOrders = useMemo(
+        () => (currentForm?.sub_widgets ?? [])
+            .map(sw => sw.widget_order)
+            .sort((a, b) => a - b),
+        [currentForm]
+    );
+
+// при смене формы — выбираем первый доступный порядок и сбрасываем sub
+    useEffect(() => {
+        setActiveSubOrder(prev =>
+            availableOrders.includes(prev) ? prev : (availableOrders[0] ?? 0)
+        );
+        setSubDisplay(null);
+    }, [availableOrders, setSubDisplay]);
+
+// безопасный геттер «валидного» порядка
+    const getEffectiveOrder = () =>
+        availableOrders.includes(activeSubOrder) ? activeSubOrder : (availableOrders[0] ?? 0);
+
+// клик по строке main (используем валидный порядок)
     const handleRowClick = (rowPk: Record<string, unknown>) => {
         if (!formIdForSub) return;
         setLastPrimary(rowPk);
-        loadSubDisplay(formIdForSub, activeSubOrder, rowPk);
+        loadSubDisplay(formIdForSub, getEffectiveOrder(), rowPk);
     };
 
-    // переключение вкладок sub
+// переключение вкладок sab (тоже валидируем)
     const handleTabClick = (order: number) => {
-        if (order === activeSubOrder) return;
-        setActiveSubOrder(order);
+        const next = availableOrders.includes(order) ? order : (availableOrders[0] ?? 0);
+        if (next === activeSubOrder) return;
+        setActiveSubOrder(next);
         if (!formIdForSub || Object.keys(lastPrimary).length === 0) return;
-        loadSubDisplay(formIdForSub, order, lastPrimary);
+        loadSubDisplay(formIdForSub, next, lastPrimary);
     };
 
+// сброс фильтров: не ставим 0, ставим первый доступный для текущей формы
+    const handleResetFilters = async () => {
+        if (!selectedFormId || !selectedWidget) return;
+        setActiveFilters([]);
+        setActiveExpandedKey(null);
+        setLastPrimary({});
+        setSubDisplay(null);
+        setActiveSubOrder(availableOrders[0] ?? 0); // ← вместо 0
+
+        try {
+            const {data} = await api.post<FormDisplay>(`/display/${selectedFormId}/main`, []);
+            setFormDisplay(data);
+            await reloadTree();
+        } catch (e) {
+            console.warn('❌ Ошибка при сбросе фильтров:', e);
+        }
+    };
 
 
     return (
         <ThemeProvider theme={dark}>
-            <div style={{display: 'flex', gap: 10, position: 'relative'}}>
+            <div className={s.contentRow}>
                 {/* Кнопки добавления */}
                 <div className={styles.floatActions}>
                     <ButtonForm isAdding={isAdding} selectedFormId={selectedFormId} selectedWidget={selectedWidget}
                                 saving={saving} startAdd={startAdd} submitAdd={submitAdd} cancelAdd={cancelAdd}/>
                 </div>
                 {/* TREE BLOCK */}
-                <TreeFormTable
-                    tree={liveTree}
-                    widgetForm={widgetForm}
-                    activeExpandedKey={activeExpandedKey}
-                    handleNestedValueClick={async (table_column_id, value) => {
-                        if (!selectedFormId) return;
-                        const newFilter = {table_column_id, value};
-                        const filters = [
-                            ...activeFilters.filter(f => f.table_column_id !== table_column_id),
-                            newFilter
-                        ];
-                        try {
-                            const {data} = await api.post<FormDisplay>(`/display/${selectedFormId}/main`, filters);
-                            setFormDisplay(data);
-                            setActiveFilters(filters);
-                        } catch (e) {
-                            console.warn('❌ Ошибка nested фильтра:', e);
-                        }
-                    }}
-                    nestedTrees={nestedTrees}
-                    handleTreeValueClick={async (table_column_id, value) => {
-                        if (!selectedFormId) return;
-                        const filters = [{table_column_id, value}];
-                        try {
-                            const {data: mainData} = await api.post<FormDisplay>(`/display/${selectedFormId}/main`, filters);
-                            setFormDisplay(mainData);
-                            setActiveFilters(filters);
-                            setSubDisplay(null);
 
 
-                            const {data} = await api.post<FormTreeColumn[] | FormTreeColumn>(
-                                `/display/${selectedFormId}/tree`,
-                                filters
-                            );
-                            const normalized = Array.isArray(data) ? data : [data];
-                            const key = `${table_column_id}-${value}`;
-                            setNestedTrees(prev => ({...prev, [key]: normalized}));
-                            setActiveExpandedKey(key);
-                        } catch (e) {
-                            console.warn('❌ Ошибка handleTreeValueClick:', e);
-                        }
-                    }}
-                    handleResetFilters={handleResetFilters}
-                />
+                        <TreeFormTable
+                            tree={liveTree}
+                            widgetForm={widgetForm}
+                            activeExpandedKey={activeExpandedKey}
+                            handleNestedValueClick={async (table_column_id, value) => {
+                                if (!selectedFormId) return;
+                                const newFilter = {table_column_id, value};
+                                const filters = [
+                                    ...activeFilters.filter(f => f.table_column_id !== table_column_id),
+                                    newFilter
+                                ];
+                                try {
+                                    const {data} = await api.post<FormDisplay>(`/display/${selectedFormId}/main`, filters);
+                                    setFormDisplay(data);
+                                    setActiveFilters(filters);
+                                } catch (e) {
+                                    console.warn('❌ Ошибка nested фильтра:', e);
+                                }
+                            }}
+                            nestedTrees={nestedTrees}
+                            handleTreeValueClick={async (table_column_id, value) => {
+                                if (!selectedFormId) return;
+                                const filters = [{table_column_id, value}];
+                                try {
+                                    const {data: mainData} = await api.post<FormDisplay>(`/display/${selectedFormId}/main`, filters);
+                                    setFormDisplay(mainData);
+                                    setActiveFilters(filters);
+                                    setSubDisplay(null);
+
+
+                                    const {data} = await api.post<FormTreeColumn[] | FormTreeColumn>(
+                                        `/display/${selectedFormId}/tree`,
+                                        filters
+                                    );
+                                    const normalized = Array.isArray(data) ? data : [data];
+                                    const key = `${table_column_id}-${value}`;
+                                    setNestedTrees(prev => ({...prev, [key]: normalized}));
+                                    setActiveExpandedKey(key);
+                                } catch (e) {
+                                    console.warn('❌ Ошибка handleTreeValueClick:', e);
+                                }
+                            }}
+                            handleResetFilters={handleResetFilters}
+                        />
+
 
                 {/* MAIN + SUB */}
-                <div style={{display: 'flex', flexDirection: 'column', gap: 20, flex: 1}}>
-
-
-                    <table className={s.tbl}>
-                        <thead>
-                        {/* верхняя строка — названия групп */}
-                        <tr style={{padding: 25}}>
-                            {headerPlan.map(g => (
-                                <th key={`g-top-${g.id}`} colSpan={g.cols.length || 1}>
-                                    {g.title}
-                                </th>
-                            ))}
-                            <th></th>
-                        </tr>
-
-                        {/* нижняя строка — подписи для каждой «реальной» колонки в группе */}
-                        <tr>
-                            {headerPlan.map(g =>
-                                g.labels.slice(0, g.cols.length).map((label, idx) => (
-                                    <th key={`g-sub-${g.id}-${idx}`}>{label}</th>
-                                ))
-                            )}
-                            <th></th>
-                        </tr>
-                        </thead>
-
-                        <tbody>
-                        {/* Инлайн-строка ввода при добавлении */}
-                        {isAdding && (
+                <div className={s.mainCol}>
+                    <div className={s.tableScroll}>
+                        <table className={s.tbl}>
+                            <thead>
+                            {/* 1-я строка шапки — группы */}
                             <tr>
-                                {flatColumnsInRenderOrder.map(col => (
-                                    <td style={{textAlign: 'center'}}
-                                        key={`add-wc${col.widget_column_id}-tc${col.table_column_id}`}>
-                                        <TextField
-                                            size="small"
-                                            value={draft[col.table_column_id] ?? ''}
-                                            onChange={e => {
-                                                const v = e.target.value;
-                                                setDraft(prev => ({...prev, [col.table_column_id]: v}));
-                                            }}
-                                            placeholder={col.placeholder ?? col.column_name}
-                                            // можно добавить min/max/тип по col.type, если понадобится
-                                        />
-
-                                    </td>
+                                {headerPlan.map(g => (
+                                    <th key={`g-top-${g.id}`} colSpan={g.cols.length || 1}>
+                                        {g.title}
+                                    </th>
                                 ))}
-                                <td></td>
-
+                                <th></th>
                             </tr>
-                        )}
 
-                        {formDisplay.data.map((row, rowIdx) => {
-                            const isEditing = editingRowIdx === rowIdx;
+                            {/* 2-я строка шапки — подписи столбцов */}
+                            <tr>
+                                {headerPlan.map(g =>
+                                    g.labels.slice(0, g.cols.length).map((label, idx) => (
+                                        <th key={`g-sub-${g.id}-${idx}`}>{label}</th>
+                                    ))
+                                )}
+                                <th></th>
+                            </tr>
+                            </thead>
 
-                            return (
-                                <tr
-                                    key={rowIdx}
-                                    onClick={() => {
-                                        if (isEditing) return; // чтобы не открывать саб-виджеты во время редактирования
-                                        const pkObj = Object.fromEntries(
-                                            Object.entries(row.primary_keys).map(([k, v]) => [k, String(v)])
-                                        );
-                                        handleRowClick(pkObj);
-                                    }}
-                                >
-                                    {flatColumnsInRenderOrder.map(col => {
-                                        const key = `${col.widget_column_id}:${col.table_column_id ?? -1}`;
-                                        const idx = valueIndexByKey.get(key);
-                                        const val = idx != null ? row.values[idx] : '';
+                            <tbody>
+                            {/* Инлайн-строка ввода при добавлении */}
+                            {isAdding && (
+                                <tr>
+                                    {flatColumnsInRenderOrder.map(col => (
+                                        <td style={{textAlign: 'center'}}
+                                            key={`add-wc${col.widget_column_id}-tc${col.table_column_id}`}>
+                                            <TextField
+                                                size="small"
+                                                value={draft[col.table_column_id] ?? ''}
+                                                onChange={e => {
+                                                    const v = e.target.value;
+                                                    setDraft(prev => ({...prev, [col.table_column_id]: v}));
+                                                }}
+                                                placeholder={col.placeholder ?? col.column_name}
+                                                // можно добавить min/max/тип по col.type, если понадобится
+                                            />
 
-                                        if (isEditing) {
-                                            return (
-                                                <td       style={{textAlign: 'center'}}  key={`edit-r${rowIdx}-wc${col.widget_column_id}-tc${col.table_column_id}`}>
-                                                    <TextField
+                                        </td>
+                                    ))}
+                                    <td></td>
 
-                                                        size={"small"}
-                                                        value={editDraft[col.table_column_id] ?? ''}
-                                                        onChange={e =>
-                                                            setEditDraft(prev => ({
-                                                                ...prev,
-                                                                [col.table_column_id]: e.target.value
-                                                            }))
-                                                        }
-                                                        onClick={e => e.stopPropagation()}
-                                                        placeholder={col.placeholder ?? col.column_name}
-                                                    />
-                                                </td>
+                                </tr>
+                            )}
 
+                            {formDisplay.data.map((row, rowIdx) => {
+                                const isEditing = editingRowIdx === rowIdx;
+
+                                return (
+                                    <tr
+                                        key={rowIdx}
+                                        onClick={() => {
+                                            if (isEditing) return; // чтобы не открывать саб-виджеты во время редактирования
+                                            const pkObj = Object.fromEntries(
+                                                Object.entries(row.primary_keys).map(([k, v]) => [k, String(v)])
                                             );
-                                        }
+                                            handleRowClick(pkObj);
+                                        }}
+                                    >
+                                        {flatColumnsInRenderOrder.map(col => {
+                                            const key = `${col.widget_column_id}:${col.table_column_id ?? -1}`;
+                                            const idx = valueIndexByKey.get(key);
+                                            const val = idx != null ? row.values[idx] : '';
 
-                                        return (
-                                            <td key={`r${rowIdx}-wc${col.widget_column_id}-tc${col.table_column_id}`}>
-                                                {val}
-                                            </td>
-                                        );
-                                    })}
+                                            if (isEditing) {
+                                                return (
+                                                    <td style={{textAlign: 'center'}}
+                                                        key={`edit-r${rowIdx}-wc${col.widget_column_id}-tc${col.table_column_id}`}>
+                                                        <TextField
+
+                                                            size={"small"}
+                                                            value={editDraft[col.table_column_id] ?? ''}
+                                                            onChange={e =>
+                                                                setEditDraft(prev => ({
+                                                                    ...prev,
+                                                                    [col.table_column_id]: e.target.value
+                                                                }))
+                                                            }
+                                                            onClick={e => e.stopPropagation()}
+                                                            placeholder={col.placeholder ?? col.column_name}
+                                                        />
+                                                    </td>
+
+                                                );
+                                            }
+
+                                            return (
+                                                <td key={`r${rowIdx}-wc${col.widget_column_id}-tc${col.table_column_id}`}>
+                                                    {val}
+                                                </td>
+                                            );
+                                        })}
 
 
-                                    {/* actions */}
-                                    <td style={{textAlign: 'center', whiteSpace: 'nowrap'}}>
-                                        {isEditing ? (
-                                            <>
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        submitEdit();
-                                                    }}
-                                                    disabled={editSaving}
-                                                >
-                                                    {editSaving ? 'Сохр...' : '✓'}
-                                                </button>
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        cancelEdit();
-                                                    }}
-                                                    disabled={editSaving}
-                                                    style={{marginLeft: 8}}
-                                                >
-                                                    х
-                                                </button>
-                                            </>
-                                        ) : (
-                                            <>
+                                        {/* actions */}
+                                        <td style={{textAlign: 'center', whiteSpace: 'nowrap'}}>
+                                            {isEditing ? (
+                                                <>
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            submitEdit();
+                                                        }}
+                                                        disabled={editSaving}
+                                                    >
+                                                        {editSaving ? 'Сохр...' : '✓'}
+                                                    </button>
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            cancelEdit();
+                                                        }}
+                                                        disabled={editSaving}
+                                                        style={{marginLeft: 8}}
+                                                    >
+                                                        х
+                                                    </button>
+                                                </>
+                                            ) : (
+                                                <>
       <span
           style={{display: 'inline-flex', cursor: 'pointer', marginRight: 10}}
           onClick={(e) => {
@@ -780,35 +805,38 @@ export const FormTable: React.FC<Props> = ({
         <EditIcon className={s.actionIcon}/>
       </span>
 
-                                                <span
-                                                    style={{
-                                                        display: 'inline-flex',
-                                                        cursor: deletingRowIdx === rowIdx ? 'progress' : 'pointer',
-                                                        opacity: deletingRowIdx === rowIdx ? 0.6 : 1
-                                                    }}
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        if (deletingRowIdx == null) deleteRow(rowIdx);
-                                                    }}
-                                                    title="Удалить"
-                                                >
+                                                    <span
+                                                        style={{
+                                                            display: 'inline-flex',
+                                                            cursor: deletingRowIdx === rowIdx ? 'progress' : 'pointer',
+                                                            opacity: deletingRowIdx === rowIdx ? 0.6 : 1
+                                                        }}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            if (deletingRowIdx == null) deleteRow(rowIdx);
+                                                        }}
+                                                        title="Удалить"
+                                                    >
         <DeleteIcon className={s.actionIcon}/>
       </span>
-                                            </>
-                                        )}
-                                    </td>
+                                                </>
+                                            )}
+                                        </td>
 
-                                </tr>
-                            );
-                        })}
+                                    </tr>
+                                );
+                            })}
 
-                        </tbody>
-                    </table>
+                            </tbody>
+                        </table>
 
-                    <SubWormTable   subHeaderGroups={subHeaderGroups}   selectedFormId={selectedFormId} selectedWidget={selectedWidget} formId={formIdForSub}
-                                  subWidgetIdByOrder={subWidgetIdByOrder} subLoading={subLoading} subError={subError}
-                                  subDisplay={subDisplay}
-                                  handleTabClick={handleTabClick}/>
+                        <SubWormTable subHeaderGroups={subHeaderGroups} selectedFormId={selectedFormId}
+                                      selectedWidget={selectedWidget} formId={formIdForSub}
+                                      subWidgetIdByOrder={subWidgetIdByOrder} subLoading={subLoading}
+                                      subError={subError}
+                                      subDisplay={subDisplay}
+                                      handleTabClick={handleTabClick}/>
+                    </div>
                 </div>
             </div>
         </ThemeProvider>
