@@ -46,13 +46,11 @@ type Props = {
     changeStatusModal: () => void
     setNavOpen: (value: boolean) => void;
     navOpen: boolean;
-    setShowCreateForm: (value: boolean) => void;
 
     deleteWidget: (widgetId: number, tableId: number) => void;
     loadFormTree: (formId: number) => Promise<void>;
     loadWorkSpaces: () => void
     addForm: (payload: NewFormPayload) => Promise<WidgetForm>;
-    reloadWidgetForms: () => Promise<void>;
     setShowCreateFormModal: (v: boolean) => void;
     setCreateFormWidget: (w: Widget) => void;
     formsListByWidget: Record<number, WidgetForm[]>;
@@ -70,7 +68,6 @@ export const TopComponent: React.FC<Props> = ({
                                                   setEditFormOpen,
                                                   setShowCreateFormModal,
                                                   setCreateFormWidget,
-                                                  reloadWidgetForms,
                                                   tablesByWs,
                                                   loadTables,
                                                   handleSelectTable,
@@ -91,7 +88,6 @@ export const TopComponent: React.FC<Props> = ({
                                                   changeStatusModal,
                                                   setNavOpen,
                                                   navOpen,
-                                                  setShowCreateForm,
                                                   deleteWidget,
                                                   formsListByWidget,
                                                   loadFormTree,

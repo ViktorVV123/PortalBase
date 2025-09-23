@@ -157,10 +157,6 @@ export const Main = () => {
         await loadFormTree(formId);
     };
 
-
-    /* if (loading) return <p>Загрузка…</p>;
-     if (error) return <p style={{color: 'red'}}>{error}</p>;*/
-
     return (
         <div className={styles.layout}>
 
@@ -168,7 +164,6 @@ export const Main = () => {
                 <TopComponent setEditFormOpen={setEditFormOpen} setFormToEdit={setFormToEdit}  formsById={formsById}
                     addForm={addForm}
                     deleteForm={deleteForm}
-                    reloadWidgetForms={reloadWidgetForms}
                     loadWorkSpaces={loadWorkSpaces} deleteWorkspace={deleteWorkspace}
                               formsByWidget={formsByWidget} setWsHover={setWsHover}
                               tblHover={tblHover}
@@ -185,7 +180,6 @@ export const Main = () => {
                               changeStatusModal={() => setShowCreateForm(true)}
                               navOpen={navOpen}
                               setNavOpen={setNavOpen}
-                              setShowCreateForm={setShowCreateForm}
                               deleteWidget={deleteWidget}
                               loadFormTree={loadFormTree}
                     setShowCreateFormModal={setShowCreateFormModal}
