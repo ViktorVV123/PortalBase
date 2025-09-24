@@ -161,6 +161,7 @@ export const Main = () => {
         <div className={styles.layout}>
 
             <div className={styles.container}>
+                <div>
                 <TopComponent setEditFormOpen={setEditFormOpen} setFormToEdit={setFormToEdit}  formsById={formsById}
                     addForm={addForm}
                     deleteForm={deleteForm}
@@ -187,6 +188,7 @@ export const Main = () => {
                     formsListByWidget={formsListByWidget}
 
                 />
+                </div>
 
                 <SetOfTables clearFormSelection={clearFormSelection} updateReference={updateReference} publishTable={publishTable} tablesByWs={tablesByWs}
                              addWidgetColumn={addWidgetColumn} setWidgetsByTable={setWidgetsByTable}
