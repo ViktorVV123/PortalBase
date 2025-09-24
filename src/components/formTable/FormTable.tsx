@@ -144,10 +144,14 @@ export const FormTable: React.FC<Props> = ({
     const deleteRow = async (rowIdx: number) => {
         if (!selectedWidget) return;
 
+
         const pf = await preflightDelete();
         if (!pf.ok || !pf.formId) return;
 
         const row = formDisplay.data[rowIdx];
+        if (selectedKey && selectedKey === pkToKey(row.primary_keys)) {
+            setSelectedKey(null);
+        }
         const pkObj = Object.fromEntries(
             Object.entries(row.primary_keys).map(([k, v]) => [k, String(v)])
         );
@@ -580,6 +584,7 @@ export const FormTable: React.FC<Props> = ({
     const handleRowClick = (rowPk: Record<string, unknown>) => {
         if (!formIdForSub) return;
         setLastPrimary(rowPk);
+        setSelectedKey(pkToKey(rowPk));
         loadSubDisplay(formIdForSub, getEffectiveOrder(), rowPk);
     };
 
@@ -597,6 +602,7 @@ export const FormTable: React.FC<Props> = ({
         if (!selectedFormId || !selectedWidget) return;
         setActiveFilters([]);
         setActiveExpandedKey(null);
+        setSelectedKey(null);
         setLastPrimary({});
         setSubDisplay(null);
         setActiveSubOrder(availableOrders[0] ?? 0); // ← вместо 0
@@ -609,6 +615,17 @@ export const FormTable: React.FC<Props> = ({
             console.warn('❌ Ошибка при сбросе фильтров:', e);
         }
     };
+
+
+    //хелпер при нажатии чтобы выделало в основной таблице
+    // стабильный ключ из primary_keys (k сортируем, чтобы порядок не влиял)
+    const pkToKey = (pk: Record<string, unknown>) =>
+        Object.keys(pk)
+            .sort()
+            .map(k => `${k}:${String(pk[k])}`)
+            .join('|');
+
+    const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
 
     return (
@@ -637,6 +654,7 @@ export const FormTable: React.FC<Props> = ({
                                     const {data} = await api.post<FormDisplay>(`/display/${selectedFormId}/main`, filters);
                                     setFormDisplay(data);
                                     setActiveFilters(filters);
+                                    setSubDisplay(null);
                                 } catch (e) {
                                     console.warn('❌ Ошибка nested фильтра:', e);
                                 }
@@ -650,7 +668,6 @@ export const FormTable: React.FC<Props> = ({
                                     setFormDisplay(mainData);
                                     setActiveFilters(filters);
                                     setSubDisplay(null);
-
 
                                     const {data} = await api.post<FormTreeColumn[] | FormTreeColumn>(
                                         `/display/${selectedFormId}/tree`,
@@ -721,10 +738,12 @@ export const FormTable: React.FC<Props> = ({
 
                             {formDisplay.data.map((row, rowIdx) => {
                                 const isEditing = editingRowIdx === rowIdx;
-
+                                const rowKey = pkToKey(row.primary_keys);
                                 return (
                                     <tr
                                         key={rowIdx}
+                                        className={selectedKey === rowKey ? s.selectedRow : undefined}
+                                        aria-selected={selectedKey === rowKey || undefined}
                                         onClick={() => {
                                             if (isEditing) return; // чтобы не открывать саб-виджеты во время редактирования
                                             const pkObj = Object.fromEntries(
@@ -732,6 +751,7 @@ export const FormTable: React.FC<Props> = ({
                                             );
                                             handleRowClick(pkObj);
                                         }}
+
                                     >
                                         {flatColumnsInRenderOrder.map(col => {
                                             const key = `${col.widget_column_id}:${col.table_column_id ?? -1}`;
