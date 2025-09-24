@@ -830,13 +830,13 @@ export const FormTable: React.FC<Props> = ({
                             </tbody>
                         </table>
 
-                        <SubWormTable subHeaderGroups={subHeaderGroups} selectedFormId={selectedFormId}
-                                      selectedWidget={selectedWidget} formId={formIdForSub}
-                                      subWidgetIdByOrder={subWidgetIdByOrder} subLoading={subLoading}
-                                      subError={subError}
-                                      subDisplay={subDisplay}
-                                      handleTabClick={handleTabClick}/>
                     </div>
+                    <SubWormTable subHeaderGroups={subHeaderGroups} selectedFormId={selectedFormId}
+                                  selectedWidget={selectedWidget} formId={formIdForSub}
+                                  subWidgetIdByOrder={subWidgetIdByOrder} subLoading={subLoading}
+                                  subError={subError}
+                                  subDisplay={subDisplay}
+                                  handleTabClick={handleTabClick}/>
                 </div>
             </div>
         </ThemeProvider>
