@@ -328,11 +328,8 @@ export const Main = () => {
 
                         // ⬅️ форсим актуализацию списка форм (обновит formsByWidget в hook)
                         await reloadWidgetForms();
-
+                        await openForm(createFormWidget.id, newForm.form_id);
                         // сразу открываем созданную форму
-                        handleSelectWidget(createFormWidget);
-                        handleSelectForm(newForm.form_id);
-                        await loadFormTree(newForm.form_id);
                     }}
                     onCancel={() => setShowCreateFormModal(false)}
                 />
@@ -353,7 +350,6 @@ export const Main = () => {
                 <ModalEditConnection
                     open={editConnOpen}
                     connectionId={editingConnId}
-                    initial={editingConnInitial}
                     onSuccess={() => {
                         setEditConnOpen(false);
                         setEditingConnId(null);
