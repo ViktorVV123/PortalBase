@@ -7,55 +7,84 @@ import {
     CircularProgress, ThemeProvider, SelectChangeEvent,
 } from '@mui/material';
 
-import AddIcon from '@/assets/image/AddIcon.svg';   // ← ваш SVG-компонент
+import AddIcon from '@/assets/image/AddIcon.svg';
+import DeleteIcon from '@/assets/image/DeleteIcon.svg';
+import EditIcon from '@/assets/image/EditIcon.svg';
+
 import {api} from '@/services/api';
 import {Connection} from '@/types/typesConnection';
 import * as styles from './ModalAddWorkspace.module.scss'
-import DeleteIcon from '@/assets/image/DeleteIcon.svg';
 import {dark} from "@/shared/themeUI/themeModal/ThemeModalUI";
 
+/** Если у твоего Connection уже есть эти поля — отдельный тип не нужен */
+type ConnectionItem = Connection & {
+    url?: {
+        drivername?: string;
+        username?: string;
+        host?: string;
+        port?: number;
+        database?: string;
+        query?: any;
+    };
+    connection?: { name?: string; description?: string };
+};
 
 type Props = {
-    connections: Connection[];
+    connections: ConnectionItem[];
     onSuccess: () => void;
     onCancel: () => void;
     setShowConnForm: (v: boolean) => void;
-    open: boolean;             // ✔ лучше управлять диалогом снаружи
+    open: boolean;
     deleteConnection: (id: number) => void;
 
+    /** ⬅️ добавили: проброс колбэка редактирования */
+    onEditConnection?: (conn: ConnectionItem) => void;
 };
 
-export const ModalAddWorkspace = ({deleteConnection,
-                                      connections, onSuccess, onCancel, setShowConnForm, open
+export const ModalAddWorkspace = ({
+                                      deleteConnection,
+                                      connections,
+                                      onSuccess,
+                                      onCancel,
+                                      setShowConnForm,
+                                      open,
+                                      onEditConnection,   // ⬅️ принимаем
                                   }: Props) => {
 
-    /* ----- local state ----- */
-    const [form, setForm] = useState({
+    // Делаем connection_id типом number | '' чтобы Select работал без warning'ов
+    const [form, setForm] = useState<{
+        connection_id: any;
+        group: string;
+        name: string;
+        description: string;
+    }>({
         connection_id: connections[0]?.id ?? '',
         group: '',
         name: '',
         description: '',
     });
+
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-
-    const handle =
-        (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-            setForm(prev => ({...prev, [e.target.name]: e.target.value}));
+    const handle = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+        setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
 
     const handleSelect = (e: SelectChangeEvent) => {
-        setForm(prev => ({
-            ...prev,
-            connection_id: Number(e.target.value),   // строку → число
-        }));
+        const val = e.target.value;
+        setForm(prev => ({ ...prev, connection_id: val === '' ? '' : Number(val) }));
     };
 
     const submit = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
             setLoading(true);
-            await api.post('/workspaces/', form);
+            // backend ожидает число — проверим
+            const payload = {
+                ...form,
+                connection_id: typeof form.connection_id === 'number' ? form.connection_id : undefined,
+            };
+            await api.post('/workspaces/', payload);
             onSuccess();
         } catch {
             setError('Не удалось создать Workspace');
@@ -64,21 +93,21 @@ export const ModalAddWorkspace = ({deleteConnection,
         }
     };
 
-    const handleDeleteConn = async (
-        e: React.MouseEvent,
-        id: number,
-    ) => {
-        e.stopPropagation();          // чтобы Select не закрылся/не выбрался
+    const handleDeleteConn = async (e: React.MouseEvent, id: number) => {
+        e.stopPropagation();   // ⬅️ не даём Select выбрать пункт
+        e.preventDefault();
         if (!confirm('Удалить подключение?')) return;
-
         await deleteConnection(id);
     };
 
-    /* ----- render ----- */
+    const handleEditConn = (e: React.MouseEvent, conn: ConnectionItem) => {
+        e.stopPropagation();   // ⬅️ не даём Select выбрать пункт
+        e.preventDefault();
+        onEditConnection?.(conn);  // ⬅️ дергаем внешний колбэк (Main откроет модалку)
+    };
+
     return (
         <ThemeProvider theme={dark}>
-
-
             <Dialog open={open} onClose={onCancel} fullWidth maxWidth="sm">
                 <DialogTitle>Создать workspace</DialogTitle>
 
@@ -92,30 +121,44 @@ export const ModalAddWorkspace = ({deleteConnection,
                                     labelId="conn-label"
                                     name="connection_id"
                                     label="Подключение"
-                                    value={form.connection_id}
+                                    value={form.connection_id}         // ⬅️ значение number | ''
                                     onChange={handleSelect}
                                     renderValue={(value) => {
-                                        const conn = connections.find(c => c.id === value);
-                                        return conn ? conn.name : '';
+                                        // value тут может быть number | '' | unknown
+                                        const id = typeof value === 'number' ? value : Number(value);
+                                        const conn = connections.find(c => c.id === id);
+                                        return conn ? (conn.name ?? conn.connection?.name ?? `#${id}`) : '';
                                     }}
                                     required
                                 >
-                                    {connections.map(c => (
-                                        <MenuItem style={{display: 'flex', flexDirection: 'column'}} key={c.id}
-                                                  value={c.id}>
-                                            <span style={{display: 'flex', gap:10}}>
-                                              <span> {c.name}</span>
-                                         {/*   <EditIcon/>*/}
-                                            <DeleteIcon  onClick={e => handleDeleteConn(e, c.id)}/>
-                                            </span>
+                                    {connections.map((c) => (
+                                        <MenuItem
+                                            key={c.id}
+                                            value={c.id}
+                                            style={{ display: 'flex', flexDirection: 'column' }}
+                                        >
+                      <span style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                        <span>{c.name ?? c.connection?.name ?? `#${c.id}`}</span>
+                          {/* КНОПКИ ДЕЙСТВИЙ: СТОПАЕМ СОБЫТИЯ */}
+                          <IconButton size="small" onClick={(e) => handleEditConn(e, c)} title="Редактировать">
+                          <EditIcon />
+                        </IconButton>
+                        <IconButton size="small" onClick={(e) => handleDeleteConn(e, c.id)} title="Удалить">
+                          <DeleteIcon />
+                        </IconButton>
+                      </span>
+
                                             <span className={styles.descriptionModal}>
-                                                {c.description === '' ?
-                                                    <span><strong>Описание:</strong> {c.description},</span> : ''}
-                                                <span>   <strong>Тип:</strong> {c.conn_type},</span>
-                                                <span><strong>Строка подключения:</strong> {c.conn_str}</span>
-                                            </span>
-
-
+                        {c.description || c.connection?.description
+                            ? <span><strong>Описание:</strong> {c.description ?? c.connection?.description}</span>
+                            : null}
+                                                {c['conn_type'] && (
+                                                    <span>&nbsp; <strong>Тип:</strong> {String(c['conn_type'])}</span>
+                                                )}
+                                                {c['conn_str'] && (
+                                                    <span>&nbsp; <strong>Строка подключения:</strong> {String(c['conn_str'])}</span>
+                                                )}
+                      </span>
                                         </MenuItem>
                                     ))}
                                 </Select>
@@ -124,10 +167,11 @@ export const ModalAddWorkspace = ({deleteConnection,
                             {/* кнопка «добавить коннектор» справа от селекта */}
                             <IconButton
                                 size="small"
-                                sx={{alignSelf: 'flex-end', mt: -1.5}}   /* прижимаем к селекту */
+                                sx={{ alignSelf: 'flex-end', mt: -1.5 }}
                                 onClick={() => setShowConnForm(true)}
+                                title="Добавить подключение"
                             >
-                                <AddIcon width={18} height={18}/>
+                                <AddIcon width={18} height={18} />
                             </IconButton>
 
                             <TextField
@@ -161,17 +205,17 @@ export const ModalAddWorkspace = ({deleteConnection,
                                 required
                             />
 
-                            {error && <span style={{color: '#d33'}}>{error}</span>}
+                            {error && <span style={{ color: '#d33' }}>{error}</span>}
                         </Stack>
                     </DialogContent>
 
-                    <DialogActions sx={{pr: 3, pb: 2}}>
+                    <DialogActions sx={{ pr: 3, pb: 2 }}>
                         <Button onClick={onCancel}>Отмена</Button>
                         <Button
                             variant="contained"
                             type="submit"
-                            disabled={loading || !form.name.trim()}
-                            startIcon={loading && <CircularProgress size={16}/>}
+                            disabled={loading || !form.name.trim() || form.connection_id === ''}
+                            startIcon={loading && <CircularProgress size={16} />}
                         >
                             {loading ? 'Создаю…' : 'Создать'}
                         </Button>
@@ -179,6 +223,5 @@ export const ModalAddWorkspace = ({deleteConnection,
                 </form>
             </Dialog>
         </ThemeProvider>
-    )
-        ;
+    );
 };

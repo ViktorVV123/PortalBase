@@ -11,6 +11,7 @@ import {ModalAddTable} from "@/components/modals/modalAddNewTable/ModalAddNewTab
 import {ModalAddWidget} from "@/components/modals/modalAddWidget/ModalAddWidget";
 import {ModalAddForm} from "@/components/modals/modalAddForm/ModalAddForm";
 import {ModalEditForm} from "@/components/modals/modalEditForm/ModalEditForm";
+import {ModalEditConnection} from "@/components/modals/ModalEditConnection/ModalEditConnection";
 
 
 export const Main = () => {
@@ -31,6 +32,9 @@ export const Main = () => {
     const [createFormWidget, setCreateFormWidget] = useState<Widget | null>(null);
     const [editFormOpen, setEditFormOpen] = useState(false);
     const [formToEdit, setFormToEdit] = useState<WidgetForm | null>(null);
+    const [editConnOpen, setEditConnOpen] = useState(false);
+    const [editingConnId, setEditingConnId] = useState<number | null>(null);
+    const [editingConnInitial, setEditingConnInitial] = useState<any>(null);
 
 
     const {
@@ -249,7 +253,25 @@ export const Main = () => {
             {/* ——— WORKSPACE ——— */}
             {showCreateForm && (
                 <ModalAddWorkspace
-
+                    onEditConnection={(conn) => {
+                        setEditingConnId(conn.id); // предполагаю, что в твоём объекте есть id
+                        setEditingConnInitial({
+                            url: {
+                                drivername: conn.url?.drivername,
+                                username:   conn.url?.username,
+                                password:   '',               // пароль можно вводить заново
+                                host:       conn.url?.host,
+                                port:       conn.url?.port,
+                                database:   conn.url?.database,
+                                query:      conn.url?.query ?? {}
+                            },
+                            connection: {
+                                name:        conn.name ?? conn.connection?.name,
+                                description: conn.description ?? conn.connection?.description
+                            }
+                        });
+                        setEditConnOpen(true);
+                    }}
                     deleteConnection={deleteConnection}
                     open={showCreateForm}                  /* ✔ правильный флаг */
                     setShowConnForm={setShowConnForm}
@@ -324,6 +346,25 @@ export const Main = () => {
                     onClose={() => setEditFormOpen(false)}
                     form={formToEdit}
                     reloadWidgetForms={reloadWidgetForms}
+                />
+            )}
+
+            {editConnOpen && editingConnId != null && (
+                <ModalEditConnection
+                    open={editConnOpen}
+                    connectionId={editingConnId}
+                    initial={editingConnInitial}
+                    onSuccess={() => {
+                        setEditConnOpen(false);
+                        setEditingConnId(null);
+                        setEditingConnInitial(null);
+                        loadConnections();   // освежить список
+                    }}
+                    onCancel={() => {
+                        setEditConnOpen(false);
+                        setEditingConnId(null);
+                        setEditingConnInitial(null);
+                    }}
                 />
             )}
 
