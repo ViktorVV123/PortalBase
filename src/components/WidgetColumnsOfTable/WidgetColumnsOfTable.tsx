@@ -8,14 +8,14 @@ import {
 import {TableColumn} from '@/components/tableColumn/TableColumn';
 import {
     Box,
-    Button,
+    Button, Checkbox, Chip,
     createTheme,
     Dialog,
     DialogActions,
     DialogContent,
-    DialogTitle,
+    DialogTitle, FormControlLabel,
     Modal,
-    Stack,
+    Stack, Switch,
     TextField,
     ThemeProvider,
     Typography,
@@ -159,6 +159,7 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
         name: selectedWidget?.name ?? '',
         description: selectedWidget?.description ?? '',
         table_id: selectedWidget?.table_id ?? 0,
+        published: selectedWidget.published ,
     });
 
     const saveWidgetMeta = useCallback(async () => {
@@ -331,6 +332,44 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                                 <TextField label="Описание" size="small" fullWidth multiline rows={3}
                                            value={widgetMeta.description ?? ''}
                                            onChange={(e) => setWidgetMeta(v => ({...v, description: e.target.value}))}
+                                />
+
+                                <FormControlLabel
+                                    label="Опубликован"
+                                    control={
+                                        <Checkbox
+                                            checked={Boolean(widgetMeta?.published)}
+                                            // кастомные иконки: ✓ для true, ✕ для false
+                                            checkedIcon={
+                                                <Box
+                                                    component="span"
+                                                    sx={{
+                                                        width: 18, height: 18, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                                                        border: '1px solid', borderColor: 'divider', borderRadius: 0.75
+                                                    }}
+                                                >
+                                                    ✓
+                                                </Box>
+                                            }
+                                            icon={
+                                                <Box
+                                                    component="span"
+                                                    sx={{
+                                                        width: 18, height: 18, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                                                        border: '1px solid', borderColor: 'divider', borderRadius: 0.75
+                                                    }}
+                                                >
+                                                    ✕
+                                                </Box>
+                                            }
+                                            // делаем «read-only» (не кликается)
+                                            disableRipple
+                                            sx={{
+                                                pointerEvents: 'none',
+                                                '&.Mui-disabled': { opacity: 1 }, // если вдруг добавишь disabled — не бледнить
+                                            }}
+                                        />
+                                    }
                                 />
                             </Stack>
                         </DialogContent>
