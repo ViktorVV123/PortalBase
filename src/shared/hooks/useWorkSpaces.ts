@@ -331,19 +331,19 @@ export const useWorkSpaces = () => {
     );
     // внутри useWorkSpaces
     const updateWidgetMeta = useCallback(
-        async (id: number, patch: Partial<Widget>) => {
+        async (id: number, patch: Partial<Widget>): Promise<Widget> => {
             const { data } = await api.patch<Widget>(`/widgets/${id}`, patch);
-            /* синхронизируем кеш */
             setWidgetsByTable(prev => {
                 const tbl = data.table_id;
-                return { ...prev,
-                    [tbl]: (prev[tbl] ?? []).map(w => w.id === id ? data : w) };
+                return {
+                    ...prev,
+                    [tbl]: (prev[tbl] ?? []).map(w => (w.id === id ? data : w)),
+                };
             });
             return data;
         },
-        []
+        [setWidgetsByTable] // ← см. п.2
     );
-
 
 
     /** GET /widgets/{id}/columns */

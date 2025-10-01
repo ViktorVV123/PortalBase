@@ -1,43 +1,24 @@
-import React, {useEffect, useState} from 'react';
-import {DTable, useWorkSpaces, Widget, WidgetForm} from '@/shared/hooks/useWorkSpaces';
+import React, { useEffect, useMemo, useState } from 'react';
+import * as styles from './Main.module.scss';
 
-import * as styles from './Main.module.scss'
-import {SetOfTables} from "@/components/setOfTables/SetOfTables";
-import {TopComponent} from "@/components/topComponent/TopComponent";
-import {ModalAddWorkspace} from "@/components/modals/modalAddWorkspace/ModalAddWorkspace";
-import {ModalAddConnection} from "@/components/modals/modalAddConnection/ModalAddConnection";
-import {WorkSpaceTypes} from "@/types/typesWorkSpaces";
-import {ModalAddTable} from "@/components/modals/modalAddNewTable/ModalAddNewTable";
-import {ModalAddWidget} from "@/components/modals/modalAddWidget/ModalAddWidget";
-import {ModalAddForm} from "@/components/modals/modalAddForm/ModalAddForm";
-import {ModalEditForm} from "@/components/modals/modalEditForm/ModalEditForm";
-import {ModalEditConnection} from "@/components/modals/ModalEditConnection/ModalEditConnection";
+import { useWorkSpaces } from '@/shared/hooks/useWorkSpaces';
+
+
+import { TopComponent } from '@/components/topComponent/TopComponent';
+import { SetOfTables } from '@/components/setOfTables/SetOfTables';
+import {useMainSelection} from "@/pages/main/hook/useMainSelection";
+import {useMainModals} from "@/pages/main/hook/useMainModals";
+import {ModalHost} from "@/components/modalHost/ModalHost";
+
 
 
 export const Main = () => {
-
     const [navOpen, setNavOpen] = useState(false);
-    const [selectedWidget, setSelectedWidget] = useState<Widget | null>(null);
-    const [selectedFormId, setSelectedFormId] = useState<number | null>(null);
-    const clearFormSelection = () => setSelectedFormId(null);
     const [wsHover, setWsHover] = useState<number | null>(null);
     const [tblHover, setTblHover] = useState<number | null>(null);
-    const [showConnForm, setShowConnForm] = useState(false);
-    const [showCreateForm, setShowCreateForm] = useState(false);
-    const [showCreateTable, setShowCreateTable] = useState(false);
-    const [createTblWs, setCreateTblWs] = useState<WorkSpaceTypes | null>(null)
-    const [showCreateWidget, setShowCreateWidget] = useState(false);
-    const [createWidgetTable, setCreateWidgetTable] = useState<DTable | null>(null);
-    const [showCreateFormModal, setShowCreateFormModal] = useState(false);
-    const [createFormWidget, setCreateFormWidget] = useState<Widget | null>(null);
-    const [editFormOpen, setEditFormOpen] = useState(false);
-    const [formToEdit, setFormToEdit] = useState<WidgetForm | null>(null);
-    const [editConnOpen, setEditConnOpen] = useState(false);
-    const [editingConnId, setEditingConnId] = useState<number | null>(null);
-    const [editingConnInitial, setEditingConnInitial] = useState<any>(null);
-
 
     const {
+        // загрузки/кэш
         loadWorkSpaces,
         columns,
         loadColumns,
@@ -92,281 +73,144 @@ export const Main = () => {
         reloadWidgetForms,
         formsListByWidget,
         deleteForm,
-        formsById, deleteTreeFieldFromForm, deleteSubWidgetFromForm
+        formsById,
+        deleteTreeFieldFromForm,
+        deleteSubWidgetFromForm,
     } = useWorkSpaces();
 
-    useEffect(() => {
-            loadWorkSpaces()
-        },
-        [loadWorkSpaces]);
+    // первичная загрузка
+    useEffect(() => { loadWorkSpaces(); }, [loadWorkSpaces]);
+    useEffect(() => { loadWidgetForms(); }, [loadWidgetForms]);
+    useEffect(() => { loadConnections(); }, [loadConnections]);
 
-    useEffect(() => {
-            loadWidgetForms()
-        },
-        [loadWidgetForms]);
+    // выборы (вынесены)
+    const selection = useMainSelection({
+        loadColumns,
+        loadWidgetsForTable,
+        loadColumnsWidget,
+        loadFormDisplay,
+        loadFormTree,
+        fetchWidgetAndTable,
+        formsByWidget,
+    });
 
-    useEffect(() => {
-            loadConnections()
-        },
-        [loadConnections]);
+    // модалки (вынесены)
+    const modals = useMainModals({
+        loadConnections,
+        loadWorkSpaces,
+        loadTables,
+        loadWidgetsForTable,
+        handleSelectTable: selection.handleSelectTable,
+        handleSelectWidget: selection.handleSelectWidget,
+        reloadWidgetForms,
+        openForm: selection.openForm,
+    });
 
-
-//показываем путь до таблицы workspace => table
-    const selectedWs = selectedTable
-        ? workSpaces.find(w => w.id === selectedTable.workspace_id) ?? null
-        : null;
-
-
-    const handleSelectTable = (table: DTable) => {
-        setSelectedWidget(null);            // сбрасываем прежний виджет
-        loadColumns(table);
-        setSelectedFormId(null);// столбцы таблицы
-        loadWidgetsForTable(table.id);      // список виджетов
-    };
-
-    const handleSelectWidget = (w: Widget) => {
-        setSelectedWidget(w);
-        setSelectedFormId(null);
-        loadColumnsWidget(w.id);            // столбцы виджета
-    };
-//для того чтобы вернуться к таблице после выбора widget
-    const handleClearWidget = () => {
-        setSelectedWidget(null);
-        setSelectedFormId(null);   // возврат к таблице
-
-    };
-
-
-    const handleSelectForm = (formId: number) => {
-        setSelectedFormId(formId);
-        loadFormDisplay(formId);
-    };
-
-    // имя формы, если выбраны и widget, и form
-    const formName =
-        selectedWidget && selectedFormId
-            ? formsByWidget[selectedWidget.id]?.name ?? ''
-            : '';
-
-
-    const openForm = async (widgetId: number, formId: number) => {
-        const {widget, table} = await fetchWidgetAndTable(widgetId);
-
-        /* 1. выбираем таблицу и виджет, чтоб колонки были загружены */
-        handleSelectTable(table);
-        handleSelectWidget(widget);
-
-        /* 2. сама форма */
-        handleSelectForm(formId);
-        await loadFormTree(formId);
-    };
+    // выбранный workspace (для хлебных крошек/шапки)
+    const selectedWs = useMemo(
+        () => (selectedTable ? workSpaces.find((w) => w.id === selectedTable.workspace_id) ?? null : null),
+        [selectedTable, workSpaces]
+    );
 
     return (
         <div className={styles.layout}>
-
             <div className={styles.container}>
                 <div>
-                <TopComponent setEditFormOpen={setEditFormOpen} setFormToEdit={setFormToEdit}  formsById={formsById}
-                    addForm={addForm}
-                    deleteForm={deleteForm}
-                    loadWorkSpaces={loadWorkSpaces} deleteWorkspace={deleteWorkspace}
-                              formsByWidget={formsByWidget} setWsHover={setWsHover}
-                              tblHover={tblHover}
-                              setTblHover={setTblHover} wsHover={wsHover}
-                              handleSelectTable={handleSelectTable} widgetsByTable={widgetsByTable}
-                              handleSelectWidget={handleSelectWidget} workSpaces={workSpaces} tablesByWs={tablesByWs}
-                              loadTables={loadTables} loadWidgetsForTable={loadWidgetsForTable}
-                              handleSelectForm={handleSelectForm}
-                              setShowCreateTable={setShowCreateTable}
-                              setCreateTblWs={setCreateTblWs}
-                              setShowCreateWidget={setShowCreateWidget}
-                              setCreateWidgetTable={setCreateWidgetTable}
-                              deleteTable={deleteTable}
-                              changeStatusModal={() => setShowCreateForm(true)}
-                              navOpen={navOpen}
-                              setNavOpen={setNavOpen}
-                              deleteWidget={deleteWidget}
-                              loadFormTree={loadFormTree}
-                    setShowCreateFormModal={setShowCreateFormModal}
-                    setCreateFormWidget={setCreateFormWidget}
-                    formsListByWidget={formsListByWidget}
-
-                />
+                    <TopComponent
+                        setEditFormOpen={modals.setEditFormOpen}
+                        setFormToEdit={modals.setFormToEdit}
+                        formsById={formsById}
+                        addForm={addForm}
+                        deleteForm={deleteForm}
+                        loadWorkSpaces={loadWorkSpaces}
+                        deleteWorkspace={deleteWorkspace}
+                        formsByWidget={formsByWidget}
+                        setWsHover={setWsHover}
+                        tblHover={tblHover}
+                        setTblHover={setTblHover}
+                        wsHover={wsHover}
+                        handleSelectTable={selection.handleSelectTable}
+                        widgetsByTable={widgetsByTable}
+                        handleSelectWidget={selection.handleSelectWidget}
+                        workSpaces={workSpaces}
+                        tablesByWs={tablesByWs}
+                        loadTables={loadTables}
+                        loadWidgetsForTable={loadWidgetsForTable}
+                        handleSelectForm={selection.handleSelectForm}
+                        setShowCreateTable={modals.setShowCreateTable}
+                        setCreateTblWs={modals.setCreateTblWs}
+                        setShowCreateWidget={modals.setShowCreateWidget}
+                        setCreateWidgetTable={modals.setCreateWidgetTable}
+                        deleteTable={deleteTable}
+                        changeStatusModal={() => modals.setShowCreateForm(true)}
+                        navOpen={navOpen}
+                        setNavOpen={setNavOpen}
+                        deleteWidget={deleteWidget}
+                        loadFormTree={loadFormTree}
+                        setShowCreateFormModal={modals.setShowCreateFormModal}
+                        setCreateFormWidget={modals.setCreateFormWidget}
+                        formsListByWidget={formsListByWidget}
+                    />
                 </div>
 
-                <SetOfTables clearFormSelection={clearFormSelection} updateReference={updateReference} publishTable={publishTable} tablesByWs={tablesByWs}
-                             addWidgetColumn={addWidgetColumn} setWidgetsByTable={setWidgetsByTable}
-                             setSelectedWidget={setSelectedWidget}
-                             columns={columns}
-                             formDisplay={formDisplay}
-                             tableName={selectedTable?.name ?? ''}
-                             loading={loading}
-                             workspaceName={selectedWs?.name ?? ''}
-                             error={error}
-                             widgetColumns={widgetColumns}
-                             wColsLoading={wColsLoading}
-                             wColsError={wColsError}
-                             handleSelectWidget={handleSelectWidget}
-                             selectedWidget={selectedWidget}
-                             handleClearWidget={handleClearWidget}
-                             selectedFormId={selectedFormId}
-                             formLoading={formLoading}
-                             formError={formError}
-                             formName={formName}
-                             loadSubDisplay={loadSubDisplay}
-                             subDisplay={subDisplay}
-                             subLoading={subLoading}
-                             subError={subError}
-                             formsByWidget={formsByWidget}
-                             openForm={openForm}
-                             deleteColumnTable={deleteColumnTable}
-                             deleteColumnWidget={deleteColumnWidget}
-                             updateTableColumn={updateTableColumn}
-                             updateWidgetColumn={updateWidgetColumn}
-                             addReference={addReference}
-                             loadColumnsWidget={loadColumnsWidget}
-                             formTrees={formTrees}
-                             loadFilteredFormDisplay={loadFilteredFormDisplay}
-                             setFormDisplay={setFormDisplay}
-                             setSubDisplay={setSubDisplay}
-                             selectedTable={selectedTable}
-                             updateTableMeta={updateTableMeta}
-                             fetchReferences={fetchReferences}
-                             deleteReference={deleteReference}
-                             updateWidgetMeta={updateWidgetMeta}
-                             formsById={formsById}
-
+                <SetOfTables
+                    clearFormSelection={selection.clearFormSelection}
+                    updateReference={updateReference}
+                    publishTable={publishTable}
+                    tablesByWs={tablesByWs}
+                    addWidgetColumn={addWidgetColumn}
+                    setWidgetsByTable={setWidgetsByTable}
+                    setSelectedWidget={selection.setSelectedWidget}
+                    columns={columns}
+                    formDisplay={formDisplay}
+                    tableName={selectedTable?.name ?? ''}
+                    loading={loading}
+                    workspaceName={selectedWs?.name ?? ''}
+                    error={error}
+                    widgetColumns={widgetColumns}
+                    wColsLoading={wColsLoading}
+                    wColsError={wColsError}
+                    handleSelectWidget={selection.handleSelectWidget}
+                    selectedWidget={selection.selectedWidget}
+                    handleClearWidget={selection.handleClearWidget}
+                    selectedFormId={selection.selectedFormId}
+                    formLoading={formLoading}
+                    formError={formError}
+                    formName={selection.formName}
+                    loadSubDisplay={loadSubDisplay}
+                    subDisplay={subDisplay}
+                    subLoading={subLoading}
+                    subError={subError}
+                    formsByWidget={formsByWidget}
+                    openForm={selection.openForm}
+                    deleteColumnTable={deleteColumnTable}
+                    deleteColumnWidget={deleteColumnWidget}
+                    updateTableColumn={updateTableColumn}
+                    updateWidgetColumn={updateWidgetColumn}
+                    addReference={addReference}
+                    loadColumnsWidget={loadColumnsWidget}
+                    formTrees={formTrees}
+                    loadFilteredFormDisplay={loadFilteredFormDisplay}
+                    setFormDisplay={setFormDisplay}
+                    setSubDisplay={setSubDisplay}
+                    selectedTable={selectedTable}
+                    updateTableMeta={updateTableMeta}
+                    fetchReferences={fetchReferences}
+                    deleteReference={deleteReference}
+                    updateWidgetMeta={updateWidgetMeta}
+                    formsById={formsById}
                 />
             </div>
 
-            {showConnForm && (
-                <ModalAddConnection open={showConnForm}
-                    /* ← добавили */
-                                    onSuccess={() => {
-                                        setShowConnForm(false);
-                                        loadConnections();
-                                    }}
-                                    onCancel={() => setShowConnForm(false)}
-                />
-            )}
-
-            {/* ——— WORKSPACE ——— */}
-            {showCreateForm && (
-                <ModalAddWorkspace
-                    onEditConnection={(conn) => {
-                        setEditingConnId(conn.id); // предполагаю, что в твоём объекте есть id
-                        setEditingConnInitial({
-                            url: {
-                                drivername: conn.url?.drivername,
-                                username:   conn.url?.username,
-                                password:   '',               // пароль можно вводить заново
-                                host:       conn.url?.host,
-                                port:       conn.url?.port,
-                                database:   conn.url?.database,
-                                query:      conn.url?.query ?? {}
-                            },
-                            connection: {
-                                name:        conn.name ?? conn.connection?.name,
-                                description: conn.description ?? conn.connection?.description
-                            }
-                        });
-                        setEditConnOpen(true);
-                    }}
-                    deleteConnection={deleteConnection}
-                    open={showCreateForm}                  /* ✔ правильный флаг */
-                    setShowConnForm={setShowConnForm}
-                    connections={connections}
-                    onSuccess={() => {
-                        setShowCreateForm(false);
-                        loadWorkSpaces();
-                    }}
-                    onCancel={() => setShowCreateForm(false)}
-                />
-            )}
-
-            {showCreateTable && createTblWs && (
-                <ModalAddTable
-                    open={showCreateTable}
-                    workspace={createTblWs}
-                    onSuccess={async (newTable) => {
-                        /* 1. закрываем модалку */
-                        setShowCreateTable(false);
-
-                        /* 2. перезагружаем список таблиц этого WS (чтобы кэш был актуален) */
-                        await loadTables(newTable.workspace_id, true);
-
-                        /* 3. и сразу выбираем только что созданную */
-                        handleSelectTable(newTable);
-                    }}
-                    onCancel={() => setShowCreateTable(false)}
-                />
-            )}
-
-            {showCreateWidget && createWidgetTable && (
-                <ModalAddWidget
-                    open={showCreateWidget}
-                    table={createWidgetTable}
-                    onSuccess={async (newWidget) => {
-                        /* 1. закрываем модалку */
-                        setShowCreateWidget(false);
-
-                        /* 2. обновляем кэш виджетов таблицы */
-                        await loadWidgetsForTable(newWidget.table_id, true);
-
-                        /* 3. сразу переключаемся на созданный виджет */
-                        handleSelectWidget(newWidget);
-                    }}
-                    onCancel={() => setShowCreateWidget(false)}
-                />
-            )}
-            {showCreateFormModal && createFormWidget && (
-                <ModalAddForm
-                    open={showCreateFormModal}
-                    widget={createFormWidget}
-                    onSuccess={async (newForm) => {
-                        setShowCreateFormModal(false);
-
-                        // ⬅️ форсим актуализацию списка форм (обновит formsByWidget в hook)
-                        await reloadWidgetForms();
-                        await openForm(createFormWidget.id, newForm.form_id);
-                        // сразу открываем созданную форму
-                    }}
-                    onCancel={() => setShowCreateFormModal(false)}
-                />
-            )}
-
-            {formToEdit && (
-                <ModalEditForm
-                    deleteSubWidgetFromForm={deleteSubWidgetFromForm}
-                    deleteTreeFieldFromForm={deleteTreeFieldFromForm}
-                    open={editFormOpen}
-                    onClose={() => setEditFormOpen(false)}
-                    form={formToEdit}
-                    reloadWidgetForms={reloadWidgetForms}
-                />
-            )}
-
-            {editConnOpen && editingConnId != null && (
-                <ModalEditConnection
-                    open={editConnOpen}
-                    connectionId={editingConnId}
-                    onSuccess={() => {
-                        setEditConnOpen(false);
-                        setEditingConnId(null);
-                        setEditingConnInitial(null);
-                        loadConnections();   // освежить список
-                    }}
-                    onCancel={() => {
-                        setEditConnOpen(false);
-                        setEditingConnId(null);
-                        setEditingConnInitial(null);
-                    }}
-                />
-            )}
-
-
+            <ModalHost
+                modals={modals}
+                connections={connections}
+                deleteConnection={deleteConnection}
+                reloadWidgetForms={reloadWidgetForms}
+                deleteTreeFieldFromForm={deleteTreeFieldFromForm}
+                deleteSubWidgetFromForm={deleteSubWidgetFromForm}
+            />
 
         </div>
-
     );
 };
