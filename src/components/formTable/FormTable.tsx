@@ -100,10 +100,23 @@ export const FormTable: React.FC<Props> = ({
     const dq = useDebounced(q, 250); // чтобы не дёргать Fuse на каждый символ
 
 
-    const currentForm: WidgetForm | null =
+    // БАЗА из пропсов (как было)
+    const baseForm: WidgetForm | null =
         selectedFormId != null
             ? (formsById[selectedFormId] ?? null)
             : (selectedWidget ? (formsByWidget[selectedWidget.id] ?? null) : null);
+
+// Локальный ОВЕРРАЙД (живое состояние формы после правок)
+    const [overrideForm, setOverrideForm] = useState<WidgetForm | null>(null);
+
+// Итоговая форма для всех вычислений ниже
+    const currentForm: WidgetForm | null = overrideForm ?? baseForm;
+
+// при смене selectedFormId — сбрасываем оверрайд
+    useEffect(() => {
+        setOverrideForm(null);
+    }, [selectedFormId]);
+
 
     // sub-widget id by order — ТОЛЬКО из текущей формы
     const subWidgetIdByOrder = useMemo(() => {
@@ -114,6 +127,7 @@ export const FormTable: React.FC<Props> = ({
         return map;
     }, [currentForm]);
 
+
     // formId для сабов — приоритет выбранной форме
     const formIdForSub = selectedFormId ?? currentForm?.form_id ?? null;
 
@@ -123,6 +137,8 @@ export const FormTable: React.FC<Props> = ({
         setActiveSubOrder(order0);
         setSubDisplay(null);
     }, [currentForm, setSubDisplay]);
+
+
 
 
     // префлайт: должен быть настроен DELETE QUERY у таблицы
@@ -550,16 +566,17 @@ export const FormTable: React.FC<Props> = ({
 
 // перезагрузка дерева из API
     const reloadTree = async () => {
-        const formId = selectedFormId ?? widgetForm?.form_id ?? null;
+        const formId = selectedFormId ?? currentForm?.form_id ?? null; // ← было widgetForm?.form_id
         if (!formId) return;
         try {
-            const {data} = await api.post<FormTreeColumn[] | FormTreeColumn>(`/display/${formId}/tree`);
+            const { data } = await api.post<FormTreeColumn[] | FormTreeColumn>(`/display/${formId}/tree`);
             const normalized = Array.isArray(data) ? data : [data];
             setLiveTree(normalized);
         } catch (e) {
             console.warn('Не удалось обновить справочники (tree):', e);
         }
     };
+
 
 
     // клик по строке main → грузим sub для ТОЙ ЖЕ формы
@@ -641,6 +658,48 @@ export const FormTable: React.FC<Props> = ({
     );
 
 
+    useEffect(() => {
+        if (!selectedFormId) return;
+
+        let aborted = false;
+
+        const onFormMutated = async (e: any) => {
+            const eventFormId = e?.detail?.formId;
+            if (eventFormId !== selectedFormId) return;
+
+            try {
+                // 1) тянем свежую форму
+                const { data } = await api.get<WidgetForm>(`/forms/${eventFormId}`);
+                if (!aborted) setOverrideForm(data);
+
+                // 2) перезагружаем tree (левый блок), чтобы сразу увидеть новые/удалённые поля
+                try {
+                    const treeRes = await api.post<FormTreeColumn[] | FormTreeColumn>(`/display/${eventFormId}/tree`);
+                    const normalized = Array.isArray(treeRes.data) ? treeRes.data : [treeRes.data];
+                    setLiveTree(normalized);
+                } catch (err) {
+                    console.warn('Не удалось обновить tree после мутации формы:', err);
+                }
+
+                // 3) валидируем активный sub-order (если добавили/удалили sub)
+                const orders = (data?.sub_widgets ?? [])
+                    .map(sw => sw.widget_order)
+                    .sort((a,b)=>a-b);
+                setActiveSubOrder(prev => orders.includes(prev) ? prev : (orders[0] ?? 0));
+                setSubDisplay(null);
+            } catch (err) {
+                console.warn('Не удалось получить свежую форму:', err);
+            }
+        };
+
+        window.addEventListener('portal:form-mutated', onFormMutated as any);
+        return () => {
+            aborted = true;
+            window.removeEventListener('portal:form-mutated', onFormMutated as any);
+        };
+    }, [selectedFormId, setSubDisplay]);
+
+
     return (
         <ThemeProvider theme={dark}>
             <div className={s.contentRow}>
@@ -654,7 +713,7 @@ export const FormTable: React.FC<Props> = ({
 
                         <TreeFormTable
                             tree={liveTree}
-                            widgetForm={widgetForm}
+                            widgetForm={currentForm}
                             activeExpandedKey={activeExpandedKey}
                             handleNestedValueClick={async (table_column_id, value) => {
                                 if (!selectedFormId) return;
