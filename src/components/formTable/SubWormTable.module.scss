@@ -1,0 +1,206 @@
+@use '@/assets/styles/fluid-type' as *;
+
+/* те же переменные, что и в основной */
+$border: #e5e5e5;
+$error: #d33;
+
+/* высота 1-й строки шапки — как в основной */
+:root {
+  --head-row-1: 40px;
+}
+
+/* корень компонента */
+.root {
+  position: relative;
+}
+
+/* ───── вкладки (копия стиля из основной) ───── */
+.tabs {
+  display: flex;
+  list-style: none;
+  padding: 0;
+  margin: 0 0 4px 0;
+  gap: 2px;
+}
+
+.tab, .tabActive {
+  padding: 4px 14px 6px;
+  border: 1px solid #666;
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
+  background: #3a3a3a;
+  color: #eee;
+  font-size: 16px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .15s;
+}
+
+.tab:hover { background: #505050; }
+
+.tabActive {
+  background: #656464;
+  font-weight: 600;
+  position: relative;
+  z-index: 1;
+}
+
+/* сообщения */
+.error {
+  color: $error;
+  padding: 16px 0;
+}
+
+/* плавающая панель действий (как у тебя было) */
+.floatActions {
+  position: absolute;
+  top: 15%;
+  right: 0%;
+  z-index: 5;
+}
+
+/* ───── скролл-обёртка: IDENT к основной ───── */
+.tableScroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: 25vh; /* можно 50vh — оставил твоё 20vh, чтобы была ниже */
+  overflow-y: auto;
+  overflow-x: auto;
+  border-radius: 4px;
+
+  /* кастомный скроллбар (WebKit) */
+  &::-webkit-scrollbar { height: 5px; width: 8px; }
+  &::-webkit-scrollbar-thumb { background: #888; border-radius: 4px; }
+  &::-webkit-scrollbar-track { background: #3a3a3a; }
+}
+
+/* ───── таблица: IDENT к основной ───── */
+.tbl {
+  width: 100%;
+  text-align: center;
+  table-layout: fixed;   /* стабильные ширины */
+  border-collapse: separate; /* sticky устойчивее */
+  border-spacing: 0;
+  @include fluid-type(13, 16);
+}
+
+/* ячейки */
+.tbl th, .tbl td {
+  border: 1px solid $border;
+  padding: 2px 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* шапка */
+.tbl thead th {
+  background: var(--header-color);
+  color: #eee;
+  font-weight: 600;
+  @include fluid-type(16, 20);
+  z-index: 2;
+}
+
+/* 1-я строка шапки (группы) */
+.tbl thead tr:nth-child(1) th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  height: var(--head-row-1); /* нужно, чтобы 2-я знала отступ */
+}
+
+/* 2-я строка шапки (подписи) */
+.tbl thead tr:nth-child(2) th {
+  position: sticky;
+  top: var(--head-row-1);
+  z-index: 3;
+}
+
+/* тело */
+.tbl td {
+  color: #ddd;
+  background: transparent;
+}
+
+/* hover строк тела */
+.tbl tbody tr:hover {
+  background: var(--hover-color);
+}
+
+/* курсор-рука только у тела */
+.tbl tbody td {
+  cursor: pointer;
+}
+
+/* выбранная строка (если используешь) */
+.selectedRow {
+  background: var(--hover-color);
+}
+.selectedRow td { font-weight: 600; }
+
+/* ───── действия в последней ячейке (IDENT) ───── */
+.actionsCell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 0;
+  height: 40px;
+  min-width: 64px;
+}
+
+.actionIcon {
+  width: 1.2em;
+  height: 1.2em;
+}
+
+/* ✓/× */
+.okBtn, .cancelBtn {
+  background: none;
+  border: 0;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  line-height: 1;
+  color: #ccc;
+  fill: #ccc;
+  cursor: pointer;
+  transition: color .15s, fill .15s;
+}
+
+.actionIcon:hover, .okBtn:hover, .cancelBtn:hover {
+  color: #fff;
+  fill: #fff;
+}
+
+/* ───── инпуты в ячейках (IDENT) ───── */
+.inp, .inpN {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 2px 4px;
+  font: inherit;
+  color: inherit;
+  background: #1e1e1e;
+  border-radius: 3px;
+}
+
+.inpN { text-align: right; }
+
+/* (опционально) альтернативные обёртки — если где-то понадобятся 1в1 */
+.tableWrapper, .tableWrapperWidget {
+  overflow: auto;
+  border-radius: 4px;
+}
+.tableWrapper {
+  max-height: calc(85vh - 200px);
+  border: 1px solid var(--header-color);
+}
+.tableWrapperWidget {
+  max-height: calc(100vh - 200px);
+  text-align: center;
+}

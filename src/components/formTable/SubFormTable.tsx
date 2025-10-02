@@ -5,7 +5,7 @@ import {api} from "@/services/api";
 import EditIcon from '@/assets/image/EditIcon.svg';
 import DeleteIcon from '@/assets/image/DeleteIcon.svg';
 import {ButtonForm} from "@/shared/buttonForm/ButtonForm";
-import * as styles from "@/components/formTable/AllFormStyle.module.scss";
+import * as sub from "@/components/formTable/SubWormTable.module.scss";
 import {TextField} from "@mui/material";
 import {HeaderModelItem} from "@/components/formTable/FormTable";
 
@@ -350,16 +350,15 @@ export const SubWormTable = ({
 
 
     return (
-        <div style={{position: 'relative'}}>
-
+        <div className={sub.root}>
             {hasTabs && (
-                <ul className={s.tabs}>
+                <ul className={sub.tabs}>
                     {subDisplay!.sub_widgets.map((sw) => {
                         const isActive = sw.widget_order === subDisplay!.displayed_widget.widget_order;
                         return (
                             <li key={sw.widget_order}>
                                 <button
-                                    className={isActive ? s.tabActive : s.tab}
+                                    className={isActive ? sub.tabActive : sub.tab}
                                     onClick={() => handleTabClick(sw.widget_order)}
                                 >
                                     {sw.name}
@@ -370,139 +369,139 @@ export const SubWormTable = ({
                 </ul>
             )}
 
-
-            {/* панель действий */}
-
             {!subDisplay ? null : subLoading ? (
                 <p>Загрузка sub-виджета…</p>
             ) : subError ? (
-                <p className={s.error}>{subError}</p>
+                <p className={sub.error}>{subError}</p>
             ) : (
                 <>
-                    <div className={styles.floatActions} style={{top: '15%',right: '0%'}}>
-                        <ButtonForm cancelAdd={cancelAdd} startAdd={startAdd} isAdding={isAdding} submitAdd={submitAdd}
-                                    saving={saving} selectedWidget={selectedWidget} selectedFormId={selectedFormId}/>
+                    <div className={sub.floatActions}>
+                        <ButtonForm
+                            cancelAdd={cancelAdd}
+                            startAdd={startAdd}
+                            isAdding={isAdding}
+                            submitAdd={submitAdd}
+                            saving={saving}
+                            selectedWidget={selectedWidget}
+                            selectedFormId={selectedFormId}
+                        />
                     </div>
-                    <table className={s.tbl}>
 
-                        <thead>
-                        <tr>
-                            {headerPlan.map(g => (
-                                <th key={`sub-g-top-${g.id}`} colSpan={g.cols.length || 1}>{g.title}</th>
-                            ))}
-                            <th/>
-                        </tr>
-
-                        <tr>
-                            {headerPlan.flatMap(g =>
-                                g.labels.slice(0, g.cols.length).map((label, idx) => (
-                                    <th key={`sub-g-sub-${g.id}-${idx}`}>{label}</th>
-                                ))
-                            )}
-                            <th/>
-                        </tr>
-                        </thead>
-
-                        <tbody>
-                        {/* инлайн-строка ввода */}
-                        {isAdding && (
+                    <div className={sub.tableScroll}>
+                        <table className={sub.tbl}>
+                            <thead>
                             <tr>
-                                {flatColumnsInRenderOrder.map((col) => (
-                                    <td key={`sub-add-wc${col.widget_column_id}-tc${col.table_column_id}`}>
-                                        <TextField size={"small"}
-                                                   value={draft[col.table_column_id] ?? ""}
-                                                   onChange={(e) => {
-                                                       const v = e.target.value;
-                                                       setDraft((prev) => ({...prev, [col.table_column_id]: v}));
-                                                   }}
-                                                   placeholder={col.placeholder ?? col.column_name}
-                                        />
-                                    </td>
+                                {headerPlan.map(g => (
+                                    <th key={`sub-g-top-${g.id}`} colSpan={g.cols.length || 1}>{g.title}</th>
                                 ))}
-                                <td/>
+                                <th />
                             </tr>
-                        )}
+                            <tr>
+                                {headerPlan.flatMap(g =>
+                                    g.labels.slice(0, g.cols.length).map((label, idx) => (
+                                        <th key={`sub-g-sub-${g.id}-${idx}`}>{label}</th>
+                                    ))
+                                )}
+                                <th />
+                            </tr>
+                            </thead>
 
-                        {subDisplay.data.map((row, rowIdx) => {
-                            const isEditing = editingRowIdx === rowIdx;
+                            <tbody>
+                            {isAdding && (
+                                <tr>
+                                    {flatColumnsInRenderOrder.map((col) => (
+                                        <td key={`sub-add-wc${col.widget_column_id}-tc${col.table_column_id}`}>
+                                            <TextField
+                                                size="small"
+                                                value={draft[col.table_column_id] ?? ""}
+                                                onChange={(e) => {
+                                                    const v = e.target.value;
+                                                    setDraft((prev) => ({ ...prev, [col.table_column_id]: v }));
+                                                }}
+                                                placeholder={col.placeholder ?? col.column_name}
+                                            />
+                                        </td>
+                                    ))}
+                                    <td />
+                                </tr>
+                            )}
 
-                            return (
-                                <tr key={rowIdx}>
-                                    {flatColumnsInRenderOrder.map((col) => {
-                                        const key = `${col.widget_column_id}:${col.table_column_id ?? -1}`;
-                                        const idx = valueIndexByKey.get(key);
-                                        const val = idx != null ? row.values[idx] : "";
+                            {subDisplay.data.map((row, rowIdx) => {
+                                const isEditing = editingRowIdx === rowIdx;
 
-                                        if (isEditing) {
+                                return (
+                                    <tr key={rowIdx}>
+                                        {flatColumnsInRenderOrder.map((col) => {
+                                            const key = `${col.widget_column_id}:${col.table_column_id ?? -1}`;
+                                            const idx = valueIndexByKey.get(key);
+                                            const val = idx != null ? row.values[idx] : "";
+
+                                            if (isEditing) {
+                                                return (
+                                                    <td key={`sub-edit-r${rowIdx}-wc${col.widget_column_id}-tc${col.table_column_id}`}>
+                                                        <input
+                                                            className={sub.inp}
+                                                            value={editDraft[col.table_column_id] ?? ""}
+                                                            onChange={(e) =>
+                                                                setEditDraft((prev) => ({
+                                                                    ...prev,
+                                                                    [col.table_column_id]: e.target.value
+                                                                }))
+                                                            }
+                                                            placeholder={col.placeholder ?? col.column_name}
+                                                        />
+                                                    </td>
+                                                );
+                                            }
+
                                             return (
-                                                <td key={`sub-edit-r${rowIdx}-wc${col.widget_column_id}-tc${col.table_column_id}`}>
-                                                    <input
-                                                        value={editDraft[col.table_column_id] ?? ""}
-                                                        onChange={(e) =>
-                                                            setEditDraft((prev) => ({
-                                                                ...prev,
-                                                                [col.table_column_id]: e.target.value
-                                                            }))
-                                                        }
-                                                        placeholder={col.placeholder ?? col.column_name}
-                                                    />
+                                                <td key={`sub-r${rowIdx}-wc${col.widget_column_id}-tc${col.table_column_id}`}>
+                                                    {val}
                                                 </td>
                                             );
-                                        }
+                                        })}
 
-                                        return (
-                                            <td key={`sub-r${rowIdx}-wc${col.widget_column_id}-tc${col.table_column_id}`}>
-                                                {val}
-                                            </td>
-                                        );
-                                    })}
-
-                                    {/* actions */}
-                                    <td style={{textAlign: "center", whiteSpace: "nowrap"}}>
-                                        {isEditing ? (
-                                            <>
-                                                <button onClick={submitEdit} disabled={editSaving}>
-                                                    {editSaving ? "Сохр." : "✓"}
-                                                </button>
-                                                <button onClick={cancelEdit} disabled={editSaving}
-                                                        style={{marginLeft: 8}}>
-                                                    x
-                                                </button>
-                                            </>
-                                        ) : (
-                                            <>
-                        <span
-                            style={{display: "inline-flex", cursor: "pointer", marginRight: 10}}
-                            onClick={() => startEdit(rowIdx)}
-                            title="Редактировать"
-                        >
-                          <EditIcon className={s.actionIcon}/>
-                        </span>
-                                                <span
-                                                    style={{
-                                                        display: "inline-flex",
-                                                        cursor: deletingRowIdx === rowIdx ? "progress" : "pointer",
-                                                        opacity: deletingRowIdx === rowIdx ? 0.6 : 1,
-                                                    }}
-                                                    onClick={() => {
-                                                        if (deletingRowIdx == null) deleteRow(rowIdx);
-                                                    }}
-                                                    title="Удалить"
-                                                >
-                          <DeleteIcon className={s.actionIcon}/>
-                        </span>
-                                            </>
-                                        )}
-                                    </td>
-                                </tr>
-                            );
-                        })}
-                        </tbody>
-                    </table>
+                                        <td className={sub.actionsCell}>
+                                            {isEditing ? (
+                                                <>
+                                                    <button className={sub.okBtn} onClick={submitEdit} disabled={editSaving}>
+                                                        {editSaving ? "…" : "✓"}
+                                                    </button>
+                                                    <button className={sub.cancelBtn} onClick={cancelEdit} disabled={editSaving}>
+                                                        ×
+                                                    </button>
+                                                </>
+                                            ) : (
+                                                <>
+                            <span
+                                style={{ display: "inline-flex", cursor: "pointer", marginRight: 10 }}
+                                onClick={() => startEdit(rowIdx)}
+                                title="Редактировать"
+                            >
+                              <EditIcon className={sub.actionIcon}/>
+                            </span>
+                                                    <span
+                                                        style={{
+                                                            display: "inline-flex",
+                                                            cursor: deletingRowIdx === rowIdx ? "progress" : "pointer",
+                                                            opacity: deletingRowIdx === rowIdx ? 0.6 : 1,
+                                                        }}
+                                                        onClick={() => { if (deletingRowIdx == null) deleteRow(rowIdx); }}
+                                                        title="Удалить"
+                                                    >
+                              <DeleteIcon className={sub.actionIcon}/>
+                            </span>
+                                                </>
+                                            )}
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                            </tbody>
+                        </table>
+                    </div>
                 </>
-            )
-            }
+            )}
         </div>
-    )
-        ;
+    );
 };
