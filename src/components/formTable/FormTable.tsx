@@ -648,6 +648,7 @@ export const FormTable: React.FC<Props> = ({
             .join('|');
 
     const [selectedKey, setSelectedKey] = useState<string | null>(null);
+    const showSearch = !!currentForm?.search_bar;
 
     const { filtered } = useFuzzyRows(
         formDisplay,
@@ -656,6 +657,12 @@ export const FormTable: React.FC<Props> = ({
         dq,
         { threshold: 0.35, distance: 120 }
     );
+    // ← NEW: если поиск выключили — обнулим q (чтобы при следующем включении не применять старый запрос)
+    useEffect(() => {
+        if (!showSearch && q) setQ('');
+    }, [showSearch]); // eslint-disable-line react-hooks/exhaustive-deps
+
+
 
 
     useEffect(() => {
@@ -759,9 +766,11 @@ export const FormTable: React.FC<Props> = ({
 
                 {/* MAIN + SUB */}
                 <div className={s.mainCol}>
-                    <div style={{display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10}}>
-                        <SearchBox value={q} onChange={setQ} placeholder="Поиск по строкам (с опечатками)"/>
-                    </div>
+                    {showSearch && (
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10 }}>
+                            <SearchBox value={q} onChange={setQ} placeholder="Поиск по строкам (с опечатками)" />
+                        </div>
+                    )}
                     <div className={s.tableScroll}>
                         <table className={s.tbl}>
                             <thead>

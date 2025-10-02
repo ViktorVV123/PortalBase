@@ -1,8 +1,8 @@
-import {ChangeEvent, useEffect, useMemo, useState} from 'react';
+import React, {ChangeEvent, useEffect, useMemo, useState} from 'react';
 import {
     Dialog, DialogTitle, DialogContent, DialogActions,
     TextField, Button, Stack, CircularProgress, ThemeProvider,
-    FormControlLabel, Checkbox, IconButton, Divider, Autocomplete
+    FormControlLabel, Checkbox, IconButton, Divider, Autocomplete, Switch, Box
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
@@ -13,7 +13,7 @@ import {dark} from '@/shared/themeUI/themeModal/ThemeModalUI';
 
 type Props = {
     open: boolean;
-    widget: Widget;                 // main widget (для формы)
+    widget: Widget;
     onSuccess: (form: WidgetForm) => void;
     onCancel: () => void;
 };
@@ -26,11 +26,13 @@ export const ModalAddForm = ({open, widget, onSuccess, onCancel}: Props) => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    // чекбоксы
+    // NEW: флаг «использовать поиск» → уйдёт в form.search_bar
+    const [searchBar, setSearchBar] = useState<boolean>(true);
+
+    // чекбоксы секций
     const [useSub, setUseSub]   = useState(false);
     const [useTree, setUseTree] = useState(false);
 
-    // динамические списки
     const [subRows, setSubRows] = useState<SubRow[]>([
         { widget_order: 1, where_conditional: '', sub_widget_id: '' }
     ]);
@@ -38,7 +40,6 @@ export const ModalAddForm = ({open, widget, onSuccess, onCancel}: Props) => {
         { column_order: 1, table_column_id: '' }
     ]);
 
-    // доступные варианты для селектов
     const [availableWidgets, setAvailableWidgets] = useState<Widget[]>([]);
     const [availableColumns, setAvailableColumns] = useState<Column[]>([]);
     const [listsLoading, setListsLoading] = useState(false);
@@ -46,7 +47,6 @@ export const ModalAddForm = ({open, widget, onSuccess, onCancel}: Props) => {
     const handle = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
         setForm(prev => ({...prev, [e.target.name]: e.target.value}));
 
-    // helpers для списков
     const addSubRow = () => setSubRows(prev => [
         ...prev,
         { widget_order: (prev[prev.length-1]?.widget_order ?? 0) + 1, where_conditional: '', sub_widget_id: '' }
@@ -63,33 +63,26 @@ export const ModalAddForm = ({open, widget, onSuccess, onCancel}: Props) => {
     const updTreeRow = (idx: number, patch: Partial<TreeRow>) =>
         setTreeRows(prev => prev.map((r,i)=> i===idx ? {...r, ...patch} : r));
 
-    // подгружаем виджеты и колонки этой таблицы
     useEffect(() => {
         if (!open) return;
         let cancelled = false;
 
-        const fetchLists = async () => {
+        (async () => {
             setListsLoading(true);
             try {
-                // виджеты для той же таблицы, что и main widget
-                const widgetsRes = await api.get<Widget[]>('/widgets');     // ← все виджеты
+                const widgetsRes = await api.get<Widget[]>('/widgets');
                 const widgets = widgetsRes.data.sort((a,b)=>a.id-b.id);
-                // колонки таблицы main widget
                 const colsRes = await api.get<Column[]>(`/tables/${widget.table_id}/columns`);
                 const cols = colsRes.data.sort((a,b)=>a.id-b.id);
-
                 if (!cancelled) {
                     setAvailableWidgets(widgets);
                     setAvailableColumns(cols);
                 }
-            } catch (e) {
-                // мягко молчим; валидация подскажет при сабмите
             } finally {
                 if (!cancelled) setListsLoading(false);
             }
-        };
+        })();
 
-        fetchLists();
         return () => { cancelled = true; };
     }, [open, widget.table_id]);
 
@@ -100,7 +93,6 @@ export const ModalAddForm = ({open, widget, onSuccess, onCancel}: Props) => {
             return;
         }
 
-        // валидация включённых секций
         if (useSub) {
             for (const r of subRows) {
                 if (r.sub_widget_id === '' || isNaN(Number(r.sub_widget_id))) {
@@ -127,6 +119,8 @@ export const ModalAddForm = ({open, widget, onSuccess, onCancel}: Props) => {
                     name: form.name,
                     description: form.description || null,
                     path: form.path || null,
+                    // NEW: передаём флаг search_bar на бэк
+                    search_bar: searchBar,
                 },
             };
 
@@ -147,14 +141,13 @@ export const ModalAddForm = ({open, widget, onSuccess, onCancel}: Props) => {
 
             const {data} = await api.post<WidgetForm>('/forms/', body);
             onSuccess(data);
-        } catch (e: any) {
+        } catch {
             setError('Не удалось создать форму');
         } finally {
             setLoading(false);
         }
     };
 
-    // удобные мапы для поиска выбранных значений
     const widgetById = useMemo(() => {
         const m = new Map<number, Widget>();
         availableWidgets.forEach(w => m.set(w.id, w));
@@ -203,6 +196,22 @@ export const ModalAddForm = ({open, widget, onSuccess, onCancel}: Props) => {
                                 onChange={handle}
                             />
 
+                            {/* NEW: переключатель поиска */}
+                            <Stack direction="row" alignItems="center" justifyContent="space-between">
+                                <Box>
+                                    <Box sx={{ fontWeight: 600 }}>Строка поиска</Box>
+                                </Box>
+                                <FormControlLabel
+                                    control={
+                                        <Switch
+                                            checked={searchBar}
+                                            onChange={(_, v) => setSearchBar(v)}
+                                        />
+                                    }
+                                    label={searchBar ? 'Включена' : 'Выключена'}
+                                />
+                            </Stack>
+
                             <Divider flexItem />
 
                             {/* SUB-WIDGETS */}
@@ -231,7 +240,7 @@ export const ModalAddForm = ({open, widget, onSuccess, onCancel}: Props) => {
 
                                                 <Autocomplete
                                                     sx={{ minWidth: 280, flex: '0 0 auto' }}
-                                                    options={availableWidgets.filter(w => w.id !== widget.id)} // можно исключить сам main widget
+                                                    options={availableWidgets.filter(w => w.id !== widget.id)}
                                                     loading={listsLoading}
                                                     value={selectedWidget}
                                                     onChange={(_, val) => updSubRow(idx, { sub_widget_id: (val?.id ?? '') as any })}

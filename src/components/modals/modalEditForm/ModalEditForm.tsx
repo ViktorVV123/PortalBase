@@ -3,7 +3,7 @@ import {
     Dialog, DialogTitle, DialogContent, DialogActions,
     Tabs, Tab, Box, Stack, TextField, Button, MenuItem,
     FormControl, InputLabel, Select, createTheme, ThemeProvider,
-    IconButton, Tooltip, Autocomplete, CircularProgress, Divider, Alert
+    IconButton, Tooltip, Autocomplete, CircularProgress, Divider, Alert, FormControlLabel, Switch, FormHelperText
 } from '@mui/material';
 import DeleteIcon from "@mui/icons-material/Delete";
 import AddIcon from "@mui/icons-material/Add";
@@ -33,6 +33,7 @@ export const ModalEditForm: React.FC<Props> = ({
     const [mainPath, setMainPath] = useState<string>('' as any);
     const [mainWidgetId, setMainWidgetId] = useState<number>(form.main_widget_id);
     const [savingMain, setSavingMain] = useState(false);
+    const [mainSearchBar, setMainSearchBar] = useState<boolean>(!!form.search_bar);
 
     // Ошибки/уведомления
     const [err, setErr] = useState<string | null>(null);
@@ -61,6 +62,7 @@ export const ModalEditForm: React.FC<Props> = ({
         setMainDesc(form.description ?? '');
         setMainPath('' as any);
         setMainWidgetId(form.main_widget_id);
+        setMainSearchBar(!!form.search_bar);
     }, [open, form]);
 
     useEffect(() => {
@@ -332,6 +334,7 @@ export const ModalEditForm: React.FC<Props> = ({
             if (mainName !== form.name) patch.name = mainName;
             if ((mainDesc || null) !== (form.description ?? null)) patch.description = mainDesc || null;
             if (mainPath !== ('' as any)) patch.path = mainPath || null;
+            if (Boolean(form.search_bar) !== mainSearchBar) patch.search_bar = mainSearchBar;
 
             if (Object.keys(patch).length > 0) {
                 await api.patch(`/forms/${form.form_id}`, patch);
@@ -376,6 +379,28 @@ export const ModalEditForm: React.FC<Props> = ({
                                 <TextField label="Name" value={mainName} onChange={e => setMainName(e.target.value)} />
                                 <TextField label="Description" value={mainDesc} onChange={e => setMainDesc(e.target.value)} />
                                 <TextField label="Path" value={mainPath} onChange={e => setMainPath(e.target.value)} />
+                                <Box
+                                    sx={{
+                                        p: 1.5,
+                                    }}
+                                >
+                                    <Stack direction="row" alignItems="center" justifyContent="space-between">
+                                        <Box>
+                                            <Box sx={{ fontWeight: 600 }}>Строка поиска</Box>
+                                        </Box>
+                                        <FormControlLabel
+                                            control={
+                                                <Switch
+                                                    checked={mainSearchBar}
+                                                    onChange={(e) => setMainSearchBar(e.target.checked)}
+                                                    color="primary"
+                                                />
+                                            }
+                                            label={mainSearchBar ? 'Включена' : 'Выключена'}
+                                            sx={{ m: 0 }}
+                                        />
+                                    </Stack>
+                                </Box>
                             </Stack>
                         </Box>
                     )}

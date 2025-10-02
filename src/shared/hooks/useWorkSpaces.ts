@@ -86,6 +86,7 @@ export interface SubWidget {
 export type WidgetForm = {
     main_widget_id: number;
     name: string;
+    search_bar:boolean;
     description: string | null;
     form_id: number;
     sub_widgets: {
