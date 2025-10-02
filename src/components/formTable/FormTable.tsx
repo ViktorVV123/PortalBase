@@ -18,6 +18,7 @@ import * as styles from './AllFormStyle.module.scss'
 import {SearchBox} from "@/components/common/SearchBox";
 import {useFuzzyRows} from "@/shared/hooks/useFuzzySearch";
 import {useDebounced} from "@/shared/hooks/useDebounced";
+import FilterOffIcon from "@/assets/image/FilterOffIcon.svg";
 
 
 /** Модель шапки, приходящая из WidgetColumnsOfTable (твой headerGroups) */
@@ -766,8 +767,15 @@ export const FormTable: React.FC<Props> = ({
 
                 {/* MAIN + SUB */}
                 <div className={s.mainCol}>
+                    <FilterOffIcon
+                        width={16}
+                        height={16}
+                        cursor="pointer"
+                        onClick={handleResetFilters}
+                    />
                     {showSearch && (
                         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10 }}>
+
                             <SearchBox value={q} onChange={setQ} placeholder="Поиск по строкам (с опечатками)" />
                         </div>
                     )}

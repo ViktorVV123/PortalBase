@@ -1,6 +1,6 @@
 import React from 'react';
 import * as s from "@/components/setOfTables/SetOfTables.module.scss";
-import FilterOffIcon from "@/assets/image/FilterOffIcon.svg";
+import SortIcon from "@/assets/image/SortIcon.svg";
 import {FormTreeColumn, WidgetForm} from "@/shared/hooks/useWorkSpaces";
 
 type TreeFormTableProps = {
@@ -34,12 +34,7 @@ export const TreeFormTable = ({
                             <div key={`${name}-${idx}`} className={s.treeList}>
                                 <div className={s.treeHeader}>
                                     <span>{name}</span>
-                                    <FilterOffIcon
-                                        width={16}
-                                        height={16}
-                                        cursor="pointer"
-                                        onClick={handleResetFilters}
-                                    />
+                                    <SortIcon/>
                                 </div>
                                 <ul className={s.treeUl}>
                                     {values.map((v, i) => {
