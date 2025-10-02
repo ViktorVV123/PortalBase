@@ -15,6 +15,9 @@ import {TextField, ThemeProvider} from "@mui/material";
 import {dark} from "@/shared/themeUI/themeModal/ThemeModalUI";
 import {ButtonForm} from "@/shared/buttonForm/ButtonForm";
 import * as styles from './AllFormStyle.module.scss'
+import {SearchBox} from "@/components/common/SearchBox";
+import {useFuzzyRows} from "@/shared/hooks/useFuzzySearch";
+import {useDebounced} from "@/shared/hooks/useDebounced";
 
 
 /** Модель шапки, приходящая из WidgetColumnsOfTable (твой headerGroups) */
@@ -93,6 +96,8 @@ export const FormTable: React.FC<Props> = ({
     const [editSaving, setEditSaving] = useState(false);
 
     const [deletingRowIdx, setDeletingRowIdx] = useState<number | null>(null);
+    const [q, setQ] = useState('');
+    const dq = useDebounced(q, 250); // чтобы не дёргать Fuse на каждый символ
 
 
     const currentForm: WidgetForm | null =
@@ -627,6 +632,14 @@ export const FormTable: React.FC<Props> = ({
 
     const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
+    const { filtered } = useFuzzyRows(
+        formDisplay,
+        flatColumnsInRenderOrder,
+        valueIndexByKey,
+        dq,
+        { threshold: 0.35, distance: 120 }
+    );
+
 
     return (
         <ThemeProvider theme={dark}>
@@ -687,6 +700,9 @@ export const FormTable: React.FC<Props> = ({
 
                 {/* MAIN + SUB */}
                 <div className={s.mainCol}>
+                    <div style={{display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10}}>
+                        <SearchBox value={q} onChange={setQ} placeholder="Поиск по строкам (с опечатками)"/>
+                    </div>
                     <div className={s.tableScroll}>
                         <table className={s.tbl}>
                             <thead>
@@ -736,22 +752,22 @@ export const FormTable: React.FC<Props> = ({
                                 </tr>
                             )}
 
-                            {formDisplay.data.map((row, rowIdx) => {
+                            {filtered.map(({ row, idx: rowIdx }) => {
                                 const isEditing = editingRowIdx === rowIdx;
                                 const rowKey = pkToKey(row.primary_keys);
+
                                 return (
                                     <tr
                                         key={rowIdx}
                                         className={selectedKey === rowKey ? s.selectedRow : undefined}
                                         aria-selected={selectedKey === rowKey || undefined}
                                         onClick={() => {
-                                            if (isEditing) return; // чтобы не открывать саб-виджеты во время редактирования
+                                            if (isEditing) return;
                                             const pkObj = Object.fromEntries(
                                                 Object.entries(row.primary_keys).map(([k, v]) => [k, String(v)])
                                             );
                                             handleRowClick(pkObj);
                                         }}
-
                                     >
                                         {flatColumnsInRenderOrder.map(col => {
                                             const key = `${col.widget_column_id}:${col.table_column_id ?? -1}`;
@@ -760,11 +776,10 @@ export const FormTable: React.FC<Props> = ({
 
                                             if (isEditing) {
                                                 return (
-                                                    <td style={{textAlign: 'center'}}
+                                                    <td style={{ textAlign: 'center' }}
                                                         key={`edit-r${rowIdx}-wc${col.widget_column_id}-tc${col.table_column_id}`}>
                                                         <TextField
-
-                                                            size={"small"}
+                                                            size="small"
                                                             value={editDraft[col.table_column_id] ?? ''}
                                                             onChange={e =>
                                                                 setEditDraft(prev => ({
@@ -776,7 +791,6 @@ export const FormTable: React.FC<Props> = ({
                                                             placeholder={col.placeholder ?? col.column_name}
                                                         />
                                                     </td>
-
                                                 );
                                             }
 
@@ -787,44 +801,25 @@ export const FormTable: React.FC<Props> = ({
                                             );
                                         })}
 
-
-                                        {/* actions */}
-                                        <td style={{textAlign: 'center', whiteSpace: 'nowrap'}}>
+                                        <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
                                             {isEditing ? (
                                                 <>
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            submitEdit();
-                                                        }}
-                                                        disabled={editSaving}
-                                                    >
+                                                    <button onClick={(e) => { e.stopPropagation(); submitEdit(); }} disabled={editSaving}>
                                                         {editSaving ? 'Сохр...' : '✓'}
                                                     </button>
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            cancelEdit();
-                                                        }}
-                                                        disabled={editSaving}
-                                                        style={{marginLeft: 8}}
-                                                    >
+                                                    <button onClick={(e) => { e.stopPropagation(); cancelEdit(); }} disabled={editSaving} style={{ marginLeft: 8 }}>
                                                         х
                                                     </button>
                                                 </>
                                             ) : (
                                                 <>
-      <span
-          style={{display: 'inline-flex', cursor: 'pointer', marginRight: 10}}
-          onClick={(e) => {
-              e.stopPropagation();
-              startEdit(rowIdx);
-          }}
-          title="Редактировать"
-      >
-        <EditIcon className={s.actionIcon}/>
-      </span>
-
+              <span
+                  style={{ display: 'inline-flex', cursor: 'pointer', marginRight: 10 }}
+                  onClick={(e) => { e.stopPropagation(); startEdit(rowIdx); }}
+                  title="Редактировать"
+              >
+                <EditIcon className={s.actionIcon}/>
+              </span>
                                                     <span
                                                         style={{
                                                             display: 'inline-flex',
@@ -837,16 +832,14 @@ export const FormTable: React.FC<Props> = ({
                                                         }}
                                                         title="Удалить"
                                                     >
-        <DeleteIcon className={s.actionIcon}/>
-      </span>
+                <DeleteIcon className={s.actionIcon}/>
+              </span>
                                                 </>
                                             )}
                                         </td>
-
                                     </tr>
                                 );
                             })}
-
                             </tbody>
                         </table>
 
