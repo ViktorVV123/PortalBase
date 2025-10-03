@@ -431,7 +431,7 @@ export const WidgetColumnsMainTable: React.FC<WidgetColumnsMainTableProps> = ({
                                 refs.map((r, rowIdx) => {
                                     const tblCol = r.table_column;
                                     const tblColId = tblCol?.id;
-                                    const type = r.type ?? tblCol?.datatype ?? '—';
+                                    const type = r.type ?? '—';
                                     const rowKey = tblColId != null ? `${wc.id}-${tblColId}` : `${wc.id}-idx-${rowIdx}`;
                                     return (
                                         <tr
