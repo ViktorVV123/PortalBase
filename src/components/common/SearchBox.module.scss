@@ -1,0 +1,17 @@
+.container {
+  /* можно переопределить через style пропсом */
+  --collapsed: 180px;
+  --expanded: 180px;
+  width: var(--collapsed);
+  transition: width .25s ease;
+  display: inline-flex;
+}
+
+.container[data-expanded='1'] {
+  width: var(--expanded);
+}
+
+/* опционально: скрыть «рывок» на очень узких экранах */
+@media (max-width: 640px) {
+  .container { --expanded: 100%; width: 100%; }
+}

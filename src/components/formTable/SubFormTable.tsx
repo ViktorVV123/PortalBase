@@ -12,25 +12,62 @@ import {HeaderModelItem} from "@/components/formTable/FormTable";
 type SubformProps = {
     subDisplay: SubDisplay | null;
     handleTabClick: (order: number) => void;
-    subLoading: any;
-    subError: any;
+    subLoading: boolean;
+    subError: string | null;
 
     /** form_id активной формы (тот же, что ты прокидываешь из FormTable) */
     formId: number | null;
 
     /** маппинг «widget_order → sub_widget_id» */
     subWidgetIdByOrder: Record<number, number>;
+
     selectedWidget: Widget | null;
     selectedFormId: number | null;
-    subHeaderGroups?: HeaderModelItem[]
-};
 
+    /** живая модель шапки для саб-таблицы */
+    subHeaderGroups?: HeaderModelItem[];
+
+    /** текущий sub_widget_id (может ещё не успеть посчитаться) */
+    currentWidgetId?: number;
+
+    /** Редактирование (state из FormTable, отдельные для sub) */
+    editingRowIdx: number | null;
+    setEditingRowIdx: React.Dispatch<React.SetStateAction<number | null>>;
+
+    editDraft: Record<number, string>;
+    setEditDraft: React.Dispatch<React.SetStateAction<Record<number, string>>>;
+
+    editSaving: boolean;
+    setEditSaving: React.Dispatch<React.SetStateAction<boolean>>;
+
+    /** Текущий активный порядок вкладки (если нужен внутри саб-таблицы) */
+    currentOrder: number | null;
+
+    /** Добавление строки в саб-таблицу */
+    isAddingSub: boolean;
+    setIsAddingSub: React.Dispatch<React.SetStateAction<boolean>>;
+
+    draftSub: Record<number, string>;
+    setDraftSub: React.Dispatch<React.SetStateAction<Record<number, string>>>;
+};
 export const SubWormTable = ({
                                  subDisplay,
                                  handleTabClick,
                                  subLoading,
                                  subError,
                                  formId,
+                                 currentWidgetId,
+                                 setEditingRowIdx,
+                                 setEditDraft,
+                                 setEditSaving,
+                                 editingRowIdx,
+                                 editDraft,
+                                 currentOrder,
+                                 editSaving,
+                                 isAddingSub,
+                                 setIsAddingSub,
+                                 draftSub,
+                                 setDraftSub,
                                  subWidgetIdByOrder,
                                  selectedWidget,
                                  selectedFormId,
@@ -103,93 +140,13 @@ export const SubWormTable = ({
     }, [subDisplay?.columns]);
 
     // текущая вкладка → sub_widget_id
-    const currentOrder = subDisplay?.displayed_widget?.widget_order ?? null;
-    const currentWidgetId =
-        currentOrder != null ? subWidgetIdByOrder[currentOrder] : undefined;
+
 
     // ───────── ДОБАВЛЕНИЕ (инлайн) ─────────
-    const [isAdding, setIsAdding] = useState(false);
-    const [draft, setDraft] = useState<Record<number, string>>({});
-    const [saving, setSaving] = useState(false);
 
-    const startAdd = async () => {
-        if (!formId || !currentWidgetId) {
-            alert("Нет formId или sub_widget_id для вставки");
-            return;
-        }
-        // префлайт INSERT (не блокируем при ошибке запроса метаданных)
-        try {
-            const {data: widget} = await api.get<Widget>(`/widgets/${currentWidgetId}`);
-            const {data: table} = await api.get<DTable>(`/tables/${widget.table_id}`);
-            if (!table?.insert_query || !table.insert_query.trim()) {
-                alert("Для таблицы саб-виджета не настроен INSERT QUERY.");
-                return;
-            }
-        } catch (e) {
-            console.warn("preflight (sub/insert) failed:", e);
-        }
-
-        setIsAdding(true);
-        const init: Record<number, string> = {};
-        flatColumnsInRenderOrder.forEach((c) => {
-            if (c.table_column_id != null) init[c.table_column_id] = "";
-        });
-        setDraft(init);
-    };
-
-    const cancelAdd = () => {
-        setIsAdding(false);
-        setDraft({});
-    };
-
-    const submitAdd = async () => {
-        if (!formId || !currentWidgetId) return;
-        setSaving(true);
-        try {
-            const values = Object.entries(draft)
-                .filter(([, v]) => v !== "" && v !== undefined && v !== null)
-                .map(([table_column_id, value]) => ({
-                    table_column_id: Number(table_column_id),
-                    value: String(value),
-                }));
-
-            const body = {pk: {}, values};
-            const url = `/data/${formId}/${currentWidgetId}`;
-
-            try {
-                await api.post(url, body);
-            } catch (err: any) {
-                const status = err?.response?.status;
-                const detail = err?.response?.data?.detail ?? err?.response?.data ?? err?.message;
-                if (status === 404 && String(detail).includes("Insert query not found")) {
-                    alert("Для саб-формы не настроен INSERT QUERY. Задайте его и повторите.");
-                    return;
-                }
-                if (status === 404) {
-                    await api.post(`${url}/`, body);
-                } else {
-                    throw err;
-                }
-            }
-
-            // мгновенно перезагружаем текущую вкладку
-            if (currentOrder != null) handleTabClick(currentOrder);
-
-            setIsAdding(false);
-            setDraft({});
-        } catch (e: any) {
-            const status = e?.response?.status;
-            const msg = e?.response?.data ?? e?.message;
-            alert(`Не удалось добавить строку: ${status ?? ""} ${typeof msg === "string" ? msg : JSON.stringify(msg)}`);
-        } finally {
-            setSaving(false);
-        }
-    };
 
     // ───────── РЕДАКТИРОВАНИЕ ─────────
-    const [editingRowIdx, setEditingRowIdx] = useState<number | null>(null);
-    const [editDraft, setEditDraft] = useState<Record<number, string>>({});
-    const [editSaving, setEditSaving] = useState(false);
+
 
     const preflightUpdate = async (): Promise<{ ok: boolean }> => {
         if (!currentWidgetId) return {ok: false};
@@ -211,7 +168,7 @@ export const SubWormTable = ({
         const pf = await preflightUpdate();
         if (!pf.ok) return;
 
-        setIsAdding(false);
+        setIsAddingSub(false);
 
         const row = subDisplay!.data[rowIdx];
         const init: Record<number, string> = {};
@@ -375,17 +332,7 @@ export const SubWormTable = ({
                 <p className={sub.error}>{subError}</p>
             ) : (
                 <>
-                    <div className={sub.floatActions}>
-                        <ButtonForm
-                            cancelAdd={cancelAdd}
-                            startAdd={startAdd}
-                            isAdding={isAdding}
-                            submitAdd={submitAdd}
-                            saving={saving}
-                            selectedWidget={selectedWidget}
-                            selectedFormId={selectedFormId}
-                        />
-                    </div>
+
 
                     <div className={sub.tableScroll}>
                         <table className={sub.tbl}>
@@ -394,7 +341,7 @@ export const SubWormTable = ({
                                 {headerPlan.map(g => (
                                     <th key={`sub-g-top-${g.id}`} colSpan={g.cols.length || 1}>{g.title}</th>
                                 ))}
-                                <th />
+                                <th/>
                             </tr>
                             <tr>
                                 {headerPlan.flatMap(g =>
@@ -402,27 +349,27 @@ export const SubWormTable = ({
                                         <th key={`sub-g-sub-${g.id}-${idx}`}>{label}</th>
                                     ))
                                 )}
-                                <th />
+                                <th/>
                             </tr>
                             </thead>
 
                             <tbody>
-                            {isAdding && (
+                            {isAddingSub && (
                                 <tr>
                                     {flatColumnsInRenderOrder.map((col) => (
                                         <td key={`sub-add-wc${col.widget_column_id}-tc${col.table_column_id}`}>
                                             <TextField
                                                 size="small"
-                                                value={draft[col.table_column_id] ?? ""}
+                                                value={draftSub[col.table_column_id] ?? ""}
                                                 onChange={(e) => {
                                                     const v = e.target.value;
-                                                    setDraft((prev) => ({ ...prev, [col.table_column_id]: v }));
+                                                    setDraftSub((prev) => ({...prev, [col.table_column_id]: v}));
                                                 }}
                                                 placeholder={col.placeholder ?? col.column_name}
                                             />
                                         </td>
                                     ))}
-                                    <td />
+                                    <td/>
                                 </tr>
                             )}
 
@@ -464,17 +411,19 @@ export const SubWormTable = ({
                                         <td className={sub.actionsCell}>
                                             {isEditing ? (
                                                 <>
-                                                    <button className={sub.okBtn} onClick={submitEdit} disabled={editSaving}>
+                                                    <button className={sub.okBtn} onClick={submitEdit}
+                                                            disabled={editSaving}>
                                                         {editSaving ? "…" : "✓"}
                                                     </button>
-                                                    <button className={sub.cancelBtn} onClick={cancelEdit} disabled={editSaving}>
+                                                    <button className={sub.cancelBtn} onClick={cancelEdit}
+                                                            disabled={editSaving}>
                                                         ×
                                                     </button>
                                                 </>
                                             ) : (
                                                 <>
                             <span
-                                style={{ display: "inline-flex", cursor: "pointer", marginRight: 10 }}
+                                style={{display: "inline-flex", cursor: "pointer", marginRight: 10}}
                                 onClick={() => startEdit(rowIdx)}
                                 title="Редактировать"
                             >
@@ -486,7 +435,9 @@ export const SubWormTable = ({
                                                             cursor: deletingRowIdx === rowIdx ? "progress" : "pointer",
                                                             opacity: deletingRowIdx === rowIdx ? 0.6 : 1,
                                                         }}
-                                                        onClick={() => { if (deletingRowIdx == null) deleteRow(rowIdx); }}
+                                                        onClick={() => {
+                                                            if (deletingRowIdx == null) deleteRow(rowIdx);
+                                                        }}
                                                         title="Удалить"
                                                     >
                               <DeleteIcon className={sub.actionIcon}/>

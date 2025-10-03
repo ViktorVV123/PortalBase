@@ -1,57 +1,60 @@
 import React from 'react';
-import {Button, Fab} from "@mui/material";
-import AddIcon from "@mui/icons-material/Add";
+import AddIcon from '@mui/icons-material/AddBox';
 import CancelIcon from '@mui/icons-material/Cancel';
 import SaveIcon from '@mui/icons-material/Save';
+import AddBox from '@mui/icons-material/AddToPhotos';
 
 type ButtonFormProps = {
-    isAdding: any,
-    startAdd: any,
-    selectedFormId?: any,
-    selectedWidget: any, submitAdd: any,
-    saving: any
-    cancelAdd: any
-}
+    isAdding: boolean;
+    startAdd: () => void;
+    selectedFormId?: number | null;
+    selectedWidget: any;
+    submitAdd: () => void;
+    saving: boolean;
+    cancelAdd: () => void;
 
-export const ButtonForm = ({
-                               isAdding,
-                               startAdd,
-                               selectedFormId,
-                               selectedWidget,
-                               submitAdd,
-                               saving,
-                               cancelAdd
-                           }: ButtonFormProps) => {
-    return (
-        <>
-            {!isAdding ? (
-                <Fab size={"small"} onClick={startAdd}
-                     disabled={!selectedFormId || !selectedWidget}
-                     title={!selectedFormId || !selectedWidget ? 'Выбери форму и виджет' : 'Добавить строку'}>
-                    <AddIcon/>
-                </Fab>
-
-            ) : (
-                <div style={{display: "flex", gap:10}}>
-                    <Fab size="small"
-                         onClick={submitAdd}
-                         disabled={saving}>
-                        <SaveIcon/>
-                    </Fab>
-                  {/*  <Button
-                    >
-                        {saving ? 'Сохранение…' : 'Сохранить'}
-                    </Button>*/}
-                    <Fab  size="small"
-                          onClick={cancelAdd}
-                          disabled={saving}>
-                        <CancelIcon/>
-                    </Fab>
-
-
-                </div>
-            )}
-        </>
-    );
+    /** передаём класс круглой кнопки из тулбара */
+    buttonClassName?: string;
+    showSubActions?:boolean;
 };
 
+export const ButtonForm: React.FC<ButtonFormProps> = ({
+                                                          isAdding,showSubActions, startAdd, selectedFormId, selectedWidget, submitAdd, saving, cancelAdd, buttonClassName
+                                                      }) => {
+    const disabled = !selectedFormId || !selectedWidget;
+
+    if (!isAdding) {
+        return (
+            <button
+                className={buttonClassName}
+                onClick={startAdd}
+                disabled={disabled}
+                title={disabled ? 'Выбери форму и виджет' : 'Добавить строку'}
+            >
+                {showSubActions ? <AddBox/>  : <AddIcon/>    }
+
+            </button>
+        );
+    }
+
+    return (
+        <div style={{ display: 'inline-flex', gap: 8 }}>
+            <button
+                className={buttonClassName}
+                onClick={submitAdd}
+                disabled={saving}
+                title="Сохранить"
+            >
+                <SaveIcon/>
+            </button>
+            <button
+                className={buttonClassName}
+                onClick={cancelAdd}
+                disabled={saving}
+                title="Отменить"
+            >
+                <CancelIcon/>
+            </button>
+        </div>
+    );
+};

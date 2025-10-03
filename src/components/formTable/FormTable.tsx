@@ -19,6 +19,7 @@ import {SearchBox} from "@/components/common/SearchBox";
 import {useFuzzyRows} from "@/shared/hooks/useFuzzySearch";
 import {useDebounced} from "@/shared/hooks/useDebounced";
 import FilterOffIcon from "@/assets/image/FilterOffIcon.svg";
+import {TableToolbar} from "@/components/tableToolbar/TableToolbar";
 
 
 /** Модель шапки, приходящая из WidgetColumnsOfTable (твой headerGroups) */
@@ -99,7 +100,91 @@ export const FormTable: React.FC<Props> = ({
     const [deletingRowIdx, setDeletingRowIdx] = useState<number | null>(null);
     const [q, setQ] = useState('');
     const dq = useDebounced(q, 250); // чтобы не дёргать Fuse на каждый символ
+    const [savingSub, setSavingSub] = useState(false);
+    const [editingRowIdxSub, setEditingRowIdxSub] = useState<number | null>(null);
+    const [editDraftSub, setEditDraftSub] = useState<Record<number, string>>({});
+    const [editSavingSub, setEditSavingSub] = useState(false);
+    const [isAddingSub, setIsAddingSub] = useState(false);
+    const [draftSub, setDraftSub] = useState<Record<number, string>>({});
 
+
+    const cancelAddSub = () => {
+        setIsAddingSub(false);
+        setDraftSub({});
+    };
+
+    const showSubActions = !!subDisplay && Object.keys(lastPrimary).length > 0;
+
+
+    const submitAddSub = async () => {
+        if (!formIdForSub || !currentWidgetId) return;
+        setSavingSub(true);
+        try {
+            const values = Object.entries(draftSub)
+                .filter(([, v]) => v !== "" && v !== undefined && v !== null)
+                .map(([table_column_id, value]) => ({
+                    table_column_id: Number(table_column_id),
+                    value: String(value),
+                }));
+
+            const body = {pk: {}, values};
+            const url = `/data/${formIdForSub}/${currentWidgetId}`;
+
+            try {
+                await api.post(url, body);
+            } catch (err: any) {
+                const status = err?.response?.status;
+                const detail = err?.response?.data?.detail ?? err?.response?.data ?? err?.message;
+                if (status === 404 && String(detail).includes("Insert query not found")) {
+                    alert("Для саб-формы не настроен INSERT QUERY. Задайте его и повторите.");
+                    return;
+                }
+                if (status === 404) {
+                    await api.post(`${url}/`, body);
+                } else {
+                    throw err;
+                }
+            }
+
+            // мгновенно перезагружаем текущую вкладку
+            if (currentOrder != null) handleTabClick(currentOrder);
+
+            setIsAddingSub(false);
+            setDraftSub({});
+        } catch (e: any) {
+            const status = e?.response?.status;
+            const msg = e?.response?.data ?? e?.message;
+            alert(`Не удалось добавить строку: ${status ?? ""} ${typeof msg === "string" ? msg : JSON.stringify(msg)}`);
+        } finally {
+            setSavingSub(false);
+        }
+    };
+
+
+    const startAddSub = async () => {
+        if (!formIdForSub || !currentWidgetId) {
+            alert("Нет formId или sub_widget_id для вставки");
+            return;
+        }
+        // префлайт INSERT (не блокируем при ошибке запроса метаданных)
+        try {
+            const {data: widget} = await api.get<Widget>(`/widgets/${currentWidgetId}`);
+            const {data: table} = await api.get<DTable>(`/tables/${widget.table_id}`);
+            if (!table?.insert_query || !table.insert_query.trim()) {
+                alert("Для таблицы саб-виджета не настроен INSERT QUERY.");
+                return;
+            }
+        } catch (e) {
+            console.warn("preflight (sub/insert) failed:", e);
+        }
+
+        setIsAddingSub(true);
+        const init: Record<number, string> = {};
+        flatColumnsInRenderOrder.forEach((c) => {
+            if (c.table_column_id != null) init[c.table_column_id] = "";
+        });
+        setDraftSub(init);
+    };
 
     // БАЗА из пропсов (как было)
     const baseForm: WidgetForm | null =
@@ -138,8 +223,6 @@ export const FormTable: React.FC<Props> = ({
         setActiveSubOrder(order0);
         setSubDisplay(null);
     }, [currentForm, setSubDisplay]);
-
-
 
 
     // префлайт: должен быть настроен DELETE QUERY у таблицы
@@ -570,14 +653,13 @@ export const FormTable: React.FC<Props> = ({
         const formId = selectedFormId ?? currentForm?.form_id ?? null; // ← было widgetForm?.form_id
         if (!formId) return;
         try {
-            const { data } = await api.post<FormTreeColumn[] | FormTreeColumn>(`/display/${formId}/tree`);
+            const {data} = await api.post<FormTreeColumn[] | FormTreeColumn>(`/display/${formId}/tree`);
             const normalized = Array.isArray(data) ? data : [data];
             setLiveTree(normalized);
         } catch (e) {
             console.warn('Не удалось обновить справочники (tree):', e);
         }
     };
-
 
 
     // клик по строке main → грузим sub для ТОЙ ЖЕ формы
@@ -602,6 +684,9 @@ export const FormTable: React.FC<Props> = ({
 // безопасный геттер «валидного» порядка
     const getEffectiveOrder = () =>
         availableOrders.includes(activeSubOrder) ? activeSubOrder : (availableOrders[0] ?? 0);
+    const currentOrder = getEffectiveOrder();
+    const currentWidgetId =
+        currentOrder != null ? subWidgetIdByOrder[currentOrder] : undefined;
 
 // клик по строке main (используем валидный порядок)
     const handleRowClick = (rowPk: Record<string, unknown>) => {
@@ -651,19 +736,17 @@ export const FormTable: React.FC<Props> = ({
     const [selectedKey, setSelectedKey] = useState<string | null>(null);
     const showSearch = !!currentForm?.search_bar;
 
-    const { filtered } = useFuzzyRows(
+    const {filtered} = useFuzzyRows(
         formDisplay,
         flatColumnsInRenderOrder,
         valueIndexByKey,
         dq,
-        { threshold: 0.35, distance: 120 }
+        {threshold: 0.35, distance: 120}
     );
     // ← NEW: если поиск выключили — обнулим q (чтобы при следующем включении не применять старый запрос)
     useEffect(() => {
         if (!showSearch && q) setQ('');
     }, [showSearch]); // eslint-disable-line react-hooks/exhaustive-deps
-
-
 
 
     useEffect(() => {
@@ -677,7 +760,7 @@ export const FormTable: React.FC<Props> = ({
 
             try {
                 // 1) тянем свежую форму
-                const { data } = await api.get<WidgetForm>(`/forms/${eventFormId}`);
+                const {data} = await api.get<WidgetForm>(`/forms/${eventFormId}`);
                 if (!aborted) setOverrideForm(data);
 
                 // 2) перезагружаем tree (левый блок), чтобы сразу увидеть новые/удалённые поля
@@ -692,7 +775,7 @@ export const FormTable: React.FC<Props> = ({
                 // 3) валидируем активный sub-order (если добавили/удалили sub)
                 const orders = (data?.sub_widgets ?? [])
                     .map(sw => sw.widget_order)
-                    .sort((a,b)=>a-b);
+                    .sort((a, b) => a - b);
                 setActiveSubOrder(prev => orders.includes(prev) ? prev : (orders[0] ?? 0));
                 setSubDisplay(null);
             } catch (err) {
@@ -712,73 +795,81 @@ export const FormTable: React.FC<Props> = ({
         <ThemeProvider theme={dark}>
             <div className={s.contentRow}>
                 {/* Кнопки добавления */}
-                <div className={styles.floatActions}>
+                {/*  <div className={styles.floatActions}>
                     <ButtonForm isAdding={isAdding} selectedFormId={selectedFormId} selectedWidget={selectedWidget}
                                 saving={saving} startAdd={startAdd} submitAdd={submitAdd} cancelAdd={cancelAdd}/>
-                </div>
+                </div>*/}
                 {/* TREE BLOCK */}
 
 
-                        <TreeFormTable
-                            tree={liveTree}
-                            widgetForm={currentForm}
-                            activeExpandedKey={activeExpandedKey}
-                            handleNestedValueClick={async (table_column_id, value) => {
-                                if (!selectedFormId) return;
-                                const newFilter = {table_column_id, value};
-                                const filters = [
-                                    ...activeFilters.filter(f => f.table_column_id !== table_column_id),
-                                    newFilter
-                                ];
-                                try {
-                                    const {data} = await api.post<FormDisplay>(`/display/${selectedFormId}/main`, filters);
-                                    setFormDisplay(data);
-                                    setActiveFilters(filters);
-                                    setSubDisplay(null);
-                                } catch (e) {
-                                    console.warn('❌ Ошибка nested фильтра:', e);
-                                }
-                            }}
-                            nestedTrees={nestedTrees}
-                            handleTreeValueClick={async (table_column_id, value) => {
-                                if (!selectedFormId) return;
-                                const filters = [{table_column_id, value}];
-                                try {
-                                    const {data: mainData} = await api.post<FormDisplay>(`/display/${selectedFormId}/main`, filters);
-                                    setFormDisplay(mainData);
-                                    setActiveFilters(filters);
-                                    setSubDisplay(null);
+                <TreeFormTable
+                    tree={liveTree}
+                    widgetForm={currentForm}
+                    activeExpandedKey={activeExpandedKey}
+                    handleNestedValueClick={async (table_column_id, value) => {
+                        if (!selectedFormId) return;
+                        const newFilter = {table_column_id, value};
+                        const filters = [
+                            ...activeFilters.filter(f => f.table_column_id !== table_column_id),
+                            newFilter
+                        ];
+                        try {
+                            const {data} = await api.post<FormDisplay>(`/display/${selectedFormId}/main`, filters);
+                            setFormDisplay(data);
+                            setActiveFilters(filters);
+                            setSubDisplay(null);
+                        } catch (e) {
+                            console.warn('❌ Ошибка nested фильтра:', e);
+                        }
+                    }}
+                    nestedTrees={nestedTrees}
+                    handleTreeValueClick={async (table_column_id, value) => {
+                        if (!selectedFormId) return;
+                        const filters = [{table_column_id, value}];
+                        try {
+                            const {data: mainData} = await api.post<FormDisplay>(`/display/${selectedFormId}/main`, filters);
+                            setFormDisplay(mainData);
+                            setActiveFilters(filters);
+                            setSubDisplay(null);
 
-                                    const {data} = await api.post<FormTreeColumn[] | FormTreeColumn>(
-                                        `/display/${selectedFormId}/tree`,
-                                        filters
-                                    );
-                                    const normalized = Array.isArray(data) ? data : [data];
-                                    const key = `${table_column_id}-${value}`;
-                                    setNestedTrees(prev => ({...prev, [key]: normalized}));
-                                    setActiveExpandedKey(key);
-                                } catch (e) {
-                                    console.warn('❌ Ошибка handleTreeValueClick:', e);
-                                }
-                            }}
-                            handleResetFilters={handleResetFilters}
-                        />
+                            const {data} = await api.post<FormTreeColumn[] | FormTreeColumn>(
+                                `/display/${selectedFormId}/tree`,
+                                filters
+                            );
+                            const normalized = Array.isArray(data) ? data : [data];
+                            const key = `${table_column_id}-${value}`;
+                            setNestedTrees(prev => ({...prev, [key]: normalized}));
+                            setActiveExpandedKey(key);
+                        } catch (e) {
+                            console.warn('❌ Ошибка handleTreeValueClick:', e);
+                        }
+                    }}
+                    handleResetFilters={handleResetFilters}
+                />
 
 
                 {/* MAIN + SUB */}
                 <div className={s.mainCol}>
-                    <FilterOffIcon
-                        width={16}
-                        height={16}
-                        cursor="pointer"
-                        onClick={handleResetFilters}
+                    <TableToolbar isAddingSub={isAddingSub} cancelAddSub={cancelAddSub} savingSub={savingSub}
+                                  startAddSub={startAddSub} submitAddSub={submitAddSub}
+                                  isAdding={isAdding}
+                                  showSubActions={showSubActions}
+                                  selectedFormId={selectedFormId}
+                                  selectedWidget={selectedWidget}
+                                  saving={saving}
+                                  startAdd={startAdd}
+                                  submitAdd={submitAdd}
+                                  cancelAdd={cancelAdd}
+                                  showSearch={showSearch}
+                                  value={q}
+                                  onChange={setQ}
+                                  onResetFilters={handleResetFilters}
+                        // можно подправить ширины по вкусу:
+                                  collapsedWidth={160}
+                                  expandedWidth={420}
                     />
-                    {showSearch && (
-                        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10 }}>
 
-                            <SearchBox value={q} onChange={setQ} placeholder="Поиск по строкам (с опечатками)" />
-                        </div>
-                    )}
+
                     <div className={s.tableScroll}>
                         <table className={s.tbl}>
                             <thead>
@@ -828,7 +919,7 @@ export const FormTable: React.FC<Props> = ({
                                 </tr>
                             )}
 
-                            {filtered.map(({ row, idx: rowIdx }) => {
+                            {filtered.map(({row, idx: rowIdx}) => {
                                 const isEditing = editingRowIdx === rowIdx;
                                 const rowKey = pkToKey(row.primary_keys);
 
@@ -852,7 +943,7 @@ export const FormTable: React.FC<Props> = ({
 
                                             if (isEditing) {
                                                 return (
-                                                    <td style={{ textAlign: 'center' }}
+                                                    <td style={{textAlign: 'center'}}
                                                         key={`edit-r${rowIdx}-wc${col.widget_column_id}-tc${col.table_column_id}`}>
                                                         <TextField
                                                             size="small"
@@ -877,21 +968,30 @@ export const FormTable: React.FC<Props> = ({
                                             );
                                         })}
 
-                                        <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
+                                        <td style={{textAlign: 'center', whiteSpace: 'nowrap'}}>
                                             {isEditing ? (
                                                 <>
-                                                    <button onClick={(e) => { e.stopPropagation(); submitEdit(); }} disabled={editSaving}>
+                                                    <button onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        submitEdit();
+                                                    }} disabled={editSaving}>
                                                         {editSaving ? 'Сохр...' : '✓'}
                                                     </button>
-                                                    <button onClick={(e) => { e.stopPropagation(); cancelEdit(); }} disabled={editSaving} style={{ marginLeft: 8 }}>
+                                                    <button onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        cancelEdit();
+                                                    }} disabled={editSaving} style={{marginLeft: 8}}>
                                                         х
                                                     </button>
                                                 </>
                                             ) : (
                                                 <>
               <span
-                  style={{ display: 'inline-flex', cursor: 'pointer', marginRight: 10 }}
-                  onClick={(e) => { e.stopPropagation(); startEdit(rowIdx); }}
+                  style={{display: 'inline-flex', cursor: 'pointer', marginRight: 10}}
+                  onClick={(e) => {
+                      e.stopPropagation();
+                      startEdit(rowIdx);
+                  }}
                   title="Редактировать"
               >
                 <EditIcon className={s.actionIcon}/>
@@ -920,12 +1020,43 @@ export const FormTable: React.FC<Props> = ({
                         </table>
 
                     </div>
-                    <SubWormTable subHeaderGroups={subHeaderGroups} selectedFormId={selectedFormId}
-                                  selectedWidget={selectedWidget} formId={formIdForSub}
-                                  subWidgetIdByOrder={subWidgetIdByOrder} subLoading={subLoading}
-                                  subError={subError}
-                                  subDisplay={subDisplay}
-                                  handleTabClick={handleTabClick}/>
+                    <SubWormTable
+                        // было: setEditSaving={setEditSaving}
+                        setEditSaving={setEditSavingSub}
+
+                        // было: editDraft={editDraft}
+                        editDraft={editDraftSub}
+
+                        // было: editingRowIdx={editingRowIdx}
+                        editingRowIdx={editingRowIdxSub}
+
+                        // было: setEditDraft={setEditDraft}
+                        setEditDraft={setEditDraftSub}
+
+                        // было: setEditingRowIdx={setEditingRowIdx}
+                        setEditingRowIdx={setEditingRowIdxSub}
+
+                        // было: editSaving={editSaving}
+                        editSaving={editSavingSub}
+
+                        // остальное без изменений
+                        draftSub={draftSub}
+                        setDraftSub={setDraftSub}
+                        isAddingSub={isAddingSub}
+                        setIsAddingSub={setIsAddingSub}
+                        currentOrder={currentOrder}
+                        currentWidgetId={currentWidgetId}
+                        subHeaderGroups={subHeaderGroups}
+                        selectedFormId={selectedFormId}
+                        selectedWidget={selectedWidget}
+                        formId={formIdForSub}
+                        subWidgetIdByOrder={subWidgetIdByOrder}
+                        subLoading={subLoading}
+                        subError={subError}
+                        subDisplay={subDisplay}
+                        handleTabClick={handleTabClick}
+                    />
+
                 </div>
             </div>
         </ThemeProvider>

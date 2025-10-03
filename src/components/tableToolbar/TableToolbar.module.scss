@@ -1,0 +1,79 @@
+.root {
+  position: sticky; /* как меню в Google-таблицах */
+  top: 0;
+  z-index: 4;
+  padding: 8px 10px;
+
+  backdrop-filter: saturate(140%) blur(6px);
+  border-bottom: 1px solid rgba(255, 255, 255, .06);
+}
+
+/* сам бар */
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* групка слева: иконки */
+.leftGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* визуальный делитель между группами */
+.divider {
+  width: 1px;
+  height: 28px;
+  background: rgba(255, 255, 255, .08);
+  margin: 0 4px;
+}
+
+/* чтобы SearchBox выглядел «пилюлей» и расширялся */
+.searchWrap {
+  --collapsed: 180px;
+  --expanded: 420px;
+
+  width: var(--collapsed);
+  transition: width .25s ease;
+}
+
+.searchWrap[data-expanded='1'] {
+  width: var(--expanded);
+}
+
+@media (max-width: 640px) {
+  .searchWrap {
+    --expanded: 100%;
+    width: 100%;
+  }
+}
+
+/* кнопка-иконка (для svg из /assets) */
+.iconBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 9999px;
+  background: #e6e3e3;
+  border: 1px solid rgba(255, 255, 255, .12);
+  cursor: pointer;
+  transition: background .15s, border-color .15s, opacity .15s;
+}
+
+.iconBtn:hover {
+  background: #838282;
+  border-color: rgba(255, 255, 255, .2);
+}
+
+.iconBtn:active {
+  opacity: .8;
+}
+
+.iconBtn[disabled] {
+  opacity: .5;
+  cursor: not-allowed;
+}
