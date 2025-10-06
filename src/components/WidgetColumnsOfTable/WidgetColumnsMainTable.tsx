@@ -19,6 +19,8 @@ const dark = createTheme({
         MuiOutlinedInput: { styleOverrides: { root: { '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#ffffff' } } } },
         MuiInputLabel: { styleOverrides: { root: { '&.Mui-focused': { color: '#ffffff' } } } },
         MuiSelect: { styleOverrides: { icon: { color: '#ffffff' } } },
+
+
     },
 });
 
@@ -38,7 +40,7 @@ type WidgetColumnsMainTableProps = {
         widgetColumnId: number,
         tableColumnId: number,
         patch: Partial<Pick<ReferenceItem,
-            'ref_column_order' | 'width' | 'type' | 'ref_alias' | 'default' | 'placeholder' | 'visible'
+            'ref_column_order' | 'width' | 'type' | 'ref_alias' | 'default' | 'placeholder' | 'visible' | 'readonly'
         >>
     ) => Promise<ReferenceItem>;
 
@@ -153,6 +155,7 @@ export const WidgetColumnsMainTable: React.FC<WidgetColumnsMainTableProps> = ({
                         visible: refObj?.visible !== false,
                         width: refObj?.width ?? 1,
                         ref_column_order: toIdx,
+                        readonly: !!refObj?.readonly,
                     });
                 }
             }
@@ -296,11 +299,12 @@ export const WidgetColumnsMainTable: React.FC<WidgetColumnsMainTableProps> = ({
         ref_default: string;
         ref_placeholder: string;
         ref_visible: boolean;
+        ref_readOnly: boolean;
     };
     const [edit, setEdit] = useState<EditState>({
         open: false, wcId: null, rowIdx: null,
         ref_alias: '', ref_type: '', ref_width: 1, ref_order: 0,
-        ref_default: '', ref_placeholder: '', ref_visible: true,
+        ref_default: '', ref_placeholder: '', ref_visible: true,ref_readOnly:false
     });
 
     const openEdit = (wc: WidgetColumn, r: ReferenceItem, rowIdx: number) => {
@@ -313,6 +317,7 @@ export const WidgetColumnsMainTable: React.FC<WidgetColumnsMainTableProps> = ({
             ref_default: r.default ?? '',
             ref_placeholder: r.placeholder ?? '',
             ref_visible: r.visible !== false,
+            ref_readOnly: !!r.readonly,
         });
     };
 
@@ -333,6 +338,7 @@ export const WidgetColumnsMainTable: React.FC<WidgetColumnsMainTableProps> = ({
             default: edit.ref_default || null,
             placeholder: edit.ref_placeholder || null,
             visible: !!edit.ref_visible,
+            readonly: !!edit.ref_readOnly,
         });
 
         // оптимистично обновляем локальное состояние
@@ -347,6 +353,7 @@ export const WidgetColumnsMainTable: React.FC<WidgetColumnsMainTableProps> = ({
                 default: edit.ref_default || null,
                 placeholder: edit.ref_placeholder || null,
                 visible: !!edit.ref_visible,
+                readonly: !!edit.ref_readOnly,
             };
 
             let next = list;
@@ -356,7 +363,6 @@ export const WidgetColumnsMainTable: React.FC<WidgetColumnsMainTableProps> = ({
                 list.splice(desiredIdx, 0, moved);
                 next = list;
             }
-
             return { ...prev, [wcId]: reindex(next) };
         });
 
@@ -417,6 +423,7 @@ export const WidgetColumnsMainTable: React.FC<WidgetColumnsMainTableProps> = ({
                                 <th>name</th>
                                 <th>ref_alias</th>
                                 <th>type</th>
+                                <th>Только чтение</th>
                                 <th>width</th>
                                 <th>default</th>
                                 <th>placeholder</th>
@@ -445,6 +452,51 @@ export const WidgetColumnsMainTable: React.FC<WidgetColumnsMainTableProps> = ({
                                             <td>{tblCol?.name ?? '—'}</td>
                                             <td>{r.ref_alias ?? '—'}</td>
                                             <td>{type}</td>
+                                            <td style={{textAlign: 'center'}}>
+                                                {tblCol?.id ? (
+                                                    <div
+                                                        onMouseDown={(e) => e.stopPropagation()}
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        draggable={false}
+                                                        style={{
+                                                            display: 'inline-flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center'
+                                                        }}
+                                                    >
+                                                        <Checkbox
+                                                            size="small"
+                                                            sx={{ color: 'common.white', '&.Mui-checked': { color: 'common.white' } }}
+                                                            checked={!!r.readonly}
+                                                            onChange={async (e) => {
+                                                                const nextVal = e.target.checked;
+
+                                                                // оптимистично меняем локально
+                                                                setLocalRefs(prev => {
+                                                                    const list = [...(prev[wc.id] ?? [])];
+                                                                    list[rowIdx] = {...list[rowIdx], readonly: nextVal};
+                                                                    return {...prev, [wc.id]: list};
+                                                                });
+
+                                                                try {
+                                                                    await updateReference(wc.id, tblCol.id!, {readonly: nextVal});
+                                                                } catch (err) {
+                                                                    console.warn('[readonly:update] failed', err);
+                                                                    // откат
+                                                                    setLocalRefs(prev => {
+                                                                        const list = [...(prev[wc.id] ?? [])];
+                                                                        list[rowIdx] = {
+                                                                            ...list[rowIdx],
+                                                                            readonly: !nextVal
+                                                                        };
+                                                                        return {...prev, [wc.id]: list};
+                                                                    });
+                                                                }
+                                                            }}
+                                                        />
+                                                    </div>
+                                                ) : '—'}
+                                            </td>
                                             <td>{r.width ?? '—'}</td>
                                             <td>{r.default ?? '—'}</td>
                                             <td>{r.placeholder ?? '—'}</td>
@@ -470,7 +522,7 @@ export const WidgetColumnsMainTable: React.FC<WidgetColumnsMainTableProps> = ({
                                 })
                             ) : (
                                 <tr>
-                                    <td colSpan={10} style={{textAlign: 'center', opacity: 0.7}}>
+                                    <td colSpan={11} style={{textAlign: 'center', opacity: 0.7}}>
                                         Нет связей — перетащите сюда строку из другого блока
                                     </td>
                                 </tr>
@@ -506,6 +558,10 @@ export const WidgetColumnsMainTable: React.FC<WidgetColumnsMainTableProps> = ({
                                 <Checkbox checked={edit.ref_visible}
                                           onChange={e => setEdit(v => ({...v, ref_visible: e.target.checked}))}/>
                             } label="visible"/>
+                            <FormControlLabel control={
+                                <Checkbox checked={edit.ref_readOnly}
+                                          onChange={e => setEdit(v => ({...v, ref_readOnly: e.target.checked}))}/>
+                            } label="только чтение"/>
                             <TextField type="number" label="ref_column_order" size="small"
                                        value={edit.ref_order}
                                        onChange={e => setEdit(v => ({...v, ref_order: Number(e.target.value)}))}/>

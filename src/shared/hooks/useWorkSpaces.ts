@@ -57,6 +57,7 @@ export type WidgetColumn = {
         type: string | null;
         default: string | null;
         visible: boolean;
+        readonly:boolean;
 
         table_column: {
             table_id: number;
