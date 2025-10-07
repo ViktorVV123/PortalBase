@@ -267,6 +267,40 @@ export const FormTable: React.FC<Props> = ({
         [headerPlan]
     );
 
+    type DisplayColumn = typeof formDisplay.columns[number];
+    const isColReadOnly = useCallback((col: DisplayColumn): boolean => {
+        const anyCol = col as any;
+
+        const explicit =
+            anyCol?.readonly === true ||
+            anyCol?.read_only === true ||
+            anyCol?.is_readonly === true ||
+            anyCol?.meta?.readonly === true;
+
+        const implicit =
+            anyCol?.primary === true || // PK
+            anyCol?.increment === true; // автоинкремент
+
+        return !!(explicit || implicit);
+    }, []);
+
+    /**
+     * множество редактируемых table_column_id
+     * используйте его, чтобы:
+     *  - не показывать инпуты для readonly полей
+     *  - не класть такие поля в draft/editDraft
+     *  - фильтровать values перед submit
+     */
+    const editableColumnIds = useMemo(() => {
+        const set = new Set<number>();
+        for (const c of flatColumnsInRenderOrder) {
+            if (c.table_column_id != null && !isColReadOnly(c)) {
+                set.add(c.table_column_id);
+            }
+        }
+        return set;
+    }, [flatColumnsInRenderOrder, isColReadOnly]);
+
     // индекс значений: "wcId:tcId" → index в row.values
     const valueIndexByKey = useMemo(() => {
         const map = new Map<string, number>();
@@ -360,7 +394,7 @@ export const FormTable: React.FC<Props> = ({
         setIsAdding(true);
         const init: Record<number, string> = {};
         flatColumnsInRenderOrder.forEach(c => {
-            if (c.table_column_id != null) init[c.table_column_id] = '';
+            if (c.table_column_id != null && !isColReadOnly(c)) init[c.table_column_id] = '';
         });
         setDraft(init);
     }, [preflightInsert, flatColumnsInRenderOrder]);
@@ -429,9 +463,10 @@ export const FormTable: React.FC<Props> = ({
             const k = `${col.widget_column_id}:${col.table_column_id ?? -1}`;
             const idx = valueIndexByKey.get(k);
             const val = idx != null ? row.values[idx] : '';
-            if (col.table_column_id != null) init[col.table_column_id] = (val ?? '').toString();
+            if (col.table_column_id != null && !isColReadOnly(col)) {
+                init[col.table_column_id] = (val ?? '').toString();
+            }
         });
-
         setEditingRowIdx(rowIdx);
         setEditDraft(init);
     }, [preflightUpdate, formDisplay.data, flatColumnsInRenderOrder, valueIndexByKey]);
@@ -787,20 +822,26 @@ export const FormTable: React.FC<Props> = ({
                             <tbody>
                             {isAdding && (
                                 <tr>
-                                    {flatColumnsInRenderOrder.map(col => (
-                                        <td key={`add-wc${col.widget_column_id}-tc${col.table_column_id}`} style={{textAlign: 'center'}}>
-                                            <TextField
-                                                size="small"
-                                                value={draft[col.table_column_id] ?? ''}
-                                                onChange={e => {
-                                                    const v = e.target.value;
-                                                    setDraft(prev => ({...prev, [col.table_column_id]: v}));
-                                                }}
-                                                placeholder={col.placeholder ?? col.column_name}
+                                    {flatColumnsInRenderOrder.map(col => {
+                                        const tcId = col.table_column_id;
+                                        const ro = isColReadOnly(col);
 
-                                            />
-                                        </td>
-                                    ))}
+                                        return (
+                                            <td key={`add-wc${col.widget_column_id}-tc${tcId}`} style={{ textAlign: 'center' }}>
+                                                {ro || tcId == null ? (
+                                                    // readonly: просто тире/плейсхолдер
+                                                    <span style={{ opacity: 0.6 }}>—</span>
+                                                ) : (
+                                                    <TextField
+                                                        size="small"
+                                                        value={draft[tcId] ?? ''}
+                                                        onChange={e => setDraft(prev => ({ ...prev, [tcId]: e.target.value }))}
+                                                        placeholder={col.placeholder ?? col.column_name}
+                                                    />
+                                                )}
+                                            </td>
+                                        );
+                                    })}
                                     <td />
                                 </tr>
                             )}
