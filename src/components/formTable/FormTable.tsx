@@ -192,8 +192,8 @@ export const FormTable: React.FC<Props> = ({
     }, [sortedColumns]);
 
     const headerPlan = useMemo(() => {
+        // Фолбэк: если нет headerGroups — группируем, как раньше
         if (!headerGroups || headerGroups.length === 0) {
-            // fallback: подряд по одинаковым (name,wcId)
             const groups: { id: number; title: string; labels: string[]; cols: typeof sortedColumns }[] = [];
             let i = 0;
             while (i < sortedColumns.length) {
@@ -213,26 +213,54 @@ export const FormTable: React.FC<Props> = ({
             return groups;
         }
 
+        // Нормальный путь: строим группы на основе живой модели шапки
         const visibleGroups = headerGroups.filter(g => g.visible !== false);
-        return visibleGroups.map(g => {
-            let cols = (byWcId[g.id] ?? []).slice();
 
-            if (g.refIds && g.refIds.length) {
+        const planned: { id: number; title: string; labels: string[]; cols: typeof sortedColumns }[] = [];
+
+        for (const g of visibleGroups) {
+            const allCols = (byWcId[g.id] ?? []).slice();
+
+            // если есть refIds — оставляем только те колонки, что перечислены (видимые), и сортируем по refIds
+            let cols = allCols;
+            let labels: string[] = [];
+
+            if (g.refIds && g.refIds.length > 0) {
                 const pos = new Map<number, number>();
                 g.refIds.forEach((id, i) => pos.set(id, i));
-                cols.sort((a, b) => {
-                    const ai = pos.has(a.table_column_id) ? pos.get(a.table_column_id)! : Number.MAX_SAFE_INTEGER;
-                    const bi = pos.has(b.table_column_id) ? pos.get(b.table_column_id)! : Number.MAX_SAFE_INTEGER;
-                    return ai - bi;
+
+                // 1) фильтр по видимым refs (refIds)
+                cols = allCols.filter(c => c.table_column_id != null && pos.has(c.table_column_id!));
+
+                // если после фильтра ничего не осталось — пропускаем группу
+                if (cols.length === 0) continue;
+
+                // 2) сортировка по порядку refIds
+                cols.sort(
+                    (a, b) =>
+                        (pos.get(a.table_column_id!) ?? Number.MAX_SAFE_INTEGER) -
+                        (pos.get(b.table_column_id!) ?? Number.MAX_SAFE_INTEGER)
+                );
+
+                // 3) подставляем подписи из g.labels, строго синхронно выбранным cols
+                const allLabels = g.labels ?? [];
+                labels = cols.map(c => {
+                    const li = pos.get(c.table_column_id!)!;
+                    return allLabels[li] ?? '—';
                 });
+            } else {
+                // Нет явного списка refIds — берём все колонки группы как есть
+                if (cols.length === 0) continue;
+                labels = (g.labels ?? []).slice(0, cols.length);
+                while (labels.length < cols.length) labels.push('—');
             }
 
-            const labels = (g.labels ?? []).slice(0, cols.length);
-            while (labels.length < cols.length) labels.push('—');
+            planned.push({ id: g.id, title: g.title, labels, cols });
+        }
 
-            return { id: g.id, title: g.title, labels, cols };
-        });
+        return planned;
     }, [headerGroups, byWcId, sortedColumns]);
+
 
     const flatColumnsInRenderOrder = useMemo(
         () => headerPlan.flatMap(g => g.cols),
@@ -740,8 +768,10 @@ export const FormTable: React.FC<Props> = ({
                             <thead>
                             <tr>
                                 {headerPlan.map(g => (
-                                    <th key={`g-top-${g.id}`} colSpan={g.cols.length || 1}>{g.title}</th>
+                                    <th key={`g-top-${g.id}`} colSpan={g.cols.length || 1}>{g.title} </th>
+
                                 ))}
+
                                 <th />
                             </tr>
                             <tr>
@@ -767,6 +797,7 @@ export const FormTable: React.FC<Props> = ({
                                                     setDraft(prev => ({...prev, [col.table_column_id]: v}));
                                                 }}
                                                 placeholder={col.placeholder ?? col.column_name}
+
                                             />
                                         </td>
                                     ))}

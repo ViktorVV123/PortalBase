@@ -107,6 +107,7 @@ export type WidgetForm = {
 export interface FormColumn {
     column_order: number;
     column_name: string;
+    readonly :boolean;
     placeholder: string | null;
     type: string | null;
     default: string | null;
@@ -207,8 +208,19 @@ export type AddFormRequest = {
     sub_widgets_lst?: NewSubWidgetItem[];
     tree_fields_lst?: NewTreeFieldItem[];
 };
+type RefPatch = Partial<{
+    ref_column_order: number;
+    width: number;
+    type: string | null;
+    ref_alias: string | null;
+    default: string | null;
+    placeholder: string | null;
+    visible: boolean;
+    readonly: boolean;
+}>;
 
 
+export type ReferenceItem = WidgetColumn['reference'][number];
 
 // shared/hooks/useWorkSpaces.ts
 export const useWorkSpaces = () => {
@@ -314,13 +326,14 @@ export const useWorkSpaces = () => {
     /** GET /widgets/tables/references/{widgetColumnId} */
     const fetchReferences = useCallback(
         async (widgetColumnId: number) => {
-            const { data } = await api.get<WidgetColumn['reference'][number][]>(
-                `/widgets/tables/references/${widgetColumnId}`,
+            const { data } = await api.get<ReferenceItem[]>(
+                `/widgets/tables/references/${widgetColumnId}`
             );
             return data;
         },
         [],
     );
+
 
     /** DELETE /widgets/tables/references/{widgetColumnId}/{tableColumnId} */
     const deleteReference = useCallback(
@@ -671,19 +684,14 @@ export const useWorkSpaces = () => {
 
     // useWorkSpaces.ts
     const updateReference = useCallback(
-        async (
-            widgetColumnId: number,
-            tableColumnId: number,
-            patch: Partial<Pick<WcReference, 'ref_column_order' | 'width' | 'type' | 'ref_alias'>>
-        ) => {
-            const body = { ...patch };
-            const { data } = await api.patch<WcReference>(
+        async (widgetColumnId: number, tableColumnId: number, patch: RefPatch) => {
+            const { data } = await api.patch<ReferenceItem>(
                 `/widgets/tables/references/${widgetColumnId}/${tableColumnId}`,
-                body,
+                patch
             );
             return data;
         },
-        [],
+        []
     );
 
 

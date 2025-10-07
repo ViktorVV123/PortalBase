@@ -4,7 +4,7 @@ import {
     Column,
     DTable,
     FormDisplay,
-    FormTreeColumn,
+    FormTreeColumn, ReferenceItem,
     SubDisplay,
     Widget,
     WidgetColumn,
@@ -33,8 +33,9 @@ type Props = {
     updateReference: (
         widgetColumnId: number,
         tableColumnId: number,
-        patch: Partial<Pick<WcReference, 'width' | 'ref_column_order'>>
-    ) => Promise<WcReference>;
+        patch: Partial<Pick<ReferenceItem, 'ref_column_order' | 'width' | 'type' | 'ref_alias' | 'default' | 'placeholder' | 'visible' | 'readonly'>>
+    ) => Promise<ReferenceItem>;
+
 
     addReference: (
         widgetColId: number,
@@ -185,47 +186,60 @@ export const SetOfTables: React.FC<Props> = (props) => {
 
     // ───────── Заголовок-превью (верхняя строка) ─────────
     const headerGroups = useMemo(() => {
-        const items =
-            widgetColumns
-                ?.map((wc) => {
-                    const effectiveOrder =
-                        editingWcId === wc.id
-                            ? wcValues.column_order ?? wc.column_order ?? 0
-                            : wc.column_order ?? 0;
+        if (!widgetColumns) return [];
 
-                    // visible берём с уровня reference
-                    const refs =
-                        liveRefsForHeader?.[wc.id] ?? referencesMap[wc.id] ?? wc.reference ?? [];
+        const items = widgetColumns
+            .map((wc) => {
+                // порядок группы (учитываем временные правки при редактировании)
+                const effectiveOrder =
+                    editingWcId === wc.id
+                        ? (wcValues.column_order ?? wc.column_order ?? 0)
+                        : (wc.column_order ?? 0);
 
-                    const groupVisible = refs.some((r) => r.visible !== false);
-                    if (!groupVisible) return null;
+                // берём ссылки в приоритете: живые из превью → карта → исходные из WC
+                const refsRaw =
+                    liveRefsForHeader?.[wc.id] ??
+                    referencesMap[wc.id] ??
+                    wc.reference ??
+                    [];
 
-                    const span = Math.max(1, refs.length || 1);
-                    const effectiveAlias = (editingWcId === wc.id ? wcValues.alias : wc.alias)?.trim();
-                    const title = effectiveAlias || refs[0]?.table_column?.name || `Колонка #${wc.id}`;
+                // фильтрация по видимости на уровне reference
+                const visRefs = refsRaw.filter((r) => r?.visible !== false);
+                if (visRefs.length === 0) return null; // вся группа скрыта
 
-                    const labels = refs.length > 0 ? refs.map((r) => r.ref_alias || '') : ['—'];
-                    const refIds =
-                        refs.length > 0
-                            ? refs
-                                .map((r) => r.table_column?.id)
-                                .filter((id): id is number => !!id)
-                            : [];
+                // заголовок: alias из редактируемого значения, иначе имя первой видимой колонки
+                const aliasFromState =
+                    (editingWcId === wc.id ? wcValues.alias : wc.alias) ?? '';
+                const effectiveAlias = typeof aliasFromState === 'string' ? aliasFromState.trim() : '';
+                const title =
+                    effectiveAlias ||
+                    visRefs[0]?.table_column?.name ||
+                    `Колонка #${wc.id}`;
 
-                    return { id: wc.id, order: effectiveOrder, title, span, labels, refIds };
-                })
-                .filter(Boolean) as {
-                id: number;
-                order: number;
-                title: string;
-                span: number;
-                labels: string[];
-                refIds: number[];
-            }[];
+                // подписи и список refIds — только по видимым ссылкам
+                const labels = visRefs.map((r) => r.ref_alias || '');
+                const refIds = visRefs
+                    .map((r) => r.table_column?.id)
+                    .filter((id): id is number => typeof id === 'number');
 
-        items?.sort((a, b) => a.order - b.order || a.id - b.id);
-        return items ?? [];
+                // span равен числу видимых reference (минимум 1 по смыслу, но тут >0)
+                const span = Math.max(1, visRefs.length);
+
+                return { id: wc.id, order: effectiveOrder, title, span, labels, refIds };
+            })
+            .filter(Boolean) as {
+            id: number;
+            order: number;
+            title: string;
+            span: number;
+            labels: string[];
+            refIds: number[];
+        }[];
+
+        items.sort((a, b) => a.order - b.order || a.id - b.id);
+        return items;
     }, [widgetColumns, referencesMap, liveRefsForHeader, editingWcId, wcValues]);
+
 
     // ───────── Саб-заголовки для subWidget (быстрее + безопаснее) ─────────
     useEffect(() => {
