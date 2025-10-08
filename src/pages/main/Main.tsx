@@ -153,7 +153,7 @@ export const Main = () => {
                     />
                 </div>
 
-                <SetOfTables
+                <SetOfTables loadWidgetForms={loadWidgetForms}
                     clearFormSelection={selection.clearFormSelection}
                     updateReference={updateReference}
                     publishTable={publishTable}

@@ -3,7 +3,7 @@ import * as s from '@/components/setOfTables/SetOfTables.module.scss';
 import {
     Column, HeaderGroup,
     Widget,
-    WidgetColumn,
+    WidgetColumn, WidgetForm,
 } from '@/shared/hooks/useWorkSpaces';
 import {TableColumn} from '@/components/tableColumn/TableColumn';
 import {
@@ -67,6 +67,8 @@ interface Props {
     setReferencesMap: React.Dispatch<React.SetStateAction<Record<number, WcReference[]>>>;
     referencesMap: Record<number, WcReference[]>;
     headerGroups: HeaderGroup[];
+    formsById: Record<number, WidgetForm>;
+    loadWidgetForms: () => Promise<void> | void;
 }
 
 const modalStyle = {
@@ -119,7 +121,9 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                                                           setLiveRefsForHeader,
                                                           setReferencesMap,
                                                           referencesMap,
-                                                          headerGroups
+                                                          headerGroups,
+                                                          formsById,
+                                                          loadWidgetForms,
                                                       }) => {
 
 
@@ -281,7 +285,7 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
             </div>
 
             {/* Основная таблица */}
-            <WidgetColumnsMainTable onRefsChange={setLiveRefsForHeader}
+            <WidgetColumnsMainTable formsById={formsById} loadWidgetForms={loadWidgetForms}  onRefsChange={setLiveRefsForHeader}
                                     addReference={(wcId, tblColId, payloadMin) =>
                                         // если на твоём бэке обязательны combobox-поля — можешь обернуть здесь
                                         addReference(wcId, tblColId, {...payloadMin})

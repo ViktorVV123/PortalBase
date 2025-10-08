@@ -8,7 +8,7 @@ import debounce from 'lodash/debounce';
 import {
     Dialog, DialogTitle, DialogContent, DialogActions,
     Button, Stack, TextField, FormControlLabel, Checkbox,
-    createTheme, ThemeProvider
+    createTheme, ThemeProvider, Autocomplete
 } from '@mui/material';
 
 type ReferenceItem = WidgetColumn['reference'][number];
@@ -53,8 +53,9 @@ function logStateSnapshot(
         width: r.width ?? null,
         order: r.ref_column_order ?? null,
     }));
-    logApi('STATE', { wcId, rows, orderIds: snap[wcId] ?? [] });
+    logApi('STATE', {wcId, rows, orderIds: snap[wcId] ?? []});
 }
+
 /* ------------------------------------------------------------ */
 
 type Props = {
@@ -62,15 +63,19 @@ type Props = {
     referencesMap: Record<number, ReferenceItem[]>;
     handleDeleteReference: (wcId: number, tblColId: number) => void;
 
-    updateWidgetColumn: (id: number, patch: Partial<Omit<WidgetColumn, 'id' | 'widget_id' | 'reference'>>) => Promise<void> | void;
+    updateWidgetColumn: (
+        id: number,
+        patch: Partial<Omit<WidgetColumn, 'id' | 'widget_id' | 'reference'>>
+    ) => Promise<void> | void;
 
+    // === ВАЖНО: разрешаем form_id ===
     updateReference: (
         widgetColumnId: number,
         tableColumnId: number,
         patch: Partial<Pick<ReferenceItem,
             'ref_column_order' | 'width' | 'type' | 'ref_alias' |
             'default' | 'placeholder' | 'visible' | 'readonly'
-        >>
+        >> & { form_id?: number | null }
     ) => Promise<ReferenceItem>;
 
     addReference: (
@@ -82,6 +87,10 @@ type Props = {
     refreshReferences?: (wcId: number) => Promise<void> | void;
     onRefsChange?: (refsMap: Record<number, ReferenceItem[]>) => void;
     deleteColumnWidget: (id: number) => void;
+
+    // формы (id -> meta)
+    formsById: Record<number, { form_id: number; name: string }>;
+    loadWidgetForms: () => Promise<void> | void;
 };
 
 export const WidgetColumnsMainTable: React.FC<Props> = ({
@@ -93,22 +102,30 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
                                                             addReference,
                                                             refreshReferences,
                                                             onRefsChange,
+                                                            formsById,
+                                                            loadWidgetForms,
                                                             deleteColumnWidget
                                                         }) => {
+
     /* -------- wrappers with logs for API calls -------- */
-    const callAddReference = useCallback(async (wcId: number, tblColId: number, payload: {width: number; ref_column_order: number}) => {
-        logApi('POST addReference:REQ', { wcId, tableColumnId: tblColId, payload });
+    const callAddReference = useCallback(async (wcId: number, tblColId: number, payload: {
+        width: number;
+        ref_column_order: number
+    }) => {
+        logApi('POST addReference:REQ', {wcId, tableColumnId: tblColId, payload});
         const res = await addReference(wcId, tblColId, payload);
-        logApi('POST addReference:OK', { wcId, tableColumnId: tblColId });
+        logApi('POST addReference:OK', {wcId, tableColumnId: tblColId});
         return res;
     }, [addReference]);
 
     const callUpdateReference = useCallback(async (
         wcId: number,
         tblColId: number,
-        patch: Partial<Pick<ReferenceItem, 'ref_column_order' | 'width' | 'type' | 'ref_alias' | 'default' | 'placeholder' | 'visible' | 'readonly'>>
+        patch: Partial<Pick<ReferenceItem, 'ref_column_order' | 'width' | 'type' | 'ref_alias' | 'default' | 'placeholder' | 'visible' | 'readonly'>> & {
+            form_id?: number | null
+        }
     ) => {
-        logApi('PATCH updateReference:REQ', { wcId, tableColumnId: tblColId, patch });
+        logApi('PATCH updateReference:REQ', {wcId, tableColumnId: tblColId, patch});
         const res = await updateReference(wcId, tblColId, patch);
         logApi('PATCH updateReference:OK', {
             wcId, tableColumnId: tblColId,
@@ -127,9 +144,9 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
     }, [updateReference]);
 
     const callUpdateWidgetColumn = useCallback(async (id: number, patch: any) => {
-        logApi('PATCH updateWidgetColumn:REQ', { widget_column_id: id, patch });
+        logApi('PATCH updateWidgetColumn:REQ', {widget_column_id: id, patch});
         const res = await updateWidgetColumn(id, patch);
-        logApi('PATCH updateWidgetColumn:OK', { widget_column_id: id });
+        logApi('PATCH updateWidgetColumn:OK', {widget_column_id: id});
         return res;
     }, [updateWidgetColumn]);
     /* -------------------------------------------------- */
@@ -144,7 +161,7 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
 
     /** alias диалог для группы */
     const [aliasOverrides, setAliasOverrides] = useState<Record<number, string | null>>({});
-    const [aliasDlg, setAliasDlg] = useState<{open: boolean; wcId: number | null; value: string}>({
+    const [aliasDlg, setAliasDlg] = useState<{ open: boolean; wcId: number | null; value: string }>({
         open: false, wcId: null, value: '',
     });
     const openAliasDialog = (wc: WidgetColumn) => setAliasDlg({open: true, wcId: wc.id, value: wc.alias ?? ''});
@@ -160,7 +177,10 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
     /** локальная копия reference для редактирования/перестановок */
     const [localRefs, setLocalRefs] = useState<Record<number, ReferenceItem[]>>({});
     const localRefsRef = useRef<Record<number, ReferenceItem[]>>({});
-    useEffect(() => { localRefsRef.current = localRefs; onRefsChange?.(localRefs); }, [localRefs, onRefsChange]);
+    useEffect(() => {
+        localRefsRef.current = localRefs;
+        onRefsChange?.(localRefs);
+    }, [localRefs, onRefsChange]);
 
     /** снапшот порядка: wcId -> [table_column.id,…] */
     const snapshotRef = useRef<Record<number, number[]>>({});
@@ -182,7 +202,18 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
         ref_column_order: Number.isFinite(ref_column_order) ? (ref_column_order as number) : (r.ref_column_order ?? 0),
     });
 
-    /** первичная инициализация локального состояния из props */
+    // —— utils: извлечь форм-id из любого вида ответа (число | объект | null)
+    const getFormId = (raw: unknown): number | null => {
+        if (raw == null) return null;
+        if (typeof raw === 'number') return raw;
+        if (typeof raw === 'object' && 'form_id' in (raw as any)) {
+            const v = (raw as any).form_id;
+            return typeof v === 'number' ? v : (Number.isFinite(+v) ? +v : null);
+        }
+        return null;
+    };
+
+    /** первичная инициализация локального состояния из props (+ нормализация form -> id) */
     useEffect(() => {
         const next: Record<number, ReferenceItem[]> = {};
         const snap: Record<number, number[]> = {};
@@ -190,19 +221,30 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
         orderedWc.forEach((wc) => {
             const src = (referencesMap[wc.id] ?? wc.reference ?? []);
 
-            const deep = src.map(r => ({
-                ...r,
-                table_column: r.table_column ? {...r.table_column} : r.table_column,
-            }));
+            const deep = src.map(r => {
+                const copy: any = {
+                    ...r,
+                    table_column: r.table_column ? {...r.table_column} : r.table_column,
+                };
+                // нормализуем форму (если пришёл объект)
+                const fid = getFormId((r as any).form ?? (r as any).form_id ?? null);
+                copy.form = fid;        // держим как number|null для UI
+                copy.form_id = fid;     // на всякий
+                // combobox тоже может быть объектом — защитимся от [object Object]
+                if (typeof (copy.combobox) === 'object' && copy.combobox !== null) {
+                    copy.combobox = (copy.combobox as any).id ?? (copy.combobox as any).code ?? 1;
+                }
+                return copy as ReferenceItem;
+            });
 
-            const sorted = deep.sort((a, b) => (a.ref_column_order ?? 0) - (b.ref_column_order ?? 0));
+            const sorted = deep.sort((a: any, b: any) => (a.ref_column_order ?? 0) - (b.ref_column_order ?? 0));
             next[wc.id] = reindex(sorted);
-            snap[wc.id] = sorted.map(r => r.table_column?.id).filter(Boolean) as number[];
+            snap[wc.id] = sorted.map((r: any) => r.table_column?.id).filter(Boolean) as number[];
         });
 
         setLocalRefs(next);
         snapshotRef.current = snap;
-        logApi('INIT:localRefs', { snapshot: snap });
+        logApi('INIT:localRefs', {snapshot: snap});
     }, [orderedWc, referencesMap, reindex]);
 
     /** быстрый поиск индекса по table_column.id */
@@ -226,14 +268,13 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
                 const nextOrder = (state[wcId] ?? []).map(r => r.table_column!.id);
                 const prevOrder = snapshot[wcId] ?? [];
                 const addedIds = nextOrder.filter(id => !prevOrder.includes(id));
-                if (addedIds.length) logApi('SYNC:additions', { wcId, addedIds, nextOrder, prevOrder });
+                if (addedIds.length) logApi('SYNC:additions', {wcId, addedIds, nextOrder, prevOrder});
 
                 for (const id of addedIds) {
                     const toIdx = nextOrder.indexOf(id);
-                    const refObj = (state[wcId] ?? [])[toIdx];
+                    const refObj = (state[wcId] ?? [])[toIdx] as any;
                     if (!refObj) continue;
-
-                    await callAddReference(wcId, id, { width: Number(refObj.width ?? 1), ref_column_order: toIdx });
+                    await callAddReference(wcId, id, {width: Number(refObj.width ?? 1), ref_column_order: toIdx});
                     await callUpdateReference(wcId, id, toFullPatch(refObj, toIdx));
                 }
             }
@@ -250,7 +291,7 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
                     if (newIdx !== oldIdx) {
                         const row = (state[wcId] ?? [])[newIdx];
                         if (!row) continue;
-                        logApi('SYNC:reorder', { wcId, tableColumnId: id, from: oldIdx, to: newIdx });
+                        logApi('SYNC:reorder', {wcId, tableColumnId: id, from: oldIdx, to: newIdx});
                         try {
                             await callUpdateReference(wcId, id, toFullPatch(row, newIdx));
                         } catch (e) {
@@ -273,7 +314,7 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
     useEffect(() => () => queueSyncRef.current?.cancel(), []);
 
     /** DnD */
-    type DragData = {srcWcId: number; fromIdx: number; tableColumnId: number};
+    type DragData = { srcWcId: number; fromIdx: number; tableColumnId: number };
     const [drag, setDrag] = useState<DragData | null>(null);
 
     const onDragStart = (srcWcId: number, fromIdx: number, tableColumnId: number) => (e: React.DragEvent) => {
@@ -283,9 +324,13 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
         setDrag(payload);
         logApi('UI:dragStart', payload);
     };
-    const onDragOver = (e: React.DragEvent) => { e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = 'move'; };
+    const onDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        e.dataTransfer.dropEffect = 'move';
+    };
 
-    const applyCrossReorder = async (d: DragData, target: {dstWcId: number; toIdx: number}) => {
+    const applyCrossReorder = async (d: DragData, target: { dstWcId: number; toIdx: number }) => {
         const {srcWcId, fromIdx} = d;
         const {dstWcId, toIdx} = target;
 
@@ -296,7 +341,7 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
                 const [rm] = next.splice(fromIdx, 1);
                 if (!rm) return prev;
                 next.splice(toIdx, 0, rm);
-                logApi('UI:reorder:inside', { wcId: srcWcId, fromIdx, toIdx });
+                logApi('UI:reorder:inside', {wcId: srcWcId, fromIdx, toIdx});
                 return {...prev, [srcWcId]: reindex(next)};
             });
         } else {
@@ -306,9 +351,17 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
                 const moved = src[fromIdx];
                 if (!moved) return prev;
                 if (dst.some(r => r.table_column?.id === moved.table_column?.id)) return prev;
-                const nextSrc = [...src]; nextSrc.splice(fromIdx, 1);
-                const nextDst = [...dst]; nextDst.splice(toIdx, 0, moved);
-                logApi('UI:reorder:cross', { fromWcId: srcWcId, toWcId: dstWcId, fromIdx, toIdx, tableColumnId: moved.table_column?.id });
+                const nextSrc = [...src];
+                nextSrc.splice(fromIdx, 1);
+                const nextDst = [...dst];
+                nextDst.splice(toIdx, 0, moved as any);
+                logApi('UI:reorder:cross', {
+                    fromWcId: srcWcId,
+                    toWcId: dstWcId,
+                    fromIdx,
+                    toIdx,
+                    tableColumnId: (moved as any).table_column?.id
+                });
                 return {
                     ...prev,
                     [srcWcId]: reindex(nextSrc),
@@ -320,36 +373,47 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
     };
 
     const onDropRow = (dstWcId: number, toIdx: number) => async (e: React.DragEvent) => {
-        e.preventDefault(); e.stopPropagation();
+        e.preventDefault();
+        e.stopPropagation();
         let data = drag;
         try {
             if (!data) {
                 const raw = e.dataTransfer.getData('application/json');
                 if (raw) data = JSON.parse(raw);
             }
-        } catch { /* noop */ }
+        } catch { /* noop */
+        }
         if (!data) return;
-        try { await applyCrossReorder(data, {dstWcId, toIdx}); }
-        finally {
-            try { e.dataTransfer.clearData(); } catch {}
+        try {
+            await applyCrossReorder(data, {dstWcId, toIdx});
+        } finally {
+            try {
+                e.dataTransfer.clearData();
+            } catch {
+            }
             setDrag(null);
             queueSyncRef.current?.flush();
         }
     };
 
     const onDropTbodyEnd = (dstWcId: number) => async (e: React.DragEvent) => {
-        e.preventDefault(); e.stopPropagation();
+        e.preventDefault();
+        e.stopPropagation();
         let data: DragData | null = drag;
         try {
             if (!data) {
                 const raw = e.dataTransfer.getData('application/json');
                 if (raw) data = JSON.parse(raw);
             }
-        } catch { /* noop */ }
+        } catch { /* noop */
+        }
         if (!data) return;
         const toIdx = localRefsRef.current[dstWcId]?.length ?? 0;
         await applyCrossReorder(data, {dstWcId, toIdx});
-        try { e.dataTransfer.clearData(); } catch {}
+        try {
+            e.dataTransfer.clearData();
+        } catch {
+        }
         setDrag(null);
         queueSyncRef.current?.flush();
     };
@@ -380,7 +444,7 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
         const idxNow = listNow.findIndex(x => x.table_column?.id === tableColumnId);
 
         if (!current) {
-            logApi('UI:openEdit:WARN:notFoundById', { wcId, tableColumnId });
+            logApi('UI:openEdit:WARN:notFoundById', {wcId, tableColumnId});
             return;
         }
 
@@ -410,20 +474,9 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
             ref_order: idxNow < 0 ? (current.ref_column_order ?? 0) : idxNow,
             ref_default: current.default ?? '',
             ref_placeholder: current.placeholder ?? '',
-            ref_visible: current.visible ?? true,
+            ref_visible: (current.visible ?? true),
             ref_readOnly: !!current.readonly,
         });
-
-        setTimeout(() => {
-            logApi('UI:openEdit:state', {
-                wcId, tableColumnId,
-                tableColumnName: current.table_column?.name ?? null,
-                ref_alias: current.ref_alias ?? '',
-                ref_visible: current.visible ?? true,
-                ref_readOnly: !!current.readonly,
-                order: idxNow
-            });
-        }, 0);
     };
 
     const closeEdit = () => setEdit(e => ({...e, open: false}));
@@ -437,7 +490,10 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
 
         const list = localRefsRef.current[wcId] ?? [];
         const current = list.find(x => x.table_column?.id === tableColumnId);
-        if (!current) { closeEdit(); return; }
+        if (!current) {
+            closeEdit();
+            return;
+        }
 
         const to = clamp(
             Number.isFinite(edit.ref_order) ? Number(edit.ref_order) : 0,
@@ -445,13 +501,10 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
             Math.max(0, list.length - 1)
         );
 
-        logApi('UI:saveEdit:EDIT_SNAPSHOT', JSON.parse(JSON.stringify(edit)));
-
-        // база текущей строки + значения из модалки
         const base = {
             ref_alias: current.ref_alias ?? null,
             type: current.type ?? null,
-            width: Number(current.width ?? 1),
+            width: Number((current as any).ref_width ?? current.width ?? 1),
             default: current.default ?? null,
             placeholder: current.placeholder ?? null,
             visible: (current.visible ?? true),
@@ -470,34 +523,16 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
             ref_column_order: to,
         } as const;
 
-        logApi('UI:saveEdit:patchBuilt', {
-            wcId,
-            tableColumnId,
-            tableColumnName: current.table_column?.name ?? null,
-            patch,
-        });
+        // ⚠️ не отправляем ref_column_order в этом ручном редактировании (оставили как раньше)
+        const safePatch: any = {...patch};
+        delete safePatch.ref_column_order;
 
-        // 🧩 исправленный участок — убираем ref_column_order, чтобы бэк не путал строки
-        const safePatch = { ...patch };
-        delete (safePatch as any).ref_column_order;
-
-        logApi('PATCH updateReference:FINAL_REQ', {
-            endpoint: `/widgets/tables/references/${wcId}/${tableColumnId}`,
-            patch: safePatch,
-        });
-
-        const res = await callUpdateReference(wcId, tableColumnId, safePatch);
-
-        logApi('PATCH updateReference:FINAL_RES', {
-            tableColumnId,
-            response: res,
-        });
-        // 🧩 конец вставки
+        await callUpdateReference(wcId, tableColumnId, safePatch);
 
         setLocalRefs(prev => {
             const list = prev[wcId] ?? [];
             const filtered = list.filter(x => x.table_column?.id !== tableColumnId);
-            const updated: ReferenceItem = {
+            const updated: any = {
                 ...current,
                 ref_alias: patch.ref_alias,
                 type: patch.type,
@@ -510,14 +545,11 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
             };
             const next = [...filtered];
             next.splice(to, 0, updated);
-            const res = { ...prev, [wcId]: reindex(next) };
-            logApi('UI:saveEdit:localUpdate', { wcId, tableColumnId, applied: patch });
-            return res;
+            return {...prev, [wcId]: reindex(next)};
         });
 
         closeEdit();
     };
-
 
     /** перемещение групп */
     const moveGroup = async (wcId: number, dir: 'up' | 'down') => {
@@ -527,12 +559,78 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
         const j = dir === 'up' ? i - 1 : i + 1;
         if (j < 0 || j >= list.length) return;
         const A = list[i], B = list[j];
-        logApi('GROUP:move', { from: A.id, to: B.id, dir, aOrder: A.column_order, bOrder: B.column_order });
+        logApi('GROUP:move', {from: A.id, to: B.id, dir, aOrder: A.column_order, bOrder: B.column_order});
         await Promise.all([
             callUpdateWidgetColumn(A.id, {column_order: B.column_order ?? 0}),
             callUpdateWidgetColumn(B.id, {column_order: A.column_order ?? 0}),
         ]);
     };
+
+    /* ───────────────────────────── формы ───────────────────────────── */
+    const formOptions = useMemo(
+        () => [{id: null as number | null, name: '—'}].concat(
+            Object.values(formsById ?? {}).map(f => ({
+                id: f.form_id as number | null,
+                name: f.name || `Форма #${f.form_id}`,
+            }))
+        ),
+        [formsById]
+    );
+
+    const formNameById = useMemo(() => {
+        const map: Record<string, string> = {'null': '— Без формы —'};
+        for (const f of formOptions) map[String(f.id)] = f.name;
+        return map;
+    }, [formOptions]);
+
+    useEffect(() => {
+        if (!formsById || Object.keys(formsById).length === 0) {
+            loadWidgetForms?.();
+        }
+    }, [formsById, loadWidgetForms]);
+
+    const [formDlg, setFormDlg] = useState<{
+        open: boolean;
+        wcId: number | null;
+        tblColId: number | null;
+        value: number | null;
+    }>({open: false, wcId: null, tblColId: null, value: null});
+
+    const openFormDialog = useCallback((wcId: number, tblColId: number, currentVal?: number | null) => {
+        setFormDlg({open: true, wcId, tblColId, value: currentVal ?? null});
+    }, []);
+
+    const closeFormDialog = useCallback(() => setFormDlg(p => ({...p, open: false})), []);
+
+    const saveFormDialog = useCallback(async () => {
+        const {wcId, tblColId, value} = formDlg;
+        if (!wcId || !tblColId) return;
+
+        // нормализация -> число или null
+        const normalized: number | null =
+            value == null ? null : (Number.isFinite(Number(value)) ? Number(value) : null);
+
+        try {
+            // === КРИТИЧНО: шлём именно form_id ===
+            await callUpdateReference(wcId, tblColId, {form_id: normalized});
+
+            // локально проставим
+            setLocalRefs(prev => ({
+                ...prev,
+                [wcId]: (prev[wcId] ?? []).map(item => {
+                    if (item.table_column?.id !== tblColId) return item;
+                    const copy: any = {...item, form: normalized, form_id: normalized};
+                    return copy as ReferenceItem;
+                })
+            }));
+
+            closeFormDialog();
+            // по желанию: await refreshReferences?.(wcId);
+        } catch (e) {
+            console.warn('[formDlg] save failed:', e);
+        }
+    }, [formDlg, callUpdateReference, setLocalRefs, closeFormDialog]);
+    /* ──────────────────────────────────────────────────────────────── */
 
     return (
         <div>
@@ -552,10 +650,12 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
                             <div style={{display: 'flex', gap: 6, marginLeft: 8, alignItems: 'center'}}>
                                 <button title="Переместить вверх" disabled={isFirst}
                                         onClick={() => moveGroup(wc.id, 'up')}
-                                        style={{opacity: isFirst ? 0.4 : 1}}>↑</button>
+                                        style={{opacity: isFirst ? 0.4 : 1}}>↑
+                                </button>
                                 <button title="Переместить вниз" disabled={isLast}
                                         onClick={() => moveGroup(wc.id, 'down')}
-                                        style={{opacity: isLast ? 0.4 : 1}}>↓</button>
+                                        style={{opacity: isLast ? 0.4 : 1}}>↓
+                                </button>
 
                                 <EditIcon className={s.actionIcon} onClick={() => openAliasDialog(wc)}/>
                                 <DeleteIcon className={s.actionIcon} onClick={() => deleteColumnWidget(wc.id)}/>
@@ -568,7 +668,7 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
                                 <th style={{width: 28}}/>
                                 <th>Название</th>
                                 <th>Подзаголовок</th>
-                                <th style={{width:80,opacity:.6}}>colId</th>{/* диагностический столбец */}
+                                <th style={{width: 80, opacity: .6}}>colId</th>
                                 <th>Тип</th>
                                 <th>Только чтение</th>
                                 <th>width</th>
@@ -576,12 +676,14 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
                                 <th>placeholder</th>
                                 <th>Видимость</th>
                                 <th>Очередность</th>
+                                <th>Combobox</th>
+                                <th>Form</th>
                                 <th/>
                             </tr>
                             </thead>
 
                             <tbody onDragOver={onDragOver} onDrop={onDropTbodyEnd(wc.id)}>
-                            {refs.length > 0 ? refs.map((r) => {
+                            {refs.length > 0 ? refs.map((r: any) => {
                                 const tblCol = r.table_column;
                                 const tblColId = tblCol?.id;
                                 if (!tblColId) return null;
@@ -589,6 +691,8 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
                                 const rowKey = `${wc.id}:${tblColId}`;
                                 const type = r.type ?? '—';
                                 const visible = (r.visible ?? true);
+                                // нормализованный id формы для отображения
+                                const formId = getFormId(r.form ?? r.form_id);
 
                                 return (
                                     <tr
@@ -601,7 +705,7 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
                                         <td style={{textAlign: 'center', opacity: 0.6}}>⋮⋮</td>
                                         <td>{tblCol?.name ?? '—'}</td>
                                         <td>{r.ref_alias ?? '—'}</td>
-                                        <td style={{opacity:.6, fontSize:12}}>{tblColId}</td>
+                                        <td style={{opacity: .6, fontSize: 12}}>{tblColId}</td>
                                         <td>{type}</td>
 
                                         {/* readonly toggle */}
@@ -610,11 +714,18 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
                                                 onMouseDown={(e) => e.stopPropagation()}
                                                 onClick={(e) => e.stopPropagation()}
                                                 draggable={false}
-                                                style={{display: 'inline-flex', alignItems: 'center', justifyContent: 'center'}}
+                                                style={{
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center'
+                                                }}
                                             >
                                                 <Checkbox
                                                     size="small"
-                                                    sx={{color: 'common.white', '&.Mui-checked': {color: 'common.white'}}}
+                                                    sx={{
+                                                        color: 'common.white',
+                                                        '&.Mui-checked': {color: 'common.white'}
+                                                    }}
                                                     checked={!!r.readonly}
                                                     onChange={async (e) => {
                                                         const nextVal = e.target.checked;
@@ -622,14 +733,22 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
                                                         setLocalRefs(prev => ({
                                                             ...prev,
                                                             [wc.id]: (prev[wc.id] ?? []).map(item =>
-                                                                item.table_column?.id === tblColId ? {...item, readonly: nextVal} : item
+                                                                item.table_column?.id === tblColId ? {
+                                                                    ...item,
+                                                                    readonly: nextVal
+                                                                } : item
                                                             )
                                                         }));
 
                                                         try {
                                                             const currentRow = (localRefsRef.current[wc.id] ?? []).find(x => x.table_column?.id === tblColId);
                                                             if (currentRow) {
-                                                                await callUpdateReference(wc.id, tblColId, {...toFullPatch({...currentRow, readonly: nextVal})});
+                                                                await callUpdateReference(wc.id, tblColId, {
+                                                                    ...toFullPatch({
+                                                                        ...currentRow,
+                                                                        readonly: nextVal
+                                                                    })
+                                                                });
                                                             } else {
                                                                 await callUpdateReference(wc.id, tblColId, {readonly: nextVal});
                                                             }
@@ -637,7 +756,10 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
                                                             setLocalRefs(prev => ({
                                                                 ...prev,
                                                                 [wc.id]: (prev[wc.id] ?? []).map(item =>
-                                                                    item.table_column?.id === tblColId ? {...item, readonly: !nextVal} : item
+                                                                    item.table_column?.id === tblColId ? {
+                                                                        ...item,
+                                                                        readonly: !nextVal
+                                                                    } : item
                                                                 )
                                                             }));
                                                         }
@@ -656,11 +778,18 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
                                                 onMouseDown={(e) => e.stopPropagation()}
                                                 onClick={(e) => e.stopPropagation()}
                                                 draggable={false}
-                                                style={{display: 'inline-flex', alignItems: 'center', justifyContent: 'center'}}
+                                                style={{
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center'
+                                                }}
                                             >
                                                 <Checkbox
                                                     size="small"
-                                                    sx={{color: 'common.white', '&.Mui-checked': {color: 'common.white'}}}
+                                                    sx={{
+                                                        color: 'common.white',
+                                                        '&.Mui-checked': {color: 'common.white'}
+                                                    }}
                                                     checked={visible}
                                                     onChange={async (e) => {
                                                         const nextVal = e.target.checked;
@@ -669,14 +798,22 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
                                                         setLocalRefs(prev => ({
                                                             ...prev,
                                                             [wc.id]: (prev[wc.id] ?? []).map(item =>
-                                                                item.table_column?.id === tblColId ? {...item, visible: nextVal} : item
+                                                                item.table_column?.id === tblColId ? {
+                                                                    ...item,
+                                                                    visible: nextVal
+                                                                } : item
                                                             )
                                                         }));
 
                                                         try {
                                                             const currentRow = (localRefsRef.current[wc.id] ?? []).find(x => x.table_column?.id === tblColId);
                                                             if (currentRow) {
-                                                                await callUpdateReference(wc.id, tblColId, {...toFullPatch({...currentRow, visible: nextVal})});
+                                                                await callUpdateReference(wc.id, tblColId, {
+                                                                    ...toFullPatch({
+                                                                        ...currentRow,
+                                                                        visible: nextVal
+                                                                    })
+                                                                });
                                                             } else {
                                                                 await callUpdateReference(wc.id, tblColId, {visible: nextVal});
                                                             }
@@ -684,7 +821,10 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
                                                             setLocalRefs(prev => ({
                                                                 ...prev,
                                                                 [wc.id]: (prev[wc.id] ?? []).map(item =>
-                                                                    item.table_column?.id === tblColId ? {...item, visible: !nextVal} : item
+                                                                    item.table_column?.id === tblColId ? {
+                                                                        ...item,
+                                                                        visible: !nextVal
+                                                                    } : item
                                                                 )
                                                             }));
                                                         }
@@ -694,21 +834,44 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
                                         </td>
 
                                         <td>{r.ref_column_order ?? 0}</td>
+                                        {/* combobox безопасно */}
+                                        <td>{typeof r.combobox === 'object' ? (r.combobox?.id ?? '—') : (r.combobox ?? '—')}</td>
+
+                                        {/* Form — кликабельно, открывает диалог */}
+                                        <td
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                openFormDialog(wc.id, tblColId, formId);
+                                            }}
+                                            title="Выбрать форму"
+                                            style={{cursor: 'pointer', textDecoration: 'underline dotted'}}
+                                        >
+                                            {formId != null ? (formNameById[String(formId)] ?? `#${formId}`) : formNameById['null']}
+                                        </td>
 
                                         <td>
-                                            <div style={{display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10}}>
+                                            <div style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                gap: 10
+                                            }}>
                                                 <EditIcon
                                                     className={s.actionIcon}
-                                                    onClick={(e) => { e.stopPropagation(); openEditById(wc.id, tblColId); }}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        openEditById(wc.id, tblColId);
+                                                    }}
                                                 />
-                                                <DeleteIcon className={s.actionIcon} onClick={() => handleDeleteReference(wc.id, tblColId)}/>
+                                                <DeleteIcon className={s.actionIcon}
+                                                            onClick={() => handleDeleteReference(wc.id, tblColId)}/>
                                             </div>
                                         </td>
                                     </tr>
                                 );
                             }) : (
                                 <tr>
-                                    <td colSpan={12} style={{textAlign: 'center', opacity: 0.7}}>
+                                    <td colSpan={13} style={{textAlign: 'center', opacity: 0.7}}>
                                         Нет связей — перетащите сюда строку из другого блока
                                     </td>
                                 </tr>
@@ -729,38 +892,37 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
                                 label="ref_alias"
                                 size="small"
                                 value={edit.ref_alias}
-                                onChange={e => { const v = e.target.value; console.log('[WidgetRefs] onChange(ref_alias) →', v); setEdit(s => ({...s, ref_alias: v})); }}
-                                onBlur={() => console.log('[WidgetRefs] onBlur(ref_alias) current=', edit.ref_alias)}
+                                onChange={e => setEdit(s => ({...s, ref_alias: e.target.value}))}
                             />
                             <TextField
                                 label="type"
                                 size="small"
                                 value={edit.ref_type}
-                                onChange={e => { const v = e.target.value; console.log('[WidgetRefs] onChange(type) →', v); setEdit(s => ({...s, ref_type: v})); }}
+                                onChange={e => setEdit(s => ({...s, ref_type: e.target.value}))}
                             />
                             <TextField
                                 type="number" label="width" size="small" value={edit.ref_width}
-                                onChange={e => { const v = Number(e.target.value); console.log('[WidgetRefs] onChange(width) →', v); setEdit(s => ({...s, ref_width: v})); }}
+                                onChange={e => setEdit(s => ({...s, ref_width: Number(e.target.value)}))}
                             />
                             <TextField
                                 label="default" size="small" value={edit.ref_default}
-                                onChange={e => { const v = e.target.value; console.log('[WidgetRefs] onChange(default) →', v); setEdit(s => ({...s, ref_default: v})); }}
+                                onChange={e => setEdit(s => ({...s, ref_default: e.target.value}))}
                             />
                             <TextField
                                 label="placeholder" size="small" value={edit.ref_placeholder}
-                                onChange={e => { const v = e.target.value; console.log('[WidgetRefs] onChange(placeholder) →', v); setEdit(s => ({...s, ref_placeholder: v})); }}
+                                onChange={e => setEdit(s => ({...s, ref_placeholder: e.target.value}))}
                             />
                             <FormControlLabel control={
                                 <Checkbox checked={edit.ref_visible}
-                                          onChange={e => { console.log('[WidgetRefs] onChange(visible) →', e.target.checked); setEdit(v => ({...v, ref_visible: e.target.checked})); }}/>
+                                          onChange={e => setEdit(v => ({...v, ref_visible: e.target.checked}))}/>
                             } label="visible"/>
                             <FormControlLabel control={
                                 <Checkbox checked={edit.ref_readOnly}
-                                          onChange={e => { console.log('[WidgetRefs] onChange(readonly) →', e.target.checked); setEdit(v => ({...v, ref_readOnly: e.target.checked})); }}/>
+                                          onChange={e => setEdit(v => ({...v, ref_readOnly: e.target.checked}))}/>
                             } label="только чтение"/>
                             <TextField
                                 type="number" label="ref_column_order" size="small" value={edit.ref_order}
-                                onChange={e => { const v = Number(e.target.value); console.log('[WidgetRefs] onChange(order) →', v); setEdit(s => ({...s, ref_order: v})); }}
+                                onChange={e => setEdit(s => ({...s, ref_order: Number(e.target.value)}))}
                             />
                         </Stack>
                     </DialogContent>
@@ -786,6 +948,33 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
                     <DialogActions>
                         <Button onClick={closeAliasDialog}>Отмена</Button>
                         <Button onClick={saveAlias} variant="contained">Сохранить</Button>
+                    </DialogActions>
+                </Dialog>
+            </ThemeProvider>
+
+            {/* Диалог выбора формы */}
+            <ThemeProvider theme={dark}>
+                <Dialog open={formDlg.open} onClose={closeFormDialog} fullWidth maxWidth="sm">
+                    <DialogTitle>Выбор формы</DialogTitle>
+                    <DialogContent dividers>
+                        <Autocomplete
+                            options={formOptions}
+                            value={formOptions.find(f => String(f.id) === String(formDlg.value)) ?? formOptions[0]}
+                            getOptionLabel={(o) => o?.name ?? ''}
+                            onOpen={() => {
+                                if (!formOptions.length) loadWidgetForms?.();
+                            }}
+                            onChange={(_e, val) => setFormDlg(p => ({...p, value: (val?.id ?? null)}))}
+                            isOptionEqualToValue={(a, b) => String(a.id) === String(b.id)}
+                            renderInput={(params) => (
+                                <TextField {...params} label="Форма" size="small" placeholder="Начните вводить…"/>
+                            )}
+                        />
+                    </DialogContent>
+                    <DialogActions>
+                        <Button onClick={() => setFormDlg(p => ({...p, value: null}))}>Очистить</Button>
+                        <Button onClick={closeFormDialog}>Отмена</Button>
+                        <Button variant="contained" onClick={saveFormDialog}>Сохранить</Button>
                     </DialogActions>
                 </Dialog>
             </ThemeProvider>

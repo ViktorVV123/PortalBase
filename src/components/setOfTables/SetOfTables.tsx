@@ -107,6 +107,7 @@ type Props = {
     tablesByWs: Record<number, DTable[]>;
     publishTable: (id: number) => void;
     formsById: Record<number, WidgetForm>;
+    loadWidgetForms: () => Promise<void> | void;
 };
 
 export const SetOfTables: React.FC<Props> = (props) => {
@@ -155,6 +156,7 @@ export const SetOfTables: React.FC<Props> = (props) => {
         publishTable,
         updateReference,
         clearFormSelection,
+        loadWidgetForms,
     } = props;
 
     // локальные состояния рендера
@@ -386,7 +388,7 @@ export const SetOfTables: React.FC<Props> = (props) => {
                 ) : wColsError ? (
                     <p className={s.error}>{wColsError}</p>
                 ) : (
-                    <WidgetColumnsOfTable
+                    <WidgetColumnsOfTable loadWidgetForms={loadWidgetForms} formsById={formsById}
                         headerGroups={headerGroups}
                         referencesMap={referencesMap}
                         setLiveRefsForHeader={setLiveRefsForHeader}

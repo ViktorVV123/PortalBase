@@ -13,7 +13,7 @@ import {SubWormTable} from '@/components/formTable/SubFormTable';
 import {TreeFormTable} from '@/components/formTable/TreeFormTable';
 import EditIcon from '@/assets/image/EditIcon.svg';
 import DeleteIcon from '@/assets/image/DeleteIcon.svg';
-import {TextField, ThemeProvider} from '@mui/material';
+import {Button, Dialog, DialogActions, DialogContent, DialogTitle, TextField, ThemeProvider} from '@mui/material';
 import {dark} from '@/shared/themeUI/themeModal/ThemeModalUI';
 import {useFuzzyRows} from '@/shared/hooks/useFuzzySearch';
 import {useDebounced} from '@/shared/hooks/useDebounced';
@@ -96,6 +96,26 @@ export const FormTable: React.FC<Props> = ({
     const [editSavingSub, setEditSavingSub] = useState(false);
     const [isAddingSub, setIsAddingSub] = useState(false);
     const [draftSub, setDraftSub] = useState<Record<number, string>>({});
+
+    const [drill, setDrill] = useState<{ open: boolean; formId: number | null; loading: boolean; display: FormDisplay | null; error?: string }>(
+        { open: false, formId: null, loading: false, display: null }
+    );
+
+
+    const openDrill = useCallback(async (formId: number) => {
+        setDrill({ open: true, formId, loading: true, display: null });
+        try {
+            const { data } = await api.post<FormDisplay>(`/display/${formId}/main`, []); // без фильтров
+            setDrill({ open: true, formId, loading: false, display: data });
+        } catch (e: any) {
+            const msg = e?.response?.data ?? e?.message ?? 'Не удалось загрузить форму';
+            setDrill({ open: true, formId, loading: false, display: null, error: String(msg) });
+        }
+    }, []);
+
+    const closeDrill = useCallback(() => {
+        setDrill({ open: false, formId: null, loading: false, display: null });
+    }, []);
 
     /** ────────────────────────────── форма и саб-настройки ───────────────────────── */
         // «база» из пропсов
@@ -868,11 +888,11 @@ export const FormTable: React.FC<Props> = ({
 
                                             if (isEditing) {
                                                 return (
-                                                    <td key={`edit-r${rowIdx}-wc${col.widget_column_id}-tc${col.table_column_id}`} style={{textAlign: 'center'}}>
+                                                    <td key={`edit-r${rowIdx}-wc${col.widget_column_id}-tc${col.table_column_id}`} style={{ textAlign: 'center' }}>
                                                         <TextField
                                                             size="small"
                                                             value={editDraft[col.table_column_id] ?? ''}
-                                                            onChange={e => setEditDraft(prev => ({...prev, [col.table_column_id]: e.target.value}))}
+                                                            onChange={e => setEditDraft(prev => ({ ...prev, [col.table_column_id]: e.target.value }))}
                                                             onClick={e => e.stopPropagation()}
                                                             placeholder={col.placeholder ?? col.column_name}
                                                         />
@@ -880,12 +900,32 @@ export const FormTable: React.FC<Props> = ({
                                                 );
                                             }
 
+                                            const clickable = col.form_id != null; // ← признак “есть связанная форма”
                                             return (
                                                 <td key={`r${rowIdx}-wc${col.widget_column_id}-tc${col.table_column_id}`}>
-                                                    {val}
+                                                    {clickable ? (
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => { e.stopPropagation(); openDrill(col.form_id!); }}
+                                                            style={{
+                                                                padding: 0,
+                                                                border: 'none',
+                                                                background: 'none',
+                                                                cursor: 'pointer',
+                                                                textDecoration: 'underline',
+                                                                color: 'var(--link, #66b0ff)'
+                                                            }}
+                                                            title={`Открыть форму #${col.form_id}`}
+                                                        >
+                                                            {val}
+                                                        </button>
+                                                    ) : (
+                                                        <>{val}</>
+                                                    )}
                                                 </td>
                                             );
                                         })}
+
 
                                         <td style={{textAlign: 'center', whiteSpace: 'nowrap'}}>
                                             {isEditing ? (
@@ -962,6 +1002,45 @@ export const FormTable: React.FC<Props> = ({
                     />
                 </div>
             </div>
+
+
+            <Dialog open={drill.open} onClose={closeDrill} fullWidth maxWidth="lg">
+                <DialogTitle>Форма #{drill.formId}</DialogTitle>
+                <DialogContent dividers>
+                    {drill.loading && <div style={{ opacity: 0.7, padding: 12 }}>Загрузка…</div>}
+                    {!!drill.error && <div style={{ color: '#f66', padding: 12 }}>Ошибка: {drill.error}</div>}
+
+                    {drill.display && (
+                        <div className={s.tableScroll}>
+                            <table className={s.tbl}>
+                                <thead>
+                                <tr>
+                                    {drill.display.columns.map((c, i) => (
+                                        <th key={`d-col-${i}`}>{c.ref_column_name ?? c.column_name}</th>
+                                    ))}
+                                </tr>
+                                </thead>
+                                <tbody>
+                                {drill.display.data.map((r, ri) => (
+                                    <tr key={`d-row-${ri}`}>
+                                        {drill.display.columns.map((c, ci) => (
+                                            <td key={`d-cell-${ri}-${ci}`}>
+                                                {r.values[ci] ?? ''}
+                                            </td>
+                                        ))}
+                                    </tr>
+                                ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={closeDrill}>Закрыть</Button>
+                </DialogActions>
+            </Dialog>
+
+
         </ThemeProvider>
     );
 };

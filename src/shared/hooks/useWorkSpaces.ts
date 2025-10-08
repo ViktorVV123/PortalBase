@@ -50,14 +50,15 @@ export type WidgetColumn = {
     reference: {
         ref_column_order: number;
         ref_alias: string | null;
-
+        combobox: any
+        form:any
         // ↓ эти поля теперь на уровне reference
         placeholder: string | null;
         width: number;
         type: string | null;
         default: string | null;
         visible: boolean;
-        readonly:boolean;
+        readonly: boolean;
 
         table_column: {
             table_id: number;
@@ -87,7 +88,7 @@ export interface SubWidget {
 export type WidgetForm = {
     main_widget_id: number;
     name: string;
-    search_bar:boolean;
+    search_bar: boolean;
     description: string | null;
     form_id: number;
     sub_widgets: {
@@ -107,7 +108,8 @@ export type WidgetForm = {
 export interface FormColumn {
     column_order: number;
     column_name: string;
-    readonly :boolean;
+    ref_column_name:string
+    readonly: boolean;
     placeholder: string | null;
     type: string | null;
     default: string | null;
@@ -115,7 +117,8 @@ export interface FormColumn {
     required: boolean;
     width: number;
     widget_column_id: number;
-    table_column_id:number
+    table_column_id: number
+    form_id:number
 }
 
 /** Одна строка данных */
@@ -155,8 +158,8 @@ export interface SubFormColumn {
     published: boolean;
     required: boolean;
     width: number;
-    widget_column_id:number;
-    table_column_id:number;
+    widget_column_id: number;
+    table_column_id: number;
 }
 
 export interface SubFormRow {
@@ -326,7 +329,7 @@ export const useWorkSpaces = () => {
     /** GET /widgets/tables/references/{widgetColumnId} */
     const fetchReferences = useCallback(
         async (widgetColumnId: number) => {
-            const { data } = await api.get<ReferenceItem[]>(
+            const {data} = await api.get<ReferenceItem[]>(
                 `/widgets/tables/references/${widgetColumnId}`
             );
             return data;
@@ -347,7 +350,7 @@ export const useWorkSpaces = () => {
     // внутри useWorkSpaces
     const updateWidgetMeta = useCallback(
         async (id: number, patch: Partial<Widget>): Promise<Widget> => {
-            const { data } = await api.patch<Widget>(`/widgets/${id}`, patch);
+            const {data} = await api.patch<Widget>(`/widgets/${id}`, patch);
             setWidgetsByTable(prev => {
                 const tbl = data.table_id;
                 return {
@@ -516,8 +519,8 @@ export const useWorkSpaces = () => {
         const listByWidget: Record<number, WidgetForm[]> = {};
 
         data.forEach(f => {
-            const sortedSubs = [...f.sub_widgets].sort((a,b)=>a.widget_order-b.widget_order);
-            const normalized = { ...f, sub_widgets: sortedSubs };
+            const sortedSubs = [...f.sub_widgets].sort((a, b) => a.widget_order - b.widget_order);
+            const normalized = {...f, sub_widgets: sortedSubs};
 
             byId[f.form_id] = normalized;
             (listByWidget[f.main_widget_id] ??= []).push(normalized);
@@ -533,12 +536,12 @@ export const useWorkSpaces = () => {
 
     const loadWidgetForms = useCallback(async () => {
         if (Object.keys(formsById).length) return;       // уже загружено
-        const { data } = await api.get<WidgetForm[]>('/forms');
+        const {data} = await api.get<WidgetForm[]>('/forms');
         normalizeForms(data);
     }, [formsById]);
 
     const reloadWidgetForms = useCallback(async () => {
-        const { data } = await api.get<WidgetForm[]>('/forms');
+        const {data} = await api.get<WidgetForm[]>('/forms');
         normalizeForms(data);
     }, []);
 
@@ -547,16 +550,16 @@ export const useWorkSpaces = () => {
     const addForm = useCallback(
         async (payload: NewFormPayload | AddFormRequest) => {
             // поддерживаем старый вызов: addForm({ main_widget_id, name, ... })
-            const body: AddFormRequest = 'form' in payload ? payload : { form: payload };
+            const body: AddFormRequest = 'form' in payload ? payload : {form: payload};
 
-            const { data } = await api.post<WidgetForm>('/forms/', body);
+            const {data} = await api.post<WidgetForm>('/forms/', body);
 
             // аккуратно обновим кеш (если у тебя один form на widget — оставляем как есть)
             setFormsByWidget(prev => ({
                 ...prev,
                 [data.main_widget_id]: {
                     ...data,
-                    sub_widgets: [...data.sub_widgets].sort((a,b)=>a.widget_order-b.widget_order)
+                    sub_widgets: [...data.sub_widgets].sort((a, b) => a.widget_order - b.widget_order)
                 }
             }));
 
@@ -580,9 +583,6 @@ export const useWorkSpaces = () => {
         }
         await reloadWidgetForms(); // синхронизируем меню
     }, [reloadWidgetForms]);
-
-
-
 
 
     //удаляем строку в Widget
@@ -662,7 +662,7 @@ export const useWorkSpaces = () => {
             patch: Partial<Omit<WidgetColumn, 'id' | 'widget_id' | 'reference'>>
         ) => {
             const clean: any = {...patch};
-            ['alias', 'default', 'promt','column_order'].forEach(f => {
+            ['alias', 'default', 'promt', 'column_order'].forEach(f => {
                 if (clean[f] === '') delete clean[f];
             });
 
@@ -685,7 +685,7 @@ export const useWorkSpaces = () => {
     // useWorkSpaces.ts
     const updateReference = useCallback(
         async (widgetColumnId: number, tableColumnId: number, patch: RefPatch) => {
-            const { data } = await api.patch<ReferenceItem>(
+            const {data} = await api.patch<ReferenceItem>(
                 `/widgets/tables/references/${widgetColumnId}/${tableColumnId}`,
                 patch
             );
@@ -695,13 +695,11 @@ export const useWorkSpaces = () => {
     );
 
 
-
-
     const addReference = useCallback(
         async (
             widgetColId: number,
             tblColId: number,
-            payload: { width: number;ref_column_order:number },
+            payload: { width: number; ref_column_order: number },
         ) => {
             await api.post(
                 `/widgets/tables/references/${widgetColId}/${tblColId}`,
@@ -816,7 +814,6 @@ export const useWorkSpaces = () => {
     );
 
 
-
 //connections
     const [connections, setConnections] = useState<Connection[]>([]);
 
@@ -842,10 +839,6 @@ export const useWorkSpaces = () => {
     }, []);
 
 
-
-
-
-
     // ↓ сразу после updateWidgetColumn
     /* ↓ держим один-единственный аргумент – готовый payload */
     const addWidgetColumn = useCallback(
@@ -859,7 +852,7 @@ export const useWorkSpaces = () => {
             column_order: number;
         }) => {
             /* POST именно в коллекцию */
-            const { data } = await api.post<WidgetColumn>(
+            const {data} = await api.post<WidgetColumn>(
                 '/widgets/columns/',    // ← слэш на конце, как у всех остальных
                 payload,
             );
@@ -885,9 +878,6 @@ export const useWorkSpaces = () => {
         },
         []
     );
-
-
-
 
 
     return {
@@ -949,7 +939,6 @@ export const useWorkSpaces = () => {
         formsById,
         deleteSubWidgetFromForm,
         deleteTreeFieldFromForm
-
 
 
     };
