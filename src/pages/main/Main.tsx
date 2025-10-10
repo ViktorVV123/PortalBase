@@ -1,15 +1,14 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
 import * as styles from './Main.module.scss';
 
-import { useWorkSpaces } from '@/shared/hooks/useWorkSpaces';
+import {useWorkSpaces} from '@/shared/hooks/useWorkSpaces';
 
 
-import { TopComponent } from '@/components/topComponent/TopComponent';
-import { SetOfTables } from '@/components/setOfTables/SetOfTables';
+import {TopComponent} from '@/components/topComponent/TopComponent';
+import {SetOfTables} from '@/components/setOfTables/SetOfTables';
 import {useMainSelection} from "@/pages/main/hook/useMainSelection";
 import {useMainModals} from "@/pages/main/hook/useMainModals";
 import {ModalHost} from "@/components/modalHost/ModalHost";
-
 
 
 export const Main = () => {
@@ -76,12 +75,19 @@ export const Main = () => {
         formsById,
         deleteTreeFieldFromForm,
         deleteSubWidgetFromForm,
+
     } = useWorkSpaces();
 
     // первичная загрузка
-    useEffect(() => { loadWorkSpaces(); }, [loadWorkSpaces]);
-    useEffect(() => { loadWidgetForms(); }, [loadWidgetForms]);
-    useEffect(() => { loadConnections(); }, [loadConnections]);
+    useEffect(() => {
+        loadWorkSpaces();
+    }, [loadWorkSpaces]);
+    useEffect(() => {
+        loadWidgetForms();
+    }, [loadWidgetForms]);
+    useEffect(() => {
+        loadConnections();
+    }, [loadConnections]);
 
     // выборы (вынесены)
     const selection = useMainSelection({
@@ -154,51 +160,52 @@ export const Main = () => {
                 </div>
 
                 <SetOfTables loadWidgetForms={loadWidgetForms}
-                    clearFormSelection={selection.clearFormSelection}
-                    updateReference={updateReference}
-                    publishTable={publishTable}
-                    tablesByWs={tablesByWs}
-                    addWidgetColumn={addWidgetColumn}
-                    setWidgetsByTable={setWidgetsByTable}
-                    setSelectedWidget={selection.setSelectedWidget}
-                    columns={columns}
-                    formDisplay={formDisplay}
-                    tableName={selectedTable?.name ?? ''}
-                    loading={loading}
-                    workspaceName={selectedWs?.name ?? ''}
-                    error={error}
-                    widgetColumns={widgetColumns}
-                    wColsLoading={wColsLoading}
-                    wColsError={wColsError}
-                    handleSelectWidget={selection.handleSelectWidget}
-                    selectedWidget={selection.selectedWidget}
-                    handleClearWidget={selection.handleClearWidget}
-                    selectedFormId={selection.selectedFormId}
-                    formLoading={formLoading}
-                    formError={formError}
-                    formName={selection.formName}
-                    loadSubDisplay={loadSubDisplay}
-                    subDisplay={subDisplay}
-                    subLoading={subLoading}
-                    subError={subError}
-                    formsByWidget={formsByWidget}
-                    openForm={selection.openForm}
-                    deleteColumnTable={deleteColumnTable}
-                    deleteColumnWidget={deleteColumnWidget}
-                    updateTableColumn={updateTableColumn}
-                    updateWidgetColumn={updateWidgetColumn}
-                    addReference={addReference}
-                    loadColumnsWidget={loadColumnsWidget}
-                    formTrees={formTrees}
-                    loadFilteredFormDisplay={loadFilteredFormDisplay}
-                    setFormDisplay={setFormDisplay}
-                    setSubDisplay={setSubDisplay}
-                    selectedTable={selectedTable}
-                    updateTableMeta={updateTableMeta}
-                    fetchReferences={fetchReferences}
-                    deleteReference={deleteReference}
-                    updateWidgetMeta={updateWidgetMeta}
-                    formsById={formsById}
+                             clearFormSelection={selection.clearFormSelection}
+                             updateReference={updateReference}
+                             publishTable={publishTable}
+                             tablesByWs={tablesByWs}
+                             addWidgetColumn={addWidgetColumn}
+                             setWidgetsByTable={setWidgetsByTable}
+                             setSelectedWidget={selection.setSelectedWidget}
+                             columns={columns}
+                             formDisplay={formDisplay}
+                             tableName={selectedTable?.name ?? ''}
+                             loading={loading}
+                             workspaceName={selectedWs?.name ?? ''}
+                             error={error}
+                             widgetColumns={widgetColumns}
+                             wColsLoading={wColsLoading}
+                             wColsError={wColsError}
+                             handleSelectWidget={selection.handleSelectWidget}
+                             selectedWidget={selection.selectedWidget}
+                             handleClearWidget={selection.handleClearWidget}
+                             selectedFormId={selection.selectedFormId}
+                             formLoading={formLoading}
+                             formError={formError}
+                             formName={selection.formName}
+                             loadSubDisplay={loadSubDisplay}
+                             subDisplay={subDisplay}
+                             subLoading={subLoading}
+                             subError={subError}
+                             formsByWidget={formsByWidget}
+                             openForm={selection.openForm}
+                             deleteColumnTable={deleteColumnTable}
+                             deleteColumnWidget={deleteColumnWidget}
+                             updateTableColumn={updateTableColumn}
+                             updateWidgetColumn={updateWidgetColumn}
+                             addReference={addReference}
+                             loadColumnsWidget={loadColumnsWidget}
+                             formTrees={formTrees}
+                             loadFilteredFormDisplay={loadFilteredFormDisplay}
+                             setFormDisplay={setFormDisplay}
+                             setSubDisplay={setSubDisplay}
+                             selectedTable={selectedTable}
+                             updateTableMeta={updateTableMeta}
+                             fetchReferences={fetchReferences}
+                             deleteReference={deleteReference}
+                             updateWidgetMeta={updateWidgetMeta}
+                             formsById={formsById}
+                             loadColumns={loadColumns}
                 />
             </div>
 

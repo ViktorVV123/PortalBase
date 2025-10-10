@@ -108,6 +108,7 @@ type Props = {
     publishTable: (id: number) => void;
     formsById: Record<number, WidgetForm>;
     loadWidgetForms: () => Promise<void> | void;
+    loadColumns:any
 };
 
 export const SetOfTables: React.FC<Props> = (props) => {
@@ -157,6 +158,7 @@ export const SetOfTables: React.FC<Props> = (props) => {
         updateReference,
         clearFormSelection,
         loadWidgetForms,
+        loadColumns,
     } = props;
 
     // локальные состояния рендера
@@ -421,9 +423,11 @@ export const SetOfTables: React.FC<Props> = (props) => {
                         updateTableMeta={updateTableMeta}
                     />
                     <TableColumn
-                        updateTableColumn={updateTableColumn}
                         columns={columns}
+                        tableId={selectedTable.id}
                         deleteColumnTable={deleteColumnTable}
+                        updateTableColumn={updateTableColumn}
+                        onCreated={() => loadColumns(selectedTable)} // перезагрузи список, как у тебя принято
                     />
                 </div>
             )}

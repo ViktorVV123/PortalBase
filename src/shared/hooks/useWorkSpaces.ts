@@ -938,7 +938,8 @@ export const useWorkSpaces = () => {
         deleteForm,
         formsById,
         deleteSubWidgetFromForm,
-        deleteTreeFieldFromForm
+        deleteTreeFieldFromForm,
+
 
 
     };
