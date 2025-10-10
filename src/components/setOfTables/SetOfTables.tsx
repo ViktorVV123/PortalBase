@@ -417,12 +417,8 @@ export const SetOfTables: React.FC<Props> = (props) => {
                 <p>Нет столбцов</p>
             ) : (
                 <div>
-                    <TableListView
-                        publishTable={publishTable}
-                        selectedTable={selectedTable}
-                        updateTableMeta={updateTableMeta}
-                    />
-                    <TableColumn
+
+                    <TableColumn publishTable={publishTable} selectedTable={selectedTable} updateTableMeta={updateTableMeta}
                         columns={columns}
                         tableId={selectedTable.id}
                         deleteColumnTable={deleteColumnTable}

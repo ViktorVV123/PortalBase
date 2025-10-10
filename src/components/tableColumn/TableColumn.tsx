@@ -2,12 +2,13 @@ import React, {useState} from 'react';
 import * as s from "@/components/setOfTables/SetOfTables.module.scss";
 import EditIcon from "@/assets/image/EditIcon.svg";
 import DeleteIcon from "@/assets/image/DeleteIcon.svg";
-import {Column} from "@/shared/hooks/useWorkSpaces";
+import {Column, DTable} from "@/shared/hooks/useWorkSpaces";
 import {api} from "@/services/api";
 import AddIcon from '@mui/icons-material/AddBox';
 import CancelIcon from '@mui/icons-material/Cancel';
 import SaveIcon from '@mui/icons-material/Save';
 import AddBox from '@mui/icons-material/AddToPhotos';
+import {TableListView} from "@/components/tableColumn/TableListView";
 
 type TableColumnProps = {
     columns: Column[];
@@ -17,6 +18,11 @@ type TableColumnProps = {
     updateTableColumn: (id: number, p: Partial<Omit<Column, 'id'>>) => void;
     /** опционально: коллбек после успешного создания */
     onCreated?: (newCol: Column) => void;
+
+
+    selectedTable: DTable | null;
+    updateTableMeta: (id: number, patch: Partial<DTable>) => void;
+    publishTable:(id: number) =>void
 };
 
 type NewCol = {
@@ -47,6 +53,9 @@ export const TableColumn: React.FC<TableColumnProps> = ({
                                                             deleteColumnTable,
                                                             updateTableColumn,
                                                             onCreated,
+                                                            selectedTable,
+                                                            updateTableMeta,
+                                                            publishTable,
                                                         }) => {
     const [editingId, setEditingId] = useState<number | null>(null);
     const [editValues, setEditValues] = useState<Partial<Column>>({});
@@ -152,15 +161,13 @@ export const TableColumn: React.FC<TableColumnProps> = ({
     return (
         <div className={s.tableWrapper}>
             <div style={{display:'flex', gap:8, marginBottom:8}}>
-                {!isAdding ? (
-                    <AddIcon onClick={startAdd}/>
-                ) : (
-                    <>
-                            {savingNew ? 'Сохранение…' : <SaveIcon/>}
-                      {/*  <button className={s.cancelBtn} onClick={cancelAdd} disabled={savingNew}>✕ Отмена</button>*/}
-                        <CancelIcon onClick={cancelAdd}/>
-                    </>
-                )}
+
+                <TableListView startAdd={startAdd} isAdding={isAdding} cancelAdd={cancelAdd} savingNew={savingNew}
+                    publishTable={publishTable}
+                    selectedTable={selectedTable}
+                    updateTableMeta={updateTableMeta}
+                />
+
             </div>
 
             <table className={s.tbl}>

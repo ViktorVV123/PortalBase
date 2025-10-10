@@ -4,15 +4,22 @@ import {Button, Typography} from "@mui/material";
 import {ModalEditTableMeta} from "@/components/modals/modalEditTableMeta/ModalEditTableMeta";
 import Editicon from "@/assets/image/EditIcon.svg";
 import * as s from "@/components/setOfTables/SetOfTables.module.scss";
+import AddIcon from "@mui/icons-material/AddBox";
+import SaveIcon from "@mui/icons-material/Save";
+import CancelIcon from "@mui/icons-material/Cancel";
 
 type Props = {
     selectedTable: DTable | null;
     updateTableMeta: (id: number, patch: Partial<DTable>) => void;
     publishTable:(id: number) =>void
+    isAdding:any
+    startAdd:any
+    savingNew:any
+    cancelAdd:any
 };
 
 
-export const TableListView: React.FC<Props> = ({selectedTable, updateTableMeta,publishTable}) => {
+export const TableListView: React.FC<Props> = ({selectedTable, updateTableMeta,publishTable,isAdding,startAdd,savingNew,cancelAdd}) => {
     const [openMetaModal, setOpenMetaModal] = useState(false);
 
     if (!selectedTable) return null;
@@ -31,7 +38,7 @@ export const TableListView: React.FC<Props> = ({selectedTable, updateTableMeta,p
     };
 
     return (
-        <div style={{marginTop: '24px'}}>
+        <div style={{marginTop: '24px', display: 'flex', alignItems: 'center', gap:15}}>
 
             <Typography
                 onClick={() => setOpenMetaModal(true)}
@@ -45,13 +52,24 @@ export const TableListView: React.FC<Props> = ({selectedTable, updateTableMeta,p
                     color: '#8ac7ff',
                     alignItems: 'center',
                     gap: 1,
-                    marginRight:5
+
 
                 }}
             >
                 Метаданные таблицы
                 <Editicon/>
             </Typography>
+
+
+            {!isAdding ? (
+                <AddIcon onClick={startAdd}/>
+            ) : (
+                <>
+                    {savingNew ? 'Сохранение…' : <SaveIcon/>}
+                    {/*  <button className={s.cancelBtn} onClick={cancelAdd} disabled={savingNew}>✕ Отмена</button>*/}
+                    <CancelIcon onClick={cancelAdd}/>
+                </>
+            )}
 
             {selectedTable.published === true ? ( <span>
 
