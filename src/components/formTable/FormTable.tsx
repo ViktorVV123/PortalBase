@@ -1,3 +1,4 @@
+
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import * as s from '@/components/setOfTables/SetOfTables.module.scss';
 import {
@@ -18,6 +19,8 @@ import {dark} from '@/shared/themeUI/themeModal/ThemeModalUI';
 import {useFuzzyRows} from '@/shared/hooks/useFuzzySearch';
 import {useDebounced} from '@/shared/hooks/useDebounced';
 import {TableToolbar} from '@/components/tableToolbar/TableToolbar';
+import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
+import ArrowDropUpIcon from '@mui/icons-material/ArrowDropUp';
 
 /** Модель шапки из WidgetColumnsOfTable */
 export type HeaderModelItem = {
@@ -96,6 +99,7 @@ export const FormTable: React.FC<Props> = ({
     const [editSavingSub, setEditSavingSub] = useState(false);
     const [isAddingSub, setIsAddingSub] = useState(false);
     const [draftSub, setDraftSub] = useState<Record<number, string>>({});
+    const [showSubHeaders, setShowSubHeaders] = useState(false);
 
     const [drill, setDrill] = useState<{ open: boolean; formId: number | null; loading: boolean; display: FormDisplay | null; error?: string }>(
         { open: false, formId: null, loading: false, display: null }
@@ -827,16 +831,34 @@ export const FormTable: React.FC<Props> = ({
 
                                 ))}
 
-                                <th />
+                                <th
+                                    rowSpan={showSubHeaders ? 1 : 2}
+                                    style={{ textAlign: 'center', verticalAlign: 'middle'}}
+                                >
+                                    <div
+                                        type="button"
+                                        onClick={() => setShowSubHeaders(v => !v)}
+                                        aria-label={showSubHeaders ? 'Скрыть подзаголовки' : 'Показать подзаголовки'}
+                                        aria-expanded={showSubHeaders}
+                                        title={showSubHeaders ? 'Скрыть подзаголовки' : 'Показать подзаголовки'}
+
+                                    >
+                                        {showSubHeaders ? <ArrowDropUpIcon />  : <ArrowDropDownIcon/>}
+                                    </div>
+
+                                </th>
+
                             </tr>
-                            <tr>
-                                {headerPlan.map(g =>
-                                    g.labels.slice(0, g.cols.length).map((label, idx) => (
-                                        <th key={`g-sub-${g.id}-${idx}`}>{label}</th>
-                                    ))
-                                )}
-                                <th />
-                            </tr>
+                            {showSubHeaders && (
+                                <tr>
+                                    {headerPlan.map(g =>
+                                        g.labels.slice(0, g.cols.length).map((label, idx) => (
+                                            <th key={`g-sub-${g.id}-${idx}`}>{label}</th>
+                                        ))
+                                    )}
+                                    <th/>
+                                </tr>
+                            )}
                             </thead>
 
                             <tbody>
@@ -847,7 +869,8 @@ export const FormTable: React.FC<Props> = ({
                                         const ro = isColReadOnly(col);
 
                                         return (
-                                            <td key={`add-wc${col.widget_column_id}-tc${tcId}`} style={{ textAlign: 'center' }}>
+                                            <td key={`add-wc${col.widget_column_id}-tc${tcId}`}
+                                                style={{textAlign: 'center'}}>
                                                 {ro || tcId == null ? (
                                                     // readonly: просто тире/плейсхолдер
                                                     <span style={{ opacity: 0.6 }}>—</span>
