@@ -4,25 +4,21 @@ import EditIcon from "@/assets/image/EditIcon.svg";
 import DeleteIcon from "@/assets/image/DeleteIcon.svg";
 import {Column, DTable} from "@/shared/hooks/useWorkSpaces";
 import {api} from "@/services/api";
-import AddIcon from '@mui/icons-material/AddBox';
-import CancelIcon from '@mui/icons-material/Cancel';
-import SaveIcon from '@mui/icons-material/Save';
-import AddBox from '@mui/icons-material/AddToPhotos';
 import {TableListView} from "@/components/tableColumn/TableListView";
 
 type TableColumnProps = {
     columns: Column[];
     /** id активной таблицы — нужен для POST */
     tableId?: number;
-    deleteColumnTable: (id: number) => void;
-    updateTableColumn: (id: number, p: Partial<Omit<Column, 'id'>>) => void;
+    deleteColumnTable?: (id: number) => void;
+    updateTableColumn?: (id: number, p: Partial<Omit<Column, 'id'>>) => void;
     /** опционально: коллбек после успешного создания */
     onCreated?: (newCol: Column) => void;
 
 
-    selectedTable: DTable | null;
-    updateTableMeta: (id: number, patch: Partial<DTable>) => void;
-    publishTable:(id: number) =>void
+    selectedTable?: DTable | null;
+    updateTableMeta?: (id: number, patch: Partial<DTable>) => void;
+    publishTable?:(id: number) =>void
 };
 
 type NewCol = {
