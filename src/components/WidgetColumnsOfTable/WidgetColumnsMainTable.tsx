@@ -2,7 +2,7 @@ import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import * as s from '@/components/setOfTables/SetOfTables.module.scss';
 import DeleteIcon from '@/assets/image/DeleteIcon.svg';
 import EditIcon from '@/assets/image/EditIcon.svg';
-import {WidgetColumn} from '@/shared/hooks/useWorkSpaces';
+import {Column, WidgetColumn} from '@/shared/hooks/useWorkSpaces';
 import type {DebouncedFunc} from 'lodash';
 import debounce from 'lodash/debounce';
 import {
@@ -10,7 +10,8 @@ import {
     Button, Stack, TextField, FormControlLabel, Checkbox,
     createTheme, ThemeProvider, Autocomplete
 } from '@mui/material';
-import {api} from '@/services/api'; // ⬅️ нужен для POST create
+import {api} from '@/services/api';
+
 
 type ReferenceItem = WidgetColumn['reference'][number];
 
@@ -99,6 +100,7 @@ type Props = {
     // формы (id -> meta)
     formsById: Record<number, { form_id: number; name: string }>;
     loadWidgetForms: () => Promise<void> | void;
+    allColumns: Column[];
 };
 
 export const WidgetColumnsMainTable: React.FC<Props> = ({
@@ -111,6 +113,7 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
                                                             onRefsChange,
                                                             formsById,
                                                             loadWidgetForms,
+                                                            allColumns,
                                                             deleteColumnWidget
                                                         }) => {
 
@@ -148,6 +151,8 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
     }, [updateWidgetColumn]);
     /* -------------------------------------------------- */
 
+
+
     /** сортируем группы стабильно */
     const orderedWc = useMemo(
         () => [...widgetColumns].sort(
@@ -173,6 +178,32 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
 
     /** локальная копия reference + снапшот порядка */
     const [localRefs, setLocalRefs] = useState<Record<number, ReferenceItem[]>>({});
+
+    // какие colId уже заняты во всех группах (по локальному состоянию)
+    const usedColumnIds = useMemo(() => {
+        const ids = new Set<number>();
+        Object.values(localRefs).forEach(list => {
+            list?.forEach(r => {
+                const id = r.table_column?.id;
+                if (typeof id === 'number') ids.add(id);
+            });
+        });
+        return ids;
+    }, [localRefs]);
+
+// доступные опции (все колонки; можно скрыть занятые, либо помечать как disabled)
+    const columnOptions = useMemo(() => {
+        return (allColumns ?? []).map(c => ({
+            id: c.id,
+            name: c.name,
+            datatype: c.datatype,
+            disabled: usedColumnIds.has(c.id),
+        }));
+    }, [allColumns, usedColumnIds]);
+
+    const getColLabel = (o?: {id:number; name:string; datatype:string} | null) =>
+        o ? `${o.name} (id:${o.id}, ${o.datatype})` : '';
+
     const localRefsRef = useRef<Record<number, ReferenceItem[]>>({});
     useEffect(() => {
         localRefsRef.current = localRefs;
@@ -1055,18 +1086,32 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
                     <DialogTitle>Добавить поле в группу</DialogTitle>
                     <DialogContent dividers>
                         <Stack spacing={2}>
-                            <TextField
-                                label="table_column_id"
-                                type="number"
-                                size="small"
-                                required
-                                value={addDlg.table_column_id ?? ''}
-                                // 🔧 БЫЛО: e.currentTarget.valueAsNumber
-                                onChange={(e) => {
-                                    const v = (e.target as HTMLInputElement).value;
-                                    setAddDlg(d => ({ ...d, table_column_id: v === '' ? null : Number(v) }));
+                            <Autocomplete
+                                options={columnOptions}
+                                value={columnOptions.find(o => o.id === addDlg.table_column_id) ?? null}
+                                getOptionLabel={(o) => getColLabel(o)}
+                                isOptionEqualToValue={(a, b) => a?.id === b?.id}
+                                onChange={(_e, opt) => {
+                                    setAddDlg(d => ({ ...d, table_column_id: opt?.id ?? null }));
                                 }}
-                                placeholder="ID столбца таблицы"
+                                renderOption={(props, option) => (
+                                    <li {...props} aria-disabled={option.disabled} style={option.disabled ? {opacity:.5, pointerEvents:'none'} : undefined}>
+                                        {getColLabel(option)} {option.disabled ? ' — уже используется' : ''}
+                                    </li>
+                                )}
+                                renderInput={(params) => (
+                                    <TextField
+                                        {...params}
+                                        label="Столбец таблицы"
+                                        size="small"
+                                        placeholder="Выберите столбец…"
+                                        helperText={
+                                            columnOptions.every(o => o.disabled)
+                                                ? 'Свободных столбцов нет — все уже добавлены в группы'
+                                                : undefined
+                                        }
+                                    />
+                                )}
                             />
 
                             <TextField label="ref_alias" size="small" value={addDlg.ref_alias}

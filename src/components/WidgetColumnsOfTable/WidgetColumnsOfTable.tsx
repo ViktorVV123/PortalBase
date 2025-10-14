@@ -290,6 +290,7 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                                     widgetColumns={widgetColumns}
                                     handleDeleteReference={handleDeleteReference}
                                     referencesMap={referencesMap}
+                                    allColumns={columns}
             />
 
             {/* Modal «Посмотреть таблицу» */}
