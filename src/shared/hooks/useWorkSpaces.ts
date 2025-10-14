@@ -2,8 +2,7 @@ import {useCallback, useState} from "react";
 import {api} from "@/services/api";
 import {WorkSpaceTypes} from "@/types/typesWorkSpaces";
 import {Connection} from "@/types/typesConnection";
-import {useLoadConnections} from "@/shared/hooks/useLoadConnections";
-import {WcReference} from "@/components/WidgetColumnsOfTable/WidgetColumnsOfTable";
+
 
 
 export interface DTable {
@@ -76,13 +75,6 @@ export type WidgetColumn = {
 };
 
 
-/** Под-виджеты, которые входят в форму */
-export interface SubWidget {
-    widget_order: number;          // порядок отображения
-    sub_widget_id: number;          // id виджета-детали
-    form_id: number;          // id той же формы
-    where_conditional: string | null;   // SQL-условие, может быть null
-}
 
 /** Объект формы, связанной с «главным» виджетом */
 export type WidgetForm = {

@@ -10,6 +10,7 @@ import {
     Button, Stack, TextField, FormControlLabel, Checkbox,
     createTheme, ThemeProvider, Autocomplete
 } from '@mui/material';
+import {api} from '@/services/api'; // ⬅️ нужен для POST create
 
 type ReferenceItem = WidgetColumn['reference'][number];
 
@@ -58,6 +59,19 @@ function logStateSnapshot(
 
 /* ------------------------------------------------------------ */
 
+/** Полный payload для создания reference */
+type RefCreatePayload = {
+    width: number;
+    ref_column_order: number;
+    type: string | null;
+    ref_alias: string | null;
+    default: string | null;
+    placeholder: string | null;
+    visible: boolean;
+    readonly: boolean;
+    form_id?: number | null;
+};
+
 type Props = {
     widgetColumns: WidgetColumn[];
     referencesMap: Record<number, ReferenceItem[]>;
@@ -68,7 +82,7 @@ type Props = {
         patch: Partial<Omit<WidgetColumn, 'id' | 'widget_id' | 'reference'>>
     ) => Promise<void> | void;
 
-    // === ВАЖНО: разрешаем form_id ===
+    // разрешаем form_id в PATCH
     updateReference: (
         widgetColumnId: number,
         tableColumnId: number,
@@ -77,8 +91,6 @@ type Props = {
             'default' | 'placeholder' | 'visible' | 'readonly'
         >> & { form_id?: number | null }
     ) => Promise<ReferenceItem>;
-
-
 
     refreshReferences?: (wcId: number) => Promise<void> | void;
     onRefsChange?: (refsMap: Record<number, ReferenceItem[]>) => void;
@@ -95,7 +107,6 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
                                                             handleDeleteReference,
                                                             updateWidgetColumn,
                                                             updateReference,
-
                                                             refreshReferences,
                                                             onRefsChange,
                                                             formsById,
@@ -104,8 +115,6 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
                                                         }) => {
 
     /* -------- wrappers with logs for API calls -------- */
-
-
     const callUpdateReference = useCallback(async (
         wcId: number,
         tblColId: number,
@@ -162,7 +171,7 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
         closeAliasDialog();
     };
 
-    /** локальная копия reference для редактирования/перестановок */
+    /** локальная копия reference + снапшот порядка */
     const [localRefs, setLocalRefs] = useState<Record<number, ReferenceItem[]>>({});
     const localRefsRef = useRef<Record<number, ReferenceItem[]>>({});
     useEffect(() => {
@@ -170,27 +179,12 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
         onRefsChange?.(localRefs);
     }, [localRefs, onRefsChange]);
 
-    /** снапшот порядка: wcId -> [table_column.id,…] */
     const snapshotRef = useRef<Record<number, number[]>>({});
 
     const reindex = useCallback((arr: ReferenceItem[]) =>
         arr.map((r, idx) => ({...r, ref_column_order: idx})), []);
 
-    /** безопасная «полная» проекция ReferenceItem для патча */
-    const toFullPatch = (r: ReferenceItem, ref_column_order?: number): Required<Pick<ReferenceItem,
-        'ref_alias' | 'type' | 'width' | 'default' | 'placeholder' | 'visible' | 'readonly' | 'ref_column_order'
-    >> => ({
-        ref_alias: r.ref_alias ?? null,
-        type: r.type ?? null,
-        width: Number(r.width ?? 1),
-        default: r.default ?? null,
-        placeholder: r.placeholder ?? null,
-        visible: (r.visible ?? true),
-        readonly: !!r.readonly,
-        ref_column_order: Number.isFinite(ref_column_order) ? (ref_column_order as number) : (r.ref_column_order ?? 0),
-    });
-
-    // —— utils: извлечь форм-id из любого вида ответа (число | объект | null)
+    // извлечь form_id как число|null
     const getFormId = (raw: unknown): number | null => {
         if (raw == null) return null;
         if (typeof raw === 'number') return raw;
@@ -214,11 +208,9 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
                     ...r,
                     table_column: r.table_column ? {...r.table_column} : r.table_column,
                 };
-                // нормализуем форму (если пришёл объект)
                 const fid = getFormId((r as any).form ?? (r as any).form_id ?? null);
-                copy.form = fid;        // держим как number|null для UI
-                copy.form_id = fid;     // на всякий
-                // combobox тоже может быть объектом — защитимся от [object Object]
+                copy.form = fid;
+                copy.form_id = fid;
                 if (typeof (copy.combobox) === 'object' && copy.combobox !== null) {
                     copy.combobox = (copy.combobox as any).id ?? (copy.combobox as any).code ?? 1;
                 }
@@ -250,7 +242,7 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
 
             Object.keys(state).forEach(k => logStateSnapshot(Number(k), state, snapshot));
 
-            // добавленные
+            // добавленные (через UI DnD; модалка сама чинит снапшот — см. ниже)
             for (const wcIdStr of Object.keys(state)) {
                 const wcId = Number(wcIdStr);
                 const nextOrder = (state[wcId] ?? []).map(r => r.table_column!.id);
@@ -299,6 +291,20 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
         }, 250);
     }
     useEffect(() => () => queueSyncRef.current?.cancel(), []);
+
+    /** toFullPatch для PATCH */
+    const toFullPatch = (r: ReferenceItem, ref_column_order?: number): Required<Pick<ReferenceItem,
+        'ref_alias' | 'type' | 'width' | 'default' | 'placeholder' | 'visible' | 'readonly' | 'ref_column_order'
+    >> => ({
+        ref_alias: r.ref_alias ?? null,
+        type: r.type ?? null,
+        width: Number(r.width ?? 1),
+        default: r.default ?? null,
+        placeholder: r.placeholder ?? null,
+        visible: (r.visible ?? true),
+        readonly: !!r.readonly,
+        ref_column_order: Number.isFinite(ref_column_order) ? (ref_column_order as number) : (r.ref_column_order ?? 0),
+    });
 
     /** DnD */
     type DragData = { srcWcId: number; fromIdx: number; tableColumnId: number };
@@ -510,7 +516,7 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
             ref_column_order: to,
         } as const;
 
-        // ⚠️ не отправляем ref_column_order в этом ручном редактировании (оставили как раньше)
+        // как и раньше: не шлём ref_column_order из ручного диалога
         const safePatch: any = {...patch};
         delete safePatch.ref_column_order;
 
@@ -553,7 +559,7 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
         ]);
     };
 
-    /* ───────────────────────────── формы ───────────────────────────── */
+    /* ───────────────── формы ───────────────── */
     const formOptions = useMemo(
         () => [{id: null as number | null, name: '—'}].concat(
             Object.values(formsById ?? {}).map(f => ({
@@ -586,22 +592,14 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
     const openFormDialog = useCallback((wcId: number, tblColId: number, currentVal?: number | null) => {
         setFormDlg({open: true, wcId, tblColId, value: currentVal ?? null});
     }, []);
-
     const closeFormDialog = useCallback(() => setFormDlg(p => ({...p, open: false})), []);
-
     const saveFormDialog = useCallback(async () => {
         const {wcId, tblColId, value} = formDlg;
         if (!wcId || !tblColId) return;
-
-        // нормализация -> число или null
         const normalized: number | null =
             value == null ? null : (Number.isFinite(Number(value)) ? Number(value) : null);
-
         try {
-            // === КРИТИЧНО: шлём именно form_id ===
             await callUpdateReference(wcId, tblColId, {form_id: normalized});
-
-            // локально проставим
             setLocalRefs(prev => ({
                 ...prev,
                 [wcId]: (prev[wcId] ?? []).map(item => {
@@ -610,14 +608,121 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
                     return copy as ReferenceItem;
                 })
             }));
-
             closeFormDialog();
-            // по желанию: await refreshReferences?.(wcId);
         } catch (e) {
             console.warn('[formDlg] save failed:', e);
         }
     }, [formDlg, callUpdateReference, setLocalRefs, closeFormDialog]);
-    /* ──────────────────────────────────────────────────────────────── */
+    /* ──────────────────────────────────────── */
+
+    /* ──────────────── ДОБАВЛЕНИЕ reference (POST) ──────────────── */
+    const [addDlg, setAddDlg] = useState<{
+        open: boolean;
+        wcId: number | null;
+        table_column_id: number | null;
+        width: number;
+        ref_column_order: number;
+        type: string;
+        ref_alias: string;
+        default: string;
+        placeholder: string;
+        visible: boolean;
+        readonly: boolean;
+        form_id: number | null;
+    }>({
+        open: false,
+        wcId: null,
+        table_column_id: null,
+        width: 1,
+        ref_column_order: 0,
+        type: '',
+        ref_alias: '',
+        default: '',
+        placeholder: '',
+        visible: true,
+        readonly: false,
+        form_id: null
+    });
+
+    /** открыть модалку добавления в конкретную группу */
+    const openAddDialog = (wcId: number) => {
+        const current = localRefsRef.current[wcId] ?? [];
+        setAddDlg({
+            open: true,
+            wcId,
+            table_column_id: null,
+            width: 1,
+            ref_column_order: current.length, // по умолчанию в конец
+            type: '',
+            ref_alias: '',
+            default: '',
+            placeholder: '',
+            visible: true,
+            readonly: false,
+            form_id: null,
+        });
+    };
+    const closeAddDialog = () => setAddDlg(d => ({...d, open: false}));
+
+    /** сохранить (POST create) */
+    const saveAddDialog = async () => {
+        const {wcId, table_column_id} = addDlg;
+        if (!wcId || !table_column_id) return;
+
+        const payload: RefCreatePayload = {
+            width: Number.isFinite(addDlg.width) ? addDlg.width : 1,
+            ref_column_order: Number.isFinite(addDlg.ref_column_order) ? addDlg.ref_column_order : 0,
+            type: addDlg.type.trim() ? addDlg.type.trim() : null,
+            ref_alias: addDlg.ref_alias.trim() ? addDlg.ref_alias.trim() : null,
+            default: addDlg.default.trim() ? addDlg.default.trim() : null,
+            placeholder: addDlg.placeholder.trim() ? addDlg.placeholder.trim() : null,
+            visible: !!addDlg.visible,
+            readonly: !!addDlg.readonly,
+            form_id: addDlg.form_id ?? null,
+        };
+
+        logApi('POST addReference:REQ', {wcId, table_column_id, payload});
+        try {
+            const {data} = await api.post<ReferenceItem>(
+                `/widgets/tables/references/${wcId}/${table_column_id}`,
+                payload
+            );
+            logApi('POST addReference:OK', {result: data});
+
+            // нормализуем form → form_id
+            const normalizedFormId = getFormId((data as any).form ?? (data as any).form_id ?? null);
+
+            // вставляем локально по order
+            setLocalRefs(prev => {
+                const list = prev[wcId] ?? [];
+                const to = Math.max(0, Math.min(addDlg.ref_column_order, list.length));
+                const created: any = {
+                    ...data,
+                    form: normalizedFormId,
+                    form_id: normalizedFormId,
+                };
+                const next = [...list];
+                next.splice(to, 0, created);
+                const reindexed = reindex(next);
+                const nextState = {...prev, [wcId]: reindexed};
+
+                // чинить снапшот — чтобы дебаунс не отправил лишний PATCH
+                const ids = reindexed.map(r => r.table_column?.id).filter(Boolean) as number[];
+                snapshotRef.current = {...snapshotRef.current, [wcId]: ids};
+
+                return nextState;
+            });
+
+            // опционально обновить внешний источник
+            await refreshReferences?.(wcId);
+
+            closeAddDialog();
+        } catch (e: any) {
+            console.warn('POST addReference:ERR', e?.response?.status, e);
+            alert('Не удалось добавить поле в группу');
+        }
+    };
+    /* ─────────────────────────────────────────────────────────────── */
 
     return (
         <div>
@@ -646,6 +751,16 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
 
                                 <EditIcon className={s.actionIcon} onClick={() => openAliasDialog(wc)}/>
                                 <DeleteIcon className={s.actionIcon} onClick={() => deleteColumnWidget(wc.id)}/>
+
+                                {/* ⬇️ Новое: добавить reference в группу */}
+                                <button
+                                    className={s.okBtn}
+                                    style={{marginLeft: 12}}
+                                    onClick={() => openAddDialog(wc.id)}
+                                    title="Добавить поле в эту группу"
+                                >
+                                    + поле
+                                </button>
                             </div>
                         </div>
 
@@ -678,7 +793,6 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
                                 const rowKey = `${wc.id}:${tblColId}`;
                                 const type = r.type ?? '—';
                                 const visible = (r.visible ?? true);
-                                // нормализованный id формы для отображения
                                 const formId = getFormId(r.form ?? r.form_id);
 
                                 return (
@@ -697,16 +811,13 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
 
                                         {/* readonly toggle */}
                                         <td style={{textAlign: 'center'}}>
-                                            <div
-                                                onMouseDown={(e) => e.stopPropagation()}
-                                                onClick={(e) => e.stopPropagation()}
-                                                draggable={false}
-                                                style={{
-                                                    display: 'inline-flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center'
-                                                }}
-                                            >
+                                            <div onMouseDown={(e) => e.stopPropagation()}
+                                                 onClick={(e) => e.stopPropagation()} draggable={false}
+                                                 style={{
+                                                     display: 'inline-flex',
+                                                     alignItems: 'center',
+                                                     justifyContent: 'center'
+                                                 }}>
                                                 <Checkbox
                                                     size="small"
                                                     sx={{
@@ -716,7 +827,6 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
                                                     checked={!!r.readonly}
                                                     onChange={async (e) => {
                                                         const nextVal = e.target.checked;
-
                                                         setLocalRefs(prev => ({
                                                             ...prev,
                                                             [wc.id]: (prev[wc.id] ?? []).map(item =>
@@ -726,7 +836,6 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
                                                                 } : item
                                                             )
                                                         }));
-
                                                         try {
                                                             const currentRow = (localRefsRef.current[wc.id] ?? []).find(x => x.table_column?.id === tblColId);
                                                             if (currentRow) {
@@ -761,16 +870,13 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
 
                                         {/* visible toggle */}
                                         <td style={{textAlign: 'center'}}>
-                                            <div
-                                                onMouseDown={(e) => e.stopPropagation()}
-                                                onClick={(e) => e.stopPropagation()}
-                                                draggable={false}
-                                                style={{
-                                                    display: 'inline-flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center'
-                                                }}
-                                            >
+                                            <div onMouseDown={(e) => e.stopPropagation()}
+                                                 onClick={(e) => e.stopPropagation()} draggable={false}
+                                                 style={{
+                                                     display: 'inline-flex',
+                                                     alignItems: 'center',
+                                                     justifyContent: 'center'
+                                                 }}>
                                                 <Checkbox
                                                     size="small"
                                                     sx={{
@@ -781,7 +887,6 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
                                                     onChange={async (e) => {
                                                         const nextVal = e.target.checked;
                                                         if (visible === nextVal) return;
-
                                                         setLocalRefs(prev => ({
                                                             ...prev,
                                                             [wc.id]: (prev[wc.id] ?? []).map(item =>
@@ -791,7 +896,6 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
                                                                 } : item
                                                             )
                                                         }));
-
                                                         try {
                                                             const currentRow = (localRefsRef.current[wc.id] ?? []).find(x => x.table_column?.id === tblColId);
                                                             if (currentRow) {
@@ -821,10 +925,9 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
                                         </td>
 
                                         <td>{r.ref_column_order ?? 0}</td>
-                                        {/* combobox безопасно */}
                                         <td>{typeof r.combobox === 'object' ? (r.combobox?.id ?? '—') : (r.combobox ?? '—')}</td>
 
-                                        {/* Form — кликабельно, открывает диалог */}
+                                        {/* Form — кликабельно */}
                                         <td
                                             onClick={(e) => {
                                                 e.stopPropagation();
@@ -843,13 +946,11 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
                                                 justifyContent: 'center',
                                                 gap: 10
                                             }}>
-                                                <EditIcon
-                                                    className={s.actionIcon}
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        openEditById(wc.id, tblColId);
-                                                    }}
-                                                />
+                                                <EditIcon className={s.actionIcon}
+                                                          onClick={(e) => {
+                                                              e.stopPropagation();
+                                                              openEditById(wc.id, tblColId);
+                                                          }}/>
                                                 <DeleteIcon className={s.actionIcon}
                                                             onClick={() => handleDeleteReference(wc.id, tblColId)}/>
                                             </div>
@@ -859,7 +960,7 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
                             }) : (
                                 <tr>
                                     <td colSpan={13} style={{textAlign: 'center', opacity: 0.7}}>
-                                        Нет связей — перетащите сюда строку из другого блока
+                                        Нет связей — перетащите сюда строку из другого блока или нажмите «+ поле»
                                     </td>
                                 </tr>
                             )}
@@ -875,30 +976,16 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
                     <DialogTitle>Правка reference</DialogTitle>
                     <DialogContent dividers>
                         <Stack spacing={2}>
-                            <TextField
-                                label="ref_alias"
-                                size="small"
-                                value={edit.ref_alias}
-                                onChange={e => setEdit(s => ({...s, ref_alias: e.target.value}))}
-                            />
-                            <TextField
-                                label="type"
-                                size="small"
-                                value={edit.ref_type}
-                                onChange={e => setEdit(s => ({...s, ref_type: e.target.value}))}
-                            />
-                            <TextField
-                                type="number" label="width" size="small" value={edit.ref_width}
-                                onChange={e => setEdit(s => ({...s, ref_width: Number(e.target.value)}))}
-                            />
-                            <TextField
-                                label="default" size="small" value={edit.ref_default}
-                                onChange={e => setEdit(s => ({...s, ref_default: e.target.value}))}
-                            />
-                            <TextField
-                                label="placeholder" size="small" value={edit.ref_placeholder}
-                                onChange={e => setEdit(s => ({...s, ref_placeholder: e.target.value}))}
-                            />
+                            <TextField label="ref_alias" size="small" value={edit.ref_alias}
+                                       onChange={e => setEdit(s => ({...s, ref_alias: e.target.value}))}/>
+                            <TextField label="type" size="small" value={edit.ref_type}
+                                       onChange={e => setEdit(s => ({...s, ref_type: e.target.value}))}/>
+                            <TextField type="number" label="width" size="small" value={edit.ref_width}
+                                       onChange={e => setEdit(s => ({...s, ref_width: Number(e.target.value)}))}/>
+                            <TextField label="default" size="small" value={edit.ref_default}
+                                       onChange={e => setEdit(s => ({...s, ref_default: e.target.value}))}/>
+                            <TextField label="placeholder" size="small" value={edit.ref_placeholder}
+                                       onChange={e => setEdit(s => ({...s, ref_placeholder: e.target.value}))}/>
                             <FormControlLabel control={
                                 <Checkbox checked={edit.ref_visible}
                                           onChange={e => setEdit(v => ({...v, ref_visible: e.target.checked}))}/>
@@ -907,10 +994,8 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
                                 <Checkbox checked={edit.ref_readOnly}
                                           onChange={e => setEdit(v => ({...v, ref_readOnly: e.target.checked}))}/>
                             } label="только чтение"/>
-                            <TextField
-                                type="number" label="ref_column_order" size="small" value={edit.ref_order}
-                                onChange={e => setEdit(s => ({...s, ref_order: Number(e.target.value)}))}
-                            />
+                            <TextField type="number" label="ref_column_order" size="small" value={edit.ref_order}
+                                       onChange={e => setEdit(s => ({...s, ref_order: Number(e.target.value)}))}/>
                         </Stack>
                     </DialogContent>
                     <DialogActions>
@@ -925,12 +1010,10 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
                 <Dialog open={aliasDlg.open} onClose={closeAliasDialog} fullWidth maxWidth="xs">
                     <DialogTitle>Изменить alias</DialogTitle>
                     <DialogContent dividers>
-                        <TextField
-                            autoFocus fullWidth size="small" label="Alias"
-                            value={aliasDlg.value}
-                            onChange={e => setAliasDlg(v => ({...v, value: e.target.value}))}
-                            placeholder="Пусто = сбросить alias"
-                        />
+                        <TextField autoFocus fullWidth size="small" label="Alias"
+                                   value={aliasDlg.value}
+                                   onChange={e => setAliasDlg(v => ({...v, value: e.target.value}))}
+                                   placeholder="Пусто = сбросить alias"/>
                     </DialogContent>
                     <DialogActions>
                         <Button onClick={closeAliasDialog}>Отмена</Button>
@@ -962,6 +1045,91 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
                         <Button onClick={() => setFormDlg(p => ({...p, value: null}))}>Очистить</Button>
                         <Button onClick={closeFormDialog}>Отмена</Button>
                         <Button variant="contained" onClick={saveFormDialog}>Сохранить</Button>
+                    </DialogActions>
+                </Dialog>
+            </ThemeProvider>
+
+            {/* Диалог ДОБАВЛЕНИЯ reference */}
+            <ThemeProvider theme={dark}>
+                <Dialog open={addDlg.open} onClose={closeAddDialog} fullWidth maxWidth="sm">
+                    <DialogTitle>Добавить поле в группу</DialogTitle>
+                    <DialogContent dividers>
+                        <Stack spacing={2}>
+                            <TextField
+                                label="table_column_id"
+                                type="number"
+                                size="small"
+                                required
+                                value={addDlg.table_column_id ?? ''}
+                                // 🔧 БЫЛО: e.currentTarget.valueAsNumber
+                                onChange={(e) => {
+                                    const v = (e.target as HTMLInputElement).value;
+                                    setAddDlg(d => ({ ...d, table_column_id: v === '' ? null : Number(v) }));
+                                }}
+                                placeholder="ID столбца таблицы"
+                            />
+
+                            <TextField label="ref_alias" size="small" value={addDlg.ref_alias}
+                                       onChange={e => setAddDlg(d => ({...d, ref_alias: e.target.value}))}/>
+                            <TextField label="type" size="small" value={addDlg.type}
+                                       onChange={e => setAddDlg(d => ({...d, type: e.target.value}))}/>
+                            <TextField
+                                label="width"
+                                type="number"
+                                size="small"
+                                value={addDlg.width}
+                                // 🔧 БЫЛО: e.currentTarget.valueAsNumber || 1
+                                onChange={(e) => {
+                                const v = (e.target as HTMLInputElement).value;
+                                setAddDlg(d => ({ ...d, width: v === '' ? 1 : Number(v) }));
+                            }}
+                                />
+                            <TextField label="default" size="small" value={addDlg.default}
+                                       onChange={e => setAddDlg(d => ({...d, default: e.target.value}))}/>
+                            <TextField label="placeholder" size="small" value={addDlg.placeholder}
+                                       onChange={e => setAddDlg(d => ({...d, placeholder: e.target.value}))}/>
+                            <FormControlLabel control={
+                                <Checkbox checked={addDlg.visible}
+                                          onChange={e => setAddDlg(v => ({...v, visible: e.target.checked}))}/>
+                            } label="visible"/>
+                            <FormControlLabel control={
+                                <Checkbox checked={addDlg.readonly}
+                                          onChange={e => setAddDlg(v => ({...v, readonly: e.target.checked}))}/>
+                            } label="только чтение"/>
+
+                            <TextField
+                                type="number"
+                                label="ref_column_order"
+                                size="small"
+                                value={addDlg.ref_column_order}
+                                // 🔧 БЫЛО: Number.isFinite(e.currentTarget.valueAsNumber) ? ...
+                                onChange={(e) => {
+                                    const v = (e.target as HTMLInputElement).value;
+                                    setAddDlg(d => ({ ...d, ref_column_order: v === '' ? 0 : Number(v) }));
+                                }}
+                                helperText="Позиция в группе (0…N). По умолчанию — в конец."
+                            />
+
+                            {/* выбор формы */}
+                            <Autocomplete
+                                options={formOptions}
+                                value={formOptions.find(f => String(f.id) === String(addDlg.form_id)) ?? formOptions[0]}
+                                getOptionLabel={(o) => o?.name ?? ''}
+                                onOpen={() => {
+                                    if (!formOptions.length) loadWidgetForms?.();
+                                }}
+                                onChange={(_e, val) => setAddDlg(p => ({...p, form_id: (val?.id ?? null)}))}
+                                isOptionEqualToValue={(a, b) => String(a.id) === String(b.id)}
+                                renderInput={(params) => (
+                                    <TextField {...params} label="Форма" size="small" placeholder="— Без формы —"/>
+                                )}
+                            />
+                        </Stack>
+                    </DialogContent>
+                    <DialogActions>
+                        <Button onClick={closeAddDialog}>Отмена</Button>
+                        <Button variant="contained" onClick={saveAddDialog}
+                                disabled={!addDlg.table_column_id}>Добавить</Button>
                     </DialogActions>
                 </Dialog>
             </ThemeProvider>
