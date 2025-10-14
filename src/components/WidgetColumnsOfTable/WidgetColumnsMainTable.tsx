@@ -11,6 +11,7 @@ import {
     createTheme, ThemeProvider, Autocomplete
 } from '@mui/material';
 import {api} from '@/services/api';
+import AddIcon from "@mui/icons-material/AddBox";
 
 
 type ReferenceItem = WidgetColumn['reference'][number];
@@ -790,7 +791,7 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
                                     onClick={() => openAddDialog(wc.id)}
                                     title="Добавить поле в эту группу"
                                 >
-                                    + поле
+                                    <AddIcon/>
                                 </button>
                             </div>
                         </div>

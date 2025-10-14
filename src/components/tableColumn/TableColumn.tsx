@@ -5,6 +5,7 @@ import DeleteIcon from "@/assets/image/DeleteIcon.svg";
 import {Column, DTable} from "@/shared/hooks/useWorkSpaces";
 import {api} from "@/services/api";
 import {TableListView} from "@/components/tableColumn/TableListView";
+import {EllipsizeSmart} from "@/shared/utils/EllipsizeSmart";
 
 type TableColumnProps = {
     columns: Column[];
@@ -155,7 +156,7 @@ export const TableColumn: React.FC<TableColumnProps> = ({
     };
 
     return (
-        <div className={s.tableWrapper}>
+        <div >
             <div style={{display:'flex', gap:8, marginBottom:8}}>
 
                 <TableListView startAdd={startAdd} isAdding={isAdding} cancelAdd={cancelAdd} savingNew={savingNew}
@@ -271,7 +272,7 @@ export const TableColumn: React.FC<TableColumnProps> = ({
                                         onChange={e => handleChange('description', e.target.value)}
                                         className={s.inp}
                                     />
-                                ) : col.description}
+                                ) :  <EllipsizeSmart text={col.description} maxLines={1} />}
                             </td>
 
                             <td>

@@ -1,27 +1,33 @@
-import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useState} from 'react';
 import * as s from '@/components/setOfTables/SetOfTables.module.scss';
 import {
-    Column, HeaderGroup,
+    Column,
+    HeaderGroup,
     Widget,
-    WidgetColumn, WidgetForm,
+    WidgetColumn,
+    WidgetForm,
 } from '@/shared/hooks/useWorkSpaces';
 import {TableColumn} from '@/components/tableColumn/TableColumn';
 import {
     Box,
-    Button, Checkbox, Chip,
+    Button,
+    Chip,
     createTheme,
     Dialog,
     DialogActions,
     DialogContent,
-    DialogTitle, FormControlLabel,
+    DialogTitle,
+    FormControlLabel,
     Modal,
-    Stack, Switch,
+    Stack,
+    Switch,
     TextField,
     ThemeProvider,
     Typography,
 } from '@mui/material';
-import {WidgetColumnsMainTable} from "@/components/WidgetColumnsOfTable/WidgetColumnsMainTable";
+import {WidgetColumnsMainTable} from '@/components/WidgetColumnsOfTable/WidgetColumnsMainTable';
 import EditIcon from '@/assets/image/EditIcon.svg';
+import {api} from '@/services/api';
 
 export type WcReference = WidgetColumn['reference'][number];
 
@@ -118,15 +124,13 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                                                           formsById,
                                                           loadWidgetForms,
                                                       }) => {
-
-
     const [addOpen, setAddOpen] = useState(false);
     const [newCol, setNewCol] = useState({
         alias: '',
         column_order: widgetColumns.length + 1,
     });
 
-    // подгружаем reference для всех wc
+    // загрузка reference для всех wc
     useEffect(() => {
         if (!widgetColumns.length) return;
         (async () => {
@@ -143,42 +147,86 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
             );
             setReferencesMap(map);
         })();
-    }, [widgetColumns, fetchReferences]);
-
-
-
-
+    }, [widgetColumns, fetchReferences, setReferencesMap]);
 
     // ───────── Метаданные виджета ─────────
     const [modalOpen, setModalOpen] = useState(false);
     const [widgetModalOpen, setWidgetModalOpen] = useState(false);
+    const [savingMeta, setSavingMeta] = useState(false);
+
+    // форма метаданных (инициализируем при открытии диалога/смене виджета)
     const [widgetMeta, setWidgetMeta] = useState<Partial<Widget>>({
         name: selectedWidget?.name ?? '',
         description: selectedWidget?.description ?? '',
         table_id: selectedWidget?.table_id ?? 0,
-        published: selectedWidget.published ,
+        published: selectedWidget?.published ?? false,
     });
 
+    useEffect(() => {
+        if (!selectedWidget || !widgetModalOpen) return;
+        setWidgetMeta({
+            name: selectedWidget.name ?? '',
+            description: selectedWidget.description ?? '',
+            table_id: selectedWidget.table_id ?? 0,
+            published: selectedWidget.published ?? false,
+        });
+    }, [selectedWidget, widgetModalOpen]);
+
+    // единый сабмит: сначала мета, затем publish если изменился
     const saveWidgetMeta = useCallback(async () => {
         if (!selectedWidget) return;
+
+        setSavingMeta(true);
+        const origPublished = Boolean(selectedWidget.published);
+        const nextPublished = Boolean(widgetMeta.published);
+
         try {
+            // 1) PATCH метаданных (без published)
             const upd = await updateWidgetMeta(selectedWidget.id, {
                 name: widgetMeta.name,
                 description: widgetMeta.description,
                 table_id: widgetMeta.table_id,
             });
-            setSelectedWidget(upd);
+
+            let finalWidget = upd;
+
+            // 2) если публикация изменилась — PATCH /publish
+            if (origPublished !== nextPublished) {
+                await api.patch(`/widgets/${selectedWidget.id}/publish`, {
+                    published: nextPublished,
+                });
+                finalWidget = { ...upd, published: nextPublished };
+            }
+
+            // 3) обновляем локальные стора
+            setSelectedWidget(finalWidget);
             setWidgetsByTable(prev => {
-                const tblId = upd.table_id;
-                const updated = (prev[tblId] ?? []).map(w => w.id === upd.id ? upd : w);
-                return {...prev, [tblId]: updated};
+                const tblId = finalWidget.table_id;
+                const updated = (prev[tblId] ?? []).map(w =>
+                    w.id === finalWidget.id ? finalWidget : w
+                );
+                return { ...prev, [tblId]: updated };
             });
-            await loadColumnsWidget(upd.id);
+
+            await loadColumnsWidget(finalWidget.id);
             setWidgetModalOpen(false);
         } catch (e) {
-            console.warn('❌ Ошибка при сохранении метаданных виджета:', e);
+            console.warn('❌ Ошибка при сохранении метаданных/публикации:', e);
+            alert('Не удалось сохранить изменения');
+        } finally {
+            setSavingMeta(false);
         }
-    }, [selectedWidget, widgetMeta, updateWidgetMeta, loadColumnsWidget, setWidgetsByTable, setSelectedWidget]);
+    }, [
+        selectedWidget,
+        widgetMeta.name,
+        widgetMeta.description,
+        widgetMeta.table_id,
+        widgetMeta.published,
+        updateWidgetMeta,
+        setSelectedWidget,
+        setWidgetsByTable,
+        loadColumnsWidget,
+    ]);
 
     // ───────── Удаление reference ─────────
     const handleDeleteReference = async (wcId: number, tblColId: number) => {
@@ -196,7 +244,6 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
             alert('Ошибка при удалении');
         }
     };
-
 
     return (
         <div className={s.tableWrapperWidget}>
@@ -274,23 +321,25 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                     </tr>
                     </thead>
                 </table>
-
             </div>
 
             {/* Основная таблица */}
-            <WidgetColumnsMainTable formsById={formsById} loadWidgetForms={loadWidgetForms}  onRefsChange={setLiveRefsForHeader}
-                                    deleteColumnWidget={deleteColumnWidget}
-                                    updateReference={updateReference}
-                                    refreshReferences={async (wcId) => {
-                                        const fresh = await fetchReferences(wcId);
-                                        setReferencesMap(prev => ({...prev, [wcId]: fresh ?? []}));
-                                        if (selectedWidget) await loadColumnsWidget(selectedWidget.id);
-                                    }}
-                                    updateWidgetColumn={updateWidgetColumn}
-                                    widgetColumns={widgetColumns}
-                                    handleDeleteReference={handleDeleteReference}
-                                    referencesMap={referencesMap}
-                                    allColumns={columns}
+            <WidgetColumnsMainTable
+                formsById={formsById}
+                loadWidgetForms={loadWidgetForms}
+                onRefsChange={setLiveRefsForHeader}
+                deleteColumnWidget={deleteColumnWidget}
+                updateReference={updateReference}
+                refreshReferences={async (wcId) => {
+                    const fresh = await fetchReferences(wcId);
+                    setReferencesMap(prev => ({...prev, [wcId]: fresh ?? []}));
+                    if (selectedWidget) await loadColumnsWidget(selectedWidget.id);
+                }}
+                updateWidgetColumn={updateWidgetColumn}
+                widgetColumns={widgetColumns}
+                handleDeleteReference={handleDeleteReference}
+                referencesMap={referencesMap}
+                allColumns={columns}
             />
 
             {/* Modal «Посмотреть таблицу» */}
@@ -319,57 +368,52 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                         <DialogTitle>Редактирование виджета</DialogTitle>
                         <DialogContent dividers>
                             <Stack spacing={2}>
-                                <TextField label="Название" size="small" fullWidth required
-                                           value={widgetMeta.name}
-                                           onChange={(e) => setWidgetMeta(v => ({...v, name: e.target.value}))}
+                                <TextField
+                                    label="Название"
+                                    size="small"
+                                    fullWidth
+                                    required
+                                    value={widgetMeta.name ?? ''}
+                                    onChange={(e) => setWidgetMeta(v => ({...v, name: e.target.value}))}
                                 />
-                                <TextField label="Описание" size="small" fullWidth multiline rows={3}
-                                           value={widgetMeta.description ?? ''}
-                                           onChange={(e) => setWidgetMeta(v => ({...v, description: e.target.value}))}
+                                <TextField
+                                    label="Описание"
+                                    size="small"
+                                    fullWidth
+                                    multiline
+                                    rows={3}
+                                    value={widgetMeta.description ?? ''}
+                                    onChange={(e) => setWidgetMeta(v => ({...v, description: e.target.value}))}
                                 />
 
                                 <FormControlLabel
-                                    label="Опубликован"
+                                    label={
+                                        <Stack direction="row" spacing={1} alignItems="center">
+                                            <span>Опубликован</span>
+                                            <Chip
+                                                size="small"
+                                                label={widgetMeta.published ? 'ON' : 'OFF'}
+                                                color={widgetMeta.published ? 'success' : 'default'}
+                                                variant="outlined"
+                                            />
+                                        </Stack>
+                                    }
                                     control={
-                                        <Checkbox
+                                        <Switch
                                             checked={Boolean(widgetMeta?.published)}
-                                            // кастомные иконки: ✓ для true, ✕ для false
-                                            checkedIcon={
-                                                <Box
-                                                    component="span"
-                                                    sx={{
-                                                        width: 18, height: 18, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                                                        border: '1px solid', borderColor: 'divider', borderRadius: 0.75
-                                                    }}
-                                                >
-                                                    ✓
-                                                </Box>
+                                            onChange={(e) =>
+                                                setWidgetMeta(v => ({ ...v, published: e.target.checked }))
                                             }
-                                            icon={
-                                                <Box
-                                                    component="span"
-                                                    sx={{
-                                                        width: 18, height: 18, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                                                        border: '1px solid', borderColor: 'divider', borderRadius: 0.75
-                                                    }}
-                                                >
-                                                    ✕
-                                                </Box>
-                                            }
-                                            // делаем «read-only» (не кликается)
-                                            disableRipple
-                                            sx={{
-                                                pointerEvents: 'none',
-                                                '&.Mui-disabled': { opacity: 1 }, // если вдруг добавишь disabled — не бледнить
-                                            }}
                                         />
                                     }
                                 />
                             </Stack>
                         </DialogContent>
-                        <DialogActions sx={{pr: 3, pb: 2}}>
-                            <Button onClick={() => setWidgetModalOpen(false)}>Отмена</Button>
-                            <Button type="submit" variant="contained">Сохранить</Button>
+                        <DialogActions sx={{ pr: 3, pb: 2, gap: 1 }}>
+                            <Button onClick={() => setWidgetModalOpen(false)} disabled={savingMeta}>Отмена</Button>
+                            <Button type="submit" variant="contained" disabled={savingMeta}>
+                                {savingMeta ? 'Сохранение…' : 'Сохранить'}
+                            </Button>
                         </DialogActions>
                     </form>
                 </Dialog>
@@ -394,37 +438,24 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                         <DialogTitle>Новый столбец</DialogTitle>
                         <DialogContent dividers>
                             <Stack spacing={2}>
-                                <TextField label="Alias" size="small" required
-                                           value={newCol.alias}
-                                           onChange={e => setNewCol(v => ({...v, alias: e.target.value}))}
+                                <TextField
+                                    label="Alias"
+                                    size="small"
+                                    required
+                                    value={newCol.alias}
+                                    onChange={e => setNewCol(v => ({...v, alias: e.target.value}))}
                                 />
-                                {/*<TextField label="Default" size="small"
-                                           value={newCol.default}
-                                           onChange={e => setNewCol(v => ({...v, default: e.target.value}))}
+                                <TextField
+                                    label="Порядок (column_order)"
+                                    type="number"
+                                    size="small"
+                                    required
+                                    value={newCol.column_order}
+                                    onChange={e => setNewCol(v => ({
+                                        ...v,
+                                        column_order: Number(e.target.value)
+                                    }))}
                                 />
-                                <TextField label="Placeholder" size="small"
-                                           value={newCol.placeholder}
-                                           onChange={e => setNewCol(v => ({...v, placeholder: e.target.value}))}
-                                />
-                                <TextField label="Тип" size="small" required
-                                           value={newCol.type}
-                                           onChange={e => setNewCol(v => ({...v, type: e.target.value}))}
-                                />*/}
-                                <TextField label="Порядок (column_order)" type="number" size="small" required
-                                           value={newCol.column_order}
-                                           onChange={e => setNewCol(v => ({
-                                               ...v,
-                                               column_order: Number(e.target.value)
-                                           }))}
-                                />
-                                {/*<Stack direction="row" alignItems="center" spacing={1}>
-                                    <Typography>Visible</Typography>
-                                    <input
-                                        type="checkbox"
-                                        checked={newCol.visible}
-                                        onChange={e => setNewCol(v => ({...v, visible: e.target.checked}))}
-                                    />
-                                </Stack>*/}
                             </Stack>
                         </DialogContent>
                         <DialogActions sx={{pr: 3, pb: 2}}>

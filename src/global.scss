@@ -5,21 +5,21 @@
 }
 
 // viewport границы (можно вынести в config, если хочешь)
-$min-vw: 320;
+$min-vw: 220;
 $max-vw: 1440;
 
 // базовые размеры шрифта
-$min-font-body: 16;
-$max-font-body: 20;
+$min-font-body: 14;
+$max-font-body: 18;
 
-$min-font-h1: 28;
-$max-font-h1: 48;
+$min-font-h1: 22;
+$max-font-h1: 30;
 
-$min-font-h2: 24;
-$max-font-h2: 40;
+$min-font-h2: 18;
+$max-font-h2: 20;
 
-$min-font-h3: 20;
-$max-font-h3: 32;
+$min-font-h3: 16;
+$max-font-h3: 18;
 
 
 @font-face {
