@@ -695,19 +695,6 @@ export const useWorkSpaces = () => {
     );
 
 
-    const addReference = useCallback(
-        async (
-            widgetColId: number,
-            tblColId: number,
-            payload: { width: number; ref_column_order: number },
-        ) => {
-            await api.post(
-                `/widgets/tables/references/${widgetColId}/${tblColId}`,
-                payload,
-            );
-        },
-        [],
-    );
 
     //ВСЕ ДЛЯ ФОРМ (они у нас самые последние из вывода таблиц и тд)
     const [formTrees, setFormTrees] = useState<Record<number, FormTreeColumn[]>>({});
@@ -915,7 +902,7 @@ export const useWorkSpaces = () => {
         deleteColumnWidget,
         deleteWidget,
         updateTableColumn,
-        updateWidgetColumn, addReference,
+        updateWidgetColumn,
         loadFormTree,
         formTrees,
         loadFilteredFormDisplay,

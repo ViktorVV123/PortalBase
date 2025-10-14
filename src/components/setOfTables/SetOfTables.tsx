@@ -37,11 +37,6 @@ type Props = {
     ) => Promise<ReferenceItem>;
 
 
-    addReference: (
-        widgetColId: number,
-        tblColId: number,
-        payload: { width: number; ref_column_order: number }
-    ) => Promise<void>;
 
     /* widget */
     widgetColumns: WidgetColumn[];
@@ -143,7 +138,7 @@ export const SetOfTables: React.FC<Props> = (props) => {
         deleteColumnWidget,
         updateTableColumn,
         updateWidgetColumn,
-        addReference,
+
         loadColumnsWidget,
         formTrees,
         loadFilteredFormDisplay,
@@ -407,7 +402,7 @@ export const SetOfTables: React.FC<Props> = (props) => {
                         updateTableColumn={updateTableColumn}
                         deleteColumnTable={deleteColumnTable}
                         deleteColumnWidget={deleteColumnWidget}
-                        addReference={addReference}
+
                         widgetColumns={widgetColumns}
                         loadColumnsWidget={loadColumnsWidget}
                         selectedWidget={selectedWidget}

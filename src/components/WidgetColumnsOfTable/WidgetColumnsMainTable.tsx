@@ -78,11 +78,7 @@ type Props = {
         >> & { form_id?: number | null }
     ) => Promise<ReferenceItem>;
 
-    addReference: (
-        widgetColId: number,
-        tblColId: number,
-        payload: { width: number; ref_column_order: number }
-    ) => Promise<void>;
+
 
     refreshReferences?: (wcId: number) => Promise<void> | void;
     onRefsChange?: (refsMap: Record<number, ReferenceItem[]>) => void;
@@ -99,7 +95,7 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
                                                             handleDeleteReference,
                                                             updateWidgetColumn,
                                                             updateReference,
-                                                            addReference,
+
                                                             refreshReferences,
                                                             onRefsChange,
                                                             formsById,
@@ -108,15 +104,7 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
                                                         }) => {
 
     /* -------- wrappers with logs for API calls -------- */
-    const callAddReference = useCallback(async (wcId: number, tblColId: number, payload: {
-        width: number;
-        ref_column_order: number
-    }) => {
-        logApi('POST addReference:REQ', {wcId, tableColumnId: tblColId, payload});
-        const res = await addReference(wcId, tblColId, payload);
-        logApi('POST addReference:OK', {wcId, tableColumnId: tblColId});
-        return res;
-    }, [addReference]);
+
 
     const callUpdateReference = useCallback(async (
         wcId: number,
@@ -274,7 +262,6 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
                     const toIdx = nextOrder.indexOf(id);
                     const refObj = (state[wcId] ?? [])[toIdx] as any;
                     if (!refObj) continue;
-                    await callAddReference(wcId, id, {width: Number(refObj.width ?? 1), ref_column_order: toIdx});
                     await callUpdateReference(wcId, id, toFullPatch(refObj, toIdx));
                 }
             }

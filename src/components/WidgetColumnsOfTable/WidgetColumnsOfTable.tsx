@@ -33,13 +33,6 @@ interface Props {
     columns: Column[];
 
     loadColumnsWidget: (widgetId: number) => void;
-
-    addReference: (
-        widgetColId: number,
-        tblColId: number,
-        payload: { width: number; ref_column_order: number }
-    ) => Promise<void>;
-
     updateReference: (
         widgetColumnId: number,
         tableColumnId: number,
@@ -107,7 +100,7 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                                                           selectedWidget,
                                                           columns,
                                                           loadColumnsWidget,
-                                                          addReference,
+
                                                           fetchReferences,
                                                           deleteReference,
                                                           updateWidgetMeta,
@@ -286,10 +279,6 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
 
             {/* Основная таблица */}
             <WidgetColumnsMainTable formsById={formsById} loadWidgetForms={loadWidgetForms}  onRefsChange={setLiveRefsForHeader}
-                                    addReference={(wcId, tblColId, payloadMin) =>
-                                        // если на твоём бэке обязательны combobox-поля — можешь обернуть здесь
-                                        addReference(wcId, tblColId, {...payloadMin})
-                                    }
                                     deleteColumnWidget={deleteColumnWidget}
                                     updateReference={updateReference}
                                     refreshReferences={async (wcId) => {

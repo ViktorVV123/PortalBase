@@ -836,7 +836,6 @@ export const FormTable: React.FC<Props> = ({
                                     style={{ textAlign: 'center', verticalAlign: 'middle'}}
                                 >
                                     <div
-                                        type="button"
                                         onClick={() => setShowSubHeaders(v => !v)}
                                         aria-label={showSubHeaders ? 'Скрыть подзаголовки' : 'Показать подзаголовки'}
                                         aria-expanded={showSubHeaders}
