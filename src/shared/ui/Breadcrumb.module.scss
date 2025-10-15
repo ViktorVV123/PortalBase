@@ -1,0 +1,45 @@
+
+
+.list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+}
+
+.item {
+  display: inline-flex;
+  align-items: center;
+}
+
+.sep {
+  opacity: .6;
+  margin: 0 6px;
+}
+
+.link {
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  color: #bdbdbd;
+  text-decoration: underline transparent;
+
+  &:hover {
+    text-decoration-color: currentColor;
+  }
+}
+
+.text {
+  color: #EEEEEE;
+  opacity: .9;
+}
+
+.active .text {
+  opacity: 1;
+  font-weight: 600;
+}

@@ -1,32 +1,31 @@
-import React, {useState} from 'react';
-import * as s from "@/components/setOfTables/SetOfTables.module.scss";
-import EditIcon from "@/assets/image/EditIcon.svg";
-import DeleteIcon from "@/assets/image/DeleteIcon.svg";
-import {Column, DTable} from "@/shared/hooks/useWorkSpaces";
-import {api} from "@/services/api";
-import {TableListView} from "@/components/tableColumn/TableListView";
-import {EllipsizeSmart} from "@/shared/utils/EllipsizeSmart";
+import React, { useCallback, useMemo, useState } from 'react';
+import * as s from '@/components/setOfTables/SetOfTables.module.scss';
+import EditIcon from '@/assets/image/EditIcon.svg';
+import DeleteIcon from '@/assets/image/DeleteIcon.svg';
+import { Column, DTable } from '@/shared/hooks/useWorkSpaces';
+import { api } from '@/services/api';
+import { TableListView } from '@/components/tableColumn/TableListView';
+import { EllipsizeSmart } from '@/shared/utils/EllipsizeSmart';
 
 type TableColumnProps = {
     columns: Column[];
     /** id активной таблицы — нужен для POST */
     tableId?: number;
-    deleteColumnTable?: (id: number) => void;
-    updateTableColumn?: (id: number, p: Partial<Omit<Column, 'id'>>) => void;
+    deleteColumnTable?: (id: number) => void | Promise<void>;
+    updateTableColumn?: (id: number, p: Partial<Omit<Column, 'id'>>) => void | Promise<void>;
     /** опционально: коллбек после успешного создания */
     onCreated?: (newCol: Column) => void;
 
-
     selectedTable?: DTable | null;
-    updateTableMeta?: (id: number, patch: Partial<DTable>) => void;
-    publishTable?:(id: number) =>void
+    updateTableMeta?: (id: number, patch: Partial<DTable>) => void | Promise<void>;
+    publishTable?: (id: number) => void | Promise<void>;
 };
 
 type NewCol = {
     name: string;
     description: string;
     datatype: string;
-    length: number | '' ;
+    length: number | '';
     precision: number | '';
     primary: boolean;
     increment: boolean;
@@ -54,117 +53,187 @@ export const TableColumn: React.FC<TableColumnProps> = ({
                                                             updateTableMeta,
                                                             publishTable,
                                                         }) => {
+    // редактирование существующей строки
     const [editingId, setEditingId] = useState<number | null>(null);
     const [editValues, setEditValues] = useState<Partial<Column>>({});
 
-    // --- создание новой строки
+    // создание
     const [isAdding, setIsAdding] = useState(false);
     const [newCol, setNewCol] = useState<NewCol>(initialNewCol);
     const [savingNew, setSavingNew] = useState(false);
 
-    const startAdd = () => {
+    const canCreate = useMemo(
+        () => Boolean(tableId && newCol.name.trim() && newCol.datatype.trim()),
+        [tableId, newCol.name, newCol.datatype]
+    );
+
+    // helpers
+    const toNumberIfFinite = (v: unknown) => {
+        if (v === '' || v === undefined || v === null) return undefined;
+        const n = typeof v === 'number' ? v : Number(v);
+        return Number.isFinite(n) ? n : undefined;
+    };
+
+    const cleanNewPayload = useCallback(
+        (n: NewCol) => {
+            const payload: Partial<Column> & { table_id: number } = {
+                table_id: tableId!,
+                name: n.name.trim(),
+                description: n.description.trim() || '',
+                datatype: n.datatype.trim(),
+                primary: !!n.primary,
+                increment: !!n.increment,
+                required: !!n.required,
+            };
+            const len = toNumberIfFinite(n.length);
+            const prec = toNumberIfFinite(n.precision);
+            if (len !== undefined) payload.length = len;
+            if (prec !== undefined) payload.precision = prec;
+            return payload;
+        },
+        [tableId]
+    );
+
+    // add flow
+    const startAdd = useCallback(() => {
         setIsAdding(true);
         setNewCol(initialNewCol);
-    };
-    const cancelAdd = () => {
+        // запретим одновременное редактирование
+        setEditingId(null);
+        setEditValues({});
+    }, []);
+
+    const cancelAdd = useCallback(() => {
         setIsAdding(false);
         setNewCol(initialNewCol);
-    };
+        setSavingNew(false);
+    }, []);
 
-    const handleNewChange = (field: keyof NewCol, value: any) =>
-        setNewCol(prev => ({...prev, [field]: value}));
+    const handleNewChange = useCallback(<K extends keyof NewCol>(field: K, value: NewCol[K]) => {
+        setNewCol((prev) => ({ ...prev, [field]: value }));
+    }, []);
 
-    const cleanNewPayload = (n: NewCol) => {
-        const payload: any = {
-            table_id: tableId,
-            name: n.name.trim(),
-            description: n.description.trim() || '',
-            datatype: n.datatype.trim(),
-            primary: !!n.primary,
-            increment: !!n.increment,
-            required: !!n.required,
-        };
-        // length/precision — опциональные: отправляем только если число
-        if (n.length !== '' && Number.isFinite(n.length)) payload.length = Number(n.length);
-        if (n.precision !== '' && Number.isFinite(n.precision)) payload.precision = Number(n.precision);
-        return payload;
-    };
-
-    const saveNew = async () => {
-        if (!newCol.name.trim() || !newCol.datatype.trim()) {
+    const saveNew = useCallback(async () => {
+        if (!tableId) {
+            alert('Не выбран tableId — создание невозможно.');
+            return;
+        }
+        if (!canCreate) {
             alert('Укажите минимум name и datatype');
             return;
         }
         setSavingNew(true);
         try {
             const body = cleanNewPayload(newCol);
-            // Swagger: POST https://csc-fv.pro.lukoil.com/api/tables/columns/
-            const {data} = await api.post<Column>('/tables/columns/', body);
+            const { data } = await api.post<Column>('/tables/columns/', body);
             onCreated?.(data);
             cancelAdd();
-        } catch (e:any) {
+        } catch (e) {
             console.error(e);
             alert('Не удалось создать столбец');
         } finally {
             setSavingNew(false);
         }
-    };
+    }, [tableId, canCreate, cleanNewPayload, newCol, onCreated, cancelAdd]);
 
-    // --- редактирование существующей
-    const startEdit = (col: Column) => {
+    // edit flow
+    const startEdit = useCallback((col: Column) => {
+        // не даём редактировать две строки одновременно
+        setIsAdding(false);
+        setSavingNew(false);
         setEditingId(col.id);
         setEditValues({
             name: col.name,
             description: col.description ?? '',
             datatype: col.datatype,
-            length: col.length ?? '',
-            precision: col.precision ?? '',
+            length: (col.length ?? '') as number | '',
+            precision: (col.precision ?? '') as number | '',
             primary: col.primary,
             increment: col.increment,
             required: col.required,
             datetime: col.datetime,
         });
-    };
-    const cancelEdit = () => {
+    }, []);
+
+    const cancelEdit = useCallback(() => {
         setEditingId(null);
         setEditValues({});
-    };
+    }, []);
 
-    const handleChange = (field: keyof Column, value: any) =>
-        setEditValues(prev => ({...prev, [field]: value}));
+    const handleChange = useCallback(<K extends keyof Column>(field: K, value: Column[K]) => {
+        setEditValues((prev) => ({ ...prev, [field]: value }));
+    }, []);
 
-    const cleanPatch = (p: Partial<Column>): Partial<Column> => {
-        const patch: any = {...p};
-        // '' → удалить поле
-        ['length', 'precision'].forEach(k => {
-            if (patch[k] === '' || patch[k] === undefined) delete patch[k];
-            else if (typeof patch[k] === 'string') {
-                const n = Number(patch[k]);
-                if (Number.isFinite(n)) patch[k] = n; else delete patch[k];
+    const cleanPatch = useCallback((p: Partial<Column>): Partial<Column> => {
+        const patch: Partial<Column> = { ...p };
+
+        // нормализуем length/precision
+        (['length', 'precision'] as const).forEach((k) => {
+            const v = (patch as any)[k];
+            if (v === '' || v === undefined || v === null) {
+                delete (patch as any)[k];
+            } else {
+                const n = toNumberIfFinite(v);
+                if (n === undefined) delete (patch as any)[k];
+                else (patch as any)[k] = n;
             }
         });
-        // убрать неизменённые неопределённости
-        Object.keys(patch).forEach(k => {
-            if (patch[k] === undefined) delete patch[k];
+
+        // удаляем undefined, чтобы не слать мусор
+        Object.keys(patch).forEach((k) => {
+            if ((patch as any)[k] === undefined) delete (patch as any)[k];
         });
+
         return patch;
-    };
-    const saveEdit = async () => {
-        if (editingId == null) return;
+    }, []);
+
+    const saveEdit = useCallback(async () => {
+        if (editingId == null || !updateTableColumn) return;
         await updateTableColumn(editingId, cleanPatch(editValues));
         cancelEdit();
-    };
+    }, [editingId, updateTableColumn, cleanPatch, editValues, cancelEdit]);
+
+    // input helpers (клавиатура)
+    const onInputKeyDownAdd = useCallback(
+        (e: React.KeyboardEvent<HTMLInputElement>) => {
+            if (e.key === 'Enter' && canCreate && !savingNew) {
+                e.preventDefault();
+                void saveNew();
+            }
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                cancelAdd();
+            }
+        },
+        [canCreate, savingNew, saveNew, cancelAdd]
+    );
+
+    const onInputKeyDownEdit = useCallback(
+        (e: React.KeyboardEvent<HTMLInputElement>) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                void saveEdit();
+            }
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                cancelEdit();
+            }
+        },
+        [saveEdit, cancelEdit]
+    );
 
     return (
-        <div >
-            <div style={{display:'flex', gap:8, marginBottom:8}}>
-
-                <TableListView startAdd={startAdd} isAdding={isAdding} cancelAdd={cancelAdd} savingNew={savingNew}
+        <div>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                <TableListView
+                    startAdd={startAdd}
+                    isAdding={isAdding}
+                    cancelAdd={cancelAdd}
+                    savingNew={savingNew}
                     publishTable={publishTable}
                     selectedTable={selectedTable}
                     updateTableMeta={updateTableMeta}
                 />
-
             </div>
 
             <table className={s.tbl}>
@@ -180,75 +249,95 @@ export const TableColumn: React.FC<TableColumnProps> = ({
                     <th>primary</th>
                     <th>increment</th>
                     <th>required</th>
-                    <th></th>
+                    <th />
                 </tr>
                 </thead>
 
                 <tbody>
+                {/* ─── Добавление новой строки ─── */}
                 {isAdding && (
                     <tr>
-                        <td>{tableId}</td>
+                        <td>{tableId ?? '—'}</td>
                         <td>—</td>
                         <td>
                             <input
                                 value={newCol.name}
-                                onChange={e => handleNewChange('name', e.target.value)}
+                                onChange={(e) => handleNewChange('name', e.target.value)}
+                                onKeyDown={onInputKeyDownAdd}
                                 className={s.inp}
                                 placeholder="name"
+                                aria-label="name"
                             />
                         </td>
                         <td>
                             <input
                                 value={newCol.description}
-                                onChange={e => handleNewChange('description', e.target.value)}
+                                onChange={(e) => handleNewChange('description', e.target.value)}
+                                onKeyDown={onInputKeyDownAdd}
                                 className={s.inp}
                                 placeholder="description"
+                                aria-label="description"
                             />
                         </td>
                         <td>
                             <input
                                 value={newCol.datatype}
-                                onChange={e => handleNewChange('datatype', e.target.value)}
+                                onChange={(e) => handleNewChange('datatype', e.target.value)}
+                                onKeyDown={onInputKeyDownAdd}
                                 className={s.inp}
                                 placeholder="datatype"
+                                aria-label="datatype"
                             />
                         </td>
                         <td>
                             <input
                                 type="number"
                                 value={newCol.length}
-                                onChange={e => handleNewChange('length', e.currentTarget.value === '' ? '' : e.currentTarget.valueAsNumber)}
+                                onChange={(e) =>
+                                    handleNewChange('length', e.currentTarget.value === '' ? '' : e.currentTarget.valueAsNumber)
+                                }
+                                onKeyDown={onInputKeyDownAdd}
                                 className={s.inpN}
                                 placeholder="length"
+                                aria-label="length"
                             />
                         </td>
                         <td>
                             <input
                                 type="number"
                                 value={newCol.precision}
-                                onChange={e => handleNewChange('precision', e.currentTarget.value === '' ? '' : e.currentTarget.valueAsNumber)}
+                                onChange={(e) =>
+                                    handleNewChange('precision', e.currentTarget.value === '' ? '' : e.currentTarget.valueAsNumber)
+                                }
+                                onKeyDown={onInputKeyDownAdd}
                                 className={s.inpN}
                                 placeholder="precision"
+                                aria-label="precision"
                             />
                         </td>
-                        {(['primary','increment','required'] as const).map(flag => (
-                            <td key={flag} style={{textAlign:'center'}}>
+                        {(['primary', 'increment', 'required'] as const).map((flag) => (
+                            <td key={flag} style={{ textAlign: 'center' }}>
                                 <input
                                     type="checkbox"
                                     checked={newCol[flag]}
-                                    onChange={e => handleNewChange(flag, e.target.checked)}
+                                    onChange={(e) => handleNewChange(flag, e.target.checked)}
+                                    aria-label={flag}
                                 />
                             </td>
                         ))}
                         <td className={s.actionsCell}>
-                            {/* Дублируем кнопки на случай, если удобно жать из строки */}
-                            <button className={s.okBtn} onClick={saveNew} disabled={savingNew}>✓</button>
-                            <button className={s.cancelBtn} onClick={cancelAdd} disabled={savingNew}>✕</button>
+                            <button className={s.okBtn} onClick={saveNew} disabled={!canCreate || savingNew} aria-label="save">
+                                ✓
+                            </button>
+                            <button className={s.cancelBtn} onClick={cancelAdd} disabled={savingNew} aria-label="cancel">
+                                ✕
+                            </button>
                         </td>
                     </tr>
                 )}
 
-                {columns.map(col => {
+                {/* ─── Список существующих колонок ─── */}
+                {columns.map((col) => {
                     const isEditing = editingId === col.id;
                     return (
                         <tr key={col.id}>
@@ -258,78 +347,114 @@ export const TableColumn: React.FC<TableColumnProps> = ({
                             <td>
                                 {isEditing ? (
                                     <input
-                                        value={editValues.name as string}
-                                        onChange={e => handleChange('name', e.target.value)}
+                                        value={(editValues.name as string) ?? ''}
+                                        onChange={(e) => handleChange('name', e.target.value)}
+                                        onKeyDown={onInputKeyDownEdit}
                                         className={s.inp}
+                                        aria-label="name"
                                     />
-                                ) : col.name}
+                                ) : (
+                                    col.name
+                                )}
                             </td>
 
                             <td>
                                 {isEditing ? (
                                     <input
-                                        value={editValues.description as string}
-                                        onChange={e => handleChange('description', e.target.value)}
+                                        value={(editValues.description as string) ?? ''}
+                                        onChange={(e) => handleChange('description', e.target.value)}
+                                        onKeyDown={onInputKeyDownEdit}
                                         className={s.inp}
+                                        aria-label="description"
                                     />
-                                ) :  <EllipsizeSmart text={col.description} maxLines={1} />}
+                                ) : (
+                                    <EllipsizeSmart text={col.description} maxLines={1} />
+                                )}
                             </td>
 
                             <td>
                                 {isEditing ? (
                                     <input
-                                        value={editValues.datatype as string}
-                                        onChange={e => handleChange('datatype', e.target.value)}
+                                        value={(editValues.datatype as string) ?? ''}
+                                        onChange={(e) => handleChange('datatype', e.target.value)}
+                                        onKeyDown={onInputKeyDownEdit}
                                         className={s.inp}
+                                        aria-label="datatype"
                                     />
-                                ) : col.datatype}
+                                ) : (
+                                    col.datatype
+                                )}
                             </td>
 
                             <td>
                                 {isEditing ? (
                                     <input
                                         type="number"
-                                        value={editValues.length as string | number}
-                                        onChange={e => handleChange('length', e.currentTarget.value === '' ? '' : e.currentTarget.valueAsNumber)}
+                                        value={(editValues.length as number | '') ?? ''}
+                                        onChange={(e) =>
+                                            handleChange('length', e.currentTarget.value === '' ? '' : e.currentTarget.valueAsNumber)
+                                        }
+                                        onKeyDown={onInputKeyDownEdit}
                                         className={s.inpN}
+                                        aria-label="length"
                                     />
-                                ) : (col.length ?? '—')}
+                                ) : (
+                                    col.length ?? '—'
+                                )}
                             </td>
 
                             <td>
                                 {isEditing ? (
                                     <input
                                         type="number"
-                                        value={editValues.precision as string | number}
-                                        onChange={e => handleChange('precision', e.currentTarget.value === '' ? '' : e.currentTarget.valueAsNumber)}
+                                        value={(editValues.precision as number | '') ?? ''}
+                                        onChange={(e) =>
+                                            handleChange('precision', e.currentTarget.value === '' ? '' : e.currentTarget.valueAsNumber)
+                                        }
+                                        onKeyDown={onInputKeyDownEdit}
                                         className={s.inpN}
+                                        aria-label="precision"
                                     />
-                                ) : (col.precision ?? '—')}
+                                ) : (
+                                    col.precision ?? '—'
+                                )}
                             </td>
 
-                            {(['primary','increment','required'] as const).map(flag => (
-                                <td key={flag} style={{textAlign:'center'}}>
+                            {(['primary', 'increment', 'required'] as const).map((flag) => (
+                                <td key={flag} style={{ textAlign: 'center' }}>
                                     {isEditing ? (
                                         <input
                                             type="checkbox"
-                                            checked={!!(editValues[flag] as boolean)}
-                                            onChange={e => handleChange(flag, e.target.checked)}
+                                            checked={Boolean(editValues[flag] as boolean | undefined ?? col[flag])}
+                                            onChange={(e) => handleChange(flag, e.target.checked)}
+                                            aria-label={flag}
                                         />
-                                    ) : (col[flag] ? '✔︎' : '')}
+                                    ) : (
+                                        col[flag] ? '✔︎' : ''
+                                    )}
                                 </td>
                             ))}
 
                             <td className={s.actionsCell}>
                                 {isEditing ? (
                                     <>
-                                        <button className={s.okBtn} onClick={saveEdit}>✓</button>
-                                        <button className={s.cancelBtn} onClick={cancelEdit}>✕</button>
+                                        <button className={s.okBtn} onClick={saveEdit} aria-label="save-row">
+                                            ✓
+                                        </button>
+                                        <button className={s.cancelBtn} onClick={cancelEdit} aria-label="cancel-row">
+                                            ✕
+                                        </button>
                                     </>
                                 ) : (
                                     <>
                                         <EditIcon className={s.actionIcon} onClick={() => startEdit(col)} />
-                                        <DeleteIcon className={s.actionIcon}
-                                                    onClick={() => confirm('Удалить?') && deleteColumnTable(col.id)} />
+                                        <DeleteIcon
+                                            className={s.actionIcon}
+                                            onClick={() => {
+                                                if (!deleteColumnTable) return;
+                                                if (confirm('Удалить столбец?')) void deleteColumnTable(col.id);
+                                            }}
+                                        />
                                     </>
                                 )}
                             </td>

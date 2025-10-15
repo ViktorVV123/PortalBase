@@ -86,8 +86,9 @@ $error: #d33;
 
 /* ячейки */
 .tbl th, .tbl td {
+  font-size: 14px;
   border: 1px solid $border;
-  padding: 2px 6px;
+  padding: 4px 8px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

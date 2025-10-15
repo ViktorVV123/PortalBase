@@ -1,4 +1,4 @@
-// components/modals/ModalEditConnection/ModalEditConnection.tsx
+// components/modals/modalEditConnection/modalEditConnection.tsx
 import {useCallback, useEffect, useMemo, useState} from 'react';
 import {
     Dialog, DialogTitle, DialogContent, DialogActions,

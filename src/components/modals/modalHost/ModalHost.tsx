@@ -7,7 +7,7 @@ import {ModalAddTable} from "@/components/modals/modalAddNewTable/ModalAddNewTab
 import {ModalAddWidget} from "@/components/modals/modalAddWidget/ModalAddWidget";
 import {ModalAddForm} from "@/components/modals/modalAddForm/ModalAddForm";
 import {ModalEditForm} from "@/components/modals/modalEditForm/ModalEditForm";
-import {ModalEditConnection} from "@/components/modals/ModalEditConnection/ModalEditConnection";
+import {ModalEditConnection} from "@/components/modals/modalEditConnection/ModalEditConnection";
 
 type Props = {
     modals: ReturnType<typeof useMainModals>;
