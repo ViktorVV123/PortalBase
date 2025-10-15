@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import React, {useCallback, useMemo, useState} from 'react';
 import * as s from './SetOfTables.module.scss';
 import {
     Column,
@@ -17,7 +17,6 @@ import {
     WcReference,
     WidgetColumnsOfTable,
 } from '@/components/WidgetColumnsOfTable/WidgetColumnsOfTable';
-import {buildHeaderGroupsFromWidgetColumns, HeaderGroup} from '@/shared/utils/headerGroups';
 import {api} from '@/services/api';
 import {Breadcrumb, Crumb} from "@/shared/ui/Breadcrumb";
 import {useHeaderGroupsFromWidgetColumns} from "@/components/setOfTables/hooks/useHeaderGroupsFromWidgetColumns";
@@ -75,7 +74,6 @@ type Props = {
     formDisplay: FormDisplay | null;
     formLoading: boolean;
     formError: string | null;
-    formName: string;
     formsByWidget: Record<number, WidgetForm>; // нужен order
     formsById: Record<number, WidgetForm>;
     formTrees: Record<number, FormTreeColumn[]>;
@@ -144,7 +142,7 @@ export const SetOfTables: React.FC<Props> = (props) => {
         addWidgetColumn, updateWidgetMeta, setSelectedWidget, setWidgetsByTable,
         // форма/саб
         selectedFormId, formDisplay, formLoading, formError, formTrees,
-        formsByWidget, formsById, formName, loadFilteredFormDisplay,
+        formsByWidget, formsById, loadFilteredFormDisplay,
         loadSubDisplay, subDisplay, subLoading, subError,
         setFormDisplay, setSubDisplay,
         // references

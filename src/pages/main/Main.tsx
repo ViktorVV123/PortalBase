@@ -174,7 +174,6 @@ export const Main = () => {
         selectedFormId: selection.selectedFormId,
         formLoading,
         formError,
-        formName: selection.formName,
         loadSubDisplay,
         subDisplay,
         subLoading,

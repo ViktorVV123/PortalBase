@@ -10,19 +10,8 @@ import {HeaderGroup} from '@/shared/utils/headerGroups';
 import {TableColumn} from '@/components/tableColumn/TableColumn';
 import {
     Box,
-    Button,
-    Chip,
     createTheme,
-    Dialog,
-    DialogActions,
-    DialogContent,
-    DialogTitle,
-    FormControlLabel,
     Modal,
-    Stack,
-    Switch,
-    TextField,
-    ThemeProvider,
     Typography,
 } from '@mui/material';
 import {WidgetColumnsMainTable} from '@/components/WidgetColumnsOfTable/WidgetColumnsMainTable';

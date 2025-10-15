@@ -1,6 +1,5 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
-import * as s from '@/components/setOfTables/SetOfTables.module.scss';
-import {Column, WidgetColumn} from '@/shared/hooks/useWorkSpaces';
+import { WidgetColumn} from '@/shared/hooks/useWorkSpaces';
 import {createTheme, ThemeProvider} from '@mui/material';
 import {api} from '@/services/api';
 
@@ -10,7 +9,7 @@ import {FormPickerDialog} from '@/components/modals/modalWidget/FormPickerDialog
 import {AddReferenceDialog} from '@/components/modals/modalWidget/AddReferenceDialog';
 
 
-import {logApi, reindex, toFullPatch, getFormId, createReference} from './ref-helpers';
+import {logApi, reindex, getFormId, createReference} from './ref-helpers';
 import type {RefItem, RefPatch, FormOption, ColumnOption, Props, EditState, AddDlgState} from './types';
 import {useRefsDnd} from "@/components/WidgetColumnsOfTable/ hooks/useRefsDnd";
 import {WidgetGroup} from "@/components/WidgetColumnsOfTable/parts/WidgetGroups";

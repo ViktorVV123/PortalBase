@@ -6,7 +6,6 @@ import {
     WidgetForm,
     FormTreeColumn,
     Widget,
-    DTable,
 } from '@/shared/hooks/useWorkSpaces';
 import {api} from '@/services/api';
 
@@ -77,6 +76,9 @@ export const FormTable: React.FC<Props> = ({
     const [showSubHeaders, setShowSubHeaders] = useState(false);
     const [q, setQ] = useState('');
     const dq = useDebounced(q, 250);
+
+
+
 
     /** ─────────── форма/сабы ─────────── */
     const baseForm: WidgetForm | null = useMemo(() => {
@@ -270,6 +272,122 @@ export const FormTable: React.FC<Props> = ({
         setSubDisplay, resetFiltersHard, reloadTree
     ]);
 
+
+
+    const [isAddingSub, setIsAddingSub] = useState(false);
+    const [draftSub, setDraftSub] = useState<Record<number, string>>({});
+    const [savingSub, setSavingSub] = useState(false);
+
+// утилита: собрать список редактируемых sub-колонок в порядке рендера
+    const subEditableTcIds = useMemo(() => {
+        // колонки саб-таблицы берем из subDisplay?.columns, а порядок — из headerPlan для саба
+        const cols = subDisplay?.columns ?? [];
+        // оставляем только те, что не PK/инкремент и у которых есть table_column_id
+        return cols
+            .filter(c => c.table_column_id != null && !((c as any).primary || (c as any).increment || (c as any).readonly))
+            .map(c => c.table_column_id as number);
+    }, [subDisplay?.columns]);
+
+// префлайт для INSERT саб-виджета с алертом
+    const preflightInsertSub = useCallback(async (): Promise<{ok:boolean}> => {
+        if (!currentWidgetId) return {ok:false};
+        try {
+            // sub widget -> его таблица
+            const { data: widget } = await api.get(`/widgets/${currentWidgetId}`);
+            const { data: table }  = await api.get(`/tables/${widget.table_id}`);
+            if (!table?.insert_query?.trim()) {
+                alert('Для таблицы саб-виджета не настроен INSERT QUERY. Задайте его в метаданных таблицы.');
+                return {ok:false};
+            }
+        } catch (e) {
+            console.warn('preflight (sub/insert) failed:', e);
+        }
+        return {ok:true};
+    }, [currentWidgetId]);
+
+// начать добавление саб-строки
+    const startAddSub = useCallback(async () => {
+        if (!formIdForSub || !currentWidgetId) return;
+        // требуем выбранную строку в основной таблице (обычно нужен FK)
+        if (!lastPrimary || Object.keys(lastPrimary).length === 0) {
+            alert('Сначала выберите строку в основной таблице, чтобы добавить связанную запись в саб-таблицу.');
+            return;
+        }
+        const pf = await preflightInsertSub();
+        if (!pf.ok) return;
+
+        // подготовить драфт (пустые значения для редактируемых полей)
+        const init: Record<number, string> = {};
+        subEditableTcIds.forEach(tcId => { init[tcId] = ''; });
+        setDraftSub(init);
+        setIsAddingSub(true);
+    }, [formIdForSub, currentWidgetId, lastPrimary, preflightInsertSub, subEditableTcIds]);
+
+// отменить добавление
+    const cancelAddSub = useCallback(() => {
+        setIsAddingSub(false);
+        setDraftSub({});
+    }, []);
+
+// отправить добавление
+    const submitAddSub = useCallback(async () => {
+        if (!formIdForSub || !currentWidgetId) return;
+
+        // без выбранной основной строки — нельзя (обычно нужен FK)
+        if (!lastPrimary || Object.keys(lastPrimary).length === 0) {
+            alert('Сначала выберите строку в основной таблице.');
+            return;
+        }
+
+        const pf = await preflightInsertSub();
+        if (!pf.ok) return;
+
+        setSavingSub(true);
+        try {
+            const values = Object.entries(draftSub)
+                .filter(([,v]) => v !== '' && v != null)
+                .map(([table_column_id, value]) => ({
+                    table_column_id: Number(table_column_id),
+                    value: String(value),
+                }));
+
+            // обычно на бэке саб-вставка требует PK родителя,
+            // поэтому шлем его; если у тебя другая схема — адаптируй.
+            const body = { pk: { primary_keys: Object.fromEntries(
+                        Object.entries(lastPrimary).map(([k,v]) => [k, String(v)])
+                    )}, values };
+
+            const url = `/data/${formIdForSub}/${currentWidgetId}`;
+            try {
+                await api.post(url, body);
+            } catch (err:any) {
+                const status = err?.response?.status;
+                const detail  = err?.response?.data?.detail ?? err?.response?.data ?? err?.message;
+                if (status === 404 && String(detail).includes('Insert query not found')) {
+                    alert('Для саб-формы не настроен INSERT QUERY. Задайте его и повторите.');
+                    return;
+                }
+                if (status === 404) {
+                    await api.post(`${url}/`, body);
+                } else {
+                    throw err;
+                }
+            }
+
+            // перезагрузим текущий саб-виджет
+            if (activeSubOrder != null) {
+                loadSubDisplay(formIdForSub, activeSubOrder, lastPrimary);
+            }
+            setIsAddingSub(false);
+            setDraftSub({});
+        } finally {
+            setSavingSub(false);
+        }
+    }, [formIdForSub, currentWidgetId, lastPrimary, draftSub, activeSubOrder, preflightInsertSub, loadSubDisplay]);
+
+
+
+
     /** ─────────── utilы/навигация ─────────── */
     const pkToKey = useCallback((pk: Record<string, unknown>) =>
             Object.keys(pk).sort().map(k => `${k}:${String(pk[k])}`).join('|')
@@ -379,14 +497,13 @@ export const FormTable: React.FC<Props> = ({
                 {/* RIGHT: MAIN + SUB */}
                 <div className={s.mainCol}>
                     <TableToolbar
-                        isAddingSub={false /* sub-кнопки решает SubWormTable */}
-                        cancelAddSub={() => {}}
-                        savingSub={false}
-                        startAddSub={() => {}}
-                        submitAddSub={() => {}}
-
-                        isAdding={isAdding}
                         showSubActions={!!subDisplay && Object.keys(lastPrimary).length > 0}
+                        cancelAddSub={cancelAddSub}
+                        startAddSub={startAddSub}
+                        isAddingSub={isAddingSub}
+                        submitAddSub={submitAddSub}
+                        savingSub={savingSub}
+                        isAdding={isAdding}
                         selectedFormId={selectedFormId}
                         selectedWidget={selectedWidget}
                         saving={saving}
@@ -436,16 +553,16 @@ export const FormTable: React.FC<Props> = ({
                     />
 
                     <SubWormTable
+                        isAddingSub={isAddingSub}
+                        setIsAddingSub={setIsAddingSub}
+                        draftSub={draftSub}
+                        setDraftSub={setDraftSub}
                         setEditSaving={() => {}}
                         editDraft={{}}
                         editingRowIdx={null}
                         setEditDraft={() => {}}
                         setEditingRowIdx={() => {}}
                         editSaving={false}
-                        draftSub={{}}
-                        setDraftSub={() => {}}
-                        isAddingSub={false}
-                        setIsAddingSub={() => {}}
                         currentOrder={currentOrder}
                         currentWidgetId={currentWidgetId}
                         subHeaderGroups={subHeaderGroups}
