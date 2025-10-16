@@ -1,108 +1,170 @@
-import {useCallback, useState} from 'react';
+// src/components/formTable/hooks/useSubCrud.ts
+import {useCallback, useMemo, useState} from 'react';
 import {api} from '@/services/api';
-import type {DTable, FormDisplay, Widget} from '@/shared/hooks/useWorkSpaces';
+import type {FormDisplay, SubDisplay} from '@/shared/hooks/useWorkSpaces';
 
 export type UseSubCrudDeps = {
+    /** id формы для саба (selectedFormId ?? currentForm.form_id) */
     formIdForSub: number | null;
+    /** sub_widget_id для активного саба */
     currentWidgetId?: number;
+    /** активный order вкладки саба (widget_order) */
     currentOrder: number | null;
-    handleTabClick: (order: number) => void;
-    flatColumnsInRenderOrder: FormDisplay['columns'];
+    /** загрузка саб-данных после добавления/переключения вкладок */
+    loadSubDisplay: (formId: number, subOrder: number, primary?: Record<string, unknown>) => void;
+    /** PK выбранной строки основной таблицы (родитель) */
+    lastPrimary: Record<string, unknown>;
+    /** полный subDisplay (нужен, чтобы определить редактируемые tcId) */
+    subDisplay: SubDisplay | null;
 };
 
+export type UseSubCrudResult = {
+    isAddingSub: boolean;
+    setIsAddingSub: (v: boolean) => void;
+    draftSub: Record<number, string>;
+    setDraftSub: React.Dispatch<React.SetStateAction<Record<number, string>>>;
+    savingSub: boolean;
+
+    startAddSub: () => Promise<void>;
+    cancelAddSub: () => void;
+    submitAddSub: () => Promise<void>;
+
+    /** вычисленные редактируемые поля саб-таблицы (table_column_id) */
+    subEditableTcIds: number[];
+};
+
+/** Выделенная логика саб-вставки (start/cancel/submit + состояния) */
 export function useSubCrud({
                                formIdForSub,
                                currentWidgetId,
                                currentOrder,
-                               handleTabClick,
-                               flatColumnsInRenderOrder,
-                           }: UseSubCrudDeps) {
+                               loadSubDisplay,
+                               lastPrimary,
+                               subDisplay,
+                           }: UseSubCrudDeps): UseSubCrudResult {
     const [isAddingSub, setIsAddingSub] = useState(false);
     const [draftSub, setDraftSub] = useState<Record<number, string>>({});
     const [savingSub, setSavingSub] = useState(false);
 
-    const [editingRowIdxSub, setEditingRowIdxSub] = useState<number | null>(null);
-    const [editDraftSub, setEditDraftSub] = useState<Record<number, string>>({});
-    const [editSavingSub, setEditSavingSub] = useState(false);
+    // Оставляем только редактируемые колонки саб-таблицы
+    const subEditableTcIds = useMemo(() => {
+        const cols = subDisplay?.columns ?? [];
+        return cols
+            .filter(c =>
+                c.table_column_id != null &&
+                !((c as any).primary || (c as any).increment || (c as any).readonly)
+            )
+            .map(c => c.table_column_id as number);
+    }, [subDisplay?.columns]);
 
-    const preflight = useCallback(async (kind: 'insert' | 'update' | 'delete') => {
-        if (!currentWidgetId) return {ok:false};
+    // Проверка наличия INSERT QUERY у таблицы саб-виджета
+    const preflightInsertSub = useCallback(async (): Promise<{ ok: boolean }> => {
+        if (!currentWidgetId) return { ok: false };
         try {
-            const {data: widget} = await api.get<Widget>(`/widgets/${currentWidgetId}`);
-            const {data: table} = await api.get<DTable>(`/tables/${widget.table_id}`);
-            const q = kind === 'insert' ? table?.insert_query
-                : kind === 'update' ? table?.update_query
-                    : table?.delete_query;
-            if (!q || !q.trim()) return {ok:false};
-        } catch {
-            return {ok:false};
+            const { data: widget } = await api.get(`/widgets/${currentWidgetId}`);
+            const { data: table }  = await api.get(`/tables/${widget.table_id}`);
+            if (!table?.insert_query?.trim()) {
+                alert('Для таблицы саб-виджета не настроен INSERT QUERY. Задайте его в метаданных таблицы.');
+                return { ok: false };
+            }
+        } catch (e) {
+            console.warn('preflight (sub/insert) failed:', e);
         }
-        return {ok:true};
+        return { ok: true };
     }, [currentWidgetId]);
 
+    // Начать добавление саб-строки
     const startAddSub = useCallback(async () => {
-        const pf = await preflight('insert');
-        if (!pf.ok || !formIdForSub || !currentWidgetId) return;
+        if (!formIdForSub || !currentWidgetId) return;
 
-        setIsAddingSub(true);
+        // Нужен выбранный родитель (обычно FK)
+        if (!lastPrimary || Object.keys(lastPrimary).length === 0) {
+            alert('Сначала выберите строку в основной таблице, чтобы добавить связанную запись в саб-таблицу.');
+            return;
+        }
+
+        const pf = await preflightInsertSub();
+        if (!pf.ok) return;
+
         const init: Record<number, string> = {};
-        flatColumnsInRenderOrder.forEach(c => { if (c.table_column_id != null) init[c.table_column_id] = ''; });
+        subEditableTcIds.forEach(tcId => { init[tcId] = ''; });
         setDraftSub(init);
-    }, [preflight, formIdForSub, currentWidgetId, flatColumnsInRenderOrder]);
+        setIsAddingSub(true);
+    }, [formIdForSub, currentWidgetId, lastPrimary, preflightInsertSub, subEditableTcIds]);
 
-    const cancelAddSub = useCallback(() => { setIsAddingSub(false); setDraftSub({}); }, []);
+    // Отменить добавление
+    const cancelAddSub = useCallback(() => {
+        setIsAddingSub(false);
+        setDraftSub({});
+    }, []);
 
+    // Отправить добавление
     const submitAddSub = useCallback(async () => {
         if (!formIdForSub || !currentWidgetId) return;
-        const pf = await preflight('insert');
+
+        if (!lastPrimary || Object.keys(lastPrimary).length === 0) {
+            alert('Сначала выберите строку в основной таблице.');
+            return;
+        }
+
+        const pf = await preflightInsertSub();
         if (!pf.ok) return;
 
         setSavingSub(true);
         try {
             const values = Object.entries(draftSub)
-                .filter(([, v]) => v !== '' && v !== undefined && v !== null)
-                .map(([table_column_id, value]) => ({ table_column_id: Number(table_column_id), value: String(value) }));
+                .filter(([, v]) => v !== '' && v != null)
+                .map(([table_column_id, value]) => ({
+                    table_column_id: Number(table_column_id),
+                    value: String(value),
+                }));
 
-            const body = { pk: {}, values };
+            const body = {
+                pk: {
+                    primary_keys: Object.fromEntries(
+                        Object.entries(lastPrimary).map(([k, v]) => [k, String(v)])
+                    ),
+                },
+                values,
+            };
+
             const url = `/data/${formIdForSub}/${currentWidgetId}`;
-
-            try { await api.post(url, body); }
-            catch (err: any) {
+            try {
+                await api.post(url, body);
+            } catch (err: any) {
                 const status = err?.response?.status;
-                const detail = err?.response?.data?.detail ?? err?.response?.data ?? err?.message;
-                if (status === 404 && String(detail).includes('Insert query not found')) return;
-                if (status === 404) { await api.post(`${url}/`, body); } else { throw err; }
+                const detail  = err?.response?.data?.detail ?? err?.response?.data ?? err?.message;
+                if (status === 404 && String(detail).includes('Insert query not found')) {
+                    alert('Для саб-формы не настроен INSERT QUERY. Задайте его и повторите.');
+                    return;
+                }
+                if (status === 404) {
+                    await api.post(`${url}/`, body);
+                } else {
+                    throw err;
+                }
             }
 
-            if (currentOrder != null) handleTabClick(currentOrder);
+            // Перезагрузить текущий саб-виджет
+            if (currentOrder != null) {
+                loadSubDisplay(formIdForSub, currentOrder, lastPrimary);
+            }
             setIsAddingSub(false);
             setDraftSub({});
         } finally {
             setSavingSub(false);
         }
-    }, [formIdForSub, currentWidgetId, draftSub, currentOrder, handleTabClick, preflight]);
-
-    const startEditSub = useCallback(async (row: FormDisplay['data'][number], valueIndexByKey: Map<string, number>) => {
-        const pf = await preflight('update');
-        if (!pf.ok) return;
-
-        const init: Record<number, string> = {};
-        flatColumnsInRenderOrder.forEach(col => {
-            const k = `${col.widget_column_id}:${col.table_column_id ?? -1}`;
-            const idx = valueIndexByKey.get(k);
-            const val = idx != null ? row.values[idx] : '';
-            if (col.table_column_id != null) init[col.table_column_id] = (val ?? '').toString();
-        });
-        setEditDraftSub(init);
-    }, [preflight, flatColumnsInRenderOrder]);
+    }, [formIdForSub, currentWidgetId, lastPrimary, draftSub, currentOrder, preflightInsertSub, loadSubDisplay]);
 
     return {
-        // state
-        isAddingSub, draftSub, savingSub,
-        editingRowIdxSub, editDraftSub, editSavingSub,
-        // handlers
-        startAddSub, cancelAddSub, submitAddSub,
+        isAddingSub,
+        setIsAddingSub,
+        draftSub,
         setDraftSub,
-        setEditingRowIdxSub, setEditDraftSub, setEditSavingSub,
+        savingSub,
+        startAddSub,
+        cancelAddSub,
+        submitAddSub,
+        subEditableTcIds,
     };
 }

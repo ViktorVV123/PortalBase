@@ -4,6 +4,7 @@ import * as s from '@/components/setOfTables/SetOfTables.module.scss';
 import EditIcon from '@/assets/image/EditIcon.svg';
 import DeleteIcon from '@/assets/image/DeleteIcon.svg';
 import type { FormDisplay } from '@/shared/hooks/useWorkSpaces';
+import {formatCellValue} from "@/shared/utils/cellFormat";
 
 type HeaderPlanGroup = {
     id: number;
@@ -166,11 +167,12 @@ export const MainTable: React.FC<Props> = (p) => {
                                                 }}
                                                 title={`Открыть форму #${col.form_id}`}
                                             >
-                                                {val}
+                                                {formatCellValue(val)}
                                             </button>
                                         ) : (
-                                            <>{val}</>
+                                            <>{formatCellValue(val)}</>
                                         )}
+
                                     </td>
                                 );
                             })}

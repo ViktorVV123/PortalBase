@@ -10,6 +10,7 @@ import DeleteIcon from '@/assets/image/DeleteIcon.svg';
 import { api } from '@/services/api';
 import type { SubDisplay, DTable, Widget } from '@/shared/hooks/useWorkSpaces';
 import type { HeaderModelItem } from '@/components/formTable/FormTable';
+import {formatCellValue, isEditableValue} from "@/shared/utils/cellFormat";
 
 type SubformProps = {
     subDisplay: SubDisplay | null;
@@ -186,7 +187,10 @@ export const SubWormTable: React.FC<SubformProps> = ({
             const k = `${col.widget_column_id}:${col.table_column_id ?? -1}`;
             const idx = valueIndexByKey.get(k);
             const val = idx != null ? row.values[idx] : '';
-            if (col.table_column_id != null) init[col.table_column_id] = (val ?? '').toString();
+            if (col.table_column_id != null && isEditableValue(val)) {
+                init[col.table_column_id] = String(val ?? '');
+            }
+
         });
 
         setEditingRowIdx(rowIdx);
@@ -419,11 +423,10 @@ export const SubWormTable: React.FC<SubformProps> = ({
                                         }
 
                                         return (
-                                            <td
-                                                key={`sub-r${rowIdx}-wc${col.widget_column_id}-tc${col.table_column_id}`}
-                                            >
-                                                {val}
+                                            <td key={`sub-r${rowIdx}-wc${col.widget_column_id}-tc${col.table_column_id}`}>
+                                                {formatCellValue(val)}
                                             </td>
+
                                         );
                                     })}
 

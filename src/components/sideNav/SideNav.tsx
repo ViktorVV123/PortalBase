@@ -56,14 +56,14 @@ export const SideNav: React.FC<Props> = ({ open, toggle, forms, openForm }) => {
 
     return (
         <div className={s.wrap} ref={wrapRef}>
-            <di
+            <div
                 className={s.burger}
                 onClick={toggle}
                 aria-haspopup="menu"
                 aria-expanded={open}
             >
                 <MenuIcon />
-            </di>
+            </div>
 
             {open && forms.length > 0 && (
                 <div className={s.popup}>

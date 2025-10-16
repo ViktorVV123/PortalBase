@@ -12,18 +12,19 @@ import {api} from '@/services/api';
 
 import {ThemeProvider} from '@mui/material';
 import {dark} from '@/shared/themeUI/themeModal/ThemeModalUI';
-import {useFuzzyRows} from '@/shared/hooks/useFuzzySearch';
-import {useDebounced} from '@/shared/hooks/useDebounced';
 import {TableToolbar} from '@/components/tableToolbar/TableToolbar';
-
 import {useDrillDialog} from '@/components/formTable/hooks/useDrillDialog';
-
 import {useMainCrud} from '@/components/formTable/hooks/useMainCrud';
 import {useFiltersTree} from '@/components/formTable/hooks/useFiltersTree';
 import {TreeFormTable} from "@/components/formTable/treeForm/TreeFormTable";
 import {MainTable} from "@/components/formTable/parts/MainTable";
 import {SubWormTable} from "@/components/formTable/subForm/SubFormTable";
 import {DrillDialog} from "@/components/formTable/parts/DrillDialog";
+import {useHeaderPlan} from "@/components/formTable/hooks/useHeaderPlan";
+import {useSubCrud} from "@/components/formTable/hooks/useSubCrud";
+import {useSubNav} from "@/components/formTable/hooks/useSubNav";
+import {useFormSearch} from "@/components/formTable/hooks/useFormSearch";
+import {useTreeHandlers} from "@/components/formTable/hooks/useTreeHandlers";
 
 
 /** Модель шапки (совместима с твоей) */
@@ -45,7 +46,10 @@ type Props = {
     subLoading: boolean;
     subError: string | null;
     formTrees: Record<number, FormTreeColumn[]>;
-    loadFilteredFormDisplay: (formId: number, filter: { table_column_id: number; value: string | number }) => Promise<void>;
+    loadFilteredFormDisplay: (formId: number, filter: {
+        table_column_id: number;
+        value: string | number
+    }) => Promise<void>;
     subHeaderGroups: HeaderModelItem[];
     setFormDisplay: (value: FormDisplay | null) => void;
     setSubDisplay: (value: SubDisplay | null) => void;
@@ -70,14 +74,11 @@ export const FormTable: React.FC<Props> = ({
                                                formsById,
                                            }) => {
     /** ─────────── локальные состояния ─────────── */
-    const [lastPrimary, setLastPrimary] = useState<Record<string, unknown>>({});
-    const [selectedKey, setSelectedKey] = useState<string | null>(null);
-    const [activeSubOrder, setActiveSubOrder] = useState<number>(0);
+
     const [showSubHeaders, setShowSubHeaders] = useState(false);
-    const [q, setQ] = useState('');
-    const dq = useDebounced(q, 250);
-
-
+    const [editingRowIdxSub, setEditingRowIdxSub] = useState<number | null>(null);
+    const [editDraftSub, setEditDraftSub] = useState<Record<number, string>>({});
+    const [editSavingSub, setEditSavingSub] = useState(false);
 
 
     /** ─────────── форма/сабы ─────────── */
@@ -90,11 +91,15 @@ export const FormTable: React.FC<Props> = ({
     const [overrideForm, setOverrideForm] = useState<WidgetForm | null>(null);
     const currentForm: WidgetForm | null = overrideForm ?? baseForm;
 
-    useEffect(() => { setOverrideForm(null); }, [selectedFormId]);
+    useEffect(() => {
+        setOverrideForm(null);
+    }, [selectedFormId]);
 
     const subWidgetIdByOrder = useMemo(() => {
         const map: Record<number, number> = {};
-        currentForm?.sub_widgets?.forEach(sw => { map[sw.widget_order] = sw.sub_widget_id; });
+        currentForm?.sub_widgets?.forEach(sw => {
+            map[sw.widget_order] = sw.sub_widget_id;
+        });
         return map;
     }, [currentForm]);
 
@@ -110,16 +115,30 @@ export const FormTable: React.FC<Props> = ({
         setSubDisplay(null);
     }, [availableOrders, setSubDisplay]);
 
+    const {
+        lastPrimary, setLastPrimary,
+        selectedKey, setSelectedKey,
+        activeSubOrder, setActiveSubOrder,
+        pkToKey,
+        handleRowClick,
+        handleTabClick,
+    } = useSubNav({
+        formIdForSub,
+        availableOrders,
+        loadSubDisplay,
+    });
+
     const currentOrder = useMemo(
         () => (availableOrders.includes(activeSubOrder) ? activeSubOrder : (availableOrders[0] ?? 0)),
         [activeSubOrder, availableOrders]
     );
     const currentWidgetId = currentOrder != null ? subWidgetIdByOrder[currentOrder] : undefined;
-
     /** ─────────── дерево значений (живое) ─────────── */
     const tree = selectedFormId ? formTrees[selectedFormId] : null;
     const [liveTree, setLiveTree] = useState<FormTreeColumn[] | null>(null);
-    useEffect(() => { setLiveTree(tree ?? null); }, [tree, selectedFormId]);
+    useEffect(() => {
+        setLiveTree(tree ?? null);
+    }, [tree, selectedFormId]);
 
     const reloadTree = useCallback(async () => {
         const formId = selectedFormId ?? currentForm?.form_id ?? null;
@@ -133,116 +152,13 @@ export const FormTable: React.FC<Props> = ({
     }, [selectedFormId, currentForm]);
 
     /** ─────────── построение шапки/колонок ─────────── */
-    const safe = (v?: string | null) => (v?.trim() ? v.trim() : '—');
 
-    const sortedColumns = useMemo(
-        () => [...formDisplay.columns].sort((a, b) => a.column_order - b.column_order),
-        [formDisplay.columns]
-    );
-
-    const byWcId = useMemo(() => {
-        const map: Record<number, typeof sortedColumns> = {};
-        for (const col of sortedColumns) (map[col.widget_column_id] ||= []).push(col);
-        return map;
-    }, [sortedColumns]);
-
-    const headerPlan = useMemo(() => {
-        if (!headerGroups?.length) {
-            // fallback по (name, wcId) — как было
-            const groups: { id: number; title: string; labels: string[]; cols: typeof sortedColumns }[] = [];
-            let i = 0;
-            while (i < sortedColumns.length) {
-                const name = sortedColumns[i].column_name;
-                const wcId = sortedColumns[i].widget_column_id;
-                const cols: typeof sortedColumns = [];
-                while (i < sortedColumns.length && sortedColumns[i].column_name === name && sortedColumns[i].widget_column_id === wcId) {
-                    cols.push(sortedColumns[i]); i++;
-                }
-                groups.push({ id: wcId, title: safe(name), labels: cols.map(() => '—'), cols });
-            }
-            return groups;
-        }
-
-        const visibleGroups = headerGroups.filter((g) => g.visible !== false);
-        const planned: { id: number; title: string; labels: string[]; cols: typeof sortedColumns }[] = [];
-
-        for (const g of visibleGroups) {
-            const allCols = (byWcId[g.id] ?? []).slice();
-            let cols = allCols;
-            let labels: string[] = [];
-
-            if (g.refIds?.length) {
-                // 1) строим словарь refId -> label
-                const labelByRefId = new Map<number, string>();
-                const total = g.refIds.length;
-                for (let i = 0; i < total; i++) {
-                    const refId = g.refIds[i];
-                    const lblRaw = (g.labels?.[i] ?? '');
-                    labelByRefId.set(refId, safe(lblRaw));
-                }
-
-                // 2) оставляем только колонки, у которых есть table_column_id и он есть в словаре
-                const candidateCols = allCols.filter(c => c.table_column_id != null && labelByRefId.has(c.table_column_id!));
-
-                // 3) сортируем колонки строго по порядку g.refIds
-                const order = new Map<number, number>();
-                g.refIds.forEach((id, idx) => order.set(id, idx));
-                cols = candidateCols.sort((a, b) => {
-                    const ai = order.get(a.table_column_id!) ?? Number.MAX_SAFE_INTEGER;
-                    const bi = order.get(b.table_column_id!) ?? Number.MAX_SAFE_INTEGER;
-                    return ai - bi;
-                });
-
-                if (!cols.length) continue;
-
-                // 4) финальные labels — просто берём из словаря по конкретным col
-                labels = cols.map(c => labelByRefId.get(c.table_column_id!) ?? '—');
-            } else {
-                // старое поведение для групп без refIds
-                if (!cols.length) continue;
-                labels = (g.labels ?? []).slice(0, cols.length).map(safe);
-                while (labels.length < cols.length) labels.push('—');
-            }
-
-            planned.push({ id: g.id, title: safe(g.title), labels, cols });
-        }
-
-        return planned;
-    }, [headerGroups, byWcId, sortedColumns]);
-
-
-    const flatColumnsInRenderOrder = useMemo(
-        () => headerPlan.flatMap(g => g.cols),
-        [headerPlan]
-    );
-
-    type DisplayColumn = typeof formDisplay.columns[number];
-    const isColReadOnly = useCallback((col: DisplayColumn): boolean => {
-        const anyCol = col as any;
-        const explicit = anyCol?.readonly === true || anyCol?.read_only === true || anyCol?.is_readonly === true || anyCol?.meta?.readonly === true;
-        const implicit = anyCol?.primary === true || anyCol?.increment === true;
-        return !!(explicit || implicit);
-    }, []);
-
-    const valueIndexByKey = useMemo(() => {
-        const map = new Map<string, number>();
-        formDisplay.columns.forEach((c, i) => {
-            map.set(`${c.widget_column_id}:${c.table_column_id ?? -1}`, i);
-        });
-        return map;
-    }, [formDisplay.columns]);
-
-    /** ─────────── поиск/фильтрация ─────────── */
-    const showSearch = !!currentForm?.search_bar;
-    const {filtered} = useFuzzyRows(
-        formDisplay,
+    const {
+        headerPlan,
         flatColumnsInRenderOrder,
         valueIndexByKey,
-        dq,
-        {threshold: 0.35, distance: 120}
-    );
-    useEffect(() => { if (!showSearch && q) setQ(''); }, [showSearch, q]);
-    const filteredRows = useMemo(() => filtered, [filtered]);
+        isColReadOnly,
+    } = useHeaderPlan(formDisplay, headerGroups);
 
     /** ─────────── фильтры/дерево (хук) ─────────── */
     const {
@@ -251,6 +167,17 @@ export const FormTable: React.FC<Props> = ({
         activeExpandedKey, setActiveExpandedKey,
         resetFiltersHard,
     } = useFiltersTree(selectedFormId, (v) => setFormDisplay(v));
+
+
+    const { handleNestedValueClick, handleTreeValueClick } = useTreeHandlers({
+        selectedFormId,
+        activeFilters,
+        setActiveFilters,
+        setNestedTrees,
+        setActiveExpandedKey,
+        setFormDisplay,
+        setSubDisplay,
+    });
 
     const handleResetFilters = useCallback(async () => {
         if (!selectedFormId || !selectedWidget) return;
@@ -272,147 +199,16 @@ export const FormTable: React.FC<Props> = ({
         setSubDisplay, resetFiltersHard, reloadTree
     ]);
 
-
-
-    const [isAddingSub, setIsAddingSub] = useState(false);
-    const [draftSub, setDraftSub] = useState<Record<number, string>>({});
-    const [savingSub, setSavingSub] = useState(false);
-
-// утилита: собрать список редактируемых sub-колонок в порядке рендера
-    const subEditableTcIds = useMemo(() => {
-        // колонки саб-таблицы берем из subDisplay?.columns, а порядок — из headerPlan для саба
-        const cols = subDisplay?.columns ?? [];
-        // оставляем только те, что не PK/инкремент и у которых есть table_column_id
-        return cols
-            .filter(c => c.table_column_id != null && !((c as any).primary || (c as any).increment || (c as any).readonly))
-            .map(c => c.table_column_id as number);
-    }, [subDisplay?.columns]);
-
-// префлайт для INSERT саб-виджета с алертом
-    const preflightInsertSub = useCallback(async (): Promise<{ok:boolean}> => {
-        if (!currentWidgetId) return {ok:false};
-        try {
-            // sub widget -> его таблица
-            const { data: widget } = await api.get(`/widgets/${currentWidgetId}`);
-            const { data: table }  = await api.get(`/tables/${widget.table_id}`);
-            if (!table?.insert_query?.trim()) {
-                alert('Для таблицы саб-виджета не настроен INSERT QUERY. Задайте его в метаданных таблицы.');
-                return {ok:false};
-            }
-        } catch (e) {
-            console.warn('preflight (sub/insert) failed:', e);
-        }
-        return {ok:true};
-    }, [currentWidgetId]);
-
-// начать добавление саб-строки
-    const startAddSub = useCallback(async () => {
-        if (!formIdForSub || !currentWidgetId) return;
-        // требуем выбранную строку в основной таблице (обычно нужен FK)
-        if (!lastPrimary || Object.keys(lastPrimary).length === 0) {
-            alert('Сначала выберите строку в основной таблице, чтобы добавить связанную запись в саб-таблицу.');
-            return;
-        }
-        const pf = await preflightInsertSub();
-        if (!pf.ok) return;
-
-        // подготовить драфт (пустые значения для редактируемых полей)
-        const init: Record<number, string> = {};
-        subEditableTcIds.forEach(tcId => { init[tcId] = ''; });
-        setDraftSub(init);
-        setIsAddingSub(true);
-    }, [formIdForSub, currentWidgetId, lastPrimary, preflightInsertSub, subEditableTcIds]);
-
-// отменить добавление
-    const cancelAddSub = useCallback(() => {
-        setIsAddingSub(false);
-        setDraftSub({});
-    }, []);
-
-// отправить добавление
-    const submitAddSub = useCallback(async () => {
-        if (!formIdForSub || !currentWidgetId) return;
-
-        // без выбранной основной строки — нельзя (обычно нужен FK)
-        if (!lastPrimary || Object.keys(lastPrimary).length === 0) {
-            alert('Сначала выберите строку в основной таблице.');
-            return;
-        }
-
-        const pf = await preflightInsertSub();
-        if (!pf.ok) return;
-
-        setSavingSub(true);
-        try {
-            const values = Object.entries(draftSub)
-                .filter(([,v]) => v !== '' && v != null)
-                .map(([table_column_id, value]) => ({
-                    table_column_id: Number(table_column_id),
-                    value: String(value),
-                }));
-
-            // обычно на бэке саб-вставка требует PK родителя,
-            // поэтому шлем его; если у тебя другая схема — адаптируй.
-            const body = { pk: { primary_keys: Object.fromEntries(
-                        Object.entries(lastPrimary).map(([k,v]) => [k, String(v)])
-                    )}, values };
-
-            const url = `/data/${formIdForSub}/${currentWidgetId}`;
-            try {
-                await api.post(url, body);
-            } catch (err:any) {
-                const status = err?.response?.status;
-                const detail  = err?.response?.data?.detail ?? err?.response?.data ?? err?.message;
-                if (status === 404 && String(detail).includes('Insert query not found')) {
-                    alert('Для саб-формы не настроен INSERT QUERY. Задайте его и повторите.');
-                    return;
-                }
-                if (status === 404) {
-                    await api.post(`${url}/`, body);
-                } else {
-                    throw err;
-                }
-            }
-
-            // перезагрузим текущий саб-виджет
-            if (activeSubOrder != null) {
-                loadSubDisplay(formIdForSub, activeSubOrder, lastPrimary);
-            }
-            setIsAddingSub(false);
-            setDraftSub({});
-        } finally {
-            setSavingSub(false);
-        }
-    }, [formIdForSub, currentWidgetId, lastPrimary, draftSub, activeSubOrder, preflightInsertSub, loadSubDisplay]);
-
-
-
-
-    /** ─────────── utilы/навигация ─────────── */
-    const pkToKey = useCallback((pk: Record<string, unknown>) =>
-            Object.keys(pk).sort().map(k => `${k}:${String(pk[k])}`).join('|')
-        , []);
-
-    const handleRowClick = useCallback((rowPk: Record<string, unknown>) => {
-        if (!formIdForSub) return;
-        setLastPrimary(rowPk);
-        setSelectedKey(pkToKey(rowPk));
-        loadSubDisplay(formIdForSub, currentOrder, rowPk);
-    }, [formIdForSub, pkToKey, loadSubDisplay, currentOrder]);
-
-    const handleTabClick = useCallback((order: number) => {
-        const next = availableOrders.includes(order) ? order : (availableOrders[0] ?? 0);
-        if (next === activeSubOrder) return;
-        setActiveSubOrder(next);
-        if (!formIdForSub || Object.keys(lastPrimary).length === 0) return;
-        loadSubDisplay(formIdForSub, next, lastPrimary);
-    }, [availableOrders, activeSubOrder, formIdForSub, lastPrimary, loadSubDisplay]);
-
     /** ─────────── drill dialog (хук) ─────────── */
     const {open, formId, loading, display, error, closeDialog, openDialog} = ((() => {
         const d = useDrillDialog();
         return {
-            open: d.open, formId: d.formId, loading: d.loading, display: d.display, error: d.error, closeDialog: d.closeDialog,
+            open: d.open,
+            formId: d.formId,
+            loading: d.loading,
+            display: d.display,
+            error: d.error,
+            closeDialog: d.closeDialog,
             openDialog: d.openDialog,
         };
     })());
@@ -444,6 +240,33 @@ export const FormTable: React.FC<Props> = ({
         setSelectedKey,
     });
 
+
+    const { showSearch, q, setQ, filteredRows } = useFormSearch(
+        formDisplay,
+        flatColumnsInRenderOrder,
+        valueIndexByKey,
+        currentForm?.search_bar,
+        { threshold: 0.35, distance: 120, debounceMs: 250 } // опционально
+    );
+
+    const {
+        isAddingSub,
+        setIsAddingSub,
+        draftSub,
+        setDraftSub,
+        savingSub,
+        startAddSub,
+        cancelAddSub,
+        submitAddSub,
+    } = useSubCrud({
+        formIdForSub,
+        currentWidgetId,
+        currentOrder,
+        loadSubDisplay,
+        lastPrimary,
+        subDisplay,
+    });
+
     /** ─────────── UI ─────────── */
     return (
         <ThemeProvider theme={dark}>
@@ -455,43 +278,8 @@ export const FormTable: React.FC<Props> = ({
                     activeExpandedKey={activeExpandedKey}
                     nestedTrees={nestedTrees}
                     handleResetFilters={handleResetFilters}
-                    handleNestedValueClick={async (table_column_id, value) => {
-                        if (!selectedFormId) return;
-                        const newFilter = {table_column_id, value};
-                        const filters = [
-                            ...activeFilters.filter(f => f.table_column_id !== table_column_id),
-                            newFilter
-                        ];
-                        try {
-                            const {data} = await api.post<FormDisplay>(`/display/${selectedFormId}/main`, filters);
-                            setFormDisplay(data);
-                            setActiveFilters(filters);
-                            setSubDisplay(null);
-                        } catch (e) {
-                            console.warn('❌ Ошибка nested фильтра:', e);
-                        }
-                    }}
-                    handleTreeValueClick={async (table_column_id, value) => {
-                        if (!selectedFormId) return;
-                        const filters = [{table_column_id, value}];
-                        try {
-                            const {data: mainData} = await api.post<FormDisplay>(`/display/${selectedFormId}/main`, filters);
-                            setFormDisplay(mainData);
-                            setActiveFilters(filters);
-                            setSubDisplay(null);
-
-                            const {data} = await api.post<FormTreeColumn[] | FormTreeColumn>(
-                                `/display/${selectedFormId}/tree`,
-                                filters
-                            );
-                            const normalized = Array.isArray(data) ? data : [data];
-                            const key = `${table_column_id}-${value}`;
-                            setNestedTrees(prev => ({...prev, [key]: normalized}));
-                            setActiveExpandedKey(key);
-                        } catch (e) {
-                            console.warn('❌ Ошибка handleTreeValueClick:', e);
-                        }
-                    }}
+                    handleNestedValueClick={handleNestedValueClick}
+                    handleTreeValueClick={handleTreeValueClick}
                 />
 
                 {/* RIGHT: MAIN + SUB */}
@@ -510,7 +298,7 @@ export const FormTable: React.FC<Props> = ({
                         startAdd={startAdd}
                         submitAdd={submitAdd}
                         cancelAdd={cancelAdd}
-                        showSearch={!!currentForm?.search_bar}
+                        showSearch={showSearch}
                         value={q}
                         onChange={setQ}
                         onResetFilters={handleResetFilters}
@@ -553,16 +341,17 @@ export const FormTable: React.FC<Props> = ({
                     />
 
                     <SubWormTable
+
+                        editingRowIdx={editingRowIdxSub}
+                        setEditingRowIdx={setEditingRowIdxSub}
+                        editDraft={editDraftSub}
+                        setEditDraft={setEditDraftSub}
+                        editSaving={editSavingSub}
+                        setEditSaving={setEditSavingSub}
                         isAddingSub={isAddingSub}
                         setIsAddingSub={setIsAddingSub}
                         draftSub={draftSub}
                         setDraftSub={setDraftSub}
-                        setEditSaving={() => {}}
-                        editDraft={{}}
-                        editingRowIdx={null}
-                        setEditDraft={() => {}}
-                        setEditingRowIdx={() => {}}
-                        editSaving={false}
                         currentOrder={currentOrder}
                         currentWidgetId={currentWidgetId}
                         subHeaderGroups={subHeaderGroups}
