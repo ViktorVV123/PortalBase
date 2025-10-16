@@ -1,7 +1,7 @@
 import {useMemo} from 'react';
 import type {WidgetColumn} from '@/shared/hooks/useWorkSpaces';
 import type {HeaderGroup} from '@/shared/utils/headerGroups';
-import type {WcReference} from '@/components/WidgetColumnsOfTable/WidgetColumnsOfTable';
+import type {WcReference} from '@/components/WidgetColumnsOfTable/WidgetColumnTable/WidgetColumnsOfTable';
 
 export function useHeaderGroupsFromWidgetColumns(
     widgetColumns: WidgetColumn[] | undefined,

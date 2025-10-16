@@ -16,7 +16,7 @@ import {TableColumn} from '@/components/tableColumn/TableColumn';
 import {
     WcReference,
     WidgetColumnsOfTable,
-} from '@/components/WidgetColumnsOfTable/WidgetColumnsOfTable';
+} from '@/components/WidgetColumnsOfTable/WidgetColumnTable/WidgetColumnsOfTable';
 import {api} from '@/services/api';
 import {Breadcrumb, Crumb} from "@/shared/ui/Breadcrumb";
 import {useHeaderGroupsFromWidgetColumns} from "@/components/setOfTables/hooks/useHeaderGroupsFromWidgetColumns";

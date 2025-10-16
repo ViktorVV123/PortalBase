@@ -184,62 +184,6 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
         });
     }, [selectedWidget, widgetModalOpen]);
 
-    // единый сабмит: сначала мета, затем publish если изменился
-    const saveWidgetMeta = useCallback(async () => {
-        if (!selectedWidget) return;
-
-        setSavingMeta(true);
-        const origPublished = Boolean(selectedWidget.published);
-        const nextPublished = Boolean(widgetMeta.published);
-
-        try {
-            // 1) PATCH метаданных (без published)
-            const upd = await updateWidgetMeta(selectedWidget.id, {
-                name: widgetMeta.name,
-                description: widgetMeta.description,
-                table_id: widgetMeta.table_id,
-            });
-
-            let finalWidget = upd;
-
-            // 2) если публикация изменилась — PATCH /publish
-            if (origPublished !== nextPublished) {
-                await api.patch(`/widgets/${selectedWidget.id}/publish`, {
-                    published: nextPublished,
-                });
-                finalWidget = {...upd, published: nextPublished};
-            }
-
-            // 3) обновляем локальные стора
-            setSelectedWidget(finalWidget);
-            setWidgetsByTable(prev => {
-                const tblId = finalWidget.table_id;
-                const updated = (prev[tblId] ?? []).map(w =>
-                    w.id === finalWidget.id ? finalWidget : w
-                );
-                return {...prev, [tblId]: updated};
-            });
-
-            await loadColumnsWidget(finalWidget.id);
-            setWidgetModalOpen(false);
-        } catch (e) {
-            console.warn('❌ Ошибка при сохранении метаданных/публикации:', e);
-            alert('Не удалось сохранить изменения');
-        } finally {
-            setSavingMeta(false);
-        }
-    }, [
-        selectedWidget,
-        widgetMeta.name,
-        widgetMeta.description,
-        widgetMeta.table_id,
-        widgetMeta.published,
-        updateWidgetMeta,
-        setSelectedWidget,
-        setWidgetsByTable,
-        loadColumnsWidget,
-    ]);
-
     // ───────── Удаление reference ─────────
     const handleDeleteReference = async (wcId: number, tblColId: number) => {
         if (!selectedWidget) return;

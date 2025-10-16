@@ -2,7 +2,7 @@ import {useEffect, useState} from 'react';
 import type {HeaderGroup} from '@/shared/utils/headerGroups';
 import {buildHeaderGroupsFromWidgetColumns} from '@/shared/utils/headerGroups';
 import type {WidgetColumn} from '@/shared/hooks/useWorkSpaces';
-import type {WcReference} from '@/components/WidgetColumnsOfTable/WidgetColumnsOfTable';
+import type {WcReference} from '@/components/WidgetColumnsOfTable/WidgetColumnTable/WidgetColumnsOfTable';
 
 /** Инъекция зависимостей делает хук тестируемым и не тянет api внутрь */
 type GetColumnsByWidgetId = (widgetId: number) => Promise<WidgetColumn[]>;
