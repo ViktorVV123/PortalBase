@@ -97,36 +97,56 @@ export type WidgetForm = {
 
 //типизация формы MAIN
 
+/** Колонка формы — один «столбец рендера» */
 export interface FormColumn {
-    column_order: number;
-    column_name: string;
-    ref_column_name:string
-    readonly: boolean;
-    placeholder: string | null;
-    type: string | null;
-    default: string | null;
-    published: boolean;
+    // Порядки
+    column_order: number;                 // порядок групп (верхняя шапка)
+    ref_column_order: number | null;      // порядок внутри группы
+    combobox_column_order: number | null; // порядок внутри "комбо" вариантов
+
+    // Имена/подписи
+    column_name: string;            // заголовок группы
+    ref_column_name: string | null; // подпись подколонки (если нет combobox_alias)
+    combobox_alias: string | null;  // подпись комбо-варианта (приоритетнее ref_column_name)
+
+    // Привязки
+    widget_column_id: number;          // id группы
+    table_column_id: number | null;    // id таблицы (может отсутствовать у вычисляемых колонок)
+    combobox_column_id: number | null; // id колонки-комбо (для уникальности ключей)
+    form_id: number | null;            // для drill-ссылок
+
+    // Валидация/видимость/поведение
+    readonly: boolean | null;  // приходит в данных; иногда вместо этого могут быть другие флаги
     required: boolean;
+    visible: boolean;          // по примеру тоже приходит true/false
     width: number;
-    widget_column_id: number;
-    table_column_id: number
-    form_id:number
+
+    // Ввод/рендер
+    placeholder: string | null;
+    type: string | null;       // "combobox" и пр.
+    default: string | null;
+
+    // Доп. флаги (могут приходить)
+    published?: boolean;
+    primary?: boolean;
+    increment?: boolean;
+    read_only?: boolean;
+    is_readonly?: boolean;
+    meta?: { readonly?: boolean; [k: string]: unknown };
 }
 
-/** Одна строка данных */
 export interface FormRow {
-    /** первичные ключи приходят объектом вида { person_id: 3, … } */
     primary_keys: Record<string, number | string>;
-    /** значения идут в том же порядке, что и columns */
-    values: (string | number | null)[];
+    values: (string | number | null)[]; // порядок совпадает с FormDisplay.columns
 }
+
+
 
 /** Заголовок блока “displayed_widget” */
 export interface DisplayedWidget {
     name: string;
     description: string | null;
 }
-
 /** Итоговый объект ответа */
 export interface FormDisplay {
     displayed_widget: DisplayedWidget;

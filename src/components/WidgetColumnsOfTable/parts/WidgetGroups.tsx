@@ -18,14 +18,10 @@ type Props = {
     refs: RefItem[];
     isFirst: boolean;
     isLast: boolean;
-
     moveGroup: (wcId: number, dir: 'up'|'down') => void;
     onOpenAlias: () => void;
     onDeleteGroup: () => void;
     onAddField: () => void;
-
-    // 👇 было: Omit<React.ComponentProps<typeof RefRow>, ...>
-    // стало: Omit<RefRowProps, ...> & TbodyDndHandlers
     rowProps: Omit<RefRowProps, 'wcId'|'r'|'formText'|'visibleText'> & TbodyDndHandlers;
     formNameById: Record<string,string>;
 };

@@ -1,12 +1,48 @@
 import {WidgetColumn, Column} from '@/shared/hooks/useWorkSpaces';
 
-export type RefItem = WidgetColumn['reference'][number];
+export type ComboItem = {
+    combobox_width: number;
+    combobox_column_order: number;
+    combobox_alias: string | null;
+    is_primary: boolean;
+    is_show: boolean;
+    is_show_hidden: boolean;
+    combobox_column_id: number;
+};
+
+export type RefItem = {
+    width?: number | null;
+    ref_column_order?: number | null;
+    type?: string | null;
+    ref_alias?: string | null;
+    default?: string | null;
+    placeholder?: string | null;
+    visible?: boolean | null;
+    readonly?: boolean | null;
+    table_column?: {
+        id: number;
+        table_id: number;
+        name: string;
+        description?: string | null;
+        datatype: string;
+        length?: number | null;
+        precision?: number | null;
+        primary?: boolean;
+        increment?: boolean;
+        required?: boolean;
+    } | null;
+    form?: number | null;
+    form_id?: number | null;
+
+    /** NEW: combobox теперь массив */
+    combobox?: ComboItem[] | null;
+};
+
 
 export type RefPatch = Partial<
     Pick<RefItem, 'ref_column_order'|'width'|'type'|'ref_alias'|'default'|'placeholder'|'visible'|'readonly'>
 > & { form_id?: number | null };
 
-export type FormOption = { id: number | null; name: string };
 export type ColumnOption = { id: number; name: string; datatype: string; disabled: boolean };
 
 export type EditState = {
@@ -45,7 +81,7 @@ export type Props = {
     updateWidgetColumn: (id: number, patch: Partial<Omit<WidgetColumn,'id'|'widget_id'|'reference'>>) => Promise<void> | void;
     updateReference: (widgetColumnId: number, tableColumnId: number, patch: RefPatch) => Promise<RefItem>;
     refreshReferences?: (wcId: number) => Promise<void> | void;
-    onRefsChange?: (refsMap: Record<number, RefItem[]>) => void;
+    onRefsChange?: any;
     deleteColumnWidget: (id: number) => void;
     formsById: Record<number, { form_id: number; name: string }>;
     loadWidgetForms: () => Promise<void> | void;

@@ -10,7 +10,7 @@ import {AddReferenceDialog} from '@/components/modals/modalWidget/AddReferenceDi
 
 
 import {logApi, reindex, getFormId, createReference} from './ref-helpers';
-import type {RefItem, RefPatch, Props, AddDlgState} from './types';
+import type {RefPatch, Props} from './types';
 import {useRefsDnd} from "@/components/WidgetColumnsOfTable/ hooks/useRefsDnd";
 import {WidgetGroup} from "@/components/WidgetColumnsOfTable/parts/WidgetGroups";
 import {useAliasDialog} from "@/components/WidgetColumnsOfTable/WidgetColumnTable/hook/useAliasDialog";
@@ -18,6 +18,8 @@ import {useFormPicker} from "@/components/WidgetColumnsOfTable/WidgetColumnTable
 import {useLocalRefs} from "@/components/WidgetColumnsOfTable/WidgetColumnTable/hook/useLocalRefs";
 import {useEditReference} from "@/components/WidgetColumnsOfTable/WidgetColumnTable/hook/useEditReference";
 import {useAddReference} from "@/components/WidgetColumnsOfTable/WidgetColumnTable/hook/useAddReference";
+import {ComboboxItemDialog} from "@/components/modals/modalCombobox/ComboboxItemDialog";
+import {useComboboxEditor} from "@/components/WidgetColumnsOfTable/WidgetColumnTable/hook/useComboboxEditor";
 
 /** ——— UI theme (для твоих модалок) ——— */
 const dark = createTheme({
@@ -115,6 +117,8 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
     });
 
 
+
+
     /** ——— Перемещение групп ——— */
     const moveGroup = async (wcId: number, dir: 'up' | 'down') => {
         const list = orderedWc;
@@ -143,11 +147,12 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
         callUpdateReference: (wcId, tblColId, patch) => callUpdateReference(wcId, tblColId, patch as any),
         setLocalRefs,
     });
-
+    const { dlg, open: openComboEditor, close: closeComboEditor, onChange: changeComboEditor, save: saveComboEditor } =
+        useComboboxEditor({ localRefsRef, setLocalRefs, callUpdateReference });
 
     /** ——— Render ——— */
     return (
-        <div>
+        <div style={{padding:5}}>
             <h3 style={{margin: '24px 0 8px'}}>Настройка формы</h3>
 
             {orderedWc.map((wc, idx) => {
@@ -173,6 +178,7 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
                             onOpenEdit: openEditById,
                             onDelete: handleDeleteReference,
                             onOpenForm: openFormDialog,
+                            onOpenComboItem: (wcId, tblColId, item) => openComboEditor(wcId, tblColId, item),
                             getIdxById, onDragStart, onDragEnd, onDragOver, onDropRow, onDropTbodyEnd
                         }}
                     />
@@ -180,6 +186,16 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
             })}
 
             <ThemeProvider theme={dark}>
+
+                <ComboboxItemDialog
+                    open={dlg.open}
+                    value={dlg.value}
+                    onChange={changeComboEditor}
+                    onClose={closeComboEditor}
+                    onSave={saveComboEditor}
+                    saving={dlg.saving}
+                />
+
                 <EditReferenceDialog
                     value={edit}
                     onChange={(patch) => setEdit(prev => ({...prev, ...patch}))}

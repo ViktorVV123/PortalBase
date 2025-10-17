@@ -16,7 +16,6 @@ import {
 } from '@mui/material';
 import {WidgetColumnsMainTable} from '@/components/WidgetColumnsOfTable/WidgetColumnsMainTable';
 import EditIcon from '@/assets/image/EditIcon.svg';
-import {api} from '@/services/api';
 import {WidgetMetaDialog} from "@/components/modals/modalWidget/WidgetMetaDialog";
 import {AddWidgetColumnDialog} from "@/components/modals/modalWidget/AddWidgetColumnDialog";
 
@@ -164,7 +163,6 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
     // ───────── Метаданные виджета ─────────
     const [modalOpen, setModalOpen] = useState(false);
     const [widgetModalOpen, setWidgetModalOpen] = useState(false);
-    const [savingMeta, setSavingMeta] = useState(false);
 
     // форма метаданных (инициализируем при открытии диалога/смене виджета)
     const [widgetMeta, setWidgetMeta] = useState<Partial<Widget>>({

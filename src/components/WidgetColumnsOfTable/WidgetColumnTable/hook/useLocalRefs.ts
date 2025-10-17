@@ -41,19 +41,27 @@ export function useLocalRefs({
                 const copy: RefItem = {
                     ...r,
                     table_column: r.table_column ? { ...r.table_column } : r.table_column,
-                    // normalize combobox: объект -> id|code, иначе оставляем как есть
-                    combobox:
-                        typeof (r as any).combobox === 'object' && (r as any).combobox !== null
-                            ? ((r as any).combobox.id ?? (r as any).combobox.code ?? 1)
-                            : (r as any).combobox,
                 } as RefItem;
+
+                // NEW: combobox как массив, отсортированный по combobox_column_order
+                let combo: any = (r as any).combobox ?? null;
+                if (Array.isArray(combo)) {
+                    combo = [...combo].sort(
+                        (a, b) => (a?.combobox_column_order ?? 0) - (b?.combobox_column_order ?? 0)
+                    );
+                } else if (combo && typeof combo === 'object') {
+                    combo = [combo]; // на всякий случай
+                } else {
+                    combo = null;
+                }
+                (copy as any).combobox = combo;
 
                 const fid = getFormId((r as any).form ?? (r as any).form_id ?? null);
                 (copy as any).form = fid;
                 (copy as any).form_id = fid;
+
                 return copy;
             });
-
             const sorted = normalized.sort((a, b) => (a.ref_column_order ?? 0) - (b.ref_column_order ?? 0));
             next[wc.id] = reindex(sorted);
             snap[wc.id] = sorted.map(r => r.table_column?.id).filter(Boolean) as number[];
