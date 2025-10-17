@@ -100,12 +100,16 @@ export function useMainCrud({
         if (!pf.ok) return;
         setIsAdding(true);
         setEditingRowIdx(null);
+
         const init: Record<number, string> = {};
         flatColumnsInRenderOrder.forEach((c) => {
-            if (c.table_column_id != null && !isColReadOnly(c)) init[c.table_column_id] = '';
+            if (c.table_column_id != null && !isColReadOnly(c)) {
+                init[c.table_column_id] = ''; // только редактируемые поля
+            }
         });
         setDraft(init);
     }, [preflightInsert, flatColumnsInRenderOrder, isColReadOnly]);
+
 
     const cancelAdd = useCallback(() => {
         setIsAdding(false);
@@ -120,7 +124,15 @@ export function useMainCrud({
         setSaving(true);
         try {
             const values = Object.entries(draft)
+                // только не-пустые (если хочешь слать пустые строки, убери этот фильтр по value)
                 .filter(([, v]) => v !== '' && v !== undefined && v !== null)
+                // только редактируемые столбцы
+                .filter(([table_column_id]) => {
+                    const col = flatColumnsInRenderOrder.find(
+                        (c) => c.table_column_id === Number(table_column_id)
+                    );
+                    return col && !isColReadOnly(col);
+                })
                 .map(([table_column_id, value]) => ({
                     table_column_id: Number(table_column_id),
                     value: String(value),
@@ -194,8 +206,15 @@ export function useMainCrud({
         setEditSaving(true);
         try {
             const row = formDisplay.data[editingRowIdx];
+
             const values = Object.entries(editDraft)
-                .filter(([, v]) => v !== '' && v !== undefined && v !== null)
+                // только редактируемые поля
+                .filter(([table_column_id]) => {
+                    const col = flatColumnsInRenderOrder.find(
+                        (c) => c.table_column_id === Number(table_column_id)
+                    );
+                    return col && !isColReadOnly(col);
+                })
                 .map(([table_column_id, value]) => ({
                     table_column_id: Number(table_column_id),
                     value: String(value),

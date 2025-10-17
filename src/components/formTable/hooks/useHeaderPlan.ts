@@ -1,140 +1,119 @@
-// src/components/formTable/hooks/useHeaderPlan.ts
+import { useMemo } from 'react';
+import type { FormDisplay } from '@/shared/hooks/useWorkSpaces';
 
-import {useCallback, useMemo} from 'react';
-import type {FormDisplay} from '@/shared/hooks/useWorkSpaces';
+export type HeaderPlanGroup = {
+    id: number;                 // widget_column_id
+    title: string;              // column_name (alias группы)
+    labels: string[];           // подписи ref/combobox
+    cols: FormDisplay['columns'];
+};
 
-import {HeaderModelItem, HeaderPlanGroup} from "@/components/formTable/types";
+export type HeaderPlanResult = {
+    headerPlan: HeaderPlanGroup[];
+    flatColumnsInRenderOrder: FormDisplay['columns'];
+    valueIndexByKey: Map<string, number>;
+    isColReadOnly: (c: FormDisplay['columns'][number]) => boolean;
+};
 
+export function useHeaderPlan(formDisplay: FormDisplay | null): HeaderPlanResult {
+    const columns = formDisplay?.columns ?? [];
 
-export function useHeaderPlan(
-    formDisplay: FormDisplay,
-    headerGroups?: HeaderModelItem[]
-) {
-    const safe = useCallback((v?: string | null) => (v?.trim() ? v.trim() : '—'), []);
+    // 1) Сортировка для отображения: column_order → ref_column_order → combobox_column_order
+    const ordered = useMemo(() => {
+        return [...columns].sort((a, b) => {
+            const colA = a.column_order ?? 0;
+            const colB = b.column_order ?? 0;
+            if (colA !== colB) return colA - colB;
 
-    // Стабильная сортировка колонок формы
-    const sortedColumns = useMemo(
-        () => [...formDisplay.columns].sort((a, b) => a.column_order - b.column_order),
-        [formDisplay.columns]
-    );
+            const refA = a.ref_column_order ?? 0;
+            const refB = b.ref_column_order ?? 0;
+            if (refA !== refB) return refA - refB;
 
-    // Индексация по widget_column_id
-    const byWcId = useMemo(() => {
-        const map: Record<number, typeof sortedColumns> = {};
-        for (const col of sortedColumns) (map[col.widget_column_id] ||= []).push(col);
-        return map;
-    }, [sortedColumns]);
+            const comboA = a.combobox_column_order ?? 0;
+            const comboB = b.combobox_column_order ?? 0;
+            return comboA - comboB;
+        });
+    }, [columns]);
 
-    // Построение headerPlan (группы, подписи, порядок колонок внутри группы)
-    const headerPlan: HeaderPlanGroup[] = useMemo(() => {
-        // fallback, если нет headerGroups — группируем последовательные колонки по (name, wcId)
-        if (!headerGroups?.length) {
-            const groups: HeaderPlanGroup[] = [];
-            let i = 0;
-            while (i < sortedColumns.length) {
-                const name = sortedColumns[i].column_name;
-                const wcId = sortedColumns[i].widget_column_id;
-                const cols: typeof sortedColumns = [];
-                while (
-                    i < sortedColumns.length &&
-                    sortedColumns[i].column_name === name &&
-                    sortedColumns[i].widget_column_id === wcId
-                    ) {
-                    cols.push(sortedColumns[i]);
-                    i++;
-                }
-                groups.push({
-                    id: wcId,
-                    title: safe(name),
-                    labels: cols.map(() => '—'),
-                    cols,
-                });
+    // 2) Нормализация combobox: подменяем table_column_id на синтетический, чтобы ключи были уникальными
+    const normalized = useMemo<FormDisplay['columns']>(() => {
+        return ordered.map((c) => {
+            if (c.type === 'combobox' && c.combobox_column_id != null && c.table_column_id != null) {
+                const syntheticTcId = -1_000_000 - Number(c.combobox_column_id);
+                return { ...c, table_column_id: syntheticTcId };
             }
-            return groups;
+            return c;
+        });
+    }, [ordered]);
+
+    // 3) Подпись для колонки
+    const getLabel = (c: FormDisplay['columns'][number]) => {
+        if (c.type === 'combobox') {
+            const alias = (c.combobox_alias ?? '').trim();
+            if (alias) return alias;
+        }
+        const ref = (c.ref_column_name ?? '').trim();
+        return ref || '—';
+    };
+
+    // 4) Группировка по widget_column_id (порядок групп — по column_order)
+    const headerPlan = useMemo<HeaderPlanGroup[]>(() => {
+        const byWc: Record<number, { title: string; cols: FormDisplay['columns']; labels: string[]; order: number }> = {};
+
+        for (const c of normalized) {
+            const wcId = c.widget_column_id;
+            if (!byWc[wcId]) {
+                byWc[wcId] = {
+                    title: c.column_name ?? '',
+                    cols: [],
+                    labels: [],
+                    order: c.column_order ?? 0,
+                };
+            }
+            byWc[wcId].cols.push(c);
+            byWc[wcId].labels.push(getLabel(c));
         }
 
-        const visibleGroups = headerGroups.filter((g) => g.visible !== false);
-        const planned: HeaderPlanGroup[] = [];
+        return Object.entries(byWc)
+            .map(([id, g]) => ({
+                id: Number(id),
+                title: g.title,
+                labels: g.labels,
+                cols: g.cols,
+            }))
+            .sort((a, b) => {
+                const aOrder = byWc[a.id].order ?? 0;
+                const bOrder = byWc[b.id].order ?? 0;
+                return aOrder - bOrder;
+            });
+    }, [normalized]);
 
-        for (const g of visibleGroups) {
-            const allCols = (byWcId[g.id] ?? []).slice();
-            let cols = allCols;
-            let labels: string[] = [];
+    // 5) Плоский список для рендера (отсортированный/нормализованный)
+    const flatColumnsInRenderOrder = normalized;
 
-            if (g.refIds?.length) {
-                // 1) словарь refId -> label
-                const labelByRefId = new Map<number, string>();
-                const total = g.refIds.length;
-                for (let i = 0; i < total; i++) {
-                    const refId = g.refIds[i];
-                    const lblRaw = g.labels?.[i] ?? '';
-                    labelByRefId.set(refId, safe(lblRaw));
-                }
-
-                // 2) берём только колонки с table_column_id из refIds
-                const candidateCols = allCols.filter(
-                    (c) => c.table_column_id != null && labelByRefId.has(c.table_column_id!)
-                );
-
-                // 3) сортируем ровно по порядку g.refIds
-                const order = new Map<number, number>();
-                g.refIds.forEach((id, idx) => order.set(id, idx));
-                cols = candidateCols.sort((a, b) => {
-                    const ai = order.get(a.table_column_id!) ?? Number.MAX_SAFE_INTEGER;
-                    const bi = order.get(b.table_column_id!) ?? Number.MAX_SAFE_INTEGER;
-                    return ai - bi;
-                });
-
-                if (!cols.length) continue;
-
-                // 4) финальные labels — по фактическим col
-                labels = cols.map((c) => labelByRefId.get(c.table_column_id!) ?? '—');
-            } else {
-                // поведение для групп без refIds
-                if (!allCols.length) continue;
-                cols = allCols;
-                labels = (g.labels ?? []).slice(0, cols.length).map(safe);
-                while (labels.length < cols.length) labels.push('—');
-            }
-
-            planned.push({ id: g.id, title: safe(g.title), labels, cols });
-        }
-
-        return planned;
-    }, [headerGroups, byWcId, safe, sortedColumns]);
-
-    // Плоский порядок колонок рендера
-    const flatColumnsInRenderOrder = useMemo(
-        () => headerPlan.flatMap((g) => g.cols),
-        [headerPlan]
-    );
-
-    // Индексация "wcId:tcId" -> индекс значения в строке
+    // 6) Мапа индексов ДЛЯ ДАННЫХ — строго по оригинальному порядку columns!
     const valueIndexByKey = useMemo(() => {
         const map = new Map<string, number>();
-        formDisplay.columns.forEach((c, i) => {
-            map.set(`${c.widget_column_id}:${c.table_column_id ?? -1}`, i);
-        });
+        for (let i = 0; i < columns.length; i++) {
+            const c = columns[i];
+            const syntheticTcId =
+                c.type === 'combobox' && c.combobox_column_id != null && c.table_column_id != null
+                    ? -1_000_000 - Number(c.combobox_column_id)
+                    : c.table_column_id ?? -1;
+
+            map.set(`${c.widget_column_id}:${syntheticTcId}`, i);
+        }
         return map;
-    }, [formDisplay.columns]);
+    }, [columns]);
 
-    // Рид-онли признак для колонки
-    type DisplayColumn = FormDisplay['columns'][number];
-    const isColReadOnly = useCallback((col: DisplayColumn): boolean => {
-        const anyCol = col as any;
-        const explicit =
-            anyCol?.readonly === true ||
-            anyCol?.read_only === true ||
-            anyCol?.is_readonly === true ||
-            anyCol?.meta?.readonly === true;
-        const implicit = anyCol?.primary === true || anyCol?.increment === true;
-        return !!(explicit || implicit);
-    }, []);
-
-    return {
-        headerPlan,
-        flatColumnsInRenderOrder,
-        valueIndexByKey,
-        isColReadOnly,
+    // 7) readOnly-флаг
+    const isColReadOnly = (c: FormDisplay['columns'][number]) => {
+        // 🔴 ключевое: скрытые считаем нередактируемыми
+        if (c.visible === false) return true;
+        if (c.type === 'combobox') return true;
+        if (c.table_column_id == null) return true;
+        return !!c.readonly;
     };
+
+    return { headerPlan, flatColumnsInRenderOrder, valueIndexByKey, isColReadOnly };
 }

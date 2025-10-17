@@ -34,6 +34,7 @@ export type HeaderModelItem = {
     labels: string[];   // подписи для каждой reference
     visible?: boolean;  // WC.visible
     refIds?: number[];  // порядок table_column_id
+    span: number;
 };
 
 type Props = {
@@ -50,7 +51,7 @@ type Props = {
         table_column_id: number;
         value: string | number
     }) => Promise<void>;
-    subHeaderGroups: HeaderModelItem[];
+    subHeaderGroups?: HeaderModelItem[];
     setFormDisplay: (value: FormDisplay | null) => void;
     setSubDisplay: (value: SubDisplay | null) => void;
     headerGroups?: HeaderModelItem[];
@@ -158,7 +159,7 @@ export const FormTable: React.FC<Props> = ({
         flatColumnsInRenderOrder,
         valueIndexByKey,
         isColReadOnly,
-    } = useHeaderPlan(formDisplay, headerGroups);
+    } = useHeaderPlan(formDisplay); // headerGroups теперь не влияет
 
     /** ─────────── фильтры/дерево (хук) ─────────── */
     const {

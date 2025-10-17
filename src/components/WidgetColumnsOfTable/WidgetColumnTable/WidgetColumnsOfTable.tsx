@@ -6,7 +6,6 @@ import {
     WidgetColumn,
     WidgetForm,
 } from '@/shared/hooks/useWorkSpaces';
-import {HeaderGroup} from '@/shared/utils/headerGroups';
 import {TableColumn} from '@/components/tableColumn/TableColumn';
 import {
     Box,
@@ -18,6 +17,7 @@ import {WidgetColumnsMainTable} from '@/components/WidgetColumnsOfTable/WidgetCo
 import EditIcon from '@/assets/image/EditIcon.svg';
 import {WidgetMetaDialog} from "@/components/modals/modalWidget/WidgetMetaDialog";
 import {AddWidgetColumnDialog} from "@/components/modals/modalWidget/AddWidgetColumnDialog";
+import {HeaderModelItem} from "@/components/formTable/FormTable";
 
 export type WcReference = WidgetColumn['reference'][number];
 
@@ -80,7 +80,7 @@ interface Props {
 
     setReferencesMap: React.Dispatch<React.SetStateAction<Record<number, WcReference[]>>>;
     referencesMap: Record<number, WcReference[]>;
-    headerGroups: HeaderGroup[];
+    headerGroups: HeaderModelItem[];
     formsById: Record<number, WidgetForm>;
     loadWidgetForms: () => Promise<void> | void;
 }

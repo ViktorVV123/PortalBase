@@ -2,33 +2,25 @@ import React, { useMemo, useState } from 'react';
 import { TextField } from '@mui/material';
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
 import ArrowDropUpIcon from '@mui/icons-material/ArrowDropUp';
-
 import * as sub from './SubWormTable.module.scss';
+
 import EditIcon from '@/assets/image/EditIcon.svg';
 import DeleteIcon from '@/assets/image/DeleteIcon.svg';
-
 import { api } from '@/services/api';
-import type { SubDisplay, DTable, Widget } from '@/shared/hooks/useWorkSpaces';
+import type { SubDisplay, DTable, Widget, FormDisplay } from '@/shared/hooks/useWorkSpaces';
 import type { HeaderModelItem } from '@/components/formTable/FormTable';
-import {formatCellValue, isEditableValue} from "@/shared/utils/cellFormat";
+import { formatCellValue, isEditableValue } from '@/shared/utils/cellFormat';
+import { useHeaderPlan } from '@/components/formTable/hooks/useHeaderPlan';
 
 type SubformProps = {
     subDisplay: SubDisplay | null;
     handleTabClick: (order: number) => void;
-
     subLoading: boolean;
     subError: string | null;
-
-    /** form_id активной формы (тот же, что приходит из FormTable) */
     formId: number | null;
-
-    /** живая модель шапки для саб-таблицы */
     subHeaderGroups?: HeaderModelItem[];
-
-    /** текущий sub_widget_id */
     currentWidgetId?: number;
 
-    /** Редактирование (state из FormTable, отдельные для sub) */
     editingRowIdx: number | null;
     setEditingRowIdx: React.Dispatch<React.SetStateAction<number | null>>;
     editDraft: Record<number, string>;
@@ -36,10 +28,8 @@ type SubformProps = {
     editSaving: boolean;
     setEditSaving: React.Dispatch<React.SetStateAction<boolean>>;
 
-    /** Текущий активный порядок вкладки (если нужен внутри саб-таблицы) */
     currentOrder: number | null;
 
-    /** Добавление строки в саб-таблицу (управление — снаружи) */
     isAddingSub: boolean;
     setIsAddingSub: React.Dispatch<React.SetStateAction<boolean>>;
     draftSub: Record<number, string>;
@@ -67,77 +57,67 @@ export const SubWormTable: React.FC<SubformProps> = ({
                                                          subHeaderGroups,
                                                      }) => {
     const [deletingRowIdx, setDeletingRowIdx] = useState<number | null>(null);
-    const [showSubHeaders, setShowSubHeaders] = useState<boolean>(false);
+    const [showSubHeaders, setShowSubHeaders] = useState(false);
 
     const hasTabs = !!subDisplay?.sub_widgets?.length;
-
     const safe = (v?: string | null) => (v && v.trim() ? v.trim() : '—');
 
-    // ───────── подготовка колонок и шапки ─────────
-    const sortedColumns = useMemo(() => {
-        const cols = subDisplay?.columns ?? [];
-        return [...cols].sort((a, b) => (a.column_order ?? 0) - (b.column_order ?? 0));
-    }, [subDisplay?.columns]);
+    // ───────── подготовка колонок и шапки через useHeaderPlan ─────────
+    const pseudoFormDisplay = useMemo(() => {
+        if (!subDisplay) return null;
+        return { columns: subDisplay.columns } as unknown as FormDisplay;
+    }, [subDisplay]);
+
+    const { headerPlan: baseHeaderPlan, flatColumnsInRenderOrder: baseFlat } =
+        useHeaderPlan(pseudoFormDisplay);
 
     const headerPlan = useMemo(() => {
-        if (subHeaderGroups && subHeaderGroups.length) {
-            // сопоставляем группам реальные колонки subDisplay по widget_column_id
-            return subHeaderGroups.map((g) => {
-                let cols = sortedColumns.filter((c) => c.widget_column_id === g.id);
+        if (!subHeaderGroups?.length) return baseHeaderPlan;
 
-                // упорядочим референсы согласно refIds (если переданы)
-                if (g.refIds && g.refIds.length) {
-                    const pos = new Map<number, number>();
-                    g.refIds.forEach((id, i) => pos.set(id, i));
-                    cols = [...cols].sort((a, b) => {
-                        const ai = pos.get(a.table_column_id!) ?? Number.MAX_SAFE_INTEGER;
-                        const bi = pos.get(b.table_column_id!) ?? Number.MAX_SAFE_INTEGER;
-                        return ai - bi;
-                    });
-                }
+        const byId = new Map(baseHeaderPlan.map((g) => [g.id, g]));
+        return subHeaderGroups.map((g) => {
+            const base = byId.get(g.id);
+            let cols = [...(base?.cols ?? [])];
 
-                // подписи берём строго из пришедших labels, подрезаем под фактическое число колонок
-                const labels = (g.labels ?? []).slice(0, cols.length);
-                while (labels.length < cols.length) labels.push('—');
-
-                return { id: g.id, title: safe(g.title), labels: labels.map(safe), cols };
-            });
-        }
-
-        // фолбэк: старая группировка по (column_name, widget_column_id)
-        const groups: { id: number; title: string; labels: string[]; cols: typeof sortedColumns }[] = [];
-        let i = 0;
-        while (i < sortedColumns.length) {
-            const name = sortedColumns[i].column_name;
-            const wcId = sortedColumns[i].widget_column_id;
-            const cols: typeof sortedColumns = [];
-            while (
-                i < sortedColumns.length &&
-                sortedColumns[i].column_name === name &&
-                sortedColumns[i].widget_column_id === wcId
-                ) {
-                cols.push(sortedColumns[i]);
-                i++;
+            // порядок по refIds, если задан
+            if (g.refIds?.length) {
+                const pos = new Map<number, number>();
+                g.refIds.forEach((id, i) => pos.set(id, i));
+                cols.sort((a, b) => {
+                    const ai = pos.get(a.table_column_id!) ?? Number.MAX_SAFE_INTEGER;
+                    const bi = pos.get(b.table_column_id!) ?? Number.MAX_SAFE_INTEGER;
+                    return ai - bi;
+                });
             }
-            groups.push({
-                id: wcId,
-                title: safe(name) || `Колонка #${wcId}`,
-                labels: cols.map(() => '—'),
+
+            const labels = (g.labels ?? []).slice(0, cols.length);
+            while (labels.length < cols.length) labels.push('—');
+
+            return {
+                id: g.id,
+                title: safe(g.title ?? base?.title ?? ''),
+                labels: labels.map(safe),
                 cols,
-            });
-        }
-        return groups;
-    }, [subHeaderGroups, sortedColumns]);
+            };
+        });
+    }, [baseHeaderPlan, subHeaderGroups]);
 
     const flatColumnsInRenderOrder = useMemo(
         () => headerPlan.flatMap((g) => g.cols),
         [headerPlan]
     );
 
+    // корректный valueIndexByKey для row.values
     const valueIndexByKey = useMemo(() => {
         const map = new Map<string, number>();
         (subDisplay?.columns ?? []).forEach((c, i) => {
-            map.set(`${c.widget_column_id}:${c.table_column_id ?? -1}`, i);
+            const syntheticTcId =
+                c.type === 'combobox' &&
+                c.combobox_column_id != null &&
+                c.table_column_id != null
+                    ? -1_000_000 - Number(c.combobox_column_id)
+                    : c.table_column_id ?? -1;
+            map.set(`${c.widget_column_id}:${syntheticTcId}`, i);
         });
         return map;
     }, [subDisplay?.columns]);
@@ -173,7 +153,7 @@ export const SubWormTable: React.FC<SubformProps> = ({
         return { ok: true };
     };
 
-    // ───────── РЕДАКТИРОВАНИЕ ─────────
+    // ───────── редактирование ─────────
     const startEdit = async (rowIdx: number) => {
         if (!formId || !currentWidgetId || !subDisplay) return;
         const pf = await preflightUpdate();
@@ -184,13 +164,18 @@ export const SubWormTable: React.FC<SubformProps> = ({
         const row = subDisplay.data[rowIdx];
         const init: Record<number, string> = {};
         flatColumnsInRenderOrder.forEach((col) => {
-            const k = `${col.widget_column_id}:${col.table_column_id ?? -1}`;
-            const idx = valueIndexByKey.get(k);
+            const syntheticTcId =
+                col.type === 'combobox' &&
+                col.combobox_column_id != null &&
+                col.table_column_id != null
+                    ? -1_000_000 - Number(col.combobox_column_id)
+                    : col.table_column_id ?? -1;
+            const key = `${col.widget_column_id}:${syntheticTcId}`;
+            const idx = valueIndexByKey.get(key);
             const val = idx != null ? row.values[idx] : '';
             if (col.table_column_id != null && isEditableValue(val)) {
                 init[col.table_column_id] = String(val ?? '');
             }
-
         });
 
         setEditingRowIdx(rowIdx);
@@ -211,7 +196,6 @@ export const SubWormTable: React.FC<SubformProps> = ({
         setEditSaving(true);
         try {
             const row = subDisplay.data[editingRowIdx];
-
             const values = Object.entries(editDraft)
                 .filter(([, v]) => v !== '' && v !== undefined && v !== null)
                 .map(([table_column_id, value]) => ({
@@ -250,13 +234,17 @@ export const SubWormTable: React.FC<SubformProps> = ({
         } catch (e: any) {
             const status = e?.response?.status;
             const msg = e?.response?.data ?? e?.message;
-            alert(`Не удалось обновить строку: ${status ?? ''} ${typeof msg === 'string' ? msg : JSON.stringify(msg)}`);
+            alert(
+                `Не удалось обновить строку: ${status ?? ''} ${
+                    typeof msg === 'string' ? msg : JSON.stringify(msg)
+                }`
+            );
         } finally {
             setEditSaving(false);
         }
     };
 
-    // ───────── УДАЛЕНИЕ ─────────
+    // ───────── удаление ─────────
     const deleteRow = async (rowIdx: number) => {
         if (!formId || !currentWidgetId || !subDisplay) return;
         const pf = await preflightDelete();
@@ -298,7 +286,11 @@ export const SubWormTable: React.FC<SubformProps> = ({
         } catch (e: any) {
             const status = e?.response?.status;
             const msg = e?.response?.data ?? e?.message;
-            alert(`Не удалось удалить строку: ${status ?? ''} ${typeof msg === 'string' ? msg : JSON.stringify(msg)}`);
+            alert(
+                `Не удалось удалить строку: ${status ?? ''} ${
+                    typeof msg === 'string' ? msg : JSON.stringify(msg)
+                }`
+            );
         } finally {
             setDeletingRowIdx(null);
         }
@@ -310,7 +302,8 @@ export const SubWormTable: React.FC<SubformProps> = ({
             {hasTabs && subDisplay && (
                 <ul className={sub.tabs}>
                     {subDisplay.sub_widgets.map((sw) => {
-                        const isActive = sw.widget_order === subDisplay.displayed_widget.widget_order;
+                        const isActive =
+                            sw.widget_order === subDisplay.displayed_widget.widget_order;
                         return (
                             <li key={sw.widget_order}>
                                 <button
@@ -339,8 +332,6 @@ export const SubWormTable: React.FC<SubformProps> = ({
                                     {g.title}
                                 </th>
                             ))}
-
-                            {/* Тумблер показа подзаголовков — как в FormTable */}
                             <th
                                 rowSpan={showSubHeaders ? 1 : 2}
                                 style={{ textAlign: 'center', verticalAlign: 'middle' }}
@@ -348,12 +339,18 @@ export const SubWormTable: React.FC<SubformProps> = ({
                                 <button
                                     type="button"
                                     onClick={() => setShowSubHeaders((v) => !v)}
-                                    aria-label={showSubHeaders ? 'Скрыть подзаголовки' : 'Показать подзаголовки'}
-                                    aria-expanded={showSubHeaders}
-                                    title={showSubHeaders ? 'Скрыть подзаголовки' : 'Показать подзаголовки'}
+                                    title={
+                                        showSubHeaders
+                                            ? 'Скрыть подзаголовки'
+                                            : 'Показать подзаголовки'
+                                    }
                                     style={{ background: 'none', border: 0, cursor: 'pointer' }}
                                 >
-                                    {showSubHeaders ? <ArrowDropUpIcon style={{ color: '#fff' }} /> : <ArrowDropDownIcon style={{ color: '#fff' }} />}
+                                    {showSubHeaders ? (
+                                        <ArrowDropUpIcon style={{ color: '#fff' }} />
+                                    ) : (
+                                        <ArrowDropDownIcon style={{ color: '#fff' }} />
+                                    )}
                                 </button>
                             </th>
                         </tr>
@@ -374,7 +371,9 @@ export const SubWormTable: React.FC<SubformProps> = ({
                         {isAddingSub && (
                             <tr>
                                 {flatColumnsInRenderOrder.map((col) => (
-                                    <td key={`sub-add-wc${col.widget_column_id}-tc${col.table_column_id}`}>
+                                    <td
+                                        key={`sub-add-wc${col.widget_column_id}-tc${col.table_column_id}`}
+                                    >
                                         <TextField
                                             size="small"
                                             value={draftSub[col.table_column_id!] ?? ''}
@@ -394,11 +393,16 @@ export const SubWormTable: React.FC<SubformProps> = ({
 
                         {subDisplay.data.map((row, rowIdx) => {
                             const isEditing = editingRowIdx === rowIdx;
-
                             return (
                                 <tr key={rowIdx}>
                                     {flatColumnsInRenderOrder.map((col) => {
-                                        const key = `${col.widget_column_id}:${col.table_column_id ?? -1}`;
+                                        const syntheticTcId =
+                                            col.type === 'combobox' &&
+                                            col.combobox_column_id != null &&
+                                            col.table_column_id != null
+                                                ? -1_000_000 - Number(col.combobox_column_id)
+                                                : col.table_column_id ?? -1;
+                                        const key = `${col.widget_column_id}:${syntheticTcId}`;
                                         const idx = valueIndexByKey.get(key);
                                         const val = idx != null ? row.values[idx] : '';
 
@@ -423,10 +427,11 @@ export const SubWormTable: React.FC<SubformProps> = ({
                                         }
 
                                         return (
-                                            <td key={`sub-r${rowIdx}-wc${col.widget_column_id}-tc${col.table_column_id}`}>
+                                            <td
+                                                key={`sub-r${rowIdx}-wc${col.widget_column_id}-tc${col.table_column_id}`}
+                                            >
                                                 {formatCellValue(val)}
                                             </td>
-
                                         );
                                     })}
 
@@ -453,7 +458,11 @@ export const SubWormTable: React.FC<SubformProps> = ({
                                         ) : (
                                             <>
                           <span
-                              style={{ display: 'inline-flex', cursor: 'pointer', marginRight: 10 }}
+                              style={{
+                                  display: 'inline-flex',
+                                  cursor: 'pointer',
+                                  marginRight: 10,
+                              }}
                               onClick={() => startEdit(rowIdx)}
                               title="Редактировать"
                           >
@@ -462,8 +471,10 @@ export const SubWormTable: React.FC<SubformProps> = ({
                                                 <span
                                                     style={{
                                                         display: 'inline-flex',
-                                                        cursor: deletingRowIdx === rowIdx ? 'progress' : 'pointer',
-                                                        opacity: deletingRowIdx === rowIdx ? 0.6 : 1,
+                                                        cursor:
+                                                            deletingRowIdx === rowIdx ? 'progress' : 'pointer',
+                                                        opacity:
+                                                            deletingRowIdx === rowIdx ? 0.6 : 1,
                                                     }}
                                                     onClick={() => {
                                                         if (deletingRowIdx == null) deleteRow(rowIdx);

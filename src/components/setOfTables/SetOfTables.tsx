@@ -19,8 +19,8 @@ import {
 } from '@/components/WidgetColumnsOfTable/WidgetColumnTable/WidgetColumnsOfTable';
 import {api} from '@/services/api';
 import {Breadcrumb, Crumb} from "@/shared/ui/Breadcrumb";
-import {useHeaderGroupsFromWidgetColumns} from "@/components/setOfTables/hooks/useHeaderGroupsFromWidgetColumns";
-import {useSubHeaderGroups} from "@/components/setOfTables/hooks/useSubHeaderGroups";
+
+import {useHeaderPreviewFromWc} from "@/components/WidgetColumnsOfTable/WidgetColumnTable/hook/useHeaderPreviewFromWc";
 
 /** ─────────────────────── Пропсы ─────────────────────── */
 type Props = {
@@ -165,7 +165,7 @@ export const SetOfTables: React.FC<Props> = (props) => {
     const currentSubWidgetId = currentSubOrder != null ? subIdByOrder[currentSubOrder] : null;
 
     // группы заголовков: основная форма и саб-форма
-    const headerGroups = useHeaderGroupsFromWidgetColumns(widgetColumns, referencesMap, liveRefsForHeader);
+    const headerGroups = useHeaderPreviewFromWc(widgetColumns, referencesMap, liveRefsForHeader ?? undefined);
 
     const getColumnsByWidgetId = useCallback(
         (id: number) =>
@@ -173,12 +173,6 @@ export const SetOfTables: React.FC<Props> = (props) => {
         []
     );
 
-
-    const subHeaderGroups = useSubHeaderGroups(
-        currentSubWidgetId,
-        fetchReferences,      // уже стабильная ссылка из пропсов/хука
-        getColumnsByWidgetId, // теперь тоже стабильная
-    );
 
     // хэндлеры навигации
     const goToTable = useCallback(() => {
@@ -214,6 +208,11 @@ export const SetOfTables: React.FC<Props> = (props) => {
         return arr;
     }, [workspaceName, tableName, selectedWidget, widgetTitle, formTitle, subTitle, goToTable, goToWidget]);
 
+
+
+
+
+
     // быстрые гварды
     if (loading) return <p>Загрузка…</p>;
     if (error) return <p className={s.error}>{error}</p>;
@@ -230,7 +229,6 @@ export const SetOfTables: React.FC<Props> = (props) => {
                         : formDisplay ? (
                             <FormTable
                                 formsById={formsById}
-                                subHeaderGroups={subHeaderGroups || undefined}
                                 headerGroups={headerGroups}
                                 setSubDisplay={setSubDisplay}
                                 formTrees={formTrees}

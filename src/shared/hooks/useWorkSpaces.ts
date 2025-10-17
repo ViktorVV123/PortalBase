@@ -172,6 +172,7 @@ export interface SubFormColumn {
     width: number;
     widget_column_id: number;
     table_column_id: number;
+    combobox_column_id:number
 }
 
 export interface SubFormRow {
