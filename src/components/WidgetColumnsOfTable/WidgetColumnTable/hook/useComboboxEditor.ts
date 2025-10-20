@@ -1,12 +1,13 @@
-import { useCallback, useState } from 'react';
-import {ComboItem, RefItem} from "@/components/WidgetColumnsOfTable/types";
-import {reindex, toFullPatch} from "@/components/WidgetColumnsOfTable/ref-helpers";
-
+import {useCallback, useState} from 'react';
+import {api} from '@/services/api';
+import {reindex} from '@/components/WidgetColumnsOfTable/ref-helpers';
+import type {ComboItem, RefItem} from '@/components/WidgetColumnsOfTable/types';
 
 type Deps = {
     localRefsRef: React.MutableRefObject<Record<number, RefItem[]>>;
     setLocalRefs: React.Dispatch<React.SetStateAction<Record<number, RefItem[]>>>;
-    callUpdateReference: (wcId: number, tblColId: number, patch: any) => Promise<any>;
+    // оставлено для совместимости
+    callUpdateReference?: (wcId: number, tblColId: number, patch: any) => Promise<any>;
 };
 
 type Draft = {
@@ -28,7 +29,6 @@ type Draft = {
 export function useComboboxEditor({
                                       localRefsRef,
                                       setLocalRefs,
-                                      callUpdateReference,
                                   }: Deps) {
     const [dlg, setDlg] = useState<Draft>({
         open: false,
@@ -46,87 +46,114 @@ export function useComboboxEditor({
         },
     });
 
-    const open = useCallback((wcId: number, tableColumnId: number, item: ComboItem) => {
+    const open = useCallback((wcId: number, tableColumnId: number, item: any) => {
+        // 1) попробуем извлечь combobox_column_id из разных ключей
+        let comboId =
+            item?.combobox_column_id ??
+            item?.id ??
+            item?.combobox_column?.id ??
+            null;
+
+        // 2) подстраховка: если не нашли — попробуем вытащить из стора (например, когда единственный combobox-элемент)
+        if (comboId == null) {
+            const list = localRefsRef.current?.[wcId] ?? [];
+            const ref = list.find(x => x.table_column?.id === tableColumnId);
+            const only = Array.isArray((ref as any)?.combobox) ? (ref as any).combobox : [];
+            if (only.length === 1 && only[0]?.combobox_column_id != null) {
+                comboId = only[0].combobox_column_id;
+            }
+        }
+
         setDlg({
             open: true,
             saving: false,
             wcId,
             tableColumnId,
-            combobox_column_id: item.combobox_column_id,
+            combobox_column_id: comboId,
             value: {
-                combobox_width: item.combobox_width ?? 1,
-                combobox_column_order: item.combobox_column_order ?? 0,
-                combobox_alias: item.combobox_alias ?? '',
-                is_primary: !!item.is_primary,
-                is_show: !!item.is_show,
-                is_show_hidden: !!item.is_show_hidden,
+                combobox_width: Number.isFinite(item?.combobox_width) ? item.combobox_width : 1,
+                combobox_column_order: Number.isFinite(item?.combobox_column_order) ? item.combobox_column_order : 0,
+                combobox_alias: item?.combobox_alias ?? '',
+                is_primary: !!item?.is_primary,
+                is_show: !!item?.is_show,
+                is_show_hidden: !!item?.is_show_hidden,
             },
         });
-    }, []);
+    }, [localRefsRef]);
 
-    const close = useCallback(() => {
-        setDlg(d => ({ ...d, open: false }));
-    }, []);
-
+    const close = useCallback(() => setDlg(d => ({...d, open: false})), []);
     const onChange = useCallback((patch: Partial<Draft['value']>) => {
-        setDlg(d => ({ ...d, value: { ...d.value, ...patch } }));
+        setDlg(d => ({...d, value: {...d.value, ...patch}}));
     }, []);
 
     const save = useCallback(async () => {
-        if (!dlg.wcId || !dlg.tableColumnId || !dlg.combobox_column_id) return;
-        setDlg(d => ({ ...d, saving: true }));
-        const wcId = dlg.wcId;
-        const tblColId = dlg.tableColumnId;
-        const comboId = dlg.combobox_column_id;
+        const { wcId, tableColumnId, combobox_column_id, value } = dlg;
 
-        const list = localRefsRef.current[wcId] ?? [];
-        const current = list.find(x => x.table_column?.id === tblColId);
-        if (!current) { setDlg(d => ({ ...d, saving: false, open: false })); return; }
+        // подробный лог, чтобы видеть что именно пусто
+        // eslint-disable-next-line no-console
+        console.warn('[ComboboxEditor.save] ids:', { wcId, tableColumnId, combobox_column_id });
 
-        const orig = Array.isArray(current.combobox) ? [...current.combobox] : [];
-        const next = orig.map(it => {
-            if (it.combobox_column_id !== comboId) return it;
-            return {
-                ...it,
-                combobox_width: dlg.value.combobox_width,
-                combobox_column_order: dlg.value.combobox_column_order,
-                combobox_alias: dlg.value.combobox_alias?.trim() || null,
-                is_primary: dlg.value.is_primary,
-                is_show: dlg.value.is_show,
-                is_show_hidden: dlg.value.is_show_hidden,
-            };
-        });
-
-        // если отмечен новый primary — снимаем флаг с остальных
-        if (dlg.value.is_primary) {
-            for (const it of next) {
-                if (it.combobox_column_id !== comboId) it.is_primary = false;
-            }
+        if (wcId == null || tableColumnId == null || combobox_column_id == null) {
+            // eslint-disable-next-line no-console
+            console.warn('[ComboboxEditor] Missing ids', { wcId, tableColumnId, combobox_column_id });
+            return;
         }
 
-        // реиндексация по порядку (чтобы не было дыр)
-        next.sort((a, b) => (a.combobox_column_order ?? 0) - (b.combobox_column_order ?? 0))
-            .forEach((it, idx) => { it.combobox_column_order = idx; });
+        const width = Number.isFinite(+value.combobox_width) ? Math.max(1, Math.trunc(+value.combobox_width)) : 1;
+        const order = Number.isFinite(+value.combobox_column_order) ? Math.max(0, Math.trunc(+value.combobox_column_order)) : 0;
+        const alias = (value.combobox_alias ?? '').toString().trim();
 
-        // оптимистичное обновление локального стейта
-        setLocalRefs(prev => {
-            const list = prev[wcId] ?? [];
-            const updated = list.map(r => r.table_column?.id === tblColId ? { ...r, combobox: next } : r);
-            return { ...prev, [wcId]: reindex(updated) };
-        });
+        const body = {
+            combobox_width: width,
+            combobox_column_order: order,
+            combobox_alias: alias,
+            is_primary: !!value.is_primary,
+            is_show: !!value.is_show,
+            is_show_hidden: !!value.is_show_hidden,
+        };
 
         try {
-            // серверный PATCH: передаём combobox как полный массив
-            const patch = { ...toFullPatch({ ...current, combobox: next }) , combobox: next };
-            await callUpdateReference(wcId, tblColId, patch);
+            setDlg(d => ({ ...d, saving: true }));
+
+            const url = `/widgets/tables/references/${wcId}/${tableColumnId}/${combobox_column_id}`;
+            // eslint-disable-next-line no-console
+            console.debug('[ComboboxEditor] PATCH →', url, body);
+            await api.patch(url, body);
+            // eslint-disable-next-line no-console
+            console.debug('[ComboboxEditor] PATCH ✓');
+
+            // обновляем локально только отредактированный элемент
+            setLocalRefs(prev => {
+                const list = prev[wcId] ?? [];
+                const updated = list.map(r => {
+                    if (r.table_column?.id !== tableColumnId) return r;
+                    const orig: any[] = Array.isArray((r as any).combobox) ? (r as any).combobox : [];
+                    const next = orig.map(it =>
+                        (it.combobox_column_id ?? it.id) === combobox_column_id ? { ...it, ...body } : { ...it }
+                    );
+
+                    if (body.is_primary) {
+                        for (const it of next) {
+                            if ((it.combobox_column_id ?? it.id) !== combobox_column_id && it.is_primary) it.is_primary = false;
+                        }
+                    }
+
+                    next
+                        .sort((a, b) => (a.combobox_column_order ?? 0) - (b.combobox_column_order ?? 0))
+                        .forEach((it, idx) => { it.combobox_column_order = idx; });
+
+                    return { ...r, combobox: next } as any;
+                });
+                return { ...prev, [wcId]: reindex(updated) };
+            });
+
             setDlg(d => ({ ...d, saving: false, open: false }));
         } catch (e) {
-            // откат (перечитать локальный из ref)
-            setLocalRefs(prev => ({ ...prev })); // простая перерисовка; по желанию можно хранить snapshot
+            // eslint-disable-next-line no-console
+            console.warn('[ComboboxEditor] PATCH ✗', e);
             setDlg(d => ({ ...d, saving: false }));
-            console.warn('PATCH combobox error', e);
         }
-    }, [dlg, localRefsRef, setLocalRefs, callUpdateReference]);
+    }, [dlg, setLocalRefs]);
 
     return { dlg, open, close, onChange, save, setDlg };
 }

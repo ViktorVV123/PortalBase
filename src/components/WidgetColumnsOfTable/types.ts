@@ -1,13 +1,14 @@
 import {WidgetColumn, Column} from '@/shared/hooks/useWorkSpaces';
 
 export type ComboItem = {
-    combobox_width: number;
-    combobox_column_order: number;
-    combobox_alias: string | null;
-    is_primary: boolean;
-    is_show: boolean;
-    is_show_hidden: boolean;
-    combobox_column_id: number;
+    combobox_column_id?: number;  // серверный id
+    id?: number;                  // на случай другого имени
+    combobox_width?: number;
+    combobox_column_order?: number;
+    combobox_alias?: string | null;
+    is_primary?: boolean;
+    is_show?: boolean;
+    is_show_hidden?: boolean;
 };
 
 export type RefItem = {

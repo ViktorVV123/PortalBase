@@ -3,12 +3,12 @@ import AddIcon from '@mui/icons-material/AddBox';
 import * as s from '@/components/setOfTables/SetOfTables.module.scss';
 import EditIcon from '@/assets/image/EditIcon.svg';
 import DeleteIcon from '@/assets/image/DeleteIcon.svg';
-import {RefRow, RefRowProps} from './RefRow';
-import type {RefItem} from '../types';
+import { RefRow, RefRowProps } from './RefRow';
+import type { RefItem } from '../types';
 
 type TbodyDndHandlers = {
-    onDragOver: (e: React.DragEvent) => void;
-    onDropTbodyEnd: (wcId: number) => (e: React.DragEvent) => void;
+    onDragOver: (e: React.DragEvent<HTMLTableSectionElement>) => void;
+    onDropTbodyEnd: (wcId: number) => (e: React.DragEvent<HTMLTableSectionElement>) => void;
 };
 
 type Props = {
@@ -18,12 +18,13 @@ type Props = {
     refs: RefItem[];
     isFirst: boolean;
     isLast: boolean;
-    moveGroup: (wcId: number, dir: 'up'|'down') => void;
+    moveGroup: (wcId: number, dir: 'up' | 'down') => void;
     onOpenAlias: () => void;
     onDeleteGroup: () => void;
     onAddField: () => void;
-    rowProps: Omit<RefRowProps, 'wcId'|'r'|'formText'|'visibleText'> & TbodyDndHandlers;
-    formNameById: Record<string,string>;
+    /** rowProps для RefRow + DnD-хендлеры для <tbody> */
+    rowProps: Omit<RefRowProps, 'wcId' | 'r' | 'formText' | 'visibleText'> & TbodyDndHandlers;
+    formNameById: Record<string, string>;
 };
 
 export const WidgetGroup: React.FC<Props> = ({
@@ -32,30 +33,48 @@ export const WidgetGroup: React.FC<Props> = ({
                                                  rowProps, formNameById
                                              }) => {
     return (
-        <div style={{marginBottom:24}}>
-            <div style={{display:'flex', gap:10, alignItems:'center'}}>
-                <h4 style={{margin:0}}>{title}</h4>
-                <span style={{color:'grey'}}>({order})</span>
-                <div style={{display:'flex', gap:6, marginLeft:8, alignItems:'center'}}>
-                    <button title="Переместить вверх" aria-label="Переместить группу вверх" disabled={isFirst}
-                            onClick={()=>moveGroup(wcId,'up')} style={{opacity:isFirst?0.4:1}}>↑</button>
-                    <button title="Переместить вниз" aria-label="Переместить группу вниз" disabled={isLast}
-                            onClick={()=>moveGroup(wcId,'down')} style={{opacity:isLast?0.4:1}}>↓</button>
+        <div style={{ marginBottom: 24 }}>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                <h4 style={{ margin: 0 }}>{title}</h4>
+                <span style={{ color: 'grey' }}>({order})</span>
 
-                    <EditIcon className={s.actionIcon} onClick={onOpenAlias} aria-label="Переименовать alias"/>
-                    <DeleteIcon className={s.actionIcon} onClick={onDeleteGroup} aria-label="Удалить группу"/>
+                <div style={{ display: 'flex', gap: 6, marginLeft: 8, alignItems: 'center' }}>
+                    <button
+                        title="Переместить вверх"
+                        aria-label="Переместить группу вверх"
+                        disabled={isFirst}
+                        onClick={() => moveGroup(wcId, 'up')}
+                        style={{ opacity: isFirst ? 0.4 : 1 }}
+                    >↑</button>
 
-                    <button className={s.okBtn} style={{marginLeft:12}} onClick={onAddField}
-                            title="Добавить поле в эту группу" aria-label="Добавить поле в группу">
-                        <AddIcon/>
+                    <button
+                        title="Переместить вниз"
+                        aria-label="Переместить группу вниз"
+                        disabled={isLast}
+                        onClick={() => moveGroup(wcId, 'down')}
+                        style={{ opacity: isLast ? 0.4 : 1 }}
+                    >↓</button>
+
+                    <EditIcon className={s.actionIcon} onClick={onOpenAlias} aria-label="Переименовать alias" />
+                    <DeleteIcon className={s.actionIcon} onClick={onDeleteGroup} aria-label="Удалить группу" />
+
+                    <button
+                        className={s.okBtn}
+                        style={{ marginLeft: 12 }}
+                        onClick={onAddField}
+                        title="Добавить поле в эту группу"
+                        aria-label="Добавить поле в группу"
+                        type="button"
+                    >
+                        <AddIcon />
                     </button>
                 </div>
             </div>
 
-            <table className={s.tbl} style={{marginTop: 8}}>
+            <table className={s.tbl} style={{ marginTop: 8 }}>
                 <thead>
                 <tr>
-                    <th style={{width: 28}}/>
+                    <th style={{ width: 28 }} />
                     <th>Название</th>
                     <th>Подзаголовок</th>
                     <th>Тип</th>
@@ -67,26 +86,31 @@ export const WidgetGroup: React.FC<Props> = ({
                     <th>Очередность</th>
                     <th>Combobox</th>
                     <th>Формы</th>
-                    <th/>
+                    <th />
                 </tr>
                 </thead>
+
                 <tbody onDragOver={rowProps.onDragOver} onDrop={rowProps.onDropTbodyEnd(wcId)}>
-                {refs.length > 0 ? refs.map((r) => {
-                    const formId = (r as any).form_id ?? (r as any).form;
-                    const formText = formId != null ? (formNameById[String(formId)] ?? `#${formId}`) : formNameById['null'];
-                    return (
-                        <RefRow
-                            key={`${wcId}:${r.table_column?.id}`}
-                            wcId={wcId}
-                            r={r}
-                            visibleText={(r.visible ?? true) ? '✓' : '✗'}
-                            formText={formText}
-                            {...rowProps}
-                        />
-                    );
-                }) : (
+                {refs.length > 0 ? (
+                    refs.map((r) => {
+                        const formId = (r as any).form_id ?? (r as any).form;
+                        const formText =
+                            formId != null ? (formNameById[String(formId)] ?? `#${formId}`) : formNameById['null'];
+
+                        return (
+                            <RefRow
+                                key={`${wcId}:${r.table_column?.id}`}
+                                wcId={wcId}
+                                r={r}
+                                visibleText={(r.visible ?? true) ? '✓' : '✗'}
+                                formText={formText}
+                                {...rowProps}
+                            />
+                        );
+                    })
+                ) : (
                     <tr>
-                        <td colSpan={13} style={{textAlign: 'center', opacity: 0.7}}>
+                        <td colSpan={13} style={{ textAlign: 'center', opacity: 0.7 }}>
                             Нет связей — перетащите сюда строку из другого блока или нажмите «+ поле»
                         </td>
                     </tr>
@@ -96,5 +120,3 @@ export const WidgetGroup: React.FC<Props> = ({
         </div>
     );
 };
-
-

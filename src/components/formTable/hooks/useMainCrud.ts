@@ -19,7 +19,6 @@ export type UseMainCrudDeps = {
     pkToKey: (pk: Record<string, unknown>) => string;
     lastPrimary: Record<string, unknown>;
     setLastPrimary: (v: Record<string, unknown>) => void;
-    // важно: чтобы можно было делать setSelectedKey(prev => ...):
     setSelectedKey: React.Dispatch<React.SetStateAction<string | null>>;
 };
 
@@ -72,18 +71,13 @@ export function useMainCrud({
                             : table?.delete_query;
 
                 if (!q || !q.trim()) {
-                    // 🔔 требуемые алерты
-                    if (kind === 'insert') {
-                        alert('Для этой таблицы не настроен INSERT QUERY. Задайте его в метаданных таблицы.');
-                    } else if (kind === 'update') {
-                        alert('Для этой таблицы не настроен UPDATE QUERY. Задайте его в метаданных таблицы.');
-                    } else {
-                        alert('Для этой таблицы не настроен DELETE QUERY. Задайте его в метаданных таблицы.');
-                    }
+                    if (kind === 'insert') alert('Для этой таблицы не настроен INSERT QUERY. Задайте его в метаданных таблицы.');
+                    else if (kind === 'update') alert('Для этой таблицы не настроен UPDATE QUERY. Задайте его в метаданных таблицы.');
+                    else alert('Для этой таблицы не настроен DELETE QUERY. Задайте его в метаданных таблицы.');
                     return { ok: false };
                 }
             } catch {
-                // мягко глотаем сетевые ошибки префлайта
+                // тихо игнорируем сетевые ошибки префлайта
             }
 
             return { ok: true, formId };
@@ -95,21 +89,22 @@ export function useMainCrud({
     const preflightUpdate = useCallback(() => ensureQuery('update'), [ensureQuery]);
     const preflightDelete = useCallback(() => ensureQuery('delete'), [ensureQuery]);
 
+    // ───────── Добавление ─────────
     const startAdd = useCallback(async () => {
         const pf = await preflightInsert();
         if (!pf.ok) return;
+
         setIsAdding(true);
         setEditingRowIdx(null);
 
         const init: Record<number, string> = {};
         flatColumnsInRenderOrder.forEach((c) => {
             if (c.table_column_id != null && !isColReadOnly(c)) {
-                init[c.table_column_id] = ''; // только редактируемые поля
+                init[c.table_column_id] = '';
             }
         });
         setDraft(init);
     }, [preflightInsert, flatColumnsInRenderOrder, isColReadOnly]);
-
 
     const cancelAdd = useCallback(() => {
         setIsAdding(false);
@@ -121,55 +116,83 @@ export function useMainCrud({
         const pf = await preflightInsert();
         if (!pf.ok || !pf.formId) return;
 
+        // values готовим ДО saving
+        const values = Object.entries(draft)
+            .filter(([, v]) => v !== '' && v !== undefined && v !== null)
+            .filter(([table_column_id]) => {
+                const col = flatColumnsInRenderOrder.find(
+                    (c) => c.table_column_id === Number(table_column_id)
+                );
+                return col && !isColReadOnly(col);
+            })
+            .map(([table_column_id, value]) => ({
+                table_column_id: Number(table_column_id),
+                value: String(value),
+            }));
+
+        if (values.length === 0) {
+            alert('Нет данных для вставки: заполни хотя бы одно редактируемое поле.');
+            return;
+        }
+
         setSaving(true);
         try {
-            const values = Object.entries(draft)
-                // только не-пустые (если хочешь слать пустые строки, убери этот фильтр по value)
-                .filter(([, v]) => v !== '' && v !== undefined && v !== null)
-                // только редактируемые столбцы
-                .filter(([table_column_id]) => {
-                    const col = flatColumnsInRenderOrder.find(
-                        (c) => c.table_column_id === Number(table_column_id)
-                    );
-                    return col && !isColReadOnly(col);
-                })
-                .map(([table_column_id, value]) => ({
-                    table_column_id: Number(table_column_id),
-                    value: String(value),
-                }));
+            // ⚠️ ВАЖНО: pk ДОЛЖЕН быть с обёрткой primary_keys, как в Swagger!
+            const body = {
+                pk: { primary_keys: {} as Record<string, string> },
+                values,
+            };
 
-            const body = { pk: {}, values };
             const url = `/data/${pf.formId}/${selectedWidget.id}`;
 
             try {
                 await api.post(url, body);
             } catch (err: any) {
                 const status = err?.response?.status;
-                const detail =
-                    err?.response?.data?.detail ?? err?.response?.data ?? err?.message;
+                const detail = err?.response?.data?.detail ?? err?.response?.data ?? err?.message;
 
-                // 🔔 404 «Insert query not found»
                 if (status === 404 && String(detail).includes('Insert query not found')) {
                     alert('Для этой таблицы не настроен INSERT QUERY. Задайте его в метаданных таблицы.');
                     return;
                 }
+                // на бэке иногда различается маршрут со слэшем
                 if (status === 404) {
                     await api.post(`${url}/`, body);
+                } else if (status === 422) {
+                    // подскажем явно, если снова будет не тот формат
+                    alert('Не удалось добавить строку (422). Проверь форму тела: { pk: { primary_keys: {} }, values: [...] }');
+                    return;
                 } else {
                     throw err;
                 }
             }
 
+            // перезагружаем данные формы c учётом активных фильтров
             const { data } = await api.post<FormDisplay>(`/display/${pf.formId}/main`, activeFilters);
             setFormDisplay(data);
             await reloadTree();
+
             setIsAdding(false);
             setDraft({});
+        } catch (e: any) {
+            const status = e?.response?.status;
+            const msg = e?.response?.data ?? e?.message;
+            alert(`Не удалось добавить строку: ${status ?? ''} ${typeof msg === 'string' ? msg : JSON.stringify(msg)}`);
         } finally {
             setSaving(false);
         }
-    }, [selectedWidget, preflightInsert, draft, activeFilters, setFormDisplay, reloadTree]);
+    }, [
+        selectedWidget,
+        preflightInsert,
+        draft,
+        flatColumnsInRenderOrder,
+        isColReadOnly,
+        activeFilters,
+        setFormDisplay,
+        reloadTree,
+    ]);
 
+    // ───────── Редактирование ─────────
     const startEdit = useCallback(
         async (rowIdx: number) => {
             const pf = await preflightUpdate();
@@ -178,14 +201,25 @@ export function useMainCrud({
 
             const row = formDisplay.data[rowIdx];
             const init: Record<number, string> = {};
+
             flatColumnsInRenderOrder.forEach((col) => {
-                const k = `${col.widget_column_id}:${col.table_column_id ?? -1}`;
+                // ключ для combobox-колонок — как в SubWormTable
+                const syntheticTcId =
+                    col.type === 'combobox' &&
+                    col.combobox_column_id != null &&
+                    col.table_column_id != null
+                        ? -1_000_000 - Number(col.combobox_column_id)
+                        : (col.table_column_id ?? -1);
+
+                const k = `${col.widget_column_id}:${syntheticTcId}`;
                 const idx = valueIndexByKey.get(k);
                 const val = idx != null ? row.values[idx] : '';
+
                 if (col.table_column_id != null && !isColReadOnly(col)) {
                     init[col.table_column_id] = (val ?? '').toString();
                 }
             });
+
             setEditingRowIdx(rowIdx);
             setEditDraft(init);
         },
@@ -208,7 +242,6 @@ export function useMainCrud({
             const row = formDisplay.data[editingRowIdx];
 
             const values = Object.entries(editDraft)
-                // только редактируемые поля
                 .filter(([table_column_id]) => {
                     const col = flatColumnsInRenderOrder.find(
                         (c) => c.table_column_id === Number(table_column_id)
@@ -234,10 +267,8 @@ export function useMainCrud({
                 await api.patch(url, body);
             } catch (err: any) {
                 const status = err?.response?.status;
-                const detail =
-                    err?.response?.data?.detail ?? err?.response?.data ?? err?.message;
+                const detail = err?.response?.data?.detail ?? err?.response?.data ?? err?.message;
 
-                // 🔔 404 «Update query not found»
                 if (status === 404 && String(detail).includes('Update query not found')) {
                     alert('Для этой таблицы не настроен UPDATE QUERY. Задайте его в метаданных таблицы.');
                     return;
@@ -269,8 +300,11 @@ export function useMainCrud({
         setFormDisplay,
         reloadTree,
         cancelEdit,
+        flatColumnsInRenderOrder,
+        isColReadOnly,
     ]);
 
+    // ───────── Удаление ─────────
     const deleteRow = useCallback(
         async (rowIdx: number) => {
             if (!selectedWidget) return;
@@ -294,10 +328,8 @@ export function useMainCrud({
                     await api.delete(url, { data: body });
                 } catch (err: any) {
                     const status = err?.response?.status;
-                    const detail =
-                        err?.response?.data?.detail ?? err?.response?.data ?? err?.message;
+                    const detail = err?.response?.data?.detail ?? err?.response?.data ?? err?.message;
 
-                    // 🔔 404 «Delete query not found»
                     if (status === 404 && String(detail).includes('Delete query not found')) {
                         alert('Для этой таблицы не настроен DELETE QUERY. Задайте его в метаданных таблицы.');
                         return;
@@ -334,7 +366,6 @@ export function useMainCrud({
     );
 
     return {
-        // state
         isAdding,
         draft,
         saving,
@@ -342,7 +373,6 @@ export function useMainCrud({
         editDraft,
         editSaving,
         deletingRowIdx,
-        // handlers
         startAdd,
         cancelAdd,
         submitAdd,

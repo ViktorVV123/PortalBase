@@ -33,15 +33,22 @@ export const ComboboxItemDialog: React.FC<Props> = ({
                         label="combobox_width"
                         size="small"
                         value={value.combobox_width}
-                        onChange={e => onChange({ combobox_width: Number(e.target.value || 0) })}
-                        inputProps={{ min: 0 }}
+                        onChange={e => {
+                            const n = parseInt(e.target.value, 10);
+                            onChange({ combobox_width: Number.isFinite(n) ? Math.max(1, n) : 1 });
+                        }}
+                        inputProps={{ min: 1 }}
                     />
+
                     <TextField
                         type="number"
                         label="combobox_column_order"
                         size="small"
                         value={value.combobox_column_order}
-                        onChange={e => onChange({ combobox_column_order: Number(e.target.value || 0) })}
+                        onChange={e => {
+                            const n = parseInt(e.target.value, 10);
+                            onChange({ combobox_column_order: Number.isFinite(n) ? Math.max(0, n) : 0 });
+                        }}
                         inputProps={{ min: 0 }}
                     />
                     <TextField
@@ -82,7 +89,12 @@ export const ComboboxItemDialog: React.FC<Props> = ({
             </DialogContent>
             <DialogActions>
                 <Button onClick={onClose} disabled={!!saving}>Отмена</Button>
-                <Button onClick={onSave} disabled={!!saving} variant="contained">
+                <Button
+                    type="button"
+                    onClick={onSave}
+                    disabled={!!saving}
+                    variant="contained"
+                >
                     {saving ? 'Сохр...' : 'Сохранить'}
                 </Button>
             </DialogActions>
