@@ -148,8 +148,12 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
         setLocalRefs,
     });
     const { dlg, open: openComboEditor, close: closeComboEditor, onChange: changeComboEditor, save: saveComboEditor } =
-        useComboboxEditor({ localRefsRef, setLocalRefs, callUpdateReference });
-
+        useComboboxEditor({
+            localRefsRef,
+            setLocalRefs,
+            // после любых изменений в combobox грузим свежие references для группы
+            refreshReferences: async (wcId) => { await refreshReferences(wcId); },
+        });
     /** ——— Render ——— */
     return (
         <div style={{padding:5}}>

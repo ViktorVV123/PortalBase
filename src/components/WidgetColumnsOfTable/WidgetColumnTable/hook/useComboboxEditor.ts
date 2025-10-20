@@ -6,8 +6,10 @@ import type {ComboItem, RefItem} from '@/components/WidgetColumnsOfTable/types';
 type Deps = {
     localRefsRef: React.MutableRefObject<Record<number, RefItem[]>>;
     setLocalRefs: React.Dispatch<React.SetStateAction<Record<number, RefItem[]>>>;
-    // оставлено для совместимости
+    // опционально: оставлено для совместимости
     callUpdateReference?: (wcId: number, tblColId: number, patch: any) => Promise<any>;
+    // ВАЖНО: рефетч всей группы после изменений (подтянуть новые combobox-элементы)
+    refreshReferences?: (wcId: number) => Promise<void>;
 };
 
 type Draft = {
@@ -29,6 +31,7 @@ type Draft = {
 export function useComboboxEditor({
                                       localRefsRef,
                                       setLocalRefs,
+                                      refreshReferences, // ← добавили
                                   }: Deps) {
     const [dlg, setDlg] = useState<Draft>({
         open: false,
@@ -47,14 +50,12 @@ export function useComboboxEditor({
     });
 
     const open = useCallback((wcId: number, tableColumnId: number, item: any) => {
-        // 1) попробуем извлечь combobox_column_id из разных ключей
         let comboId =
             item?.combobox_column_id ??
             item?.id ??
             item?.combobox_column?.id ??
             null;
 
-        // 2) подстраховка: если не нашли — попробуем вытащить из стора (например, когда единственный combobox-элемент)
         if (comboId == null) {
             const list = localRefsRef.current?.[wcId] ?? [];
             const ref = list.find(x => x.table_column?.id === tableColumnId);
@@ -89,10 +90,8 @@ export function useComboboxEditor({
     const save = useCallback(async () => {
         const { wcId, tableColumnId, combobox_column_id, value } = dlg;
 
-        // подробный лог, чтобы видеть что именно пусто
         // eslint-disable-next-line no-console
         console.warn('[ComboboxEditor.save] ids:', { wcId, tableColumnId, combobox_column_id });
-
         if (wcId == null || tableColumnId == null || combobox_column_id == null) {
             // eslint-disable-next-line no-console
             console.warn('[ComboboxEditor] Missing ids', { wcId, tableColumnId, combobox_column_id });
@@ -122,7 +121,7 @@ export function useComboboxEditor({
             // eslint-disable-next-line no-console
             console.debug('[ComboboxEditor] PATCH ✓');
 
-            // обновляем локально только отредактированный элемент
+            // оптимистично обновляем локально отредактированный элемент
             setLocalRefs(prev => {
                 const list = prev[wcId] ?? [];
                 const updated = list.map(r => {
@@ -132,6 +131,7 @@ export function useComboboxEditor({
                         (it.combobox_column_id ?? it.id) === combobox_column_id ? { ...it, ...body } : { ...it }
                     );
 
+                    // если сделали текущий primary — снимаем с остальных
                     if (body.is_primary) {
                         for (const it of next) {
                             if ((it.combobox_column_id ?? it.id) !== combobox_column_id && it.is_primary) it.is_primary = false;
@@ -147,13 +147,18 @@ export function useComboboxEditor({
                 return { ...prev, [wcId]: reindex(updated) };
             });
 
+            // КРИТИЧНО: подтянуть свежие данные с бэка (новые элементы появятся сразу)
+            if (typeof refreshReferences === 'function') {
+                await refreshReferences(wcId);
+            }
+
             setDlg(d => ({ ...d, saving: false, open: false }));
         } catch (e) {
             // eslint-disable-next-line no-console
             console.warn('[ComboboxEditor] PATCH ✗', e);
             setDlg(d => ({ ...d, saving: false }));
         }
-    }, [dlg, setLocalRefs]);
+    }, [dlg, setLocalRefs, refreshReferences]);
 
     return { dlg, open, close, onChange, save, setDlg };
 }
