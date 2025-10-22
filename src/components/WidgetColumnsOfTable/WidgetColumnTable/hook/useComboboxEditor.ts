@@ -1,7 +1,7 @@
 import {useCallback, useState} from 'react';
 import {api} from '@/services/api';
 import {reindex} from '@/components/WidgetColumnsOfTable/ref-helpers';
-import type {ComboItem, RefItem} from '@/components/WidgetColumnsOfTable/types';
+import type {RefItem} from '@/components/WidgetColumnsOfTable/types';
 
 type Deps = {
     localRefsRef: React.MutableRefObject<Record<number, RefItem[]>>;
@@ -17,8 +17,9 @@ type Draft = {
     saving: boolean;
     wcId: number | null;
     tableColumnId: number | null;
-    combobox_column_id: number | null;
     value: {
+
+        combobox_column_id: number | null;
         combobox_width: number;
         combobox_column_order: number;
         combobox_alias: string;
@@ -38,14 +39,15 @@ export function useComboboxEditor({
         saving: false,
         wcId: null,
         tableColumnId: null,
-        combobox_column_id: null,
         value: {
+            combobox_column_id: null,
             combobox_width: 1,
             combobox_column_order: 0,
             combobox_alias: '',
             is_primary: false,
             is_show: true,
             is_show_hidden: false,
+
         },
     });
 
@@ -70,14 +72,15 @@ export function useComboboxEditor({
             saving: false,
             wcId,
             tableColumnId,
-            combobox_column_id: comboId,
             value: {
+                combobox_column_id: comboId,
                 combobox_width: Number.isFinite(item?.combobox_width) ? item.combobox_width : 1,
                 combobox_column_order: Number.isFinite(item?.combobox_column_order) ? item.combobox_column_order : 0,
                 combobox_alias: item?.combobox_alias ?? '',
                 is_primary: !!item?.is_primary,
                 is_show: !!item?.is_show,
                 is_show_hidden: !!item?.is_show_hidden,
+
             },
         });
     }, [localRefsRef]);
@@ -88,7 +91,8 @@ export function useComboboxEditor({
     }, []);
 
     const save = useCallback(async () => {
-        const { wcId, tableColumnId, combobox_column_id, value } = dlg;
+        const { wcId, tableColumnId, value } = dlg;
+        const { combobox_column_id } = value;
 
         // eslint-disable-next-line no-console
         console.warn('[ComboboxEditor.save] ids:', { wcId, tableColumnId, combobox_column_id });

@@ -25,6 +25,15 @@ type Props = {
     /** rowProps для RefRow + DnD-хендлеры для <tbody> */
     rowProps: Omit<RefRowProps, 'wcId' | 'r' | 'formText' | 'visibleText'> & TbodyDndHandlers;
     formNameById: Record<string, string>;
+    onOpenComboCreate: (wcId: number, tblColId: number, preset?: Partial<{
+        combobox_column_id: number | null;
+        combobox_width: number;
+        combobox_column_order: number;
+        combobox_alias: string;
+        is_primary: boolean;
+        is_show: boolean;
+        is_show_hidden: boolean;
+    }>) => void;
 };
 
 export const WidgetGroup: React.FC<Props> = ({
@@ -86,6 +95,7 @@ export const WidgetGroup: React.FC<Props> = ({
                     <th>Очередность</th>
                     <th>Combobox</th>
                     <th>Формы</th>
+                    <th>id</th>
                     <th />
                 </tr>
                 </thead>
