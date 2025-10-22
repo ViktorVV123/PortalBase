@@ -26,7 +26,7 @@ import { useComboboxEditor } from '@/components/WidgetColumnsOfTable/WidgetColum
 
 import { useComboboxCreate } from '@/components/WidgetColumnsOfTable/WidgetColumnTable/hook/useComboboxCreate';
 import {useRefsDnd} from "@/components/WidgetColumnsOfTable/ hooks/useRefsDnd";
-import {ComboboxAddDialog} from "@/components/WidgetColumnsOfTable/WidgetColumnTable/hook/ComboboxAddDialog";
+import {ComboboxAddDialog} from "@/components/modals/modalCombobox/ComboboxAddDialog";
 
 /** ——— UI theme (для твоих модалок) ——— */
 const dark = createTheme({

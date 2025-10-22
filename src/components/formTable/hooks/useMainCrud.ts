@@ -1,8 +1,15 @@
-import {useCallback, useState} from 'react';
-import {api} from '@/services/api';
-import type {DTable, FormDisplay, Widget} from '@/shared/hooks/useWorkSpaces';
+// useMainCrud.ts
+import { useCallback, useState } from 'react';
+import { api } from '@/services/api';
+import type { DTable, FormDisplay, Widget } from '@/shared/hooks/useWorkSpaces';
 
 type EnsureQueryKind = 'insert' | 'update' | 'delete';
+
+// Синхронно с MainTable/useHeaderPlan
+type ExtCol = FormDisplay['columns'][number] & {
+    __write_tc_id?: number;
+    __is_primary_combo_input?: boolean;
+};
 
 export type UseMainCrudDeps = {
     formDisplay: FormDisplay;
@@ -12,8 +19,8 @@ export type UseMainCrudDeps = {
     activeFilters: Array<{ table_column_id: number; value: string | number }>;
     setFormDisplay: (v: FormDisplay) => void;
     reloadTree: () => Promise<void>;
-    isColReadOnly: (col: FormDisplay['columns'][number]) => boolean;
-    flatColumnsInRenderOrder: FormDisplay['columns'];
+    isColReadOnly: (col: ExtCol) => boolean;
+    flatColumnsInRenderOrder: ExtCol[];
     valueIndexByKey: Map<string, number>;
     setSubDisplay: (v: null) => void;
     pkToKey: (pk: Record<string, unknown>) => string;
@@ -77,7 +84,7 @@ export function useMainCrud({
                     return { ok: false };
                 }
             } catch {
-                // тихо игнорируем сетевые ошибки префлайта
+                // префлайт — не критичная ошибка
             }
 
             return { ok: true, formId };
@@ -99,8 +106,9 @@ export function useMainCrud({
 
         const init: Record<number, string> = {};
         flatColumnsInRenderOrder.forEach((c) => {
-            if (c.table_column_id != null && !isColReadOnly(c)) {
-                init[c.table_column_id] = '';
+            const writeTcId = (c.__write_tc_id ?? c.table_column_id) ?? null;
+            if (writeTcId != null && !isColReadOnly(c)) {
+                init[writeTcId] = '';
             }
         });
         setDraft(init);
@@ -116,19 +124,12 @@ export function useMainCrud({
         const pf = await preflightInsert();
         if (!pf.ok || !pf.formId) return;
 
-        // values готовим ДО saving
-        const values = Object.entries(draft)
-            .filter(([, v]) => v !== '' && v !== undefined && v !== null)
-            .filter(([table_column_id]) => {
-                const col = flatColumnsInRenderOrder.find(
-                    (c) => c.table_column_id === Number(table_column_id)
-                );
-                return col && !isColReadOnly(col);
-            })
-            .map(([table_column_id, value]) => ({
-                table_column_id: Number(table_column_id),
-                value: String(value),
-            }));
+        // Берём все непустые поля из draft (draft уже содержит только редактируемые writeTcId)
+        const entries = Object.entries(draft).filter(([, v]) => v !== '' && v != null);
+        const values = entries.map(([tcIdStr, v]) => ({
+            table_column_id: Number(tcIdStr),
+            value: String(v),
+        }));
 
         if (values.length === 0) {
             alert('Нет данных для вставки: заполни хотя бы одно редактируемое поле.');
@@ -137,7 +138,6 @@ export function useMainCrud({
 
         setSaving(true);
         try {
-            // ⚠️ ВАЖНО: pk ДОЛЖЕН быть с обёрткой primary_keys, как в Swagger!
             const body = {
                 pk: { primary_keys: {} as Record<string, string> },
                 values,
@@ -155,19 +155,16 @@ export function useMainCrud({
                     alert('Для этой таблицы не настроен INSERT QUERY. Задайте его в метаданных таблицы.');
                     return;
                 }
-                // на бэке иногда различается маршрут со слэшем
                 if (status === 404) {
                     await api.post(`${url}/`, body);
                 } else if (status === 422) {
-                    // подскажем явно, если снова будет не тот формат
-                    alert('Не удалось добавить строку (422). Проверь форму тела: { pk: { primary_keys: {} }, values: [...] }');
+                    alert('Не удалось добавить строку (422). Проверь тело: { pk: { primary_keys: {} }, values: [...] }');
                     return;
                 } else {
                     throw err;
                 }
             }
 
-            // перезагружаем данные формы c учётом активных фильтров
             const { data } = await api.post<FormDisplay>(`/display/${pf.formId}/main`, activeFilters);
             setFormDisplay(data);
             await reloadTree();
@@ -185,8 +182,6 @@ export function useMainCrud({
         selectedWidget,
         preflightInsert,
         draft,
-        flatColumnsInRenderOrder,
-        isColReadOnly,
         activeFilters,
         setFormDisplay,
         reloadTree,
@@ -203,20 +198,14 @@ export function useMainCrud({
             const init: Record<number, string> = {};
 
             flatColumnsInRenderOrder.forEach((col) => {
-                // ключ для combobox-колонок — как в SubWormTable
-                const syntheticTcId =
-                    col.type === 'combobox' &&
-                    col.combobox_column_id != null &&
-                    col.table_column_id != null
-                        ? -1_000_000 - Number(col.combobox_column_id)
-                        : (col.table_column_id ?? -1);
-
-                const k = `${col.widget_column_id}:${syntheticTcId}`;
+                // читаем по синтетическому ключу (у combobox он уже подменён)
+                const k = `${col.widget_column_id}:${col.table_column_id ?? -1}`;
                 const idx = valueIndexByKey.get(k);
                 const val = idx != null ? row.values[idx] : '';
 
-                if (col.table_column_id != null && !isColReadOnly(col)) {
-                    init[col.table_column_id] = (val ?? '').toString();
+                const writeTcId = (col.__write_tc_id ?? col.table_column_id) ?? null;
+                if (writeTcId != null && !isColReadOnly(col)) {
+                    init[writeTcId] = (val ?? '').toString();
                 }
             });
 
@@ -241,17 +230,12 @@ export function useMainCrud({
         try {
             const row = formDisplay.data[editingRowIdx];
 
-            const values = Object.entries(editDraft)
-                .filter(([table_column_id]) => {
-                    const col = flatColumnsInRenderOrder.find(
-                        (c) => c.table_column_id === Number(table_column_id)
-                    );
-                    return col && !isColReadOnly(col);
-                })
-                .map(([table_column_id, value]) => ({
-                    table_column_id: Number(table_column_id),
-                    value: String(value),
-                }));
+            // Точно так же: берём непустые поля из editDraft (уже только по writeTcId)
+            const entries = Object.entries(editDraft).filter(([, v]) => v !== '' && v != null);
+            const values = entries.map(([tcIdStr, v]) => ({
+                table_column_id: Number(tcIdStr),
+                value: String(v),
+            }));
 
             const body = {
                 pk: {
@@ -300,8 +284,6 @@ export function useMainCrud({
         setFormDisplay,
         reloadTree,
         cancelEdit,
-        flatColumnsInRenderOrder,
-        isColReadOnly,
     ]);
 
     // ───────── Удаление ─────────
