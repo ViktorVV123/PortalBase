@@ -368,9 +368,8 @@ export const FormTable: React.FC<Props> = ({
             <DrillDialog
                 open={open}
                 formId={formId}
-                loading={loading}
-                error={error}
-                display={display}
+                display={display}           // это main display, который уже грузит useDrillDialog
+                formsById={formsById}       // ← добавили
                 onClose={closeDialog}
             />
         </ThemeProvider>

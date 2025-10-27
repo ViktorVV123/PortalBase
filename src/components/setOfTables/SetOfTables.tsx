@@ -158,20 +158,8 @@ export const SetOfTables: React.FC<Props> = (props) => {
     const [referencesMap, setReferencesMap] = useState<Record<number, WcReference[]>>({});
     const [liveRefsForHeader, setLiveRefsForHeader] = useState<Record<number, WcReference[]> | null>(null);
 
-    // текущая форма и суб-виджет
-    const currentForm = useCurrentForm(selectedFormId, selectedWidget, formsById, formsByWidget);
-    const subIdByOrder = useSubWidgetIdByOrder(currentForm);
-    const currentSubOrder = subDisplay?.displayed_widget?.widget_order ?? null;
-    const currentSubWidgetId = currentSubOrder != null ? subIdByOrder[currentSubOrder] : null;
-
     // группы заголовков: основная форма и саб-форма
     const headerGroups = useHeaderPreviewFromWc(widgetColumns, referencesMap, liveRefsForHeader ?? undefined);
-
-    const getColumnsByWidgetId = useCallback(
-        (id: number) =>
-            api.get<WidgetColumn[]>(`/widgets/${id}/columns`).then(r => r.data),
-        []
-    );
 
 
     // хэндлеры навигации

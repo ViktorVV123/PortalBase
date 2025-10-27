@@ -18,15 +18,7 @@ function fallback(v?: string | null) {
 }
 
 function labelsForRef(r: WcReference): string[] {
-    if ((r as any).type === 'combobox') {
-        const raw = (r as any).combobox;
-        if (!Array.isArray(raw)) return [fallback((r as any).ref_alias)];
-        const visible = raw
-            .filter((it: any) => it?.is_show === true)
-            .sort((a: any, b: any) => (a?.combobox_column_order ?? 0) - (b?.combobox_column_order ?? 0));
-        const arr = visible.map((it: any) => (it?.combobox_alias ?? '').trim()).filter(Boolean);
-        return arr.length ? arr : [fallback((r as any).ref_alias)];
-    }
+
     return [fallback((r as any).ref_alias)];
 }
 

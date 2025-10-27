@@ -24,6 +24,8 @@ export type HeaderPlanResult = {
 export function useHeaderPlan(formDisplay: FormDisplay | null): HeaderPlanResult {
     const columns = (formDisplay?.columns ?? []) as ExtCol[];
 
+
+
     // 1) сортировка (как было)
     const ordered = useMemo(() => {
         return [...columns].sort((a, b) => {
@@ -39,25 +41,23 @@ export function useHeaderPlan(formDisplay: FormDisplay | null): HeaderPlanResult
         });
     }, [columns]);
 
-    // 2) нормализация combobox: синтетический tcId для отображения,
-    //    + сохраняем реальный tcId в __write_tc_id
+    // 2) нормализация combobox (как было)
     const normalized = useMemo<ExtCol[]>(() => {
         return ordered.map((c) => {
             if (c.type === 'combobox' && c.combobox_column_id != null && c.table_column_id != null) {
                 const syntheticTcId = -1_000_000 - Number(c.combobox_column_id);
                 return {
                     ...c,
-                    __write_tc_id: c.table_column_id,      // сохраняем настоящий tcId
-                    table_column_id: syntheticTcId,        // синтетический — только для чтения/ключей
+                    __write_tc_id: c.table_column_id,
+                    table_column_id: syntheticTcId,
                 };
             }
             return c;
         });
     }, [ordered]);
 
-    // 3) промаркируем primary-комбоколонку (минимальный combobox_column_order на один write_tc_id)
+    // 3) помечаем primary для combobox (как было)
     const normalizedWithPrimary = useMemo<ExtCol[]>(() => {
-        // группа по write_tc_id (только для combobox)
         const map: Record<number, ExtCol[]> = {};
         for (const c of normalized) {
             if (c.type === 'combobox' && c.__write_tc_id != null) {
@@ -65,13 +65,13 @@ export function useHeaderPlan(formDisplay: FormDisplay | null): HeaderPlanResult
                 (map[k] ??= []).push(c);
             }
         }
-        const primaryKeys = new Set<string>(); // `${wcId}:${writeTcId}`
+        const primaryKeys = new Set<string>();
         Object.entries(map).forEach(([writeTcIdStr, arr]) => {
             const byWc: Record<number, ExtCol[]> = {};
             for (const c of arr) (byWc[c.widget_column_id] ??= []).push(c);
             Object.entries(byWc).forEach(([wcIdStr, list]) => {
                 const primary = [...list].sort((a,b)=>(a.combobox_column_order ?? 0)-(b.combobox_column_order ?? 0))[0];
-                primaryKeys.add(`${wcIdStr}:${writeTcIdStr}`);
+                if (primary) primaryKeys.add(`${wcIdStr}:${writeTcIdStr}`);
             });
         });
 
@@ -84,17 +84,13 @@ export function useHeaderPlan(formDisplay: FormDisplay | null): HeaderPlanResult
         });
     }, [normalized]);
 
-    // 4) подписи (как было)
+    // 4) подписи: ИГНОРИРУЕМ combobox_alias, всегда берём ref-название
     const getLabel = (c: ExtCol) => {
-        if (c.type === 'combobox') {
-            const alias = (c.combobox_alias ?? '').trim();
-            if (alias) return alias;
-        }
-        const ref = (c.ref_column_name ?? '').trim();
+        const ref = (c.ref_column_name ?? '').trim(); // либо c.ref_alias, если есть в payload
         return ref || '—';
     };
 
-    // 5) группировка по widget_column_id
+    // 5) группировка по widget_column_id (как было)
     const headerPlan = useMemo<HeaderPlanGroup[]>(() => {
         const byWc: Record<number, { title: string; cols: ExtCol[]; labels: string[]; order: number }> = {};
         for (const c of normalizedWithPrimary) {
@@ -103,6 +99,7 @@ export function useHeaderPlan(formDisplay: FormDisplay | null): HeaderPlanResult
                 byWc[wcId] = { title: c.column_name ?? '', cols: [], labels: [], order: c.column_order ?? 0 };
             }
             byWc[wcId].cols.push(c);
+            // подзаголовок теперь всегда от референса, без combobox-подписей
             byWc[wcId].labels.push(getLabel(c));
         }
         return Object.entries(byWc)
@@ -112,7 +109,7 @@ export function useHeaderPlan(formDisplay: FormDisplay | null): HeaderPlanResult
 
     const flatColumnsInRenderOrder = normalizedWithPrimary;
 
-    // 6) индекс для values (по оригинальному columns без синтетики — как было)
+    // 6) индекс для values (как было)
     const valueIndexByKey = useMemo(() => {
         const map = new Map<string, number>();
         for (let i = 0; i < columns.length; i++) {
@@ -126,10 +123,10 @@ export function useHeaderPlan(formDisplay: FormDisplay | null): HeaderPlanResult
         return map;
     }, [columns]);
 
-    // 7) readonly-логика: combobox editable только в primary
+    // 7) readonly-логика (как было)
     const isColReadOnly = (c: ExtCol) => {
         if (c.visible === false) return true;
-        if (c.type === 'combobox') return !c.__is_primary_combo_input; // писать можно только в primary
+        if (c.type === 'combobox') return !c.__is_primary_combo_input;
         if (c.table_column_id == null) return true;
         return !!c.readonly;
     };

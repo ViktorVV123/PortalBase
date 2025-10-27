@@ -228,11 +228,15 @@ export const MainTable: React.FC<Props> = (p) => {
                 </tr>
                 {p.showSubHeaders && (
                     <tr>
-                        {p.headerPlan.map(g =>
-                            g.labels.slice(0, g.cols.length).map((label, idx) => (
-                                <th key={`g-sub-${g.id}-${idx}`}>{label}</th>
-                            ))
-                        )}
+                        {p.headerPlan.map(g => {
+                            const span = g.cols.length || 1;
+                            const label = (g.labels?.[0] ?? '—'); // одна подпись на весь widget_column
+                            return (
+                                <th key={`g-sub-${g.id}`} colSpan={span}>
+                                    {label}
+                                </th>
+                            );
+                        })}
                         <th />
                     </tr>
                 )}
