@@ -3,11 +3,30 @@ import {api} from '@/services/api';
 import {reindex} from '@/components/WidgetColumnsOfTable/ref-helpers';
 import type {RefItem} from '@/components/WidgetColumnsOfTable/types';
 
+type FlexibleFormCache = Partial<{
+    main_widget_id: number;
+    form_id: number;
+    name: string;
+}>;
+
 type Deps = {
     localRefsRef: React.MutableRefObject<Record<number, RefItem[]>>;
     setLocalRefs: React.Dispatch<React.SetStateAction<Record<number, RefItem[]>>>;
     refreshReferences?: (wcId: number) => Promise<void>;
+
+    /** Может быть без main_widget_id — тогда используем resolveMainWidgetId */
+    formsById?: Record<number, FlexibleFormCache>;
+
+    /** Колбэк-резолвер на случай, если в formsById нет main_widget_id */
+    resolveMainWidgetId?: (formId: number) => Promise<number | null>;
 };
+
+export type OpenComboResult =
+    | { ok: true }
+    | { ok: false; reason: 'NO_FORM' | 'NO_TABLE' };
+
+
+
 
 type Draft = {
     open: boolean;
@@ -15,8 +34,11 @@ type Draft = {
     wcId: number | null;
     tableColumnId: number | null;
     value: {
+        /** используется только для фильтрации колонок в диалоге; руками не вводится */
         table_id: number | null;
-        combobox_column_id: number | null; // обязательный для POST path
+
+        /** обязательный для PATCH path */
+        combobox_column_id: number | null;
         combobox_width: number;
         combobox_column_order: number;
         combobox_alias: string;
@@ -26,7 +48,16 @@ type Draft = {
     };
 };
 
-export function useComboboxCreate({ localRefsRef, setLocalRefs, refreshReferences }: Deps) {
+const comboKeyOf = (it: any) =>
+    it?.combobox_column?.id ?? it?.combobox_column_id ?? it?.id ?? -1;
+
+export function useComboboxCreate({
+                                      localRefsRef,
+                                      setLocalRefs,
+                                      refreshReferences,
+                                      formsById,
+                                      resolveMainWidgetId,
+                                  }: Deps) {
     const [dlg, setDlg] = useState<Draft>({
         open: false,
         saving: false,
@@ -44,14 +75,78 @@ export function useComboboxCreate({ localRefsRef, setLocalRefs, refreshReference
         },
     });
 
-    const open = useCallback((wcId: number, tableColumnId: number, preset?: Partial<Draft['value']>) => {
+    const findRow = useCallback((wcId: number, tableColumnId: number): RefItem | undefined => {
         const list = localRefsRef.current?.[wcId] ?? [];
-        const ref = list.find(x => x.table_column?.id === tableColumnId);
-        const tableId = ref?.table_column?.table_id ?? null;
-        const currentItems: any[] = Array.isArray((ref as any)?.combobox) ? (ref as any).combobox : [];
+        return list.find(x => (x.table_column?.id as number) === tableColumnId);
+    }, [localRefsRef]);
+
+    /** достаём main_widget_id: из r.form, либо из formsById, либо через resolveMainWidgetId */
+    const getMainWidgetId = useCallback(async (row: RefItem): Promise<number | null> => {
+        const raw: any = row;
+
+        // 1) уже лежит в r.form?
+        if (raw?.form?.main_widget_id) {
+            const n = Number(raw.form.main_widget_id);
+            return Number.isFinite(n) ? n : null;
+        }
+
+        // 2) возьмём form_id
+        const formId: number | null = raw?.form_id ?? raw?.form?.form_id ?? null;
+        if (!formId) return null;
+
+        // 3) попробуем из кэша
+        const cached = formsById?.[formId];
+        if (cached?.main_widget_id != null) {
+            const n = Number(cached.main_widget_id);
+            if (Number.isFinite(n)) return n;
+        }
+
+        // 4) последний шанс — внешний резолвер
+        if (resolveMainWidgetId) {
+            try {
+                const n = await resolveMainWidgetId(formId);
+                return Number.isFinite(n as number) ? (n as number) : null;
+            } catch {
+                /* ignore */
+            }
+        }
+
+        return null;
+    }, [formsById, resolveMainWidgetId]);
+
+    /** по main_widget_id достаём table_id */
+    const fetchTableIdByMainWidget = useCallback(async (mainWidgetId: number): Promise<number | null> => {
+        try {
+            const { data } = await api.get(`/widgets/${mainWidgetId}`);
+            const tableId = (data?.table_id as number) ?? (data?.table?.id as number) ?? null;
+            return Number.isFinite(tableId) ? tableId : null;
+        } catch {
+            return null;
+        }
+    }, []);
+
+    /**
+     * Открыть диалог создания combobox.
+     * Если для строки нельзя определить table_id (нет формы/нет таблицы) — возвращаем ok:false.
+     */
+    const open = useCallback(async (
+        wcId: number,
+        tableColumnId: number,
+        preset?: Partial<Draft['value']>
+    ): Promise<OpenComboResult> => {
+        const row = findRow(wcId, tableColumnId);
+        if (!row) return { ok: false, reason: 'NO_TABLE' };
+
+        const mainWidgetId = await getMainWidgetId(row);
+        if (!mainWidgetId) return { ok: false, reason: 'NO_FORM' };
+
+        const tableIdFromForm = await fetchTableIdByMainWidget(mainWidgetId);
+        if (!tableIdFromForm) return { ok: false, reason: 'NO_TABLE' };
+
+        const currentItems: any[] = Array.isArray((row as any)?.combobox) ? (row as any).combobox : [];
         const nextOrder = Number.isFinite(preset?.combobox_column_order as any)
             ? Number(preset!.combobox_column_order)
-            : currentItems.length; // по умолчанию — в конец
+            : currentItems.length;
 
         setDlg({
             open: true,
@@ -59,7 +154,7 @@ export function useComboboxCreate({ localRefsRef, setLocalRefs, refreshReference
             wcId,
             tableColumnId,
             value: {
-                table_id: tableId,
+                table_id: tableIdFromForm,                 // ← у каждой строки свой table_id
                 combobox_column_id: preset?.combobox_column_id ?? null,
                 combobox_width: Math.max(1, Math.trunc(preset?.combobox_width ?? 1)),
                 combobox_column_order: Math.max(0, Math.trunc(nextOrder)),
@@ -69,14 +164,17 @@ export function useComboboxCreate({ localRefsRef, setLocalRefs, refreshReference
                 is_show_hidden: !!preset?.is_show_hidden,
             },
         });
-    }, [localRefsRef]);
 
-    const close = useCallback(() => setDlg(d => ({...d, open: false})), []);
+        return { ok: true };
+    }, [findRow, getMainWidgetId, fetchTableIdByMainWidget]);
+
+    const close = useCallback(() => setDlg(d => ({ ...d, open: false })), []);
 
     const onChange = useCallback((patch: Partial<Draft['value']>) => {
         setDlg(d => ({ ...d, value: { ...d.value, ...patch } }));
     }, []);
 
+    /** PATCH upsert combobox-элемента */
     const save = useCallback(async () => {
         const { wcId, tableColumnId, value } = dlg;
         if (wcId == null || tableColumnId == null || value.combobox_column_id == null) {
@@ -84,6 +182,16 @@ export function useComboboxCreate({ localRefsRef, setLocalRefs, refreshReference
             return;
         }
 
+        // 1) определяем, есть ли уже такой combobox в локальном состоянии
+        const list = localRefsRef.current?.[wcId] ?? [];
+        const row = list.find(r => (r.table_column?.id as number) === tableColumnId) as any;
+        const orig: any[] = Array.isArray(row?.combobox) ? row.combobox : [];
+        const key = Number(value.combobox_column_id);
+        const exists = orig.some(it =>
+            (it?.combobox_column?.id ?? it?.combobox_column_id ?? it?.id) === key
+        );
+
+        // 2) нормализуем payload
         const body = {
             combobox_width: Math.max(1, Math.trunc(+value.combobox_width || 1)),
             combobox_column_order: Math.max(0, Math.trunc(+value.combobox_column_order || 0)),
@@ -93,49 +201,65 @@ export function useComboboxCreate({ localRefsRef, setLocalRefs, refreshReference
             is_show_hidden: !!value.is_show_hidden,
         };
 
+        const url = `/widgets/tables/references/${wcId}/${tableColumnId}/${key}`;
+
         try {
             setDlg(d => ({ ...d, saving: true }));
-            const url = `/widgets/tables/references/${wcId}/${tableColumnId}/${value.combobox_column_id}`;
-            await api.post(url, body);
 
-            // оптимистично допишем новый элемент в локальный стор (если этой combobox_column_id не было)
+            // 3) CREATE vs UPDATE
+            if (exists) {
+                await api.patch(url, body);
+            } else {
+                await api.post(url, body);
+            }
+
+            // 4) оптимистичный апдейт локального стора
             setLocalRefs(prev => {
-                const list = prev[wcId] ?? [];
-                const updated = list.map(r => {
+                const group = prev[wcId] ?? [];
+                const updated = group.map((r: any) => {
                     if (r.table_column?.id !== tableColumnId) return r;
-                    const orig: any[] = Array.isArray((r as any).combobox) ? (r as any).combobox : [];
-                    const exists = orig.some(it =>
-                        (it.combobox_column_id ?? it.id) === value.combobox_column_id
-                    );
-                    const next = exists
-                        ? orig.map(it =>
-                            (it.combobox_column_id ?? it.id) === value.combobox_column_id ? { ...it, ...body } : { ...it }
-                        )
-                        : orig.concat([{ id: value.combobox_column_id, combobox_column_id: value.combobox_column_id, ...body }]);
 
+                    const current: any[] = Array.isArray(r.combobox) ? r.combobox : [];
+                    const next = exists
+                        ? current.map(it =>
+                            (it?.combobox_column?.id ?? it?.combobox_column_id ?? it?.id) === key
+                                ? { ...it, ...body }
+                                : { ...it }
+                        )
+                        : current.concat([{ id: key, combobox_column_id: key, ...body }]);
+
+                    // единственный primary
                     if (body.is_primary) {
                         for (const it of next) {
-                            if ((it.combobox_column_id ?? it.id) !== value.combobox_column_id && it.is_primary) it.is_primary = false;
+                            const idOf = it?.combobox_column?.id ?? it?.combobox_column_id ?? it?.id;
+                            if (idOf !== key && it.is_primary) it.is_primary = false;
                         }
                     }
+
+                    // порядок
                     next
-                        .sort((a, b) => (a.combobox_column_order ?? 0) - (b.combobox_column_order ?? 0))
+                        .sort((a, b) => (a?.combobox_column_order ?? 0) - (b?.combobox_column_order ?? 0))
                         .forEach((it, idx) => { it.combobox_column_order = idx; });
 
-                    return { ...r, combobox: next } as any;
+                    return { ...r, combobox: next };
                 });
+
                 return { ...prev, [wcId]: reindex(updated) };
             });
 
-            // подтянуть фактическое состояние с сервера (важно для новых id)
+            // 5) подтянуть с сервера (нужны реальные id nested-объектов)
             await refreshReferences?.(wcId);
 
             setDlg(d => ({ ...d, saving: false, open: false }));
-        } catch (e) {
-            console.warn('[ComboboxCreate] POST ✗', e);
+        } catch (e: any) {
+            console.warn('[ComboboxCreate] SAVE error', { exists, method: exists ? 'PATCH' : 'POST', url, body, e });
+            // полезно увидеть ответ бэка в консоли
+            // alert можно тоже добавить, если надо:
+            // alert(`Не удалось сохранить combobox (${exists ? 'редактирование' : 'создание'}). Код: ${e?.response?.status ?? '—'}`);
             setDlg(d => ({ ...d, saving: false }));
         }
-    }, [dlg, setLocalRefs, refreshReferences]);
+    }, [dlg, localRefsRef, setLocalRefs, refreshReferences]);
+
 
     return { dlg, open, close, onChange, save, setDlg };
 }

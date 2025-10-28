@@ -7,9 +7,7 @@ import {
 import { api } from '@/services/api';
 
 type ComboboxAddValue = {
-    // table_id больше не обязателен — можно не передавать
-    table_id?: number | null;
-
+    table_id: number | null;                 // ← приходит из useComboboxCreate, руками не вводим
     combobox_column_id: number | null;
     combobox_width: number;
     combobox_column_order: number;
@@ -28,178 +26,96 @@ type Props = {
     onSave: () => void;
 };
 
-type ColumnOption = {
-    id: number;
-    name: string;
-    table_id: number;
-    table_name: string;
-};
+type ColumnOption = { id: number; name: string };
 
 export const ComboboxAddDialog: React.FC<Props> = ({
                                                        open, value, saving = false, onChange, onClose, onSave
                                                    }) => {
     const [loadingCols, setLoadingCols] = useState(false);
     const [cols, setCols] = useState<ColumnOption[]>([]);
-    const [colsError, setColsError] = useState<string | null>(null);
-    const [lookupName, setLookupName] = useState<string | null>(null);
-    const [query, setQuery] = useState('');
+    const [error, setError] = useState<string | null>(null);
 
-    // загружаем ВСЕ таблицы и их колонки
+    // Грузим только колонки конкретной таблицы формы
     useEffect(() => {
         let cancelled = false;
-        const loadAllColumns = async () => {
+        const load = async () => {
             if (!open) return;
+
+            const tid = value.table_id ?? null;
+            if (!Number.isFinite(tid as number) || (tid as number) <= 0) {
+                setCols([]);
+                setError('Форма не выбрана или не удалось определить таблицу для формы.');
+                return;
+            }
+
             setLoadingCols(true);
-            setColsError(null);
+            setError(null);
             setCols([]);
             try {
-                // 1) список таблиц
-                const tablesRes = await api.get<{ id: number; name: string }[]>('/tables');
-                const tables = tablesRes.data ?? [];
-
-                // 2) параллельные запросы на колонки каждой таблицы
-                const perTableCols = await Promise.all(
-                    tables.map(async t => {
-                        try {
-                            const res = await api.get<{ id: number; name: string }[]>(`/tables/${t.id}/columns`);
-                            return (res.data ?? []).map(c => ({
-                                id: (c as any).id,
-                                name: (c as any).name,
-                                table_id: t.id,
-                                table_name: t.name,
-                            }) as ColumnOption);
-                        } catch {
-                            return [] as ColumnOption[];
-                        }
-                    })
-                );
-
-                const flat = perTableCols.flat().sort((a, b) => {
-                    // сначала по имени таблицы, затем по имени колонки, затем по id
-                    const tn = a.table_name.localeCompare(b.table_name, 'ru');
-                    if (tn !== 0) return tn;
-                    const cn = a.name.localeCompare(b.name, 'ru');
-                    if (cn !== 0) return cn;
-                    return a.id - b.id;
-                });
-
-                if (!cancelled) setCols(flat);
+                const { data } = await api.get(`/tables/${tid}/columns`);
+                const arr = (data ?? []).map((c: any) => ({ id: c.id, name: c.name })) as ColumnOption[];
+                if (!cancelled) setCols(arr);
             } catch {
-                if (!cancelled) {
-                    setColsError('Не удалось загрузить перечень колонок. Можно ввести ID вручную.');
-                }
+                if (!cancelled) setError('Не удалось загрузить колонки таблицы.');
             } finally {
                 if (!cancelled) setLoadingCols(false);
             }
         };
-
-        loadAllColumns();
+        load();
         return () => { cancelled = true; };
-    }, [open]);
-
-    useEffect(() => { setLookupName(null); }, [value.combobox_column_id]);
-
-    const filteredCols = useMemo(() => {
-        const q = query.trim().toLowerCase();
-        if (!q) return cols;
-        return cols.filter(o =>
-            String(o.id).includes(q) ||
-            o.name.toLowerCase().includes(q) ||
-            o.table_name.toLowerCase().includes(q)
-        );
-    }, [cols, query]);
+    }, [open, value.table_id]);
 
     const canSave = useMemo(() => {
-        return Number.isFinite(value.combobox_column_id as number)
-            && (value.combobox_column_id as number) > 0
-            && !saving;
-    }, [value.combobox_column_id, saving]);
-
-    // ручной lookup по /tables/columns/{id}
-    const handleLookup = async () => {
-        const id = Number(value.combobox_column_id);
-        if (!Number.isFinite(id) || id <= 0) {
-            setLookupName('Введите корректный ID');
-            return;
-        }
-        try {
-            const { data } = await api.get(`/tables/columns/${id}`);
-            const name = (data as any)?.name ?? '(без имени)';
-            setLookupName(`${name}`);
-        } catch {
-            setLookupName('Колонка не найдена');
-        }
-    };
+        const idOk = Number.isFinite(value.combobox_column_id as number) && (value.combobox_column_id as number) > 0;
+        const tableOk = Number.isFinite(value.table_id as number) && (value.table_id as number) > 0;
+        return idOk && tableOk && !saving;
+    }, [value.combobox_column_id, value.table_id, saving]);
 
     return (
         <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
             <DialogTitle>Добавить элемент Combobox</DialogTitle>
             <DialogContent dividers>
 
-                {/* combobox_column_id: Select со всеми колонками, либо TextField с lookup при ошибке */}
-                {!colsError ? (
-                    <>
+                <FormHelperText sx={{ mb: 1 }}>
+                    {Number.isFinite(value.table_id as number) && (value.table_id as number) > 0
+                        ? `Колонки формы: таблица #${value.table_id}`
+                        : 'Форма не выбрана — выбор колонок недоступен'}
+                </FormHelperText>
 
+                <FormControl fullWidth size="small" margin="dense" disabled={!Number.isFinite(value.table_id as number)}>
+                    <InputLabel id="combo-col-id-label">combobox_column_id</InputLabel>
+                    <Select
+                        labelId="combo-col-id-label"
+                        label="combobox_column_id"
+                        value={value.combobox_column_id ?? ''}
+                        onChange={(e) => {
+                            const n = parseInt(String(e.target.value), 10);
+                            onChange({ combobox_column_id: Number.isFinite(n) ? n : null });
+                        }}
+                        MenuProps={{
+                            PaperProps: { sx: { bgcolor: '#0f0f0f', color: '#fff', maxHeight: 420 } },
+                            MenuListProps: { sx: { bgcolor: '#0f0f0f', color: '#fff' } },
+                        }}
+                    >
+                        {loadingCols ? (
+                            <MenuItem disabled>
+                                <CircularProgress size={16} sx={{ mr: 1 }} /> Загрузка…
+                            </MenuItem>
+                        ) : error ? (
+                            <MenuItem disabled>{error}</MenuItem>
+                        ) : (
+                            cols.map(opt => (
+                                <MenuItem key={opt.id} value={opt.id}>
+                                    #{opt.id} · {opt.name}
+                                </MenuItem>
+                            ))
+                        )}
+                    </Select>
+                    <FormHelperText>
+                        Выберите колонку **из таблицы формы** (список формируется автоматически).
+                    </FormHelperText>
+                </FormControl>
 
-                        <FormControl fullWidth size="small" margin="dense">
-                            <InputLabel id="combo-col-id-label">combobox_column_id</InputLabel>
-                            <Select
-                                labelId="combo-col-id-label"
-                                label="combobox_column_id"
-                                value={value.combobox_column_id ?? ''}
-                                onChange={(e) => {
-                                    const n = parseInt(String(e.target.value), 10);
-                                    onChange({ combobox_column_id: Number.isFinite(n) ? n : null });
-                                }}
-                                MenuProps={{
-                                    PaperProps: { sx: { bgcolor: '#0f0f0f', color: '#fff', maxHeight: 420 } },
-                                    MenuListProps: { sx: { bgcolor: '#0f0f0f', color: '#fff' } },
-                                }}
-                            >
-                                {loadingCols ? (
-                                    <MenuItem disabled>
-                                        <CircularProgress size={16} sx={{ mr: 1 }} /> Загрузка…
-                                    </MenuItem>
-                                ) : (
-                                    filteredCols.map(opt => (
-                                        <MenuItem key={opt.id} value={opt.id}>
-                                            #{opt.id} · {opt.table_name} · {opt.name}
-                                        </MenuItem>
-                                    ))
-                                )}
-                            </Select
-                                >
-                            <FormHelperText>Выберите колонку из всех таблиц</FormHelperText>
-                        </FormControl>
-                    </>
-                ) : (
-                    <>
-                        <FormControl fullWidth margin="dense">
-                            <TextField
-                                type="number"
-                                label="combobox_column_id"
-                                size="small"
-                                value={value.combobox_column_id ?? ''}
-                                onChange={e => {
-                                    const n = parseInt(e.target.value, 10);
-                                    onChange({ combobox_column_id: Number.isFinite(n) ? n : null });
-                                }}
-                                required
-                                helperText={colsError}
-                            />
-                        </FormControl>
-                        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                            <Button onClick={handleLookup} variant="outlined" size="small">
-                                Проверить имя по ID
-                            </Button>
-                            {lookupName && (
-                                <FormHelperText sx={{ m: 0 }}>Колонка: {lookupName}</FormHelperText>
-                            )}
-                        </div>
-                    </>
-                )}
-
-                {/* Остальные поля */}
                 <FormControl fullWidth margin="dense">
                     <TextField
                         type="number"
