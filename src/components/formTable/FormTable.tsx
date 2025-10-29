@@ -80,6 +80,7 @@ export const FormTable: React.FC<Props> = ({
     const [editingRowIdxSub, setEditingRowIdxSub] = useState<number | null>(null);
     const [editDraftSub, setEditDraftSub] = useState<Record<number, string>>({});
     const [editSavingSub, setEditSavingSub] = useState(false);
+    const [clickMode, setClickMode] = useState<boolean | null>(null);
 
 
     /** ─────────── форма/сабы ─────────── */
@@ -214,6 +215,23 @@ export const FormTable: React.FC<Props> = ({
         };
     })());
 
+
+    useEffect(() => {
+        // аккуратно, display может быть null вначале
+        const cols = display?.columns ?? [];
+        const types = cols.map((c, i) => ({ i, table_column_id: c.table_column_id, type: c?.type }));
+        // eslint-disable-next-line no-console
+        console.groupCollapsed('%c[FormTable] display snapshot', 'color: #0aa');
+        console.log({ open, formId, loading, error });
+        console.log('columns.length:', cols.length);
+        console.table(types);
+        console.groupEnd();
+    }, [display, open, formId, loading, error]);
+
+
+
+
+
     /** ─────────── CRUD main (хук) ─────────── */
     const {
         isAdding, draft, saving,
@@ -268,6 +286,28 @@ export const FormTable: React.FC<Props> = ({
         subDisplay,
     });
 
+
+    // внутри компонента FormTable, рядом с useHeaderPlan / до рендера
+    const isComboboxRoot = useMemo(
+        () => (formDisplay?.columns ?? []).some(c => c?.type === 'combobox'),
+        [formDisplay]
+    );
+
+    const handleOpenDrillFromMain = useCallback(
+        (fid?: number | null, meta?: { originColumnType?: 'combobox' | null }) => {
+            const isCombo = meta?.originColumnType === 'combobox';
+            setClickMode(isCombo);
+            console.log('[FormTable] openDrill', { fid, originColumnType: meta?.originColumnType, isCombo });
+            openDialog(fid);
+        },
+        [openDialog]
+    );
+
+    useEffect(() => {
+        if (!open) setClickMode(null);
+    }, [open]);
+
+
     /** ─────────── UI ─────────── */
     return (
         <ThemeProvider theme={dark}>
@@ -311,7 +351,7 @@ export const FormTable: React.FC<Props> = ({
                         headerPlan={headerPlan as any}
                         showSubHeaders={showSubHeaders}
                         onToggleSubHeaders={() => setShowSubHeaders(v => !v)}
-
+                        onOpenDrill={handleOpenDrillFromMain}
                         isAdding={isAdding}
                         draft={draft}
                         onDraftChange={(tcId, v) => setDraft(prev => ({...prev, [tcId]: v}))}
@@ -338,7 +378,6 @@ export const FormTable: React.FC<Props> = ({
                         onDeleteRow={deleteRow}
                         deletingRowIdx={deletingRowIdx}
 
-                        onOpenDrill={(fid) => openDialog(fid)}
                     />
 
                     <SubWormTable
@@ -368,6 +407,7 @@ export const FormTable: React.FC<Props> = ({
             <DrillDialog
                 open={open}
                 formId={formId}
+                isComboboxRoot={!!clickMode}
                 display={display}           // это main display, который уже грузит useDrillDialog
                 formsById={formsById}       // ← добавили
                 onClose={closeDialog}

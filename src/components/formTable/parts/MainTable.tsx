@@ -54,7 +54,8 @@ type Props = {
     onDeleteRow: (rowIdx: number) => void;
     deletingRowIdx: number | null;
 
-    onOpenDrill: (formId: number) => void;
+    /** ВАЖНО: второй аргумент — тип кликнутой колонки */
+    onOpenDrill?: (fid?: number | null, meta?: { originColumnType?: 'combobox' | null }) => void;
 };
 
 /** Кэш вариантов combobox по ключу wcId:writeTcId */
@@ -360,7 +361,6 @@ export const MainTable: React.FC<Props> = (p) => {
                                             // просмотр: склеим видимые значения всех визуальных столбцов группы
                                             const shownParts = group.map(gcol => getShown(p.valueIndexByKey, row.values, gcol)).filter(Boolean);
                                             const display = shownParts.length ? shownParts.map(formatCellValue).join(' · ') : '—';
-                                            // клик по drill’у берём с primary (если есть form_id)
                                             const clickable = primary.form_id != null;
 
                                             cells.push(
@@ -368,7 +368,16 @@ export const MainTable: React.FC<Props> = (p) => {
                                                     {clickable ? (
                                                         <button
                                                             type="button"
-                                                            onClick={(e) => { e.stopPropagation(); p.onOpenDrill(primary.form_id!); }}
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                p.onOpenDrill?.(primary.form_id!, { originColumnType: 'combobox' });
+                                                                console.debug('[MainTable] drill click (combobox)', {
+                                                                    formId: primary.form_id,
+                                                                    originColumnType: 'combobox',
+                                                                    widget_column_id: primary.widget_column_id,
+                                                                    table_column_id: primary.table_column_id
+                                                                });
+                                                            }}
                                                             style={{
                                                                 padding: 0,
                                                                 border: 'none',
@@ -418,7 +427,16 @@ export const MainTable: React.FC<Props> = (p) => {
                                                 {clickable ? (
                                                     <button
                                                         type="button"
-                                                        onClick={(e) => { e.stopPropagation(); p.onOpenDrill(col.form_id!); }}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            p.onOpenDrill?.(col.form_id!, { originColumnType: (col.type as 'combobox' | null) ?? null });
+                                                            console.debug('[MainTable] drill click (regular)', {
+                                                                formId: col.form_id,
+                                                                originColumnType: col.type ?? null,
+                                                                widget_column_id: col.widget_column_id,
+                                                                table_column_id: col.table_column_id
+                                                            });
+                                                        }}
                                                         style={{
                                                             padding: 0,
                                                             border: 'none',
