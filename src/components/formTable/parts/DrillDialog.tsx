@@ -389,7 +389,7 @@ export const DrillDialog: React.FC<Props> = ({
                                 headerPlan={headerPlan as any}
                                 showSubHeaders={isComboboxMode ? showSubHeaders : false}
                                 onToggleSubHeaders={() => isComboboxMode && setShowSubHeaders(v => !v)}
-
+                                onOpenDrill={isComboboxMode ? handleOpenDrill : undefined}
                                 isAdding={isAdding}
                                 draft={draft}
                                 onDraftChange={(tcId, v) => setDraft(prev => ({...prev, [tcId]: v}))}
@@ -416,7 +416,6 @@ export const DrillDialog: React.FC<Props> = ({
                                 onDeleteRow={deleteRow}
                                 deletingRowIdx={deletingRowIdx}
 
-                                onOpenDrill={handleOpenDrill}
                             />
 
                             {/* SUB — только в режиме combobox */}

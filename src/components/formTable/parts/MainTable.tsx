@@ -361,7 +361,7 @@ export const MainTable: React.FC<Props> = (p) => {
                                             // просмотр: склеим видимые значения всех визуальных столбцов группы
                                             const shownParts = group.map(gcol => getShown(p.valueIndexByKey, row.values, gcol)).filter(Boolean);
                                             const display = shownParts.length ? shownParts.map(formatCellValue).join(' · ') : '—';
-                                            const clickable = primary.form_id != null;
+                                            const clickable = primary.form_id != null && !!p.onOpenDrill;
 
                                             cells.push(
                                                 <td key={`view-combo-${primary.widget_column_id}:${writeTcId}`} colSpan={span}>
@@ -421,7 +421,7 @@ export const MainTable: React.FC<Props> = (p) => {
                                             </td>
                                         );
                                     } else {
-                                        const clickable = col.form_id != null;
+                                        const clickable = col.form_id != null && !!p.onOpenDrill;
                                         cells.push(
                                             <td key={`cell-${visKey}`}>
                                                 {clickable ? (
@@ -429,7 +429,7 @@ export const MainTable: React.FC<Props> = (p) => {
                                                         type="button"
                                                         onClick={(e) => {
                                                             e.stopPropagation();
-                                                            p.onOpenDrill?.(col.form_id!, { originColumnType: (col.type as 'combobox' | null) ?? null });
+                                                            p.onOpenDrill?.(col.form_id!, { originColumnType: null });
                                                             console.debug('[MainTable] drill click (regular)', {
                                                                 formId: col.form_id,
                                                                 originColumnType: col.type ?? null,
