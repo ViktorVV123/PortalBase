@@ -39,6 +39,7 @@ type Props = {
     formsById: Record<number, WidgetForm>;
     onClose: () => void;
     isComboboxRoot: boolean;
+    loadSubDisplay: (formId: number, subOrder: number, primary?: Record<string, unknown>) => void;
 };
 
 const safe = (v?: string | null) => (v?.trim() ? v.trim() : '—');
@@ -48,7 +49,8 @@ export const DrillDialog: React.FC<Props> = ({
                                                  formId,
                                                  display,
                                                  formsById,
-                                                 onClose,isComboboxRoot
+                                                 onClose,isComboboxRoot,
+                                                 loadSubDisplay
                                              }) => {
     /** ─── стек форм (drill) ─── */
     const [formStack, setFormStack] = useState<number[]>(() => (formId ? [formId] : []));

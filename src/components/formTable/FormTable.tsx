@@ -287,12 +287,6 @@ export const FormTable: React.FC<Props> = ({
     });
 
 
-    // внутри компонента FormTable, рядом с useHeaderPlan / до рендера
-    const isComboboxRoot = useMemo(
-        () => (formDisplay?.columns ?? []).some(c => c?.type === 'combobox'),
-        [formDisplay]
-    );
-
     const handleOpenDrillFromMain = useCallback(
         (fid?: number | null, meta?: { originColumnType?: 'combobox' | null }) => {
             const isCombo = meta?.originColumnType === 'combobox';
@@ -405,6 +399,7 @@ export const FormTable: React.FC<Props> = ({
             </div>
 
             <DrillDialog
+                loadSubDisplay={loadSubDisplay}
                 open={open}
                 formId={formId}
                 isComboboxRoot={!!clickMode}
