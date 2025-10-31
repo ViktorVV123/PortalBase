@@ -41,7 +41,6 @@ export function useSubWormTable({
                                     setEditDraft,
                                     editSaving,
                                     setEditSaving,
-
                                     isAddingSub,
                                     setIsAddingSub,
                                     draftSub,

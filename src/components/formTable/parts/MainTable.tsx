@@ -55,7 +55,10 @@ type Props = {
     deletingRowIdx: number | null;
 
     /** ВАЖНО: второй аргумент — тип кликнутой колонки */
-    onOpenDrill?: (fid?: number | null, meta?: { originColumnType?: 'combobox' | null }) => void;
+    onOpenDrill?: (
+        fid?: number | null,
+        meta?: { originColumnType?: 'combobox' | null; primary?: Record<string, unknown> }
+    ) => void;
 };
 
 /** Кэш вариантов combobox по ключу wcId:writeTcId */
@@ -370,7 +373,10 @@ export const MainTable: React.FC<Props> = (p) => {
                                                             type="button"
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
-                                                                p.onOpenDrill?.(primary.form_id!, { originColumnType: 'combobox' });
+                                                                p.onOpenDrill?.(primary.form_id!, {
+                                                                    originColumnType: 'combobox',
+                                                                    primary: row.primary_keys,            // 👈 прокидываем PK текущей строки
+                                                                });
                                                                 console.debug('[MainTable] drill click (combobox)', {
                                                                     formId: primary.form_id,
                                                                     originColumnType: 'combobox',
@@ -429,7 +435,10 @@ export const MainTable: React.FC<Props> = (p) => {
                                                         type="button"
                                                         onClick={(e) => {
                                                             e.stopPropagation();
-                                                            p.onOpenDrill?.(col.form_id!, { originColumnType: null });
+                                                            p.onOpenDrill?.(col.form_id!, {
+                                                                originColumnType: null,
+                                                                primary: row.primary_keys,            // опционально
+                                                            });
                                                             console.debug('[MainTable] drill click (regular)', {
                                                                 formId: col.form_id,
                                                                 originColumnType: col.type ?? null,

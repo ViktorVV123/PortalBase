@@ -82,6 +82,10 @@ export const FormTable: React.FC<Props> = ({
     const [editSavingSub, setEditSavingSub] = useState(false);
     const [clickMode, setClickMode] = useState<boolean | null>(null);
 
+    const [drillInitialPrimary, setDrillInitialPrimary] = useState<Record<string, unknown> | null>(null);
+
+
+
 
     /** ─────────── форма/сабы ─────────── */
     const baseForm: WidgetForm | null = useMemo(() => {
@@ -230,6 +234,25 @@ export const FormTable: React.FC<Props> = ({
 
 
 
+    const handleOpenDrillFromMain = useCallback(
+        (fid?: number | null, meta?: { originColumnType?: 'combobox' | null; primary?: Record<string, unknown> }) => {
+            const isCombo = meta?.originColumnType === 'combobox';
+            setClickMode(isCombo);
+            setDrillInitialPrimary(meta?.primary ?? null);   // 👈 сохранили PK
+            openDialog(fid);
+        },
+        [openDialog]
+    );
+
+
+    useEffect(() => {
+        if (!open) {
+            setClickMode(null);
+            setDrillInitialPrimary(null);       // 👈 сброс
+        }
+    }, [open]);
+
+
 
 
     /** ─────────── CRUD main (хук) ─────────── */
@@ -287,15 +310,7 @@ export const FormTable: React.FC<Props> = ({
     });
 
 
-    const handleOpenDrillFromMain = useCallback(
-        (fid?: number | null, meta?: { originColumnType?: 'combobox' | null }) => {
-            const isCombo = meta?.originColumnType === 'combobox';
-            setClickMode(isCombo);
-            console.log('[FormTable] openDrill', { fid, originColumnType: meta?.originColumnType, isCombo });
-            openDialog(fid);
-        },
-        [openDialog]
-    );
+
 
     useEffect(() => {
         if (!open) setClickMode(null);
@@ -406,6 +421,7 @@ export const FormTable: React.FC<Props> = ({
                 display={display}           // это main display, который уже грузит useDrillDialog
                 formsById={formsById}       // ← добавили
                 onClose={closeDialog}
+                initialPrimary={drillInitialPrimary ?? undefined}
             />
         </ThemeProvider>
     );

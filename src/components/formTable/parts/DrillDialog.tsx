@@ -40,6 +40,7 @@ type Props = {
     onClose: () => void;
     isComboboxRoot: boolean;
     loadSubDisplay: (formId: number, subOrder: number, primary?: Record<string, unknown>) => void;
+    initialPrimary?: Record<string, unknown>;
 };
 
 const safe = (v?: string | null) => (v?.trim() ? v.trim() : '—');
@@ -50,7 +51,8 @@ export const DrillDialog: React.FC<Props> = ({
                                                  display,
                                                  formsById,
                                                  onClose,isComboboxRoot,
-                                                 loadSubDisplay
+                                                 loadSubDisplay,
+                                                 initialPrimary
                                              }) => {
     /** ─── стек форм (drill) ─── */
     const [formStack, setFormStack] = useState<number[]>(() => (formId ? [formId] : []));
@@ -113,6 +115,27 @@ export const DrillDialog: React.FC<Props> = ({
     const isComboboxMode = isComboboxRoot;
 
 
+    const fetchSub = useCallback(
+        async (fid: number, order: number, primary?: Record<string, unknown>) => {
+            const params = new URLSearchParams({ sub_widget_order: String(order) });
+
+            // body: только primary_keys (без sub_widget_order!)
+            const body =
+                primary && Object.keys(primary).length
+                    ? {
+                        primary_keys: Object.fromEntries(
+                            Object.entries(primary).map(([k, v]) => [k, String(v)])
+                        ),
+                    }
+                    : {};
+
+            const { data } = await api.post<SubDisplay>(`/display/${fid}/sub?${params}`, body);
+            setSubDisplay(data);
+        },
+        []
+    );
+
+
 
     /** ─── TREE (живой) ─── */
     const [liveTree, setLiveTree] = useState<FormTreeColumn[] | null>(null);
@@ -163,8 +186,10 @@ export const DrillDialog: React.FC<Props> = ({
     } = useSubNav({
         formIdForSub: currentFormId,
         availableOrders,
-        // Фактическую загрузку сабов включаем только в combobox-режиме ниже
-        loadSubDisplay: async () => {},
+        loadSubDisplay: (fid, order, primary) => {
+            if (!isComboboxMode || !fid) return;
+            return fetchSub(fid, order, primary);
+        },
     });
 
     useEffect(() => {
@@ -243,14 +268,8 @@ export const DrillDialog: React.FC<Props> = ({
 
     /** ─── SUB CRUD включаем только в combobox-режиме ─── */
     const {
-        isAddingSub,
-        setIsAddingSub,
-        draftSub,
-        setDraftSub,
-        savingSub,
-        startAddSub,
-        cancelAddSub,
-        submitAddSub,
+        isAddingSub, setIsAddingSub, draftSub, setDraftSub,
+        savingSub, startAddSub, cancelAddSub, submitAddSub,
     } = useSubCrud({
         formIdForSub: isComboboxMode ? currentFormId : null,
         currentWidgetId: isComboboxMode
@@ -264,32 +283,27 @@ export const DrillDialog: React.FC<Props> = ({
         currentOrder: isComboboxMode
             ? (availableOrders.includes(activeSubOrder) ? activeSubOrder : (availableOrders[0] ?? 0))
             : 0,
-        loadSubDisplay: async (fid, subOrder, primary) => {
+        loadSubDisplay: (fid, order, primary) => {              // 👈 важно
             if (!isComboboxMode || !fid) return;
-            const payload =
-                primary && Object.keys(primary).length
-                    ? { primary_keys: primary, sub_widget_order: subOrder }
-                    : { sub_widget_order: subOrder };
-            const {data} = await api.post<SubDisplay>(`/display/${fid}/sub`, payload);
-            setSubDisplay(data);
+            return fetchSub(fid, order, primary);
         },
         lastPrimary,
         subDisplay,
     });
 
+
     const onSubTabClick = useCallback(async (order: number) => {
         if (!isComboboxMode) return;
         setActiveSubOrder(order);
+
         if (currentFormId && Object.keys(lastPrimary).length) {
-            const {data} = await api.post<SubDisplay>(`/display/${currentFormId}/sub`, {
-                primary_keys: lastPrimary,
-                sub_widget_order: order
-            });
-            setSubDisplay(data);
+            fetchSub(currentFormId, order, lastPrimary); // ← сюда
         } else {
             setSubDisplay(null);
         }
-    }, [isComboboxMode, currentFormId, lastPrimary, setActiveSubOrder]);
+    }, [isComboboxMode, currentFormId, lastPrimary, fetchSub, setActiveSubOrder]);
+
+
 
     /** ─── drill внутри модалки ─── */
     const handleOpenDrill = useCallback((nextId?: number | null) => {
@@ -329,6 +343,15 @@ export const DrillDialog: React.FC<Props> = ({
         console.groupEnd();
     }, [open, formId, currentFormId, isComboboxMode, localDisplay, loading, error]);
 
+    useEffect(() => {
+        if (!open || !isComboboxMode || !currentFormId) return;
+        const hasPrimary = initialPrimary && Object.keys(initialPrimary).length > 0;
+        if (!hasPrimary) return;
+
+        setLastPrimary(initialPrimary!);
+        setSelectedKey(pkToKey(initialPrimary!));
+        // загрузку саба теперь делаем ТОЛЬКО по клику строки внутри модалки
+    }, [open, isComboboxMode, currentFormId, initialPrimary, pkToKey, setLastPrimary, setSelectedKey]);
 
     return (
         <Dialog open={open} onClose={onClose} fullWidth maxWidth="xl">
