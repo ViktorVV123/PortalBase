@@ -8,31 +8,46 @@ type ButtonFormProps = {
     isAdding: boolean;
     startAdd: () => void;
     selectedFormId?: number | null;
-    selectedWidget: any;
+    selectedWidget?: any;              // ← сделаем опциональным
     submitAdd: () => void;
     saving: boolean;
     cancelAdd: () => void;
 
     /** передаём класс круглой кнопки из тулбара */
     buttonClassName?: string;
-    showSubActions?:boolean;
+    /** true → это «саб»-кнопки (вторая группа в тулбаре) */
+    showSubActions?: boolean;
 };
 
 export const ButtonForm: React.FC<ButtonFormProps> = ({
-                                                          isAdding,showSubActions, startAdd, selectedFormId, selectedWidget, submitAdd, saving, cancelAdd, buttonClassName
+                                                          isAdding,
+                                                          showSubActions,
+                                                          startAdd,
+                                                          selectedFormId,
+                                                          selectedWidget,
+                                                          submitAdd,
+                                                          saving,
+                                                          cancelAdd,
+                                                          buttonClassName
                                                       }) => {
-    const disabled = !selectedFormId || !selectedWidget;
+    // Для main (showSubActions=false) — не блокируем кнопку "Добавить" вообще.
+    // Для sub (showSubActions=true) — оставляем старую проверку.
+    const startDisabled = showSubActions ? (!selectedFormId || !selectedWidget) : false;
 
     if (!isAdding) {
         return (
             <button
+                type="button"
                 className={buttonClassName}
                 onClick={startAdd}
-                disabled={disabled}
-                title={disabled ? 'Выбери форму и виджет' : 'Добавить строку'}
+                disabled={startDisabled}
+                title={
+                    startDisabled
+                        ? 'Выбери форму и виджет'
+                        : (showSubActions ? 'Добавить запись в подформу' : 'Добавить запись')
+                }
             >
-                {showSubActions ? <AddBox/>  : <AddIcon/>    }
-
+                {showSubActions ? <AddBox/> : <AddIcon/>}
             </button>
         );
     }
@@ -40,14 +55,16 @@ export const ButtonForm: React.FC<ButtonFormProps> = ({
     return (
         <div style={{ display: 'inline-flex', gap: 8 }}>
             <button
+                type="button"
                 className={buttonClassName}
                 onClick={submitAdd}
-                disabled={saving}
+                disabled={saving}             // блокируем только на сохранении
                 title="Сохранить"
             >
                 <SaveIcon/>
             </button>
             <button
+                type="button"
                 className={buttonClassName}
                 onClick={cancelAdd}
                 disabled={saving}
