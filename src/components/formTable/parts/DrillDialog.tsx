@@ -39,6 +39,9 @@ type Props = {
 
     /** PK строки, по которой открыли модалку (для подсветки/сабов) */
     initialPrimary?: Record<string, unknown>;
+
+    /** Синхронизировать основной экран после CRUD в модалке */
+    onSyncParentMain?: (formId: number) => void;
 };
 
 const safe = (v?: string | null) => (v?.trim() ? v.trim() : '—');
@@ -52,10 +55,10 @@ export const DrillDialog: React.FC<Props> = ({
                                                  comboboxMode,
                                                  selectedWidget,
                                                  formsByWidget,
-                                                 loadSubDisplay, // оставляем в сигнатуре
+                                                 loadSubDisplay,
                                                  initialPrimary,
+                                                 onSyncParentMain,
                                              }) => {
-    // Без open или formId — не рендерим
     if (!open || !formId) return null;
 
     /** ─── стек форм ─── */
@@ -90,6 +93,13 @@ export const DrillDialog: React.FC<Props> = ({
     const lastLoadedRef = useRef<number | null>(null);
     const inflightRef = useRef<boolean>(false);
 
+    const setDisplayBoth = useCallback((v: FormDisplay) => {
+        setLocalDisplay(v);
+        if (onSyncParentMain && currentFormId) {
+            try { onSyncParentMain(currentFormId); } catch {}
+        }
+    }, [onSyncParentMain, currentFormId]);
+
     const fetchMain = useCallback(async (fid: number) => {
         if (!fid) return;
         if (inflightRef.current) return;
@@ -123,22 +133,19 @@ export const DrillDialog: React.FC<Props> = ({
         fetchMain(currentFormId).catch(() => {});
     }, [currentFormId, display, formId, fetchMain]);
 
-    /** ─── ВАЖНО: resolvedWidgetId и table_id именно ТЕКУЩЕЙ формы ─── */
-        // 1) пробуем сопоставить formId → widgetId из мапы
+    /** ─── wid/tid ТЕКУЩЕЙ формы ─── */
     const widFromMap = useMemo<number | null>(() => {
-            if (!currentFormId) return null;
-            const pair = Object.entries(formsByWidget).find(([, v]) => v?.form_id === currentFormId);
-            return pair ? Number(pair[0]) : null;
-        }, [formsByWidget, currentFormId]);
+        if (!currentFormId) return null;
+        const pair = Object.entries(formsByWidget).find(([, v]) => v?.form_id === currentFormId);
+        return pair ? Number(pair[0]) : null;
+    }, [formsByWidget, currentFormId]);
 
-    // 2) пробуем взять из displayed_widget
     const widFromDisplay = useMemo<number | null>(() => {
         const dw: any = (localDisplay as any)?.displayed_widget;
         const wid = (dw?.id ?? dw?.widget_id ?? null);
         return typeof wid === 'number' ? wid : null;
     }, [localDisplay]);
 
-    // 3) окончательный resolvedWidgetId
     const [resolvedWidgetId, setResolvedWidgetId] = useState<number | null>(null);
     useEffect(() => {
         let cancelled = false;
@@ -162,7 +169,6 @@ export const DrillDialog: React.FC<Props> = ({
         return () => { cancelled = true; };
     }, [currentFormId, widFromMap, widFromDisplay, selectedWidget?.id]);
 
-    // 4) резолв table_id по текущему виджету
     const [resolvedTableId, setResolvedTableId] = useState<number | null>(null);
     const [resolvingTable, setResolvingTable] = useState<boolean>(false);
     const [resolveErr, setResolveErr] = useState<string | null>(null);
@@ -310,7 +316,7 @@ export const DrillDialog: React.FC<Props> = ({
         selectedFormId: currentFormId,
         formsByWidget: formsByWidget as any,
         activeFilters,
-        setFormDisplay: (v) => setLocalDisplay(v),
+        setFormDisplay: setDisplayBoth,        // 👈 обёртка — обновит и родителя
         reloadTree,
         isColReadOnly,
         flatColumnsInRenderOrder,
@@ -361,11 +367,11 @@ export const DrillDialog: React.FC<Props> = ({
         setLocalDisplay(null);
     }, [pushForm, setActiveFilters, setActiveExpandedKey, setSelectedKey, setLastPrimary]);
 
-    /** ─── Безопасный старт «Добавить» только когда всё готово ─── */
+    /** ─── Безопасный старт «Добавить» ─── */
     const startAddSafe = useCallback(() => {
         if (!localDisplay) return;
         if (!resolvedWidgetId) return;
-        if (!resolvedTableId) return; // защитит от /tables/undefined
+        if (!resolvedTableId) return;
         startAdd();
     }, [localDisplay, resolvedWidgetId, resolvedTableId, startAdd]);
 
@@ -383,8 +389,10 @@ export const DrillDialog: React.FC<Props> = ({
         try {
             await resetFiltersHard();
             if (isComboboxMode) await reloadTree();
+            // опционально синканём и родителя после полного ресета
+            if (onSyncParentMain) onSyncParentMain(currentFormId);
         } catch {}
-    }, [currentFormId, availableOrders, isComboboxMode, setActiveExpandedKey, setSelectedKey, setLastPrimary, setSubDisplay, setActiveSubOrder, resetFiltersHard, reloadTree, setActiveFilters]);
+    }, [currentFormId, availableOrders, isComboboxMode, setActiveExpandedKey, setSelectedKey, setLastPrimary, setSubDisplay, setActiveSubOrder, resetFiltersHard, reloadTree, setActiveFilters, onSyncParentMain]);
 
     if (!currentFormId) return null;
 
@@ -403,7 +411,6 @@ export const DrillDialog: React.FC<Props> = ({
                     {loading && <div style={{opacity: 0.7, padding: 12}}>Загрузка…</div>}
                     {!!error && <div style={{color: '#f66', padding: 12}}>Ошибка: {error}</div>}
 
-                    {/* Дебаг: текущий wid/tid */}
                     {(resolvedWidgetId || resolvedTableId) && (
                         <div style={{opacity: 0.7, padding: '4px 12px'}}>
                             Виджет: #{resolvedWidgetId ?? '—'} · Таблица: {resolvingTable ? '…' : (resolvedTableId ?? '—')}

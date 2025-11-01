@@ -529,6 +529,7 @@ export function useMainCrud({
     ]);
 
     // ───────── Удаление ─────────
+// ───────── Удаление ─────────
     const deleteRow = useCallback(
         async (rowIdx: number) => {
             if (!selectedWidget) return;
@@ -568,6 +569,9 @@ export function useMainCrud({
                 const { data } = await api.post<FormDisplay>(`/display/${pf.formId}/main`, activeFilters);
                 setFormDisplay(data);
 
+                // ✅ ВАЖНО: обновляем дерево после удаления
+                try { await reloadTree(); } catch {}
+
                 if (pkToKey(lastPrimary) === rowKey) {
                     setLastPrimary({});
                     setSubDisplay(null);
@@ -586,8 +590,11 @@ export function useMainCrud({
             lastPrimary,
             setSubDisplay,
             setSelectedKey,
+            reloadTree,         // не забудь в зависимостях
+            setLastPrimary,
         ]
     );
+
 
     return {
         isAdding,

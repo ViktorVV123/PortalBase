@@ -331,7 +331,15 @@ export const FormTable: React.FC<Props> = ({
             {/* DRILL-модалка: без useDrillDialog, управляем локально */}
             <DrillDialog
 
-
+                onSyncParentMain={async (fid) => {
+                    try {
+                        const { data } = await api.post<FormDisplay | FormDisplay[]>(`/display/${fid}/main`, activeFilters);
+                        const next = Array.isArray(data) ? data[0] : data;
+                        if (next) setFormDisplay(next);
+                    } catch (e) {
+                        console.warn('[FormTable] onSyncParentMain failed:', e);
+                    }
+                }}
                 open={drillOpen}
                 onClose={() => setDrillOpen(false)}
                 formId={drillFormId}
