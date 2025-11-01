@@ -435,6 +435,7 @@ export const DrillDialog: React.FC<Props> = ({
                             )}
 
                             <div className={s.mainCol}>
+
                                 <TableToolbar
                                     showSubActions={isComboboxMode && !!subDisplay && Object.keys(lastPrimary).length > 0}
                                     cancelAddSub={cancelAddSub}

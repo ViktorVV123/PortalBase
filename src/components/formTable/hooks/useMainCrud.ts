@@ -161,6 +161,35 @@ export function useMainCrud({
     const preflightUpdate = useCallback(() => ensureQuery('update'), [ensureQuery]);
     const preflightDelete = useCallback(() => ensureQuery('delete'), [ensureQuery]);
 
+
+
+    function isSameComboGroupCRUD(a: ExtCol, b: ExtCol): boolean {
+        if (!a || !b) return false;
+        const aWrite = (a.__write_tc_id ?? a.table_column_id) ?? null;
+        const bWrite = (b.__write_tc_id ?? b.table_column_id) ?? null;
+        return (
+            a.type === 'combobox' &&
+            b.type === 'combobox' &&
+            a.widget_column_id === b.widget_column_id &&
+            aWrite != null &&
+            bWrite != null &&
+            aWrite === bWrite
+        );
+    }
+
+    function getWriteTcIdForComboGroupCRUD(group: ExtCol[]): number | null {
+        const primary = group.find(c => c.__is_primary_combo_input) ?? group[0];
+        if (primary?.__write_tc_id != null) return primary.__write_tc_id;
+        for (const g of group) {
+            if (g.__write_tc_id != null) return g.__write_tc_id;
+        }
+        console.warn('[useMainCrud][startAdd] combobox group has no __write_tc_id', group);
+        return null;
+    }
+
+
+
+
     // ───────── Добавление ─────────
     const startAdd = useCallback(async () => {
         const pf = await preflightInsert();
@@ -170,19 +199,41 @@ export function useMainCrud({
         setEditingRowIdx(null);
 
         const init: Record<number, string> = {};
-        const editableList: Array<{ writeTcId: number; col: string | undefined; type: string | undefined }> = [];
+        const seen = new Set<number>();
 
-        flatColumnsInRenderOrder.forEach((c) => {
-            const writeTcId = (c.__write_tc_id ?? c.table_column_id) ?? null;
-            if (writeTcId != null && !isColReadOnly(c)) {
-                init[writeTcId] = '';
-                editableList.push({ writeTcId, col: c.column_name, type: (c as any).type });
+        // Идём как в рендере: слева-направо, склеиваем combobox в группы, кладём ОДИН write-id на группу
+        for (let i = 0; i < flatColumnsInRenderOrder.length; ) {
+            const c = flatColumnsInRenderOrder[i];
+
+            if (c.type === 'combobox') {
+                let j = i + 1;
+                while (j < flatColumnsInRenderOrder.length && isSameComboGroupCRUD(c, flatColumnsInRenderOrder[j])) j += 1;
+                const group = flatColumnsInRenderOrder.slice(i, j);
+                const writeTcId = getWriteTcIdForComboGroupCRUD(group);
+                if (writeTcId != null && !seen.has(writeTcId)) {
+                    // Для добавления по умолчанию пусто — пользователь выберет
+                    init[writeTcId] = '';
+                    seen.add(writeTcId);
+                }
+                i = j;
+                continue;
             }
-        });
 
-        log('startAdd → editable fields', editableList);
+            // Обычная колонка
+            const writeTcId = (c.__write_tc_id ?? c.table_column_id) ?? null;
+            if (writeTcId != null && !seen.has(writeTcId)) {
+                init[writeTcId] = String(c.default ?? '');
+                seen.add(writeTcId);
+            }
+            i += 1;
+        }
+
+        log('startAdd → init draft (unique write ids)', init);
         setDraft(init);
-    }, [preflightInsert, flatColumnsInRenderOrder, isColReadOnly]);
+        setIsAdding(true);
+        setEditingRowIdx(null);
+    }, [preflightInsert, flatColumnsInRenderOrder]);
+
 
     const cancelAdd = useCallback(() => {
         setIsAdding(false);
@@ -194,26 +245,26 @@ export function useMainCrud({
         const pf = await preflightInsert();
         if (!pf.ok || !pf.formId) return;
 
-        const entries = Object.entries(draft).filter(([, v]) => v !== '' && v != null);
-        const values = entries.map(([tcIdStr, v]) => ({
-            table_column_id: Number(tcIdStr),
-            value: String(v), // для combobox тут ID из primary[0]
-        }));
-
-        log('submitAdd → draft', draft);
-        log('submitAdd → values[]', values);
-
-        if (values.length === 0) {
-            alert('Нет данных для вставки: заполни хотя бы одно редактируемое поле.');
-            return;
-        }
-
         setSaving(true);
         try {
-            const body = {
-                pk: { primary_keys: {} as Record<string, string> },
-                values,
-            };
+            // 1) Собираем список ВСЕХ write_tc_id из плоских колонок (уникально)
+            const allWriteIds: number[] = [];
+            const seen = new Set<number>();
+            flatColumnsInRenderOrder.forEach((c) => {
+                const w = (c.__write_tc_id ?? c.table_column_id) ?? null;
+                if (w != null && !seen.has(w)) { seen.add(w); allWriteIds.push(w); }
+            });
+
+            // 2) Формируем values без фильтра: пустые строки тоже отправляем
+            const values = allWriteIds.map((tcId) => ({
+                table_column_id: tcId,
+                value: String(draft[tcId] ?? ''), // бек сам применит default, если надо
+            }));
+
+            log('submitAdd → allWriteIds', allWriteIds);
+            log('submitAdd → values[] (no filter)', values);
+
+            const body = { pk: { primary_keys: {} as Record<string, string> }, values };
             const url = `/data/${pf.formId}/${selectedWidget.id}`;
             log('submitAdd → request', { url, body });
 
@@ -222,9 +273,6 @@ export function useMainCrud({
             } catch (err: any) {
                 const status = err?.response?.status;
                 const detail = err?.response?.data?.detail ?? err?.response?.data ?? err?.message;
-
-                console.warn('[CRUD][submitAdd] POST failed', { status, detail, url });
-
                 if (status === 404 && String(detail).includes('Insert query not found')) {
                     alert('Для этой таблицы не настроен INSERT QUERY. Задайте его в метаданных таблицы.');
                     return;
@@ -252,7 +300,16 @@ export function useMainCrud({
         } finally {
             setSaving(false);
         }
-    }, [selectedWidget, preflightInsert, draft, activeFilters, setFormDisplay, reloadTree]);
+    }, [
+        selectedWidget,
+        preflightInsert,
+        draft,
+        activeFilters,
+        setFormDisplay,
+        reloadTree,
+        flatColumnsInRenderOrder,
+    ]);
+
 
     // ───────── Редактирование ─────────
     const startEdit = useCallback(
@@ -269,7 +326,7 @@ export function useMainCrud({
 
             flatColumnsInRenderOrder.forEach((col) => {
                 const writeTcId = (col.__write_tc_id ?? col.table_column_id) ?? null;
-                if (writeTcId == null || isColReadOnly(col)) return;
+                if (writeTcId == null) return;
 
                 const visKey = `${col.widget_column_id}:${col.table_column_id ?? -1}`;
                 const idx = valueIndexByKey.get(visKey);
@@ -281,9 +338,9 @@ export function useMainCrud({
                     const g = comboGroups.get(gKey) ?? { wcId: col.widget_column_id, writeTcId, tokens: [] };
                     if (shownStr) g.tokens.push(shownStr);
                     comboGroups.set(gKey, g);
-                    // init[writeTcId] заполним ниже после сопоставления
+                    // init для combobox будет выставлен ниже после маппинга на id
                 } else {
-                    init[writeTcId] = shownStr;
+                    init[writeTcId] = shownStr; // даже если read-only → кладём текущее видимое значение
                 }
             });
 
@@ -347,47 +404,55 @@ export function useMainCrud({
         try {
             const row = formDisplay.data[editingRowIdx];
 
-            // 0) подготовка утилит для логов
+            // 0) PK утилиты
             const pkObj = Object.fromEntries(
                 Object.entries(row.primary_keys).map(([k, v]) => [k, String(v)])
             );
             const pkToString = (pk: Record<string, unknown>) =>
                 Object.keys(pk).sort().map(k => `${k}:${String(pk[k])}`).join('|');
 
-            // 1) вычисляем values из editDraft
-            const nonEmptyEntries = Object.entries(editDraft).filter(([, v]) => v !== '' && v != null);
-            const values = nonEmptyEntries.map(([tcIdStr, v]) => ({
+            // 1) считаем значения для отправки из editDraft (включая read-only/visible:false)
+            const hasDefault = new Set<number>();
+            flatColumnsInRenderOrder.forEach((c) => {
+                const w = (c.__write_tc_id ?? c.table_column_id) ?? null;
+                if (w != null && c.default != null) hasDefault.add(w);
+            });
+
+            const entries = Object.entries(editDraft).filter(([tcIdStr, v]) => {
+                if (v != null && String(v) !== '') return true;
+                const tcId = Number(tcIdStr);
+                return hasDefault.has(tcId); // даже пустое — если колонка имеет default
+            });
+
+            const values = entries.map(([tcIdStr, v]) => ({
                 table_column_id: Number(tcIdStr),
-                value: String(v), // для combobox здесь ID из primary[0]
+                value: String(v ?? ''),
             }));
 
-            // 2) строим body+url
+            // 2) body + url
             const body = {
                 pk: { primary_keys: pkObj as Record<string, string> },
                 values,
             };
             const url = `/data/${pf.formId}/${selectedWidget.id}`;
 
-            // 3) соберём «до/после» по редактируемым колонкам (для сравнения)
+            // 3) before/after лог по тем write_tc_id, которые реально отправляем (entries)
             type BeforeAfter = {
                 widget_column_id: number;
                 write_tc_id: number;
                 shown_before: string;
-                sending_value?: string; // то, что уйдёт на бек
+                sending_value?: string;
             };
 
             const beforeAfter: BeforeAfter[] = [];
-            // пройдём по всем колонкам, для которых есть editDraft (write_tc_id)
-            for (const [tcIdStr] of nonEmptyEntries) {
+            for (const [tcIdStr] of entries) {
                 const writeTcId = Number(tcIdStr);
 
-                // найдём визуальную (синтетическую) колонку(и), которая(ые) отображают этот writeTcId
                 const related = flatColumnsInRenderOrder.filter(c => {
                     const w = (c.__write_tc_id ?? c.table_column_id) ?? null;
                     return w === writeTcId;
                 });
 
-                // возьмём первую подходящую визуальную колонку для "before"
                 const col = related[0];
                 if (col) {
                     const visKey = `${col.widget_column_id}:${col.table_column_id ?? -1}`;
@@ -409,22 +474,14 @@ export function useMainCrud({
                 }
             }
 
-            // 4) ГРУППОВЫЕ ЛОГИ
-            // eslint-disable-next-line no-console
+            // 4) Логи
             console.groupCollapsed('[CRUD][submitEdit]');
-            // eslint-disable-next-line no-console
             console.log('PK:', pkObj, 'pkKey:', pkToString(pkObj));
-            // eslint-disable-next-line no-console
             console.log('editDraft (raw):', editDraft);
-            // eslint-disable-next-line no-console
-            console.log('non-empty entries:', nonEmptyEntries);
-            // eslint-disable-next-line no-console
+            console.log('entries (to send):', entries);
             console.log('values[] (will be sent):', values);
-            // eslint-disable-next-line no-console
             console.log('request:', { url, body });
-            // eslint-disable-next-line no-console
             console.log('BEFORE (shown) & SENDING values by write_tc_id:', beforeAfter);
-            // eslint-disable-next-line no-console
             console.groupEnd();
 
             // 5) PATCH
@@ -448,19 +505,16 @@ export function useMainCrud({
                 }
             }
 
-            // eslint-disable-next-line no-console
             console.groupCollapsed('[CRUD][submitEdit] PATCH response');
-            // eslint-disable-next-line no-console
             console.log(patchRespData);
-            // eslint-disable-next-line no-console
             console.groupEnd();
 
-            // 6) Релоад main и постфактум сравнение «до/после»
+            // 6) Релоад main + сравнение after
             const { data: newDisplay } = await api.post<FormDisplay>(`/display/${pf.formId}/main`, activeFilters);
 
-            // найти обновлённую строку по PK
             const findRowByPk = (fd: FormDisplay, pk: Record<string, unknown>) => {
-                const key = (obj: Record<string, unknown>) => Object.keys(obj).sort().map(k => `${k}:${String(obj[k])}`).join('|');
+                const key = (obj: Record<string, unknown>) =>
+                    Object.keys(obj).sort().map(k => `${k}:${String(obj[k])}`).join('|');
                 const target = key(pk);
                 for (let i = 0; i < fd.data.length; i += 1) {
                     const k = key(fd.data[i].primary_keys as Record<string, unknown>);
@@ -471,11 +525,9 @@ export function useMainCrud({
 
             const updatedRow = findRowByPk(newDisplay, pkObj);
 
-            // соберём "после" для тех же write_tc_id
             const after: Array<BeforeAfter & { shown_after: string }> = [];
             if (updatedRow) {
                 beforeAfter.forEach((ba) => {
-                    // снова пытаемся взять любую визуальную колонку, связанную с write_tc_id
                     const related = flatColumnsInRenderOrder.filter(c => {
                         const w = (c.__write_tc_id ?? c.table_column_id) ?? null;
                         return w === ba.write_tc_id;
@@ -495,13 +547,9 @@ export function useMainCrud({
                 });
             }
 
-            // eslint-disable-next-line no-console
             console.groupCollapsed('[CRUD][submitEdit] AFTER reload');
-            // eslint-disable-next-line no-console
             console.log('new display row:', updatedRow);
-            // eslint-disable-next-line no-console
             console.table(after);
-            // eslint-disable-next-line no-console
             console.groupEnd();
 
             setFormDisplay(newDisplay);
@@ -525,8 +573,9 @@ export function useMainCrud({
         cancelEdit,
         flatColumnsInRenderOrder,
         valueIndexByKey,
-        isColReadOnly,
+        isColReadOnly, // остаётся в deps как и раньше
     ]);
+
 
     // ───────── Удаление ─────────
 // ───────── Удаление ─────────

@@ -114,9 +114,7 @@ function useComboOptions(widgetColumnId: number, writeTcId: number | null) {
             })
             .finally(() => !cancelled && setLoading(false));
 
-        return () => {
-            cancelled = true;
-        };
+        return () => { cancelled = true; };
     }, [key, widgetColumnId, writeTcId]);
 
     return { loading, options, error };
@@ -154,7 +152,6 @@ function InputCell({
                 value={value ?? ''}
                 displayEmpty
                 onChange={(e) => onChange(String(e.target.value ?? ''))}
-                // ⬇⬇⬇ ВАЖНО: когда Select ЗАКРЫТ — показываем showHidden
                 renderValue={(val) => {
                     if (!val) return <span style={{ opacity: 0.6 }}>{placeholder || '—'}</span>;
                     const opt = options.find(o => o.id === val);
@@ -163,7 +160,6 @@ function InputCell({
             >
                 <MenuItem value=""><em>—</em></MenuItem>
                 {options.map(o => (
-                    // ⬇⬇⬇ В МЕНЮ (когда Select ОТКРЫТ) — показываем show
                     <MenuItem key={o.id} value={o.id} title={o.showHidden.join(' / ')}>
                         {o.show.join(' · ')}
                     </MenuItem>
@@ -210,6 +206,22 @@ function getShown(valIndexByKey: Map<string, number>, rowValues: (string | numbe
     const idx = valIndexByKey.get(key);
     const shownVal = idx != null ? rowValues[idx] : '';
     return shownVal == null ? '' : String(shownVal);
+}
+
+/** Для combobox-группы вернуть реальный write_tc_id (один на всю группу) */
+function getWriteTcIdForComboGroup(group: ExtCol[]): number | null {
+    // 1) Пробуем у "первичной" колонки
+    const primary = pickPrimaryCombo(group);
+    if (primary.__write_tc_id != null) return primary.__write_tc_id;
+
+    // 2) Иначе ищем у любой визуальной колонки группы
+    for (const g of group) {
+        if (g.__write_tc_id != null) return g.__write_tc_id;
+    }
+
+    // 3) Фолбэк: лог, чтобы заметить ошибку разметки колонок
+    console.warn('[MainTable][add] combobox group has no __write_tc_id', group);
+    return null;
 }
 
 export const MainTable: React.FC<Props> = (p) => {
@@ -266,20 +278,28 @@ export const MainTable: React.FC<Props> = (p) => {
                                     const group = cols.slice(i, j);
                                     const span = group.length;
                                     const primary = pickPrimaryCombo(group);
-                                    const writeTcId = (primary.__write_tc_id ?? primary.table_column_id) ?? null;
-                                    const ro = p.isColReadOnly(primary);
+                                    const writeTcId = getWriteTcIdForComboGroup(group);
+
+                                    // В режиме добавления НЕ блокируем ввод (даже если колонка readOnly/visible:false)
+                                    const ro = false;
                                     const value = writeTcId == null ? '' : (p.draft[writeTcId] ?? '');
 
+                                    // Диагностика (при желании оставь)
+                                    // console.debug('[MainTable][add] combo group', {
+                                    //   widget_column_id: primary.widget_column_id,
+                                    //   writeTcId,
+                                    //   draftKeyExists: writeTcId != null ? (writeTcId in p.draft) : false,
+                                    //   draftValue: writeTcId != null ? p.draft[writeTcId] : undefined,
+                                    // });
+
                                     cells.push(
-                                        <td key={`add-combo-${primary.widget_column_id}:${writeTcId}`} colSpan={span} style={{ textAlign: 'center' }}>
+                                        <td key={`add-combo-${primary.widget_column_id}:${writeTcId ?? 'null'}`} colSpan={span} style={{ textAlign: 'center' }}>
                                             <InputCell
                                                 mode="add"
                                                 col={primary}
                                                 readOnly={ro}
                                                 value={value}
-                                                onChange={(v) => {
-                                                    if (writeTcId != null) p.onDraftChange(writeTcId, v);
-                                                }}
+                                                onChange={(v) => { if (writeTcId != null) p.onDraftChange(writeTcId, v); }}
                                                 placeholder={p.placeholderFor(primary)}
                                             />
                                         </td>
@@ -288,9 +308,12 @@ export const MainTable: React.FC<Props> = (p) => {
                                     continue;
                                 }
 
-                                // Обычная колонка
+                                // Обычная колонка (add)
                                 const writeTcId = (col.__write_tc_id ?? col.table_column_id) ?? null;
-                                const ro = p.isColReadOnly(col);
+
+                                // В добавлении НЕ блокируем ввод
+                                const ro = false;
+
                                 const value = writeTcId == null ? '' : (p.draft[writeTcId] ?? '');
                                 cells.push(
                                     <td key={`add-${col.widget_column_id}:${col.table_column_id ?? -1}`} style={{ textAlign: 'center' }}>
@@ -346,7 +369,7 @@ export const MainTable: React.FC<Props> = (p) => {
                                         const span = group.length;
                                         const primary = pickPrimaryCombo(group);
                                         const writeTcId = (primary.__write_tc_id ?? primary.table_column_id) ?? null;
-                                        const ro = p.isColReadOnly(primary);
+                                        const ro = p.isColReadOnly(primary) || primary.visible === false;
 
                                         if (isEditing) {
                                             const value = writeTcId == null ? '' : (p.editDraft[writeTcId] ?? '');
@@ -377,7 +400,7 @@ export const MainTable: React.FC<Props> = (p) => {
                                                                 e.stopPropagation();
                                                                 p.onOpenDrill?.(primary.form_id!, {
                                                                     originColumnType: 'combobox',
-                                                                    primary: row.primary_keys,            // 👈 прокидываем PK текущей строки
+                                                                    primary: row.primary_keys, // прокидываем PK текущей строки
                                                                 });
                                                                 console.debug('[MainTable] drill click (combobox)', {
                                                                     formId: primary.form_id,
@@ -412,7 +435,7 @@ export const MainTable: React.FC<Props> = (p) => {
                                     // ───── Обычная колонка (не combobox)
                                     const visKey = `${col.widget_column_id}:${col.table_column_id ?? -1}`;
                                     const shownVal = getShown(p.valueIndexByKey, row.values, col);
-                                    const ro = p.isColReadOnly(col);
+                                    const ro = p.isColReadOnly(col) || col.visible === false;
                                     const writeTcId = (col.__write_tc_id ?? col.table_column_id) ?? null;
 
                                     if (isEditing) {
@@ -439,7 +462,7 @@ export const MainTable: React.FC<Props> = (p) => {
                                                             e.stopPropagation();
                                                             p.onOpenDrill?.(col.form_id!, {
                                                                 originColumnType: null,
-                                                                primary: row.primary_keys,            // опционально
+                                                                primary: row.primary_keys,
                                                             });
                                                             console.debug('[MainTable] drill click (regular)', {
                                                                 formId: col.form_id,
@@ -476,7 +499,9 @@ export const MainTable: React.FC<Props> = (p) => {
                             <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
                                 {isEditing ? (
                                     (() => {
-                                        const hasEditable = p.flatColumnsInRenderOrder.some(c => !p.isColReadOnly(c));
+                                        const hasEditable = p.flatColumnsInRenderOrder.some(
+                                            c => c.visible !== false && !p.isColReadOnly(c)
+                                        );
                                         return (
                                             <>
                                                 {hasEditable && (
