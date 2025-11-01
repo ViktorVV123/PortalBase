@@ -154,14 +154,16 @@ function InputCell({
                 value={value ?? ''}
                 displayEmpty
                 onChange={(e) => onChange(String(e.target.value ?? ''))}
+                // ⬇⬇⬇ ВАЖНО: когда Select ЗАКРЫТ — показываем showHidden
                 renderValue={(val) => {
                     if (!val) return <span style={{ opacity: 0.6 }}>{placeholder || '—'}</span>;
                     const opt = options.find(o => o.id === val);
-                    return opt ? opt.show.join(' · ') : String(val);
+                    return opt ? opt.showHidden.join(' · ') : String(val);
                 }}
             >
                 <MenuItem value=""><em>—</em></MenuItem>
                 {options.map(o => (
+                    // ⬇⬇⬇ В МЕНЮ (когда Select ОТКРЫТ) — показываем show
                     <MenuItem key={o.id} value={o.id} title={o.showHidden.join(' / ')}>
                         {o.show.join(' · ')}
                     </MenuItem>
