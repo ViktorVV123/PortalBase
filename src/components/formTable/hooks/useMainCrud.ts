@@ -40,6 +40,7 @@ export type UseMainCrudDeps = {
     lastPrimary: Record<string, unknown>;
     setLastPrimary: (v: Record<string, unknown>) => void;
     setSelectedKey: React.Dispatch<React.SetStateAction<string | null>>;
+    preflightTableId?: number | null;
 };
 
 type ComboColumnMeta = { ref_column_order: number; width: number; combobox_alias: string | null };
@@ -86,6 +87,7 @@ export function useMainCrud({
                                 lastPrimary,
                                 setLastPrimary,
                                 setSelectedKey,
+                                preflightTableId,
                             }: UseMainCrudDeps) {
     const [isAdding, setIsAdding] = useState(false);
     const [draft, setDraft] = useState<Record<number, string>>({});
@@ -105,12 +107,33 @@ export function useMainCrud({
 
     const ensureQuery = useCallback(
         async (kind: EnsureQueryKind): Promise<{ ok: boolean; formId?: number }> => {
-            if (!selectedWidget) return { ok: false };
+            if (!selectedWidget && !preflightTableId) return { ok: false };
+
             const formId = getEffectiveFormId();
             if (!formId) return { ok: false };
 
             try {
-                const { data: table } = await api.get<DTable>(`/tables/${selectedWidget.table_id}`);
+                let tableId: number | null = preflightTableId ?? null;
+
+                if (!tableId) {
+                    const maybeTid = (selectedWidget as any)?.table_id as number | undefined;
+                    if (maybeTid) tableId = maybeTid ?? null;
+                }
+
+                if (!tableId) {
+                    const wid = selectedWidget?.id;
+                    if (!wid) return { ok: false };
+                    const { data: widgetMeta } = await api.get<{ id: number; table_id: number }>(`/widgets/${wid}`);
+                    tableId = widgetMeta?.table_id ?? null;
+                }
+
+                if (!tableId) return { ok: false };
+
+                // 👇 лог — какой tableId реально использован
+                log('ensureQuery → tableId used', { kind, formId, tableId });
+
+                const { data: table } = await api.get<DTable>(`/tables/${tableId}`);
+
                 const q =
                     kind === 'insert'
                         ? table?.insert_query
@@ -130,8 +153,9 @@ export function useMainCrud({
 
             return { ok: true, formId };
         },
-        [selectedWidget, getEffectiveFormId]
+        [selectedWidget, preflightTableId, getEffectiveFormId] // 👈 ДОБАВИЛИ preflightTableId
     );
+
 
     const preflightInsert = useCallback(() => ensureQuery('insert'), [ensureQuery]);
     const preflightUpdate = useCallback(() => ensureQuery('update'), [ensureQuery]);
@@ -198,6 +222,8 @@ export function useMainCrud({
             } catch (err: any) {
                 const status = err?.response?.status;
                 const detail = err?.response?.data?.detail ?? err?.response?.data ?? err?.message;
+
+                console.warn('[CRUD][submitAdd] POST failed', { status, detail, url });
 
                 if (status === 404 && String(detail).includes('Insert query not found')) {
                     alert('Для этой таблицы не настроен INSERT QUERY. Задайте его в метаданных таблицы.');

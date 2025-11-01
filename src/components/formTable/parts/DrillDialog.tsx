@@ -1,8 +1,6 @@
 // DrillDialog.tsx
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
-import {
-    Button, Dialog, DialogActions, DialogContent, DialogTitle, ThemeProvider,
-} from '@mui/material';
+import {Button, Dialog, DialogActions, DialogContent, DialogTitle, ThemeProvider} from '@mui/material';
 import * as s from '@/components/setOfTables/SetOfTables.module.scss';
 import {dark} from '@/shared/themeUI/themeModal/ThemeModalUI';
 import {api} from '@/services/api';
@@ -20,25 +18,23 @@ import {useSubCrud} from '@/components/formTable/hooks/useSubCrud';
 import {useTreeHandlers} from '@/components/formTable/hooks/useTreeHandlers';
 import {useMainCrud} from '@/components/formTable/hooks/useMainCrud';
 
-import type {
-    FormDisplay, SubDisplay, WidgetForm, FormTreeColumn,
-} from '@/shared/hooks/useWorkSpaces';
+import type {FormDisplay, SubDisplay, WidgetForm, FormTreeColumn} from '@/shared/hooks/useWorkSpaces';
 
 type Props = {
     open: boolean;
     formId: number | null;
-    display?: FormDisplay | null; // можно передать initial, но не обязательно
+    display?: FormDisplay | null;
     formsById: Record<number, WidgetForm>;
     onClose: () => void;
 
-    /** Режим фиксируем извне на момент клика (combobox | только main) */
+    /** Режим модалки фиксируем на момент клика (combobox | только main) */
     comboboxMode: boolean;
 
-    /** Для enable Add в main */
+    /** Нужен только id; в модалке всё равно переключаемся на форму/виджет из стека */
     selectedWidget: { id: number } | null;
+
     formsByWidget: Record<number, { form_id: number }>;
 
-    /** Для саб-части */
     loadSubDisplay: (formId: number, subOrder: number, primary?: Record<string, unknown>) => void;
 
     /** PK строки, по которой открыли модалку (для подсветки/сабов) */
@@ -56,11 +52,10 @@ export const DrillDialog: React.FC<Props> = ({
                                                  comboboxMode,
                                                  selectedWidget,
                                                  formsByWidget,
-                                                 loadSubDisplay,       // не используем, но оставляем сигнатуру
+                                                 loadSubDisplay, // оставляем в сигнатуре
                                                  initialPrimary,
                                              }) => {
-
-    // --- guards: без open или formId не рендерим модалку вовсе
+    // Без open или formId — не рендерим
     if (!open || !formId) return null;
 
     /** ─── стек форм ─── */
@@ -82,7 +77,7 @@ export const DrillDialog: React.FC<Props> = ({
         [currentFormId, formsById]
     );
 
-    /** ─── режим (lock) ─── */
+    /** ─── фиксируем режим ─── */
     const [isComboboxMode] = useState<boolean>(!!comboboxMode);
 
     /** ─── main display (локально) ─── */
@@ -92,20 +87,19 @@ export const DrillDialog: React.FC<Props> = ({
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    // предохранитель от повторной загрузки одного и того же fid
     const lastLoadedRef = useRef<number | null>(null);
-    const inflightRef   = useRef<boolean>(false);
+    const inflightRef = useRef<boolean>(false);
 
     const fetchMain = useCallback(async (fid: number) => {
         if (!fid) return;
         if (inflightRef.current) return;
-        if (lastLoadedRef.current === fid && localDisplay) return; // уже загружали и есть данные
+        if (lastLoadedRef.current === fid && localDisplay) return;
 
         inflightRef.current = true;
         setLoading(true);
         setError(null);
         try {
-            const { data } = await api.post<FormDisplay | FormDisplay[]>(`/display/${fid}/main`);
+            const {data} = await api.post<FormDisplay | FormDisplay[]>(`/display/${fid}/main`);
             const d = Array.isArray(data) ? data[0] : data;
             setLocalDisplay(d ?? null);
             lastLoadedRef.current = fid;
@@ -121,27 +115,94 @@ export const DrillDialog: React.FC<Props> = ({
 
     useEffect(() => {
         if (!currentFormId) return;
-        // если дали initial display и он соответствует текущей форме — используем
         if (display && formId === currentFormId) {
             setLocalDisplay(display);
             lastLoadedRef.current = currentFormId;
             return;
         }
-        // иначе грузим один раз на форму
         fetchMain(currentFormId).catch(() => {});
     }, [currentFormId, display, formId, fetchMain]);
+
+    /** ─── ВАЖНО: resolvedWidgetId и table_id именно ТЕКУЩЕЙ формы ─── */
+        // 1) пробуем сопоставить formId → widgetId из мапы
+    const widFromMap = useMemo<number | null>(() => {
+            if (!currentFormId) return null;
+            const pair = Object.entries(formsByWidget).find(([, v]) => v?.form_id === currentFormId);
+            return pair ? Number(pair[0]) : null;
+        }, [formsByWidget, currentFormId]);
+
+    // 2) пробуем взять из displayed_widget
+    const widFromDisplay = useMemo<number | null>(() => {
+        const dw: any = (localDisplay as any)?.displayed_widget;
+        const wid = (dw?.id ?? dw?.widget_id ?? null);
+        return typeof wid === 'number' ? wid : null;
+    }, [localDisplay]);
+
+    // 3) окончательный resolvedWidgetId
+    const [resolvedWidgetId, setResolvedWidgetId] = useState<number | null>(null);
+    useEffect(() => {
+        let cancelled = false;
+        const candidate = widFromMap ?? widFromDisplay ?? selectedWidget?.id ?? null;
+        if (candidate) {
+            setResolvedWidgetId(candidate);
+            return;
+        }
+        if (!currentFormId) {
+            setResolvedWidgetId(null);
+            return;
+        }
+        (async () => {
+            try {
+                const { data } = await api.get<{ id: number; widget_id: number }>(`/forms/${currentFormId}`);
+                if (!cancelled) setResolvedWidgetId(data?.widget_id ?? null);
+            } catch {
+                if (!cancelled) setResolvedWidgetId(null);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [currentFormId, widFromMap, widFromDisplay, selectedWidget?.id]);
+
+    // 4) резолв table_id по текущему виджету
+    const [resolvedTableId, setResolvedTableId] = useState<number | null>(null);
+    const [resolvingTable, setResolvingTable] = useState<boolean>(false);
+    const [resolveErr, setResolveErr] = useState<string | null>(null);
+
+    useEffect(() => {
+        let cancelled = false;
+        setResolvedTableId(null);
+        setResolveErr(null);
+
+        if (!resolvedWidgetId) return;
+
+        setResolvingTable(true);
+        api.get<{ id: number; table_id: number }>(`/widgets/${resolvedWidgetId}`)
+            .then(({ data }) => {
+                if (cancelled) return;
+                const tid = data?.table_id ?? null;
+                setResolvedTableId(tid);
+                console.debug('[DrillDialog] resolved wid/tid:', { wid: resolvedWidgetId, tid });
+            })
+            .catch((e: any) => {
+                if (cancelled) return;
+                setResolveErr(String(e?.message ?? 'Не удалось получить table_id'));
+                setResolvedTableId(null);
+            })
+            .finally(() => { if (!cancelled) setResolvingTable(false); });
+
+        return () => { cancelled = true; };
+    }, [resolvedWidgetId]);
 
     /** ─── SUB ─── */
     const [subDisplay, setSubDisplay] = useState<SubDisplay | null>(null);
 
     const fetchSub = useCallback(
         async (fid: number, order: number, primary?: Record<string, unknown>) => {
-            const params = new URLSearchParams({ sub_widget_order: String(order) });
+            const params = new URLSearchParams({sub_widget_order: String(order)});
             const body =
                 primary && Object.keys(primary).length
-                    ? { primary_keys: Object.fromEntries(Object.entries(primary).map(([k, v]) => [k, String(v)])) }
+                    ? {primary_keys: Object.fromEntries(Object.entries(primary).map(([k, v]) => [k, String(v)]))}
                     : {};
-            const { data } = await api.post<SubDisplay>(`/display/${fid}/sub?${params}`, body);
+            const {data} = await api.post<SubDisplay>(`/display/${fid}/sub?${params}`, body);
             setSubDisplay(data);
         }, []
     );
@@ -149,7 +210,7 @@ export const DrillDialog: React.FC<Props> = ({
     /** ─── TREE ─── */
     const [liveTree, setLiveTree] = useState<FormTreeColumn[] | null>(null);
     const fetchTree = useCallback(async (fid: number) => {
-        const { data } = await api.post<FormTreeColumn[] | FormTreeColumn>(`/display/${fid}/tree`);
+        const {data} = await api.post<FormTreeColumn[] | FormTreeColumn>(`/display/${fid}/tree`);
         setLiveTree(Array.isArray(data) ? data : [data]);
     }, []);
     const reloadTree = useCallback(async () => {
@@ -166,12 +227,7 @@ export const DrillDialog: React.FC<Props> = ({
     }, [currentFormId, isComboboxMode, fetchTree]);
 
     /** ─── Header/Plan ─── */
-    const {
-        headerPlan,
-        flatColumnsInRenderOrder,
-        valueIndexByKey,
-        isColReadOnly,
-    } = useHeaderPlan(
+    const {headerPlan, flatColumnsInRenderOrder, valueIndexByKey, isColReadOnly} = useHeaderPlan(
         localDisplay ?? ({columns: [], data: [], displayed_widget: {name: '', description: ''}} as FormDisplay)
     );
 
@@ -183,7 +239,7 @@ export const DrillDialog: React.FC<Props> = ({
         resetFiltersHard,
     } = useFiltersTree(currentFormId, setLocalDisplay);
 
-    const { handleNestedValueClick, handleTreeValueClick } = useTreeHandlers({
+    const {handleNestedValueClick, handleTreeValueClick} = useTreeHandlers({
         selectedFormId: currentFormId,
         activeFilters,
         setActiveFilters,
@@ -203,8 +259,7 @@ export const DrillDialog: React.FC<Props> = ({
         lastPrimary, setLastPrimary,
         selectedKey, setSelectedKey,
         activeSubOrder, setActiveSubOrder,
-        pkToKey,
-        handleRowClick,
+        pkToKey, handleRowClick,
     } = useSubNav({
         formIdForSub: currentFormId,
         availableOrders,
@@ -227,20 +282,20 @@ export const DrillDialog: React.FC<Props> = ({
     }, [isComboboxMode, currentFormId, initialPrimary, pkToKey, setLastPrimary, setSelectedKey]);
 
     /** ─── Поиск ─── */
-    const { showSearch, q, setQ, filteredRows } = useFormSearch(
+    const {showSearch, q, setQ, filteredRows} = useFormSearch(
         localDisplay ?? ({columns: [], data: [], displayed_widget: {name: '', description: ''}} as FormDisplay),
         flatColumnsInRenderOrder,
         valueIndexByKey,
         currentForm?.search_bar,
-        { threshold: 0.35, distance: 120, debounceMs: 250 }
+        {threshold: 0.35, distance: 120, debounceMs: 250}
     );
 
-    /** ─── CRUD main ─── */
+    /** ─── selectedWidget для CRUD — строго текущей формы */
     const selectedWidgetForPreflight = useMemo(() => {
-        const wid = (currentForm as any)?.widget_id as number | undefined;
-        return wid ? ({ id: wid } as any) : null;
-    }, [currentForm]);
+        return resolvedWidgetId ? ({ id: resolvedWidgetId } as any) : null;
+    }, [resolvedWidgetId]);
 
+    /** ─── CRUD main ─── */
     const {
         isAdding, draft, saving,
         editingRowIdx, editDraft, editSaving,
@@ -265,6 +320,7 @@ export const DrillDialog: React.FC<Props> = ({
         lastPrimary,
         setLastPrimary,
         setSelectedKey,
+        preflightTableId: resolvedTableId,
     });
 
     /** ─── SUB CRUD (только combobox) ─── */
@@ -292,16 +348,6 @@ export const DrillDialog: React.FC<Props> = ({
         subDisplay,
     });
 
-    const onSubTabClick = useCallback(async (order: number) => {
-        if (!isComboboxMode) return;
-        setActiveSubOrder(order);
-        if (currentFormId && Object.keys(lastPrimary).length) {
-            fetchSub(currentFormId, order, lastPrimary);
-        } else {
-            setSubDisplay(null);
-        }
-    }, [isComboboxMode, currentFormId, lastPrimary, fetchSub, setActiveSubOrder]);
-
     /** ─── Drill внутри модалки ─── */
     const handleOpenDrill = useCallback((nextId?: number | null) => {
         if (!nextId) return;
@@ -311,12 +357,19 @@ export const DrillDialog: React.FC<Props> = ({
         setSelectedKey(null);
         setLastPrimary({});
         setSubDisplay(null);
-        // сбрасываем маркер загруженной формы, чтобы новая подформа подгрузилась один раз
         lastLoadedRef.current = null;
         setLocalDisplay(null);
     }, [pushForm, setActiveFilters, setActiveExpandedKey, setSelectedKey, setLastPrimary]);
 
-    /** ─── UI ─── */
+    /** ─── Безопасный старт «Добавить» только когда всё готово ─── */
+    const startAddSafe = useCallback(() => {
+        if (!localDisplay) return;
+        if (!resolvedWidgetId) return;
+        if (!resolvedTableId) return; // защитит от /tables/undefined
+        startAdd();
+    }, [localDisplay, resolvedWidgetId, resolvedTableId, startAdd]);
+
+    /** ─── Сброс фильтров ─── */
     const [showSubHeaders, setShowSubHeaders] = useState(false);
 
     const handleResetFilters = useCallback(async () => {
@@ -350,6 +403,14 @@ export const DrillDialog: React.FC<Props> = ({
                     {loading && <div style={{opacity: 0.7, padding: 12}}>Загрузка…</div>}
                     {!!error && <div style={{color: '#f66', padding: 12}}>Ошибка: {error}</div>}
 
+                    {/* Дебаг: текущий wid/tid */}
+                    {(resolvedWidgetId || resolvedTableId) && (
+                        <div style={{opacity: 0.7, padding: '4px 12px'}}>
+                            Виджет: #{resolvedWidgetId ?? '—'} · Таблица: {resolvingTable ? '…' : (resolvedTableId ?? '—')}
+                            {!!resolveErr && <span style={{color: '#f66'}}> · {resolveErr}</span>}
+                        </div>
+                    )}
+
                     {!localDisplay ? (
                         <div style={{opacity: 0.7, padding: 12}}>Готовлю данные…</div>
                     ) : (
@@ -374,13 +435,15 @@ export const DrillDialog: React.FC<Props> = ({
                                     isAddingSub={isComboboxMode ? isAddingSub : false}
                                     submitAddSub={submitAddSub}
                                     savingSub={isComboboxMode ? savingSub : false}
+
                                     isAdding={isAdding}
                                     selectedFormId={currentFormId}
-                                    selectedWidget={selectedWidget ? { id: selectedWidget.id } as any : null}
+                                    selectedWidget={selectedWidgetForPreflight}
                                     saving={saving}
-                                    startAdd={startAdd}
+                                    startAdd={startAddSafe}
                                     submitAdd={submitAdd}
                                     cancelAdd={cancelAdd}
+
                                     showSearch={showSearch}
                                     value={q}
                                     onChange={setQ}
@@ -393,10 +456,11 @@ export const DrillDialog: React.FC<Props> = ({
                                     headerPlan={headerPlan as any}
                                     showSubHeaders={isComboboxMode ? showSubHeaders : false}
                                     onToggleSubHeaders={() => isComboboxMode && setShowSubHeaders(v => !v)}
-                                    onOpenDrill={isComboboxMode ? handleOpenDrill : undefined}
+                                    onOpenDrill={isComboboxMode ? (nextId) => handleOpenDrill(nextId) : undefined}
+
                                     isAdding={isAdding}
                                     draft={draft}
-                                    onDraftChange={(tcId, v) => setDraft(prev => ({ ...prev, [tcId]: v }))}
+                                    onDraftChange={(tcId, v) => setDraft(prev => ({...prev, [tcId]: v}))}
                                     flatColumnsInRenderOrder={flatColumnsInRenderOrder}
                                     isColReadOnly={isColReadOnly}
                                     placeholderFor={(c) => c.placeholder ?? c.column_name}
@@ -404,12 +468,14 @@ export const DrillDialog: React.FC<Props> = ({
                                     valueIndexByKey={valueIndexByKey}
                                     selectedKey={selectedKey}
                                     pkToKey={pkToKey}
+
                                     editingRowIdx={editingRowIdx}
                                     editDraft={editDraft}
-                                    onEditDraftChange={(tcId, v) => setEditDraft(prev => ({ ...prev, [tcId]: v }))}
+                                    onEditDraftChange={(tcId, v) => setEditDraft(prev => ({...prev, [tcId]: v}))}
                                     onSubmitEdit={submitEdit}
                                     onCancelEdit={cancelEdit}
                                     editSaving={editSaving}
+
                                     onRowClick={handleRowClick}
                                     onStartEdit={startEdit}
                                     onDeleteRow={deleteRow}
@@ -439,7 +505,14 @@ export const DrillDialog: React.FC<Props> = ({
                                         subLoading={false}
                                         subError={null as any}
                                         subDisplay={subDisplay}
-                                        handleTabClick={order => onSubTabClick(order)}
+                                        handleTabClick={(order) => {
+                                            setActiveSubOrder(order);
+                                            if (currentFormId && Object.keys(lastPrimary).length) {
+                                                fetchSub(currentFormId, order, lastPrimary);
+                                            } else {
+                                                setSubDisplay(null);
+                                            }
+                                        }}
                                     />
                                 )}
                             </div>

@@ -330,6 +330,8 @@ export const FormTable: React.FC<Props> = ({
 
             {/* DRILL-модалка: без useDrillDialog, управляем локально */}
             <DrillDialog
+
+
                 open={drillOpen}
                 onClose={() => setDrillOpen(false)}
                 formId={drillFormId}
