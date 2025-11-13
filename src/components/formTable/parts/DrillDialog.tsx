@@ -423,6 +423,10 @@ export const DrillDialog: React.FC<Props> = ({
 
     if (!currentFormId) return null;
 
+    const enableSub = effectiveComboboxMode && hasSubWidgets && !disableNestedDrill;
+    const enable = effectiveComboboxMode && hasSubWidgets && disableNestedDrill;
+
+
     return (
         <Dialog open={open} onClose={onClose} fullWidth maxWidth="xl">
             <DialogTitle style={{display: 'flex', gap: 8, alignItems: 'center'}}>
@@ -452,6 +456,7 @@ export const DrillDialog: React.FC<Props> = ({
                             {/* дерево только если combobox-режим + реально есть tree_fields */}
                             {effectiveComboboxMode && hasTreeFields && (
                                 <TreeFormTable
+
                                     tree={liveTree}
                                     widgetForm={currentForm}
                                     activeExpandedKey={activeExpandedKey}
@@ -463,6 +468,7 @@ export const DrillDialog: React.FC<Props> = ({
                             )}
 
                             <div className={s.mainCol}>
+                                {enable && (
                                 <TableToolbar
                                     showSubActions={
                                         effectiveComboboxMode &&
@@ -489,6 +495,7 @@ export const DrillDialog: React.FC<Props> = ({
                                     collapsedWidth={160}
                                     expandedWidth={420}
                                 />
+                                    )}
 
                                 <MainTable
                                     headerPlan={headerPlan as any}
@@ -520,7 +527,7 @@ export const DrillDialog: React.FC<Props> = ({
                                 />
 
                                 {/* SubWormTable только если у формы действительно есть sub_widgets */}
-                                {effectiveComboboxMode && hasSubWidgets && (
+                                {enableSub && (
                                     <SubWormTable
                                         editingRowIdx={null}
                                         setEditingRowIdx={() => {}}
