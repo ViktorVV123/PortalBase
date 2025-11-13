@@ -8,7 +8,6 @@ import {api} from '@/services/api';
 import {ThemeProvider} from '@mui/material';
 import {dark} from '@/shared/themeUI/themeModal/ThemeModalUI';
 import {TableToolbar} from '@/components/tableToolbar/TableToolbar';
-// ⛔️ удалено: import {useDrillDialog} from '@/components/formTable/hooks/useDrillDialog';
 import {useMainCrud} from '@/components/formTable/hooks/useMainCrud';
 import {useFiltersTree} from '@/components/formTable/hooks/useFiltersTree';
 import {TreeFormTable} from '@/components/formTable/treeForm/TreeFormTable';
@@ -74,6 +73,9 @@ export const FormTable: React.FC<Props> = ({
     const [drillFormId, setDrillFormId] = useState<number | null>(null);
     const [drillComboboxMode, setDrillComboboxMode] = useState(false);
     const [drillInitialPrimary, setDrillInitialPrimary] = useState<Record<string, unknown> | undefined>(undefined);
+    const [drillDisableNested, setDrillDisableNested] = useState(false);
+
+
 
     /** ───────── форма/сабы ───────── */
     const baseForm: WidgetForm | null = useMemo(() => {
@@ -221,21 +223,29 @@ export const FormTable: React.FC<Props> = ({
 
     /** ───────── Открытие DRILL из MainTable ───────── */
     const handleOpenDrillFromMain = useCallback(
-        (fid?: number | null, meta?: { originColumnType?: 'combobox' | null; primary?: Record<string, unknown> }) => {
+        (
+            fid?: number | null,
+            meta?: {
+                originColumnType?: 'combobox' | null;
+                primary?: Record<string, unknown>;
+                openedFromEdit?: boolean;
+            }
+        ) => {
             if (!fid) return;
             setDrillFormId(fid);
             setDrillComboboxMode(meta?.originColumnType === 'combobox'); // фиксируем режим на момент клика
             setDrillInitialPrimary(meta?.primary || undefined);          // сохраняем PK (для сабов)
+            setDrillDisableNested(!!meta?.openedFromEdit);               // если открыли из edit → внутри нельзя дальше проваливаться
             setDrillOpen(true);
         },
         []
     );
-
     /** очистка при закрытии модалки */
     useEffect(() => {
         if (!drillOpen) {
             setDrillComboboxMode(false);
             setDrillInitialPrimary(undefined);
+            setDrillDisableNested(false); // 👈 сбрасываем
         }
     }, [drillOpen]);
 
@@ -305,6 +315,7 @@ export const FormTable: React.FC<Props> = ({
                         deletingRowIdx={deletingRowIdx}
                     />
 
+
                     <SubWormTable
                         editingRowIdx={editingRowIdxSub}
                         setEditingRowIdx={setEditingRowIdxSub}
@@ -345,6 +356,7 @@ export const FormTable: React.FC<Props> = ({
                 formId={drillFormId}
                 /* display не передаём — модалка сама загрузит main для formId */
                 formsById={formsById}
+                disableNestedDrill={drillDisableNested} // 👈 новое
                 comboboxMode={drillComboboxMode}                            // фиксированный режим
                 selectedWidget={selectedWidget ? { id: selectedWidget.id } : null}
                 formsByWidget={formsByWidget}

@@ -29,7 +29,7 @@ type Props = {
 
     /** Режим модалки фиксируем на момент клика (combobox | только main) */
     comboboxMode: boolean;
-
+    disableNestedDrill?: boolean;
     /** Нужен только id; в модалке всё равно переключаемся на форму/виджет из стека */
     selectedWidget: { id: number } | null;
 
@@ -56,6 +56,7 @@ export const DrillDialog: React.FC<Props> = ({
                                                  selectedWidget,
                                                  formsByWidget,
                                                  loadSubDisplay,
+                                                 disableNestedDrill,
                                                  initialPrimary,
                                                  onSyncParentMain,
                                              }) => {
@@ -354,9 +355,21 @@ export const DrillDialog: React.FC<Props> = ({
         subDisplay,
     });
 
+
+
+
     /** ─── Drill внутри модалки ─── */
-    const handleOpenDrill = useCallback((nextId?: number | null) => {
+
+
+
+
+    /** ─── Drill внутри модалки ─── */
+    const handleOpenDrill = useCallback((
+        nextId?: number | null,
+        meta?: { originColumnType?: 'combobox' | null; primary?: Record<string, unknown> }
+    ) => {
         if (!nextId) return;
+
         pushForm(nextId);
         setActiveFilters([]);
         setActiveExpandedKey(null);
@@ -366,6 +379,7 @@ export const DrillDialog: React.FC<Props> = ({
         lastLoadedRef.current = null;
         setLocalDisplay(null);
     }, [pushForm, setActiveFilters, setActiveExpandedKey, setSelectedKey, setLastPrimary]);
+
 
     /** ─── Безопасный старт «Добавить» ─── */
     const startAddSafe = useCallback(() => {
@@ -422,7 +436,7 @@ export const DrillDialog: React.FC<Props> = ({
                         <div style={{opacity: 0.7, padding: 12}}>Готовлю данные…</div>
                     ) : (
                         <div className={s.contentRow}>
-                            {isComboboxMode && (
+                           {/* {isComboboxMode && (*/}
                                 <TreeFormTable
                                     tree={liveTree}
                                     widgetForm={currentForm}
@@ -432,7 +446,7 @@ export const DrillDialog: React.FC<Props> = ({
                                     handleNestedValueClick={handleNestedValueClick}
                                     handleTreeValueClick={handleTreeValueClick}
                                 />
-                            )}
+                       {/*     )}*/}
 
                             <div className={s.mainCol}>
 
@@ -464,7 +478,7 @@ export const DrillDialog: React.FC<Props> = ({
                                     headerPlan={headerPlan as any}
                                     showSubHeaders={isComboboxMode ? showSubHeaders : false}
                                     onToggleSubHeaders={() => isComboboxMode && setShowSubHeaders(v => !v)}
-                                    onOpenDrill={isComboboxMode ? (nextId) => handleOpenDrill(nextId) : undefined}
+                                    onOpenDrill={disableNestedDrill ? undefined : handleOpenDrill}  // 👈 вот оно
 
                                     isAdding={isAdding}
                                     draft={draft}
@@ -476,21 +490,20 @@ export const DrillDialog: React.FC<Props> = ({
                                     valueIndexByKey={valueIndexByKey}
                                     selectedKey={selectedKey}
                                     pkToKey={pkToKey}
-
                                     editingRowIdx={editingRowIdx}
                                     editDraft={editDraft}
                                     onEditDraftChange={(tcId, v) => setEditDraft(prev => ({...prev, [tcId]: v}))}
                                     onSubmitEdit={submitEdit}
                                     onCancelEdit={cancelEdit}
                                     editSaving={editSaving}
-
                                     onRowClick={handleRowClick}
                                     onStartEdit={startEdit}
                                     onDeleteRow={deleteRow}
                                     deletingRowIdx={deletingRowIdx}
                                 />
 
-                                {isComboboxMode && (
+
+                                {/*   {isComboboxMode && (*/}
                                     <SubWormTable
                                         editingRowIdx={null}
                                         setEditingRowIdx={() => {}}
@@ -522,7 +535,7 @@ export const DrillDialog: React.FC<Props> = ({
                                             }
                                         }}
                                     />
-                                )}
+                              {/*  )}*/}
                             </div>
                         </div>
                     )}
