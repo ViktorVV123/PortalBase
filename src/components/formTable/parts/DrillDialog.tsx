@@ -113,10 +113,8 @@ export const DrillDialog: React.FC<Props> = ({
 
     const setDisplayBoth = useCallback((v: FormDisplay) => {
         setLocalDisplay(v);
-        if (onSyncParentMain && currentFormId) {
-            try { onSyncParentMain(currentFormId); } catch {}
-        }
-    }, [onSyncParentMain, currentFormId]);
+    }, [setLocalDisplay]);
+
 
     const fetchMain = useCallback(async (fid: number) => {
         if (!fid) return;
