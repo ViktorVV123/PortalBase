@@ -30,6 +30,7 @@ type Props = {
     /** Режим модалки фиксируем на момент клика (combobox | только main) */
     comboboxMode: boolean;
     disableNestedDrill?: boolean;
+
     /** Нужен только id; в модалке всё равно переключаемся на форму/виджет из стека */
     selectedWidget: { id: number } | null;
 
@@ -65,12 +66,16 @@ export const DrillDialog: React.FC<Props> = ({
     /** ─── стек форм ─── */
     const [formStack, setFormStack] = useState<number[]>([formId]);
     const currentFormId = formStack[formStack.length - 1] ?? null;
-    useEffect(() => { if (open && formId) setFormStack([formId]); }, [open, formId]);
+
+    useEffect(() => {
+        if (open && formId) setFormStack([formId]);
+    }, [open, formId]);
 
     const pushForm = useCallback((fid: number) => {
         if (!fid) return;
         setFormStack(prev => (prev[prev.length - 1] === fid ? prev : [...prev, fid]));
     }, []);
+
     const popForm = useCallback(() => {
         setFormStack(prev => (prev.length > 1 ? prev.slice(0, -1) : prev));
     }, []);
@@ -81,8 +86,20 @@ export const DrillDialog: React.FC<Props> = ({
         [currentFormId, formsById]
     );
 
-    /** ─── фиксируем режим ─── */
+    /** ─── базовый флаг "модалка для combobox" ─── */
     const [isComboboxMode] = useState<boolean>(!!comboboxMode);
+
+    /** ─── есть ли вообще сабы и дерево на этой форме ─── */
+    const hasSubWidgets = (currentForm?.sub_widgets?.length ?? 0) > 0;
+    const hasTreeFields = (currentForm?.tree_fields?.length ?? 0) > 0;
+
+    /**
+     * Итоговый режим:
+     * - comboboxMode говорит, что пришли из combobox-колонки
+     * - но реально combobox-режим (с деревом/сабами) включаем только,
+     *   если у формы действительно есть хотя бы tree_fields или sub_widgets
+     */
+    const effectiveComboboxMode = isComboboxMode && (hasSubWidgets || hasTreeFields);
 
     /** ─── main display (локально) ─── */
     const [localDisplay, setLocalDisplay] = useState<FormDisplay | null>(
@@ -148,6 +165,7 @@ export const DrillDialog: React.FC<Props> = ({
     }, [localDisplay]);
 
     const [resolvedWidgetId, setResolvedWidgetId] = useState<number | null>(null);
+
     useEffect(() => {
         let cancelled = false;
         const candidate = widFromMap ?? widFromDisplay ?? selectedWidget?.id ?? null;
@@ -204,11 +222,14 @@ export const DrillDialog: React.FC<Props> = ({
 
     const fetchSub = useCallback(
         async (fid: number, order: number, primary?: Record<string, unknown>) => {
-            const params = new URLSearchParams({sub_widget_order: String(order)});
+            if (!fid) return;
+
+            const params = new URLSearchParams({ sub_widget_order: String(order) });
             const body =
                 primary && Object.keys(primary).length
-                    ? {primary_keys: Object.fromEntries(Object.entries(primary).map(([k, v]) => [k, String(v)]))}
+                    ? { primary_keys: Object.fromEntries(Object.entries(primary).map(([k, v]) => [k, String(v)])) }
                     : {};
+
             const {data} = await api.post<SubDisplay>(`/display/${fid}/sub?${params}`, body);
             setSubDisplay(data);
         }, []
@@ -216,22 +237,24 @@ export const DrillDialog: React.FC<Props> = ({
 
     /** ─── TREE ─── */
     const [liveTree, setLiveTree] = useState<FormTreeColumn[] | null>(null);
+
     const fetchTree = useCallback(async (fid: number) => {
         const {data} = await api.post<FormTreeColumn[] | FormTreeColumn>(`/display/${fid}/tree`);
         setLiveTree(Array.isArray(data) ? data : [data]);
     }, []);
+
     const reloadTree = useCallback(async () => {
-        if (!currentFormId || !isComboboxMode) return;
+        if (!currentFormId || !effectiveComboboxMode || !hasTreeFields) return;
         try { await fetchTree(currentFormId); } catch {}
-    }, [currentFormId, isComboboxMode, fetchTree]);
+    }, [currentFormId, effectiveComboboxMode, hasTreeFields, fetchTree]);
 
     useEffect(() => {
-        if (currentFormId && isComboboxMode) {
+        if (currentFormId && effectiveComboboxMode && hasTreeFields) {
             fetchTree(currentFormId).catch(() => {});
         } else {
             setLiveTree(null);
         }
-    }, [currentFormId, isComboboxMode, fetchTree]);
+    }, [currentFormId, effectiveComboboxMode, hasTreeFields, fetchTree]);
 
     /** ─── Header/Plan ─── */
     const {headerPlan, flatColumnsInRenderOrder, valueIndexByKey, isColReadOnly} = useHeaderPlan(
@@ -271,7 +294,7 @@ export const DrillDialog: React.FC<Props> = ({
         formIdForSub: currentFormId,
         availableOrders,
         loadSubDisplay: (fid, order, primary) => {
-            if (!isComboboxMode || !fid) return;
+            if (!effectiveComboboxMode || !hasSubWidgets || !fid) return;
             return fetchSub(fid, order, primary);
         },
     });
@@ -281,12 +304,12 @@ export const DrillDialog: React.FC<Props> = ({
     }, [availableOrders, setActiveSubOrder]);
 
     useEffect(() => {
-        if (!isComboboxMode || !currentFormId) return;
+        if (!effectiveComboboxMode || !currentFormId) return;
         const hasPrimary = initialPrimary && Object.keys(initialPrimary).length > 0;
         if (!hasPrimary) return;
         setLastPrimary(initialPrimary!);
         setSelectedKey(pkToKey(initialPrimary!));
-    }, [isComboboxMode, currentFormId, initialPrimary, pkToKey, setLastPrimary, setSelectedKey]);
+    }, [effectiveComboboxMode, currentFormId, initialPrimary, pkToKey, setLastPrimary, setSelectedKey]);
 
     /** ─── Поиск ─── */
     const {showSearch, q, setQ, filteredRows} = useFormSearch(
@@ -317,7 +340,7 @@ export const DrillDialog: React.FC<Props> = ({
         selectedFormId: currentFormId,
         formsByWidget: formsByWidget as any,
         activeFilters,
-        setFormDisplay: setDisplayBoth,        // 👈 обёртка — обновит и родителя
+        setFormDisplay: setDisplayBoth,
         reloadTree,
         isColReadOnly,
         flatColumnsInRenderOrder,
@@ -330,13 +353,13 @@ export const DrillDialog: React.FC<Props> = ({
         preflightTableId: resolvedTableId,
     });
 
-    /** ─── SUB CRUD (только combobox) ─── */
+    /** ─── SUB CRUD (только при наличии sub_widgets) ─── */
     const {
         isAddingSub, setIsAddingSub, draftSub, setDraftSub,
         savingSub, startAddSub, cancelAddSub, submitAddSub,
     } = useSubCrud({
-        formIdForSub: isComboboxMode ? currentFormId : null,
-        currentWidgetId: isComboboxMode
+        formIdForSub: effectiveComboboxMode && hasSubWidgets ? currentFormId : null,
+        currentWidgetId: effectiveComboboxMode && hasSubWidgets
             ? (
                 (availableOrders.includes(activeSubOrder)
                         ? currentForm?.sub_widgets?.find(sw => sw.widget_order === activeSubOrder)?.sub_widget_id
@@ -344,24 +367,16 @@ export const DrillDialog: React.FC<Props> = ({
                 ) ?? undefined
             )
             : undefined,
-        currentOrder: isComboboxMode
+        currentOrder: effectiveComboboxMode && hasSubWidgets
             ? (availableOrders.includes(activeSubOrder) ? activeSubOrder : (availableOrders[0] ?? 0))
             : 0,
         loadSubDisplay: (fid, order, primary) => {
-            if (!isComboboxMode || !fid) return;
+            if (!effectiveComboboxMode || !hasSubWidgets || !fid) return;
             return fetchSub(fid, order, primary);
         },
         lastPrimary,
         subDisplay,
     });
-
-
-
-
-    /** ─── Drill внутри модалки ─── */
-
-
-
 
     /** ─── Drill внутри модалки ─── */
     const handleOpenDrill = useCallback((
@@ -379,7 +394,6 @@ export const DrillDialog: React.FC<Props> = ({
         lastLoadedRef.current = null;
         setLocalDisplay(null);
     }, [pushForm, setActiveFilters, setActiveExpandedKey, setSelectedKey, setLastPrimary]);
-
 
     /** ─── Безопасный старт «Добавить» ─── */
     const startAddSafe = useCallback(() => {
@@ -402,11 +416,10 @@ export const DrillDialog: React.FC<Props> = ({
         setActiveSubOrder(availableOrders[0] ?? 0);
         try {
             await resetFiltersHard();
-            if (isComboboxMode) await reloadTree();
-            // опционально синканём и родителя после полного ресета
+            if (effectiveComboboxMode && hasTreeFields) await reloadTree();
             if (onSyncParentMain) onSyncParentMain(currentFormId);
         } catch {}
-    }, [currentFormId, availableOrders, isComboboxMode, setActiveExpandedKey, setSelectedKey, setLastPrimary, setSubDisplay, setActiveSubOrder, resetFiltersHard, reloadTree, setActiveFilters, onSyncParentMain]);
+    }, [currentFormId, availableOrders, effectiveComboboxMode, hasTreeFields, setActiveExpandedKey, setSelectedKey, setLastPrimary, setSubDisplay, setActiveSubOrder, resetFiltersHard, reloadTree, setActiveFilters, onSyncParentMain]);
 
     if (!currentFormId) return null;
 
@@ -417,7 +430,7 @@ export const DrillDialog: React.FC<Props> = ({
                     <Button size="small" onClick={popForm}>Назад</Button>
                 )}
                 Форма #{currentFormId} {localDisplay ? `— ${safe(localDisplay.displayed_widget?.name)}` : ''}
-                {!isComboboxMode && <span style={{marginLeft: 8, opacity: .7}}>(только Main)</span>}
+                {!effectiveComboboxMode && <span style={{marginLeft: 8, opacity: .7}}>(только Main)</span>}
             </DialogTitle>
 
             <DialogContent dividers>
@@ -436,7 +449,8 @@ export const DrillDialog: React.FC<Props> = ({
                         <div style={{opacity: 0.7, padding: 12}}>Готовлю данные…</div>
                     ) : (
                         <div className={s.contentRow}>
-                           {/* {isComboboxMode && (*/}
+                            {/* дерево только если combobox-режим + реально есть tree_fields */}
+                            {effectiveComboboxMode && hasTreeFields && (
                                 <TreeFormTable
                                     tree={liveTree}
                                     widgetForm={currentForm}
@@ -446,18 +460,21 @@ export const DrillDialog: React.FC<Props> = ({
                                     handleNestedValueClick={handleNestedValueClick}
                                     handleTreeValueClick={handleTreeValueClick}
                                 />
-                       {/*     )}*/}
+                            )}
 
                             <div className={s.mainCol}>
-
                                 <TableToolbar
-                                    showSubActions={isComboboxMode && !!subDisplay && Object.keys(lastPrimary).length > 0}
+                                    showSubActions={
+                                        effectiveComboboxMode &&
+                                        hasSubWidgets &&
+                                        !!subDisplay &&
+                                        Object.keys(lastPrimary).length > 0
+                                    }
                                     cancelAddSub={cancelAddSub}
                                     startAddSub={startAddSub}
-                                    isAddingSub={isComboboxMode ? isAddingSub : false}
+                                    isAddingSub={effectiveComboboxMode && hasSubWidgets ? isAddingSub : false}
                                     submitAddSub={submitAddSub}
-                                    savingSub={isComboboxMode ? savingSub : false}
-
+                                    savingSub={effectiveComboboxMode && hasSubWidgets ? savingSub : false}
                                     isAdding={isAdding}
                                     selectedFormId={currentFormId}
                                     selectedWidget={selectedWidgetForPreflight}
@@ -465,7 +482,6 @@ export const DrillDialog: React.FC<Props> = ({
                                     startAdd={startAddSafe}
                                     submitAdd={submitAdd}
                                     cancelAdd={cancelAdd}
-
                                     showSearch={showSearch}
                                     value={q}
                                     onChange={setQ}
@@ -476,10 +492,11 @@ export const DrillDialog: React.FC<Props> = ({
 
                                 <MainTable
                                     headerPlan={headerPlan as any}
-                                    showSubHeaders={isComboboxMode ? showSubHeaders : false}
-                                    onToggleSubHeaders={() => isComboboxMode && setShowSubHeaders(v => !v)}
-                                    onOpenDrill={disableNestedDrill ? undefined : handleOpenDrill}  // 👈 вот оно
-
+                                    showSubHeaders={effectiveComboboxMode && hasSubWidgets ? showSubHeaders : false}
+                                    onToggleSubHeaders={() =>
+                                        effectiveComboboxMode && hasSubWidgets && setShowSubHeaders(v => !v)
+                                    }
+                                    onOpenDrill={disableNestedDrill ? undefined : handleOpenDrill}
                                     isAdding={isAdding}
                                     draft={draft}
                                     onDraftChange={(tcId, v) => setDraft(prev => ({...prev, [tcId]: v}))}
@@ -502,8 +519,8 @@ export const DrillDialog: React.FC<Props> = ({
                                     deletingRowIdx={deletingRowIdx}
                                 />
 
-
-                                {/*   {isComboboxMode && (*/}
+                                {/* SubWormTable только если у формы действительно есть sub_widgets */}
+                                {effectiveComboboxMode && hasSubWidgets && (
                                     <SubWormTable
                                         editingRowIdx={null}
                                         setEditingRowIdx={() => {}}
@@ -515,11 +532,16 @@ export const DrillDialog: React.FC<Props> = ({
                                         setIsAddingSub={setIsAddingSub}
                                         draftSub={draftSub}
                                         setDraftSub={setDraftSub}
-                                        currentOrder={availableOrders.includes(activeSubOrder) ? activeSubOrder : (availableOrders[0] ?? 0)}
+                                        currentOrder={
+                                            availableOrders.includes(activeSubOrder)
+                                                ? activeSubOrder
+                                                : (availableOrders[0] ?? 0)
+                                        }
                                         currentWidgetId={
                                             (availableOrders.includes(activeSubOrder)
-                                                ? currentForm?.sub_widgets?.find(sw => sw.widget_order === activeSubOrder)?.sub_widget_id
-                                                : currentForm?.sub_widgets?.[0]?.sub_widget_id) ?? undefined
+                                                    ? currentForm?.sub_widgets?.find(sw => sw.widget_order === activeSubOrder)?.sub_widget_id
+                                                    : currentForm?.sub_widgets?.[0]?.sub_widget_id
+                                            ) ?? undefined
                                         }
                                         subHeaderGroups={undefined}
                                         formId={currentFormId}
@@ -528,14 +550,19 @@ export const DrillDialog: React.FC<Props> = ({
                                         subDisplay={subDisplay}
                                         handleTabClick={(order) => {
                                             setActiveSubOrder(order);
-                                            if (currentFormId && Object.keys(lastPrimary).length) {
+                                            if (
+                                                effectiveComboboxMode &&
+                                                hasSubWidgets &&
+                                                currentFormId &&
+                                                Object.keys(lastPrimary).length
+                                            ) {
                                                 fetchSub(currentFormId, order, lastPrimary);
                                             } else {
                                                 setSubDisplay(null);
                                             }
                                         }}
                                     />
-                              {/*  )}*/}
+                                )}
                             </div>
                         </div>
                     )}
