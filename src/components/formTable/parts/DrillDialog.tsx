@@ -415,20 +415,39 @@ export const DrillDialog: React.FC<Props> = ({
 
     const handleResetFilters = useCallback(async () => {
         if (!currentFormId) return;
+
+        // сбрасываем ТОЛЬКО локальные состояния модалки
         setActiveFilters([]);
         setActiveExpandedKey(null);
         setSelectedKey(null);
         setLastPrimary({});
         setSubDisplay(null);
         setActiveSubOrder(availableOrders[0] ?? 0);
+
         try {
-            await resetFiltersHard();
-            if (effectiveComboboxMode && hasTreeFields) await reloadTree();
-            if (onSyncParentMain) onSyncParentMain(currentFormId);
-        } catch {}
-    }, [currentFormId, availableOrders, effectiveComboboxMode, hasTreeFields,
-        setActiveExpandedKey, setSelectedKey, setLastPrimary, setSubDisplay,
-        setActiveSubOrder, resetFiltersHard, reloadTree, setActiveFilters, onSyncParentMain]);
+            await resetFiltersHard(); // POST /display/{fid}/main только для локального display
+            if (effectiveComboboxMode && hasTreeFields) {
+                await reloadTree();    // локальное дерево в модалке
+            }
+            // ❌ Больше НЕ трогаем onSyncParentMain — не дергаем родительский MainTable
+        } catch {
+            // можно оставить пусто или повесить console.warn, как хочешь
+        }
+    }, [
+        currentFormId,
+        availableOrders,
+        effectiveComboboxMode,
+        hasTreeFields,
+        setActiveExpandedKey,
+        setSelectedKey,
+        setLastPrimary,
+        setSubDisplay,
+        setActiveSubOrder,
+        resetFiltersHard,
+        reloadTree,
+        setActiveFilters,
+    ]);
+
 
     if (!currentFormId) return null;
 

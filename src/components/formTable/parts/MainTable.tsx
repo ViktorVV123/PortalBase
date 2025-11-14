@@ -252,6 +252,10 @@ const ComboEditDisplay: React.FC<ComboEditDisplayProps> = ({
                                                                editDraft,
                                                                onOpenDrill,
                                                            }) => {
+
+
+
+
     const primary = pickPrimaryCombo(group);
     const writeTcId = (primary.__write_tc_id ?? primary.table_column_id) ?? null;
 
@@ -261,11 +265,13 @@ const ComboEditDisplay: React.FC<ComboEditDisplayProps> = ({
 
     let display = '';
 
-    // 1) если в editDraft уже лежит выбранное значение → пытаемся найти его в combobox-опциях
+    // 1) если в editDraft уже лежит выбранное значение → берем красивую подпись из combobox
     if (draftId && options.length) {
         const opt = options.find(o => o.id === draftId);
         if (opt) {
-            display = opt.showHidden.join(' · ');
+            // 🔧 БЫЛО: opt.showHidden.join(' · ')
+            // СТАЛО: основная подпись из show
+            display = opt.show.join(' · ');
         }
     }
 
@@ -318,7 +324,33 @@ const ComboEditDisplay: React.FC<ComboEditDisplayProps> = ({
     );
 };
 
+
 export const MainTable: React.FC<Props> = (p) => {
+
+    const stableRows = React.useMemo(() => {
+        // копия, чтобы не мутировать исходный массив
+        const copy = [...p.filteredRows];
+
+        copy.sort((a, b) => {
+            const aPk: any = a.row.primary_keys || {};
+            const bPk: any = b.row.primary_keys || {};
+
+            const aId = aPk.person_id;
+            const bId = bPk.person_id;
+
+            if (aId == null || bId == null) return 0;
+
+            const na = typeof aId === 'number' ? aId : parseInt(String(aId), 10);
+            const nb = typeof bId === 'number' ? bId : parseInt(String(bId), 10);
+
+            if (Number.isNaN(na) || Number.isNaN(nb)) return 0;
+
+            return na - nb; // сортировка по person_id по возрастанию
+        });
+
+        return copy;
+    }, [p.filteredRows]);
+
     return (
         <div className={s.tableScroll}>
             <table className={s.tbl}>
@@ -426,13 +458,13 @@ export const MainTable: React.FC<Props> = (p) => {
                 )}
 
                 {/* ───────── Основные строки ───────── */}
-                {p.filteredRows.map(({ row, idx: rowIdx }) => {
+                {stableRows.map(({ row, idx: rowIdx }) => {   // 👈 тут вместо p.filteredRows
                     const isEditing = p.editingRowIdx === rowIdx;
                     const rowKey = p.pkToKey(row.primary_keys);
 
                     return (
                         <tr
-                            key={rowIdx}
+                            key={rowKey}  // фиксированный ключ по первичному ключу
                             className={p.selectedKey === rowKey ? s.selectedRow : undefined}
                             aria-selected={p.selectedKey === rowKey || undefined}
                             onClick={() => {
