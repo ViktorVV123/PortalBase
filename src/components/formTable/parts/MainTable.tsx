@@ -49,21 +49,22 @@ type Props = {
     onCancelEdit: () => void;
     editSaving: boolean;
 
-    onRowClick: (pkObj: Record<string, unknown>) => void;
+    /** теперь сюда прилетает RowView, а не pk-объект */
+    onRowClick: (view: RowView) => void;
     onStartEdit: (rowIdx: number) => void;
     onDeleteRow: (rowIdx: number) => void;
     deletingRowIdx: number | null;
 
-    /** ВАЖНО: второй аргумент — тип кликнутой колонки */
     disableDrillWhileEditing?: boolean;
 
-    /** ВАЖНО: второй аргумент — тип кликнутой колонки */
+    /** meta расширили targetWriteTcId — в какой write_tc_id нужно писать выбранное значение */
     onOpenDrill?: (
         fid?: number | null,
         meta?: {
             originColumnType?: 'combobox' | null;
             primary?: Record<string, unknown>;
-            openedFromEdit?: boolean; // 👈 добавили
+            openedFromEdit?: boolean;
+            targetWriteTcId?: number;
         }
     ) => void;
 };
@@ -217,16 +218,13 @@ function getShown(valIndexByKey: Map<string, number>, rowValues: (string | numbe
 
 /** Для combobox-группы вернуть реальный write_tc_id (один на всю группу) */
 function getWriteTcIdForComboGroup(group: ExtCol[]): number | null {
-    // 1) Пробуем у "первичной" колонки
     const primary = pickPrimaryCombo(group);
     if (primary.__write_tc_id != null) return primary.__write_tc_id;
 
-    // 2) Иначе ищем у любой визуальной колонки группы
     for (const g of group) {
         if (g.__write_tc_id != null) return g.__write_tc_id;
     }
 
-    // 3) Фолбэк: лог, чтобы заметить ошибку разметки колонок
     console.warn('[MainTable][add] combobox group has no __write_tc_id', group);
     return null;
 }
@@ -255,7 +253,7 @@ export const MainTable: React.FC<Props> = (p) => {
                     <tr>
                         {p.headerPlan.map(g => {
                             const span = g.cols.length || 1;
-                            const label = (g.labels?.[0] ?? '—'); // одна подпись на весь widget_column
+                            const label = (g.labels?.[0] ?? '—');
                             return (
                                 <th key={`g-sub-${g.id}`} colSpan={span}>
                                     {label}
@@ -268,7 +266,7 @@ export const MainTable: React.FC<Props> = (p) => {
                 </thead>
 
                 <tbody>
-                {/* ───────── Добавление: объединяем combobox-группы в одну TD ───────── */}
+                {/* ───────── Добавление ───────── */}
                 {p.isAdding && (
                     <tr>
                         {(() => {
@@ -287,20 +285,15 @@ export const MainTable: React.FC<Props> = (p) => {
                                     const primary = pickPrimaryCombo(group);
                                     const writeTcId = getWriteTcIdForComboGroup(group);
 
-                                    // В режиме добавления НЕ блокируем ввод (даже если колонка readOnly/visible:false)
                                     const ro = false;
                                     const value = writeTcId == null ? '' : (p.draft[writeTcId] ?? '');
 
-                                    // Диагностика (при желании оставь)
-                                    // console.debug('[MainTable][add] combo group', {
-                                    //   widget_column_id: primary.widget_column_id,
-                                    //   writeTcId,
-                                    //   draftKeyExists: writeTcId != null ? (writeTcId in p.draft) : false,
-                                    //   draftValue: writeTcId != null ? p.draft[writeTcId] : undefined,
-                                    // });
-
                                     cells.push(
-                                        <td key={`add-combo-${primary.widget_column_id}:${writeTcId ?? 'null'}`} colSpan={span} style={{ textAlign: 'center' }}>
+                                        <td
+                                            key={`add-combo-${primary.widget_column_id}:${writeTcId ?? 'null'}`}
+                                            colSpan={span}
+                                            style={{ textAlign: 'center' }}
+                                        >
                                             <InputCell
                                                 mode="add"
                                                 col={primary}
@@ -317,13 +310,14 @@ export const MainTable: React.FC<Props> = (p) => {
 
                                 // Обычная колонка (add)
                                 const writeTcId = (col.__write_tc_id ?? col.table_column_id) ?? null;
-
-                                // В добавлении НЕ блокируем ввод
                                 const ro = false;
-
                                 const value = writeTcId == null ? '' : (p.draft[writeTcId] ?? '');
+
                                 cells.push(
-                                    <td key={`add-${col.widget_column_id}:${col.table_column_id ?? -1}`} style={{ textAlign: 'center' }}>
+                                    <td
+                                        key={`add-${col.widget_column_id}:${col.table_column_id ?? -1}`}
+                                        style={{ textAlign: 'center' }}
+                                    >
                                         <InputCell
                                             mode="add"
                                             col={col}
@@ -354,10 +348,7 @@ export const MainTable: React.FC<Props> = (p) => {
                             aria-selected={p.selectedKey === rowKey || undefined}
                             onClick={() => {
                                 if (isEditing) return;
-                                const pkObj = Object.fromEntries(
-                                    Object.entries(row.primary_keys).map(([k, v]) => [k, String(v)])
-                                );
-                                p.onRowClick(pkObj);
+                                p.onRowClick({ row, idx: rowIdx });
                             }}
                         >
                             {(() => {
@@ -379,11 +370,13 @@ export const MainTable: React.FC<Props> = (p) => {
                                         const ro = p.isColReadOnly(primary) || primary.visible === false;
 
                                         if (isEditing) {
-                                            // При редактировании вместо Select открываем DrillDialog по клику
+                                            // В edit-режиме combobox — только через DrillDialog
                                             const shownParts = group
                                                 .map(gcol => getShown(p.valueIndexByKey, row.values, gcol))
                                                 .filter(Boolean);
-                                            const display = shownParts.length ? shownParts.map(formatCellValue).join(' · ') : '—';
+                                            const display = shownParts.length
+                                                ? shownParts.map(formatCellValue).join(' · ')
+                                                : '—';
                                             const clickable = primary.form_id != null && !!p.onOpenDrill;
 
                                             cells.push(
@@ -400,12 +393,14 @@ export const MainTable: React.FC<Props> = (p) => {
                                                                 p.onOpenDrill?.(primary.form_id!, {
                                                                     originColumnType: 'combobox',
                                                                     primary: row.primary_keys,
-                                                                    openedFromEdit: true, // 👈 ВАЖНО: открыли модалку из edit
+                                                                    openedFromEdit: true,
+                                                                    targetWriteTcId: writeTcId ?? undefined,
                                                                 });
                                                                 console.debug('[MainTable] drill click (combobox, edit mode)', {
                                                                     formId: primary.form_id,
                                                                     widget_column_id: primary.widget_column_id,
-                                                                    table_column_id: primary.table_column_id
+                                                                    table_column_id: primary.table_column_id,
+                                                                    targetWriteTcId: writeTcId,
                                                                 });
                                                             }}
                                                             style={{
@@ -414,7 +409,7 @@ export const MainTable: React.FC<Props> = (p) => {
                                                                 background: 'none',
                                                                 cursor: 'pointer',
                                                                 textDecoration: 'underline',
-                                                                color: 'var(--link,#66b0ff)'
+                                                                color: 'var(--link,#66b0ff)',
                                                             }}
                                                             title={`Открыть форму #${primary.form_id} для выбора значения`}
                                                         >
@@ -425,18 +420,21 @@ export const MainTable: React.FC<Props> = (p) => {
                                                     )}
                                                 </td>
                                             );
-                                        }
-
-
-
-                                        else {
-                                            // просмотр: склеим видимые значения всех визуальных столбцов группы
-                                            const shownParts = group.map(gcol => getShown(p.valueIndexByKey, row.values, gcol)).filter(Boolean);
-                                            const display = shownParts.length ? shownParts.map(formatCellValue).join(' · ') : '—';
+                                        } else {
+                                            // просмотр
+                                            const shownParts = group
+                                                .map(gcol => getShown(p.valueIndexByKey, row.values, gcol))
+                                                .filter(Boolean);
+                                            const display = shownParts.length
+                                                ? shownParts.map(formatCellValue).join(' · ')
+                                                : '—';
                                             const clickable = primary.form_id != null && !!p.onOpenDrill;
 
                                             cells.push(
-                                                <td key={`view-combo-${primary.widget_column_id}:${writeTcId}`} colSpan={span}>
+                                                <td
+                                                    key={`view-combo-${primary.widget_column_id}:${writeTcId}`}
+                                                    colSpan={span}
+                                                >
                                                     {clickable ? (
                                                         <button
                                                             type="button"
@@ -445,13 +443,13 @@ export const MainTable: React.FC<Props> = (p) => {
                                                                 p.onOpenDrill?.(primary.form_id!, {
                                                                     originColumnType: 'combobox',
                                                                     primary: row.primary_keys,
-                                                                    openedFromEdit: false, // 👈 из просмотра
+                                                                    openedFromEdit: false,
                                                                 });
                                                                 console.debug('[MainTable] drill click (combobox)', {
                                                                     formId: primary.form_id,
                                                                     originColumnType: 'combobox',
                                                                     widget_column_id: primary.widget_column_id,
-                                                                    table_column_id: primary.table_column_id
+                                                                    table_column_id: primary.table_column_id,
                                                                 });
                                                             }}
                                                             style={{
@@ -460,7 +458,7 @@ export const MainTable: React.FC<Props> = (p) => {
                                                                 background: 'none',
                                                                 cursor: 'pointer',
                                                                 textDecoration: 'underline',
-                                                                color: 'var(--link,#66b0ff)'
+                                                                color: 'var(--link,#66b0ff)',
                                                             }}
                                                             title={`Открыть форму #${primary.form_id}`}
                                                         >
@@ -477,7 +475,7 @@ export const MainTable: React.FC<Props> = (p) => {
                                         continue;
                                     }
 
-                                    // ───── Обычная колонка (не combobox)
+                                    // ───── Обычная колонка
                                     const visKey = `${col.widget_column_id}:${col.table_column_id ?? -1}`;
                                     const shownVal = getShown(p.valueIndexByKey, row.values, col);
                                     const ro = p.isColReadOnly(col) || col.visible === false;
@@ -491,7 +489,9 @@ export const MainTable: React.FC<Props> = (p) => {
                                                     col={col}
                                                     readOnly={ro}
                                                     value={writeTcId == null ? '' : (p.editDraft[writeTcId] ?? '')}
-                                                    onChange={(v) => { if (writeTcId != null) p.onEditDraftChange(writeTcId, v); }}
+                                                    onChange={(v) => {
+                                                        if (writeTcId != null) p.onEditDraftChange(writeTcId, v);
+                                                    }}
                                                     placeholder={p.placeholderFor(col)}
                                                 />
                                             </td>
@@ -508,13 +508,13 @@ export const MainTable: React.FC<Props> = (p) => {
                                                             p.onOpenDrill?.(col.form_id!, {
                                                                 originColumnType: null,
                                                                 primary: row.primary_keys,
-                                                                openedFromEdit: false, // 👈 тоже из просмотра
+                                                                openedFromEdit: false,
                                                             });
                                                             console.debug('[MainTable] drill click (regular)', {
                                                                 formId: col.form_id,
                                                                 originColumnType: col.type ?? null,
                                                                 widget_column_id: col.widget_column_id,
-                                                                table_column_id: col.table_column_id
+                                                                table_column_id: col.table_column_id,
                                                             });
                                                         }}
                                                         style={{
@@ -523,7 +523,7 @@ export const MainTable: React.FC<Props> = (p) => {
                                                             background: 'none',
                                                             cursor: 'pointer',
                                                             textDecoration: 'underline',
-                                                            color: 'var(--link,#66b0ff)'
+                                                            color: 'var(--link,#66b0ff)',
                                                         }}
                                                         title={`Открыть форму #${col.form_id}`}
                                                     >
@@ -580,7 +580,12 @@ export const MainTable: React.FC<Props> = (p) => {
                                         </button>
                                         <button
                                             type="button"
-                                            style={{ background: 'none', border: 0, cursor: 'pointer', opacity: p.deletingRowIdx === rowIdx ? 0.6 : 1 }}
+                                            style={{
+                                                background: 'none',
+                                                border: 0,
+                                                cursor: 'pointer',
+                                                opacity: p.deletingRowIdx === rowIdx ? 0.6 : 1,
+                                            }}
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 if (p.deletingRowIdx == null) p.onDeleteRow(rowIdx);

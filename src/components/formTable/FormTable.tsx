@@ -74,8 +74,8 @@ export const FormTable: React.FC<Props> = ({
     const [drillComboboxMode, setDrillComboboxMode] = useState(false);
     const [drillInitialPrimary, setDrillInitialPrimary] = useState<Record<string, unknown> | undefined>(undefined);
     const [drillDisableNested, setDrillDisableNested] = useState(false);
-
-
+    /** в какой write_tc_id надо записать выбранный PK из DrillDialog */
+    const [drillTargetWriteTcId, setDrillTargetWriteTcId] = useState<number | null>(null);
 
     /** ───────── форма/сабы ───────── */
     const baseForm: WidgetForm | null = useMemo(() => {
@@ -229,25 +229,45 @@ export const FormTable: React.FC<Props> = ({
                 originColumnType?: 'combobox' | null;
                 primary?: Record<string, unknown>;
                 openedFromEdit?: boolean;
+                targetWriteTcId?: number;
             }
         ) => {
             if (!fid) return;
             setDrillFormId(fid);
-            setDrillComboboxMode(meta?.originColumnType === 'combobox'); // фиксируем режим на момент клика
-            setDrillInitialPrimary(meta?.primary || undefined);          // сохраняем PK (для сабов)
-            setDrillDisableNested(!!meta?.openedFromEdit);               // если открыли из edit → внутри нельзя дальше проваливаться
+            setDrillComboboxMode(meta?.originColumnType === 'combobox');
+            setDrillInitialPrimary(meta?.primary || undefined);
+            setDrillDisableNested(!!meta?.openedFromEdit);
+            setDrillTargetWriteTcId(meta?.targetWriteTcId ?? null);
             setDrillOpen(true);
         },
         []
     );
+
     /** очистка при закрытии модалки */
     useEffect(() => {
         if (!drillOpen) {
             setDrillComboboxMode(false);
             setDrillInitialPrimary(undefined);
-            setDrillDisableNested(false); // 👈 сбрасываем
+            setDrillDisableNested(false);
+            setDrillTargetWriteTcId(null);
         }
     }, [drillOpen]);
+
+    /** ───────── Приём выбранной строки из DrillDialog ───────── */
+    const handlePickFromDrill = useCallback(
+        ({ primary }: { row: FormDisplay['data'][number]; primary: Record<string, unknown> }) => {
+            if (drillTargetWriteTcId == null) return;
+
+            const pkValues = Object.values(primary ?? {});
+            const nextId = pkValues.length ? String(pkValues[0]) : '';
+
+            setEditDraft(prev => ({
+                ...prev,
+                [drillTargetWriteTcId]: nextId,
+            }));
+        },
+        [drillTargetWriteTcId, setEditDraft]
+    );
 
     /** ───────── UI ───────── */
     return (
@@ -315,7 +335,6 @@ export const FormTable: React.FC<Props> = ({
                         deletingRowIdx={deletingRowIdx}
                     />
 
-
                     <SubWormTable
                         editingRowIdx={editingRowIdxSub}
                         setEditingRowIdx={setEditingRowIdxSub}
@@ -339,9 +358,8 @@ export const FormTable: React.FC<Props> = ({
                 </div>
             </div>
 
-            {/* DRILL-модалка: без useDrillDialog, управляем локально */}
+            {/* DRILL-модалка */}
             <DrillDialog
-
                 onSyncParentMain={async (fid) => {
                     try {
                         const { data } = await api.post<FormDisplay | FormDisplay[]>(`/display/${fid}/main`, activeFilters);
@@ -354,14 +372,14 @@ export const FormTable: React.FC<Props> = ({
                 open={drillOpen}
                 onClose={() => setDrillOpen(false)}
                 formId={drillFormId}
-                /* display не передаём — модалка сама загрузит main для formId */
                 formsById={formsById}
-                disableNestedDrill={drillDisableNested} // 👈 новое
-                comboboxMode={drillComboboxMode}                            // фиксированный режим
+                disableNestedDrill={drillDisableNested}
+                comboboxMode={drillComboboxMode}
                 selectedWidget={selectedWidget ? { id: selectedWidget.id } : null}
                 formsByWidget={formsByWidget}
                 loadSubDisplay={loadSubDisplay}
                 initialPrimary={drillInitialPrimary}
+                onPickFromDrill={drillDisableNested ? handlePickFromDrill : undefined}
             />
         </ThemeProvider>
     );

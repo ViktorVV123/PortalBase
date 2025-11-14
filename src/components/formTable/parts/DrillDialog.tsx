@@ -20,6 +20,9 @@ import {useMainCrud} from '@/components/formTable/hooks/useMainCrud';
 
 import type {FormDisplay, SubDisplay, WidgetForm, FormTreeColumn} from '@/shared/hooks/useWorkSpaces';
 
+/** тот же RowView, что и в MainTable */
+type RowView = { row: FormDisplay['data'][number]; idx: number };
+
 type Props = {
     open: boolean;
     formId: number | null;
@@ -43,6 +46,12 @@ type Props = {
 
     /** Синхронизировать основной экран после CRUD в модалке */
     onSyncParentMain?: (formId: number) => void;
+
+    /** Выбор строки в режиме disableNestedDrill (редактирование combobox в MainTable) */
+    onPickFromDrill?: (payload: {
+        row: FormDisplay['data'][number];
+        primary: Record<string, unknown>;
+    }) => void;
 };
 
 const safe = (v?: string | null) => (v?.trim() ? v.trim() : '—');
@@ -60,6 +69,7 @@ export const DrillDialog: React.FC<Props> = ({
                                                  disableNestedDrill,
                                                  initialPrimary,
                                                  onSyncParentMain,
+                                                 onPickFromDrill,
                                              }) => {
     if (!open || !formId) return null;
 
@@ -113,8 +123,7 @@ export const DrillDialog: React.FC<Props> = ({
 
     const setDisplayBoth = useCallback((v: FormDisplay) => {
         setLocalDisplay(v);
-    }, [setLocalDisplay]);
-
+    }, []);
 
     const fetchMain = useCallback(async (fid: number) => {
         if (!fid) return;
@@ -318,7 +327,7 @@ export const DrillDialog: React.FC<Props> = ({
         {threshold: 0.35, distance: 120, debounceMs: 250}
     );
 
-    /** ─── selectedWidget для CRUD — строго текущей формы */
+    /** ─── selectedWidget для CRUD — строго текущей формы ─── */
     const selectedWidgetForPreflight = useMemo(() => {
         return resolvedWidgetId ? ({ id: resolvedWidgetId } as any) : null;
     }, [resolvedWidgetId]);
@@ -417,13 +426,40 @@ export const DrillDialog: React.FC<Props> = ({
             if (effectiveComboboxMode && hasTreeFields) await reloadTree();
             if (onSyncParentMain) onSyncParentMain(currentFormId);
         } catch {}
-    }, [currentFormId, availableOrders, effectiveComboboxMode, hasTreeFields, setActiveExpandedKey, setSelectedKey, setLastPrimary, setSubDisplay, setActiveSubOrder, resetFiltersHard, reloadTree, setActiveFilters, onSyncParentMain]);
+    }, [currentFormId, availableOrders, effectiveComboboxMode, hasTreeFields,
+        setActiveExpandedKey, setSelectedKey, setLastPrimary, setSubDisplay,
+        setActiveSubOrder, resetFiltersHard, reloadTree, setActiveFilters, onSyncParentMain]);
 
     if (!currentFormId) return null;
 
     const enableSub = effectiveComboboxMode && hasSubWidgets && !disableNestedDrill;
     const enable = effectiveComboboxMode && hasSubWidgets && disableNestedDrill;
 
+    /**
+     * Специальный onRowClick для режима выбора значения (disableNestedDrill = true):
+     * вместо навигации по сабам просто отдаём строку наверх и закрываем модалку.
+     */
+    const handleRowClickForSelect = useCallback((view: RowView) => {
+        if (!disableNestedDrill) {
+            handleRowClick(view);
+            return;
+        }
+
+        if (!onPickFromDrill) return;
+
+        const raw: any = view.row;
+        const primary: Record<string, unknown> =
+            raw && typeof raw === 'object' && raw.primary_keys
+                ? raw.primary_keys
+                : {};
+
+        onPickFromDrill({
+            row: view.row,
+            primary,
+        });
+
+        onClose();
+    }, [disableNestedDrill, handleRowClick, onPickFromDrill, onClose]);
 
     return (
         <Dialog open={open} onClose={onClose} fullWidth maxWidth="xl">
@@ -454,7 +490,6 @@ export const DrillDialog: React.FC<Props> = ({
                             {/* дерево только если combobox-режим + реально есть tree_fields */}
                             {effectiveComboboxMode && hasTreeFields && (
                                 <TreeFormTable
-
                                     tree={liveTree}
                                     widgetForm={currentForm}
                                     activeExpandedKey={activeExpandedKey}
@@ -467,33 +502,33 @@ export const DrillDialog: React.FC<Props> = ({
 
                             <div className={s.mainCol}>
                                 {enable && (
-                                <TableToolbar
-                                    showSubActions={
-                                        effectiveComboboxMode &&
-                                        hasSubWidgets &&
-                                        !!subDisplay &&
-                                        Object.keys(lastPrimary).length > 0
-                                    }
-                                    cancelAddSub={cancelAddSub}
-                                    startAddSub={startAddSub}
-                                    isAddingSub={effectiveComboboxMode && hasSubWidgets ? isAddingSub : false}
-                                    submitAddSub={submitAddSub}
-                                    savingSub={effectiveComboboxMode && hasSubWidgets ? savingSub : false}
-                                    isAdding={isAdding}
-                                    selectedFormId={currentFormId}
-                                    selectedWidget={selectedWidgetForPreflight}
-                                    saving={saving}
-                                    startAdd={startAddSafe}
-                                    submitAdd={submitAdd}
-                                    cancelAdd={cancelAdd}
-                                    showSearch={showSearch}
-                                    value={q}
-                                    onChange={setQ}
-                                    onResetFilters={handleResetFilters}
-                                    collapsedWidth={160}
-                                    expandedWidth={420}
-                                />
-                                    )}
+                                    <TableToolbar
+                                        showSubActions={
+                                            effectiveComboboxMode &&
+                                            hasSubWidgets &&
+                                            !!subDisplay &&
+                                            Object.keys(lastPrimary).length > 0
+                                        }
+                                        cancelAddSub={cancelAddSub}
+                                        startAddSub={startAddSub}
+                                        isAddingSub={effectiveComboboxMode && hasSubWidgets ? isAddingSub : false}
+                                        submitAddSub={submitAddSub}
+                                        savingSub={effectiveComboboxMode && hasSubWidgets ? savingSub : false}
+                                        isAdding={isAdding}
+                                        selectedFormId={currentFormId}
+                                        selectedWidget={selectedWidgetForPreflight}
+                                        saving={saving}
+                                        startAdd={startAddSafe}
+                                        submitAdd={submitAdd}
+                                        cancelAdd={cancelAdd}
+                                        showSearch={showSearch}
+                                        value={q}
+                                        onChange={setQ}
+                                        onResetFilters={handleResetFilters}
+                                        collapsedWidth={160}
+                                        expandedWidth={420}
+                                    />
+                                )}
 
                                 <MainTable
                                     headerPlan={headerPlan as any}
@@ -518,13 +553,14 @@ export const DrillDialog: React.FC<Props> = ({
                                     onSubmitEdit={submitEdit}
                                     onCancelEdit={cancelEdit}
                                     editSaving={editSaving}
-                                    onRowClick={handleRowClick}
+                                    onRowClick={disableNestedDrill ? handleRowClickForSelect : handleRowClick}
                                     onStartEdit={startEdit}
                                     onDeleteRow={deleteRow}
                                     deletingRowIdx={deletingRowIdx}
                                 />
 
-                                {/* SubWormTable только если у формы действительно есть sub_widgets */}
+                                {/* SubWormTable только если у формы действительно есть sub_widgets
+                                   и модалка не открыта из редактирования (disableNestedDrill=false) */}
                                 {enableSub && (
                                     <SubWormTable
                                         editingRowIdx={null}
