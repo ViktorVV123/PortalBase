@@ -1,4 +1,3 @@
-// MainTable.tsx
 import React from 'react';
 import { MenuItem, Select, TextField } from '@mui/material';
 import * as s from '@/components/setOfTables/SetOfTables.module.scss';
@@ -229,6 +228,96 @@ function getWriteTcIdForComboGroup(group: ExtCol[]): number | null {
     return null;
 }
 
+/** 👇 Новый компонент: отображение combobox в режиме редактирования с учётом editDraft */
+type ComboEditDisplayProps = {
+    group: ExtCol[];
+    row: FormDisplay['data'][number];
+    valueIndexByKey: Map<string, number>;
+    editDraft: Record<number, string>;
+    onOpenDrill?: (
+        fid?: number | null,
+        meta?: {
+            originColumnType?: 'combobox' | null;
+            primary?: Record<string, unknown>;
+            openedFromEdit?: boolean;
+            targetWriteTcId?: number;
+        }
+    ) => void;
+};
+
+const ComboEditDisplay: React.FC<ComboEditDisplayProps> = ({
+                                                               group,
+                                                               row,
+                                                               valueIndexByKey,
+                                                               editDraft,
+                                                               onOpenDrill,
+                                                           }) => {
+    const primary = pickPrimaryCombo(group);
+    const writeTcId = (primary.__write_tc_id ?? primary.table_column_id) ?? null;
+
+    const { options } = useComboOptions(primary.widget_column_id, writeTcId ?? null);
+
+    const draftId = writeTcId != null ? editDraft[writeTcId] : '';
+
+    let display = '';
+
+    // 1) если в editDraft уже лежит выбранное значение → пытаемся найти его в combobox-опциях
+    if (draftId && options.length) {
+        const opt = options.find(o => o.id === draftId);
+        if (opt) {
+            display = opt.showHidden.join(' · ');
+        }
+    }
+
+    // 2) если ещё ничего не выбрано / опции не успели загрузиться → старое значение из row.values
+    if (!display) {
+        const shownParts = group
+            .map(gcol => getShown(valueIndexByKey, row.values, gcol))
+            .filter(Boolean);
+        display = shownParts.length
+            ? shownParts.map(formatCellValue).join(' · ')
+            : '—';
+    }
+
+    const clickable = primary.form_id != null && !!onOpenDrill;
+
+    if (!clickable) {
+        return <>{display}</>;
+    }
+
+    return (
+        <button
+            type="button"
+            onClick={(e) => {
+                e.stopPropagation();
+                onOpenDrill?.(primary.form_id!, {
+                    originColumnType: 'combobox',
+                    primary: row.primary_keys,
+                    openedFromEdit: true,
+                    targetWriteTcId: writeTcId ?? undefined,
+                });
+                console.debug('[MainTable] drill click (combobox, edit mode)', {
+                    formId: primary.form_id,
+                    widget_column_id: primary.widget_column_id,
+                    table_column_id: primary.table_column_id,
+                    targetWriteTcId: writeTcId,
+                });
+            }}
+            style={{
+                padding: 0,
+                border: 'none',
+                background: 'none',
+                cursor: 'pointer',
+                textDecoration: 'underline',
+                color: 'var(--link,#66b0ff)',
+            }}
+            title={`Открыть форму #${primary.form_id} для выбора значения`}
+        >
+            {display}
+        </button>
+    );
+};
+
 export const MainTable: React.FC<Props> = (p) => {
     return (
         <div className={s.tableScroll}>
@@ -367,57 +456,21 @@ export const MainTable: React.FC<Props> = (p) => {
                                         const span = group.length;
                                         const primary = pickPrimaryCombo(group);
                                         const writeTcId = (primary.__write_tc_id ?? primary.table_column_id) ?? null;
-                                        const ro = p.isColReadOnly(primary) || primary.visible === false;
 
                                         if (isEditing) {
-                                            // В edit-режиме combobox — только через DrillDialog
-                                            const shownParts = group
-                                                .map(gcol => getShown(p.valueIndexByKey, row.values, gcol))
-                                                .filter(Boolean);
-                                            const display = shownParts.length
-                                                ? shownParts.map(formatCellValue).join(' · ')
-                                                : '—';
-                                            const clickable = primary.form_id != null && !!p.onOpenDrill;
-
                                             cells.push(
                                                 <td
                                                     key={`edit-combo-${primary.widget_column_id}:${writeTcId}`}
                                                     colSpan={span}
                                                     style={{ textAlign: 'center' }}
                                                 >
-                                                    {clickable ? (
-                                                        <button
-                                                            type="button"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                p.onOpenDrill?.(primary.form_id!, {
-                                                                    originColumnType: 'combobox',
-                                                                    primary: row.primary_keys,
-                                                                    openedFromEdit: true,
-                                                                    targetWriteTcId: writeTcId ?? undefined,
-                                                                });
-                                                                console.debug('[MainTable] drill click (combobox, edit mode)', {
-                                                                    formId: primary.form_id,
-                                                                    widget_column_id: primary.widget_column_id,
-                                                                    table_column_id: primary.table_column_id,
-                                                                    targetWriteTcId: writeTcId,
-                                                                });
-                                                            }}
-                                                            style={{
-                                                                padding: 0,
-                                                                border: 'none',
-                                                                background: 'none',
-                                                                cursor: 'pointer',
-                                                                textDecoration: 'underline',
-                                                                color: 'var(--link,#66b0ff)',
-                                                            }}
-                                                            title={`Открыть форму #${primary.form_id} для выбора значения`}
-                                                        >
-                                                            {display}
-                                                        </button>
-                                                    ) : (
-                                                        <>{display}</>
-                                                    )}
+                                                    <ComboEditDisplay
+                                                        group={group}
+                                                        row={row}
+                                                        valueIndexByKey={p.valueIndexByKey}
+                                                        editDraft={p.editDraft}
+                                                        onOpenDrill={p.onOpenDrill}
+                                                    />
                                                 </td>
                                             );
                                         } else {
