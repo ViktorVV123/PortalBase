@@ -77,6 +77,8 @@ export const FormTable: React.FC<Props> = ({
     /** в какой write_tc_id надо записать выбранный PK из DrillDialog */
     const [drillTargetWriteTcId, setDrillTargetWriteTcId] = useState<number | null>(null);
 
+    const [comboReloadToken, setComboReloadToken] = useState(0);
+
     /** ───────── форма/сабы ───────── */
     const baseForm: WidgetForm | null = useMemo(() => {
         if (selectedFormId != null) return formsById[selectedFormId] ?? null;
@@ -265,9 +267,13 @@ export const FormTable: React.FC<Props> = ({
                 ...prev,
                 [drillTargetWriteTcId]: nextId,
             }));
+
+            // 👇 важное место: сигналим, что нужно перезагрузить combobox-опции
+            setComboReloadToken(v => v + 1);
         },
         [drillTargetWriteTcId, setEditDraft]
     );
+
 
     /** ───────── UI ───────── */
     return (
@@ -333,6 +339,7 @@ export const FormTable: React.FC<Props> = ({
                         onStartEdit={startEdit}
                         onDeleteRow={deleteRow}
                         deletingRowIdx={deletingRowIdx}
+                        comboReloadToken={comboReloadToken}
                     />
 
                     <SubWormTable
@@ -360,7 +367,11 @@ export const FormTable: React.FC<Props> = ({
 
             {/* DRILL-модалка */}
             <DrillDialog
-                onSyncParentMain={async (fid) => {
+                onSyncParentMain={async () => {
+                    // 👇 определяем, какую форму сейчас показывает FormTable
+                    const fid = selectedFormId ?? currentForm?.form_id ?? null;
+                    if (!fid) return;
+
                     try {
                         const { data } = await api.post<FormDisplay | FormDisplay[]>(`/display/${fid}/main`, activeFilters);
                         const next = Array.isArray(data) ? data[0] : data;
@@ -380,6 +391,8 @@ export const FormTable: React.FC<Props> = ({
                 loadSubDisplay={loadSubDisplay}
                 initialPrimary={drillInitialPrimary}
                 onPickFromDrill={drillDisableNested ? handlePickFromDrill : undefined}
+                onComboboxChanged={() => setComboReloadToken(v => v + 1)}
+
             />
         </ThemeProvider>
     );

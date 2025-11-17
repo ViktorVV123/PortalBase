@@ -34,6 +34,8 @@ export const ButtonForm: React.FC<ButtonFormProps> = ({
     // Для sub (showSubActions=true) — оставляем старую проверку.
     const startDisabled = showSubActions ? (!selectedFormId || !selectedWidget) : false;
 
+
+
     if (!isAdding) {
         return (
             <button

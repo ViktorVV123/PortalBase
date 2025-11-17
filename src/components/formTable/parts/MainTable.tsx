@@ -66,6 +66,7 @@ type Props = {
             targetWriteTcId?: number;
         }
     ) => void;
+    comboReloadToken?: number;
 };
 
 /** Кэш вариантов combobox по ключу wcId:writeTcId */
@@ -83,7 +84,7 @@ type ComboOption = {
 };
 
 /** Загружает и кэширует варианты для combobox колонки */
-function useComboOptions(widgetColumnId: number, writeTcId: number | null) {
+function useComboOptions(widgetColumnId: number, writeTcId: number | null, reloadToken = 0) {
     const [loading, setLoading] = React.useState(false);
     const [options, setOptions] = React.useState<ComboOption[]>([]);
     const [error, setError] = React.useState<string | null>(null);
@@ -94,7 +95,10 @@ function useComboOptions(widgetColumnId: number, writeTcId: number | null) {
         if (!widgetColumnId || !writeTcId) return;
 
         const cached = comboCache.get(key);
-        if (cached) {
+
+        // если reloadToken == 0 и есть кэш — используем его
+        // если reloadToken > 0 — всегда идём на сервер за свежими данными
+        if (!reloadToken && cached) {
             setOptions(cached.options);
             return;
         }
@@ -108,9 +112,9 @@ function useComboOptions(widgetColumnId: number, writeTcId: number | null) {
             .then(({ data }) => {
                 if (cancelled) return;
                 const opts: ComboOption[] = data.data.map((row) => ({
-                    id: String(row.primary?.[0] ?? ''),          // важное место: ID = primary[0]
-                    show: (row.show ?? []).map(v => String(v)),  // видимая краткая подпись
-                    showHidden: (row.show_hidden ?? []).map(v => String(v)), // полная подпись/подсказка
+                    id: String(row.primary?.[0] ?? ''),
+                    show: (row.show ?? []).map(v => String(v)),
+                    showHidden: (row.show_hidden ?? []).map(v => String(v)),
                 }));
                 comboCache.set(key, { options: opts, columns: data.columns });
                 setOptions(opts);
@@ -122,7 +126,7 @@ function useComboOptions(widgetColumnId: number, writeTcId: number | null) {
             .finally(() => !cancelled && setLoading(false));
 
         return () => { cancelled = true; };
-    }, [key, widgetColumnId, writeTcId]);
+    }, [key, widgetColumnId, writeTcId, reloadToken]); // 👈 добавили reloadToken
 
     return { loading, options, error };
 }
@@ -162,7 +166,7 @@ function InputCell({
                 renderValue={(val) => {
                     if (!val) return <span style={{ opacity: 0.6 }}>{placeholder || '—'}</span>;
                     const opt = options.find(o => o.id === val);
-                    return opt ? opt.showHidden.join(' · ') : String(val);
+                    return opt ? opt.show.join(' · ') : String(val);
                 }}
             >
                 <MenuItem value=""><em>—</em></MenuItem>
@@ -174,6 +178,7 @@ function InputCell({
             </Select>
         );
     }
+
 
     return (
         <TextField
@@ -243,6 +248,7 @@ type ComboEditDisplayProps = {
             targetWriteTcId?: number;
         }
     ) => void;
+    comboReloadToken?: number;
 };
 
 const ComboEditDisplay: React.FC<ComboEditDisplayProps> = ({
@@ -251,32 +257,33 @@ const ComboEditDisplay: React.FC<ComboEditDisplayProps> = ({
                                                                valueIndexByKey,
                                                                editDraft,
                                                                onOpenDrill,
+                                                               comboReloadToken,
                                                            }) => {
-
-
-
-
     const primary = pickPrimaryCombo(group);
     const writeTcId = (primary.__write_tc_id ?? primary.table_column_id) ?? null;
 
-    const { options } = useComboOptions(primary.widget_column_id, writeTcId ?? null);
+    const { options } = useComboOptions(primary.widget_column_id, writeTcId ?? null, comboReloadToken ?? 0);
 
     const draftId = writeTcId != null ? editDraft[writeTcId] : '';
 
-    let display = '';
+    let display: string;
 
-    // 1) если в editDraft уже лежит выбранное значение → берем красивую подпись из combobox
-    if (draftId && options.length) {
-        const opt = options.find(o => o.id === draftId);
-        if (opt) {
-            // 🔧 БЫЛО: opt.showHidden.join(' · ')
-            // СТАЛО: основная подпись из show
-            display = opt.show.join(' · ');
+    if (draftId) {
+        // 1) пробуем найти красивую подпись по draftId
+        if (options.length) {
+            const opt = options.find(o => o.id === draftId);
+            if (opt) {
+                display = opt.show.join(' · ');
+            } else {
+                // пока опция не найдена (например, только что переименовали) — хотя бы сам ID
+                display = draftId;
+            }
+        } else {
+            // options ещё грузятся — тоже показываем ID, чтобы было видно, что значение уже выбрано
+            display = draftId;
         }
-    }
-
-    // 2) если ещё ничего не выбрано / опции не успели загрузиться → старое значение из row.values
-    if (!display) {
+    } else {
+        // 2) draftId ещё нет → старое значение из row.values
         const shownParts = group
             .map(gcol => getShown(valueIndexByKey, row.values, gcol))
             .filter(Boolean);
@@ -323,6 +330,7 @@ const ComboEditDisplay: React.FC<ComboEditDisplayProps> = ({
         </button>
     );
 };
+
 
 
 export const MainTable: React.FC<Props> = (p) => {
@@ -502,6 +510,7 @@ export const MainTable: React.FC<Props> = (p) => {
                                                         valueIndexByKey={p.valueIndexByKey}
                                                         editDraft={p.editDraft}
                                                         onOpenDrill={p.onOpenDrill}
+                                                        comboReloadToken={p.comboReloadToken} // 👈 вот это
                                                     />
                                                 </td>
                                             );

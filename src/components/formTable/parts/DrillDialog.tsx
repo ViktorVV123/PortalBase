@@ -29,7 +29,7 @@ type Props = {
     display?: FormDisplay | null;
     formsById: Record<number, WidgetForm>;
     onClose: () => void;
-
+    onSyncParentMain?: () => void;
     /** Режим модалки фиксируем на момент клика (combobox | только main) */
     comboboxMode: boolean;
     disableNestedDrill?: boolean;
@@ -45,13 +45,14 @@ type Props = {
     initialPrimary?: Record<string, unknown>;
 
     /** Синхронизировать основной экран после CRUD в модалке */
-    onSyncParentMain?: (formId: number) => void;
+
 
     /** Выбор строки в режиме disableNestedDrill (редактирование combobox в MainTable) */
     onPickFromDrill?: (payload: {
         row: FormDisplay['data'][number];
         primary: Record<string, unknown>;
     }) => void;
+    onComboboxChanged?: () => void;
 };
 
 const safe = (v?: string | null) => (v?.trim() ? v.trim() : '—');
@@ -70,8 +71,18 @@ export const DrillDialog: React.FC<Props> = ({
                                                  initialPrimary,
                                                  onSyncParentMain,
                                                  onPickFromDrill,
+                                                 onComboboxChanged,
                                              }) => {
     if (!open || !formId) return null;
+
+    const [hasCrudChanges, setHasCrudChanges] = useState(false);
+
+    // при каждом новом открытии/смене formId сбрасываем флаг
+    useEffect(() => {
+        if (open) {
+            setHasCrudChanges(false);
+        }
+    }, [open, formId]);
 
     /** ─── стек форм ─── */
     const [formStack, setFormStack] = useState<number[]>([formId]);
@@ -155,7 +166,8 @@ export const DrillDialog: React.FC<Props> = ({
             lastLoadedRef.current = currentFormId;
             return;
         }
-        fetchMain(currentFormId).catch(() => {});
+        fetchMain(currentFormId).catch(() => {
+        });
     }, [currentFormId, display, formId, fetchMain]);
 
     /** ─── wid/tid ТЕКУЩЕЙ формы ─── */
@@ -186,13 +198,15 @@ export const DrillDialog: React.FC<Props> = ({
         }
         (async () => {
             try {
-                const { data } = await api.get<{ id: number; widget_id: number }>(`/forms/${currentFormId}`);
+                const {data} = await api.get<{ id: number; widget_id: number }>(`/forms/${currentFormId}`);
                 if (!cancelled) setResolvedWidgetId(data?.widget_id ?? null);
             } catch {
                 if (!cancelled) setResolvedWidgetId(null);
             }
         })();
-        return () => { cancelled = true; };
+        return () => {
+            cancelled = true;
+        };
     }, [currentFormId, widFromMap, widFromDisplay, selectedWidget?.id]);
 
     const [resolvedTableId, setResolvedTableId] = useState<number | null>(null);
@@ -208,20 +222,24 @@ export const DrillDialog: React.FC<Props> = ({
 
         setResolvingTable(true);
         api.get<{ id: number; table_id: number }>(`/widgets/${resolvedWidgetId}`)
-            .then(({ data }) => {
+            .then(({data}) => {
                 if (cancelled) return;
                 const tid = data?.table_id ?? null;
                 setResolvedTableId(tid);
-                console.debug('[DrillDialog] resolved wid/tid:', { wid: resolvedWidgetId, tid });
+                console.debug('[DrillDialog] resolved wid/tid:', {wid: resolvedWidgetId, tid});
             })
             .catch((e: any) => {
                 if (cancelled) return;
                 setResolveErr(String(e?.message ?? 'Не удалось получить table_id'));
                 setResolvedTableId(null);
             })
-            .finally(() => { if (!cancelled) setResolvingTable(false); });
+            .finally(() => {
+                if (!cancelled) setResolvingTable(false);
+            });
 
-        return () => { cancelled = true; };
+        return () => {
+            cancelled = true;
+        };
     }, [resolvedWidgetId]);
 
     /** ─── SUB ─── */
@@ -231,10 +249,10 @@ export const DrillDialog: React.FC<Props> = ({
         async (fid: number, order: number, primary?: Record<string, unknown>) => {
             if (!fid) return;
 
-            const params = new URLSearchParams({ sub_widget_order: String(order) });
+            const params = new URLSearchParams({sub_widget_order: String(order)});
             const body =
                 primary && Object.keys(primary).length
-                    ? { primary_keys: Object.fromEntries(Object.entries(primary).map(([k, v]) => [k, String(v)])) }
+                    ? {primary_keys: Object.fromEntries(Object.entries(primary).map(([k, v]) => [k, String(v)]))}
                     : {};
 
             const {data} = await api.post<SubDisplay>(`/display/${fid}/sub?${params}`, body);
@@ -252,12 +270,16 @@ export const DrillDialog: React.FC<Props> = ({
 
     const reloadTree = useCallback(async () => {
         if (!currentFormId || !effectiveComboboxMode || !hasTreeFields) return;
-        try { await fetchTree(currentFormId); } catch {}
+        try {
+            await fetchTree(currentFormId);
+        } catch {
+        }
     }, [currentFormId, effectiveComboboxMode, hasTreeFields, fetchTree]);
 
     useEffect(() => {
         if (currentFormId && effectiveComboboxMode && hasTreeFields) {
-            fetchTree(currentFormId).catch(() => {});
+            fetchTree(currentFormId).catch(() => {
+            });
         } else {
             setLiveTree(null);
         }
@@ -329,7 +351,7 @@ export const DrillDialog: React.FC<Props> = ({
 
     /** ─── selectedWidget для CRUD — строго текущей формы ─── */
     const selectedWidgetForPreflight = useMemo(() => {
-        return resolvedWidgetId ? ({ id: resolvedWidgetId } as any) : null;
+        return resolvedWidgetId ? ({id: resolvedWidgetId} as any) : null;
     }, [resolvedWidgetId]);
 
     /** ─── CRUD main ─── */
@@ -342,7 +364,11 @@ export const DrillDialog: React.FC<Props> = ({
         deleteRow,
         setDraft, setEditDraft,
     } = useMainCrud({
-        formDisplay: (localDisplay ?? ({columns: [], data: [], displayed_widget: {name: '', description: ''}} as FormDisplay)),
+        formDisplay: (localDisplay ?? ({
+            columns: [],
+            data: [],
+            displayed_widget: {name: '', description: ''}
+        } as FormDisplay)),
         selectedWidget: selectedWidgetForPreflight,
         selectedFormId: currentFormId,
         formsByWidget: formsByWidget as any,
@@ -359,6 +385,32 @@ export const DrillDialog: React.FC<Props> = ({
         setSelectedKey,
         preflightTableId: resolvedTableId,
     });
+
+
+    const submitAddWithMark = useCallback(async () => {
+        try {
+            await submitAdd();
+            setHasCrudChanges(true);
+        } catch (e) {
+            // useMainCrud уже логирует/алертит, здесь можно молча
+        }
+    }, [submitAdd]);
+
+    const submitEditWithMark = useCallback(async () => {
+        try {
+            await submitEdit();
+            setHasCrudChanges(true);
+        } catch (e) {
+        }
+    }, [submitEdit]);
+
+    const deleteRowWithMark = useCallback(async (rowIdx: number) => {
+        try {
+            await deleteRow(rowIdx);
+            setHasCrudChanges(true);
+        } catch (e) {
+        }
+    }, [deleteRow]);
 
     /** ─── SUB CRUD (только при наличии sub_widgets) ─── */
     const {
@@ -449,6 +501,7 @@ export const DrillDialog: React.FC<Props> = ({
     ]);
 
 
+
     if (!currentFormId) return null;
 
     const enableSub = effectiveComboboxMode && hasSubWidgets && !disableNestedDrill;
@@ -480,6 +533,27 @@ export const DrillDialog: React.FC<Props> = ({
         onClose();
     }, [disableNestedDrill, handleRowClick, onPickFromDrill, onClose]);
 
+    const handleClose = useCallback(async () => {
+        if (hasCrudChanges) {
+            // 1) перезагрузим основную форму родителя (MainTable)
+            if (onSyncParentMain) {
+                try {
+                    await onSyncParentMain();
+                } catch (e) {
+                    console.warn('[DrillDialog] onSyncParentMain failed on close', e);
+                }
+            }
+
+            // 2) скажем родителю, что словарь для combobox поменялся
+            if (onComboboxChanged) {
+                onComboboxChanged();
+            }
+        }
+
+        onClose();
+    }, [hasCrudChanges, onSyncParentMain, onComboboxChanged, formId, onClose]);
+
+
     return (
         <Dialog open={open} onClose={onClose} fullWidth maxWidth="xl">
             <DialogTitle style={{display: 'flex', gap: 8, alignItems: 'center'}}>
@@ -497,7 +571,8 @@ export const DrillDialog: React.FC<Props> = ({
 
                     {(resolvedWidgetId || resolvedTableId) && (
                         <div style={{opacity: 0.7, padding: '4px 12px'}}>
-                            Виджет: #{resolvedWidgetId ?? '—'} · Таблица: {resolvingTable ? '…' : (resolvedTableId ?? '—')}
+                            Виджет: #{resolvedWidgetId ?? '—'} ·
+                            Таблица: {resolvingTable ? '…' : (resolvedTableId ?? '—')}
                             {!!resolveErr && <span style={{color: '#f66'}}> · {resolveErr}</span>}
                         </div>
                     )}
@@ -537,15 +612,16 @@ export const DrillDialog: React.FC<Props> = ({
                                         selectedFormId={currentFormId}
                                         selectedWidget={selectedWidgetForPreflight}
                                         saving={saving}
-                                        startAdd={startAddSafe}
-                                        submitAdd={submitAdd}
-                                        cancelAdd={cancelAdd}
                                         showSearch={showSearch}
                                         value={q}
                                         onChange={setQ}
                                         onResetFilters={handleResetFilters}
                                         collapsedWidth={160}
                                         expandedWidth={420}
+
+                                        startAdd={startAddSafe}
+                                        submitAdd={submitAddWithMark}
+                                        cancelAdd={cancelAdd}
                                     />
                                 )}
 
@@ -569,12 +645,15 @@ export const DrillDialog: React.FC<Props> = ({
                                     editingRowIdx={editingRowIdx}
                                     editDraft={editDraft}
                                     onEditDraftChange={(tcId, v) => setEditDraft(prev => ({...prev, [tcId]: v}))}
-                                    onSubmitEdit={submitEdit}
-                                    onCancelEdit={cancelEdit}
+
                                     editSaving={editSaving}
                                     onRowClick={disableNestedDrill ? handleRowClickForSelect : handleRowClick}
                                     onStartEdit={startEdit}
-                                    onDeleteRow={deleteRow}
+
+                                    comboReloadToken={0}
+                                    onSubmitEdit={submitEditWithMark}
+                                    onCancelEdit={cancelEdit}
+                                    onDeleteRow={deleteRowWithMark}
                                     deletingRowIdx={deletingRowIdx}
                                 />
 
@@ -583,11 +662,14 @@ export const DrillDialog: React.FC<Props> = ({
                                 {enableSub && (
                                     <SubWormTable
                                         editingRowIdx={null}
-                                        setEditingRowIdx={() => {}}
+                                        setEditingRowIdx={() => {
+                                        }}
                                         editDraft={{}}
-                                        setEditDraft={() => {}}
+                                        setEditDraft={() => {
+                                        }}
                                         editSaving={false}
-                                        setEditSaving={() => {}}
+                                        setEditSaving={() => {
+                                        }}
                                         isAddingSub={isAddingSub}
                                         setIsAddingSub={setIsAddingSub}
                                         draftSub={draftSub}
@@ -630,7 +712,7 @@ export const DrillDialog: React.FC<Props> = ({
             </DialogContent>
 
             <DialogActions>
-                <Button onClick={onClose}>Закрыть</Button>
+                <Button onClick={handleClose}>Закрыть</Button>
             </DialogActions>
         </Dialog>
     );
