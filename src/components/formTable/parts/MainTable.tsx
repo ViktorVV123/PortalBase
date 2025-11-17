@@ -48,7 +48,6 @@ type Props = {
     onCancelEdit: () => void;
     editSaving: boolean;
 
-    /** теперь сюда прилетает RowView, а не pk-объект */
     onRowClick: (view: RowView) => void;
     onStartEdit: (rowIdx: number) => void;
     onDeleteRow: (rowIdx: number) => void;
@@ -56,7 +55,6 @@ type Props = {
 
     disableDrillWhileEditing?: boolean;
 
-    /** meta расширили targetWriteTcId — в какой write_tc_id нужно писать выбранное значение */
     onOpenDrill?: (
         fid?: number | null,
         meta?: {
@@ -66,6 +64,8 @@ type Props = {
             targetWriteTcId?: number;
         }
     ) => void;
+
+    /** триггер для перезагрузки combobox-опций после CRUD в DrillDialog */
     comboReloadToken?: number;
 };
 
@@ -79,9 +79,17 @@ type ComboResp = {
 };
 type ComboOption = {
     id: string;           // primary[0] → как строка
-    show: string[];       // для короткой подписи
-    showHidden: string[]; // для подсказки
+    show: string[];       // то, что backend даёт в show
+    showHidden: string[]; // то, что backend даёт в show_hidden
 };
+
+/** Собираем красивую подпись из show + show_hidden */
+function buildOptionLabel(opt: ComboOption): string {
+    const base = opt.show ?? [];
+    const extra = (opt.showHidden ?? []).filter(v => !base.includes(v));
+    const parts = [...base, ...extra];
+    return parts.length ? parts.join(' · ') : opt.id;
+}
 
 /** Загружает и кэширует варианты для combobox колонки */
 function useComboOptions(widgetColumnId: number, writeTcId: number | null, reloadToken = 0) {
@@ -126,7 +134,7 @@ function useComboOptions(widgetColumnId: number, writeTcId: number | null, reloa
             .finally(() => !cancelled && setLoading(false));
 
         return () => { cancelled = true; };
-    }, [key, widgetColumnId, writeTcId, reloadToken]); // 👈 добавили reloadToken
+    }, [key, widgetColumnId, writeTcId, reloadToken]);
 
     return { loading, options, error };
 }
@@ -156,6 +164,7 @@ function InputCell({
     const isComboPrimary = col.type === 'combobox' && col.__is_primary_combo_input;
     if (isComboPrimary) {
         const { options } = useComboOptions(col.widget_column_id, writeTcId);
+
         return (
             <Select
                 size="small"
@@ -166,19 +175,22 @@ function InputCell({
                 renderValue={(val) => {
                     if (!val) return <span style={{ opacity: 0.6 }}>{placeholder || '—'}</span>;
                     const opt = options.find(o => o.id === val);
-                    return opt ? opt.show.join(' · ') : String(val);
+                    return opt ? buildOptionLabel(opt) : String(val);
                 }}
             >
                 <MenuItem value=""><em>—</em></MenuItem>
                 {options.map(o => (
-                    <MenuItem key={o.id} value={o.id} title={o.showHidden.join(' / ')}>
-                        {o.show.join(' · ')}
+                    <MenuItem
+                        key={o.id}
+                        value={o.id}
+                        title={o.showHidden.join(' / ')}
+                    >
+                        {buildOptionLabel(o)}
                     </MenuItem>
                 ))}
             </Select>
         );
     }
-
 
     return (
         <TextField
@@ -206,14 +218,18 @@ function isSameComboGroup(a: ExtCol, b: ExtCol): boolean {
     );
 }
 
-/** Хелпер: найти первичную колонку в combobox-группе (где Select) */
+/** Хелпер: найти первичную колонку в combobox-группе (где Select / drill) */
 function pickPrimaryCombo(cols: ExtCol[]): ExtCol {
     const primary = cols.find(c => c.__is_primary_combo_input);
     return primary ?? cols[0];
 }
 
 /** Хелпер: взять показанное значение для визуальной колонки */
-function getShown(valIndexByKey: Map<string, number>, rowValues: (string | number | null)[], col: ExtCol) {
+function getShown(
+    valIndexByKey: Map<string, number>,
+    rowValues: (string | number | null)[],
+    col: ExtCol,
+) {
     const key = `${col.widget_column_id}:${col.table_column_id ?? -1}`;
     const idx = valIndexByKey.get(key);
     const shownVal = idx != null ? rowValues[idx] : '';
@@ -233,7 +249,8 @@ function getWriteTcIdForComboGroup(group: ExtCol[]): number | null {
     return null;
 }
 
-/** 👇 Новый компонент: отображение combobox в режиме редактирования с учётом editDraft */
+/** Отображение combobox в режиме редактирования с учётом editDraft */
+/** Отображение combobox в режиме редактирования с учётом editDraft */
 type ComboEditDisplayProps = {
     group: ExtCol[];
     row: FormDisplay['data'][number];
@@ -262,34 +279,69 @@ const ComboEditDisplay: React.FC<ComboEditDisplayProps> = ({
     const primary = pickPrimaryCombo(group);
     const writeTcId = (primary.__write_tc_id ?? primary.table_column_id) ?? null;
 
-    const { options } = useComboOptions(primary.widget_column_id, writeTcId ?? null, comboReloadToken ?? 0);
+    const { options } = useComboOptions(
+        primary.widget_column_id,
+        writeTcId ?? null,
+        comboReloadToken ?? 0,
+    );
 
     const draftId = writeTcId != null ? editDraft[writeTcId] : '';
 
     let display: string;
 
     if (draftId) {
-        // 1) пробуем найти красивую подпись по draftId
+        // 1) Есть draftId → пробуем красиво отрисовать по options
         if (options.length) {
             const opt = options.find(o => o.id === draftId);
             if (opt) {
-                display = opt.show.join(' · ');
+                display = buildOptionLabel(opt);
             } else {
-                // пока опция не найдена (например, только что переименовали) — хотя бы сам ID
                 display = draftId;
             }
         } else {
-            // options ещё грузятся — тоже показываем ID, чтобы было видно, что значение уже выбрано
+            // options ещё грузятся — хотя бы покажем ID
             display = draftId;
         }
     } else {
-        // 2) draftId ещё нет → старое значение из row.values
-        const shownParts = group
+        // 2) draftId нет → пытаемся понять, какая опция сейчас стоит по тексту из row.values
+        const viewParts = group
             .map(gcol => getShown(valueIndexByKey, row.values, gcol))
             .filter(Boolean);
-        display = shownParts.length
-            ? shownParts.map(formatCellValue).join(' · ')
-            : '—';
+        const viewLabel = viewParts.length
+            ? viewParts.map(formatCellValue).join(' · ')
+            : '';
+
+        if (options.length && viewLabel) {
+            const normalizedView = viewLabel.trim();
+            let matched: ComboOption | undefined;
+
+            for (const opt of options) {
+                const full = buildOptionLabel(opt).trim();
+                const hidden = (opt.showHidden ?? []).join(' · ').trim();
+
+                if (!full && !hidden) continue;
+
+                if (
+                    full === normalizedView ||
+                    hidden === normalizedView ||
+                    full.endsWith(` · ${normalizedView}`) ||
+                    normalizedView.endsWith(` · ${hidden}`)
+                ) {
+                    matched = opt;
+                    break;
+                }
+            }
+
+            if (matched) {
+                // 👉 всегда показываем полный label из show + show_hidden
+                display = buildOptionLabel(matched);
+            } else {
+                display = viewLabel || '—';
+            }
+        } else {
+            // нет options — просто показываем как есть из row.values
+            display = viewLabel || '—';
+        }
     }
 
     const clickable = primary.form_id != null && !!onOpenDrill;
@@ -332,9 +384,7 @@ const ComboEditDisplay: React.FC<ComboEditDisplayProps> = ({
 };
 
 
-
 export const MainTable: React.FC<Props> = (p) => {
-
     const stableRows = React.useMemo(() => {
         // копия, чтобы не мутировать исходный массив
         const copy = [...p.filteredRows];
@@ -466,7 +516,7 @@ export const MainTable: React.FC<Props> = (p) => {
                 )}
 
                 {/* ───────── Основные строки ───────── */}
-                {stableRows.map(({ row, idx: rowIdx }) => {   // 👈 тут вместо p.filteredRows
+                {stableRows.map(({ row, idx: rowIdx }) => {
                     const isEditing = p.editingRowIdx === rowIdx;
                     const rowKey = p.pkToKey(row.primary_keys);
 
@@ -510,7 +560,7 @@ export const MainTable: React.FC<Props> = (p) => {
                                                         valueIndexByKey={p.valueIndexByKey}
                                                         editDraft={p.editDraft}
                                                         onOpenDrill={p.onOpenDrill}
-                                                        comboReloadToken={p.comboReloadToken} // 👈 вот это
+                                                        comboReloadToken={p.comboReloadToken}
                                                     />
                                                 </td>
                                             );
