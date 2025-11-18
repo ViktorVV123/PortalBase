@@ -249,20 +249,45 @@ export function useMainCrud({
         try {
             // 1) Собираем список ВСЕХ write_tc_id из плоских колонок (уникально)
             const allWriteIds: number[] = [];
+            const comboWriteIds = new Set<number>(); // 👈 запоминаем combobox-поля
             const seen = new Set<number>();
+
             flatColumnsInRenderOrder.forEach((c) => {
                 const w = (c.__write_tc_id ?? c.table_column_id) ?? null;
-                if (w != null && !seen.has(w)) { seen.add(w); allWriteIds.push(w); }
+                if (w != null && !seen.has(w)) {
+                    seen.add(w);
+                    allWriteIds.push(w);
+
+                    if (c.type === 'combobox') {
+                        comboWriteIds.add(w);
+                    }
+                }
             });
 
-            // 2) Формируем values без фильтра: пустые строки тоже отправляем
-            const values = allWriteIds.map((tcId) => ({
-                table_column_id: tcId,
-                value: String(draft[tcId] ?? ''), // бек сам применит default, если надо
-            }));
+            // 2) Формируем values:
+            //    - для combobox: пустое → null
+            //    - для остальных: как раньше, пустое → ''
+            const values = allWriteIds.map((tcId) => {
+                const raw = draft[tcId];
+                const isCombo = comboWriteIds.has(tcId);
+
+                let value: string;
+
+                if (isCombo && (raw == null || raw === '')) {
+                    // 👇 отправляем именно строку "null"
+                    value = 'null';
+                } else {
+                    value = String(raw ?? '');
+                }
+
+                return {
+                    table_column_id: tcId,
+                    value,
+                };
+            });
 
             log('submitAdd → allWriteIds', allWriteIds);
-            log('submitAdd → values[] (no filter)', values);
+            log('submitAdd → values[] (with null for empty combobox)', values);
 
             const body = { pk: { primary_keys: {} as Record<string, string> }, values };
             const url = `/data/${pf.formId}/${selectedWidget.id}`;
@@ -273,6 +298,7 @@ export function useMainCrud({
             } catch (err: any) {
                 const status = err?.response?.status;
                 const detail = err?.response?.data?.detail ?? err?.response?.data ?? err?.message;
+
                 if (status === 404 && String(detail).includes('Insert query not found')) {
                     alert('Для этой таблицы не настроен INSERT QUERY. Задайте его в метаданных таблицы.');
                     return;
@@ -280,7 +306,16 @@ export function useMainCrud({
                 if (status === 404) {
                     await api.post(`${url}/`, body);
                 } else if (status === 422) {
-                    alert('Не удалось добавить строку (422). Проверь тело: { pk: { primary_keys: {} }, values: [...] }');
+                    // 👇 Лог в консоль, чтобы увидеть, ЧТО именно не нравится бэку
+                    console.error('[submitAdd] 422 от бэка', {
+                        detail,
+                        body,
+                    });
+
+                    alert(
+                        `Не удалось добавить строку (422).\n` +
+                        `detail: ${typeof detail === 'string' ? detail : JSON.stringify(detail)}`
+                    );
                     return;
                 } else {
                     throw err;
@@ -309,6 +344,7 @@ export function useMainCrud({
         reloadTree,
         flatColumnsInRenderOrder,
     ]);
+
 
 
     // ───────── Редактирование ─────────
