@@ -275,13 +275,14 @@ export const TopComponent: React.FC<Props> = (props) => {
                     onClose={() => setEditModalOpen(false)}
                     defaultName={selectedWS.name}
                     defaultDescription={selectedWS.description}
-                    onSubmit={async ({ name, description }) => {
+                    defaultGroup={selectedWS.group}
+                    onSubmit={async ({ name, description,group }) => {
                         try {
                             await api.patch(`/workspaces/${selectedWS.id}`, {
                                 name,
                                 description,
                                 connection_id: selectedWS.connection_id ?? 0,
-                                group: selectedWS.group ?? 'default',
+                                group
                             });
                             await loadWorkSpaces();
                             setEditModalOpen(false);

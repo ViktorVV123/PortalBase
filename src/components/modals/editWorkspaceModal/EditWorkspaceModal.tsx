@@ -13,9 +13,10 @@ import {dark} from "@/shared/themeUI/themeModal/ThemeModalUI";
 type Props = {
     open: boolean;
     onClose: () => void;
-    onSubmit: (form: { name: string; description: string }) => void;
+    onSubmit: (form: { name: string; description: string, group:string }) => void;
     defaultName: string;
     defaultDescription: string;
+    defaultGroup:string
 };
 
 
@@ -25,15 +26,18 @@ export const EditWorkspaceModal: React.FC<Props> = ({
                                                         onClose,
                                                         onSubmit,
                                                         defaultName,
-                                                        defaultDescription
+                                                        defaultDescription,
+                                                        defaultGroup
                                                     }) => {
     const [name, setName] = useState(defaultName);
     const [description, setDescription] = useState(defaultDescription);
+    const [group, setGroup] = useState(defaultGroup);
 
     useEffect(() => {
         if (open) {
             setName(defaultName);
             setDescription(defaultDescription);
+            setGroup(defaultGroup);
         }
     }, [open, defaultName, defaultDescription]);
 
@@ -56,10 +60,17 @@ export const EditWorkspaceModal: React.FC<Props> = ({
                     value={description}
                     onChange={e => setDescription(e.target.value)}
                 />
+                <TextField
+                    fullWidth
+                    margin="dense"
+                    label="Группы"
+                    value={group}
+                    onChange={e => setGroup(e.target.value)}
+                />
             </DialogContent>
             <DialogActions>
                 <Button onClick={onClose}>Отмена</Button>
-                <Button onClick={() => onSubmit({ name, description })} variant="contained">Сохранить</Button>
+                <Button onClick={() => onSubmit({ name, description,group })} variant="contained">Сохранить</Button>
             </DialogActions>
         </Dialog>
         </ThemeProvider>
