@@ -58,6 +58,7 @@ export type EditState = {
     ref_placeholder: string;
     ref_visible: boolean;
     ref_readOnly: boolean;
+    ref_datatype: string | null;
 };
 
 export type AddDlgState = {

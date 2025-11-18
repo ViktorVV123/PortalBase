@@ -3,9 +3,11 @@ import { MenuItem, Select, TextField } from '@mui/material';
 import * as s from '@/components/setOfTables/SetOfTables.module.scss';
 import EditIcon from '@/assets/image/EditIcon.svg';
 import DeleteIcon from '@/assets/image/DeleteIcon.svg';
+import LockIcon from '@/assets/image/LockIcon.svg';
 import type { FormDisplay } from '@/shared/hooks/useWorkSpaces';
 import { api } from '@/services/api';
 import { formatCellValue } from '@/shared/utils/cellFormat';
+
 
 // Расширенная колонка из useHeaderPlan (там добавляем служебные поля)
 type ExtCol = FormDisplay['columns'][number] & {
@@ -441,6 +443,28 @@ export const MainTable: React.FC<Props> = (p) => {
         return copy;
     }, [p.filteredRows]);
 
+    const rlsMeta = React.useMemo(() => {
+        const col = p.flatColumnsInRenderOrder.find(c => c.type === 'rls');
+        if (!col) return null;
+
+        const key = `${col.widget_column_id}:${col.table_column_id ?? -1}`;
+        const idx = p.valueIndexByKey.get(key);
+
+        if (idx == null) return null;
+        return { col, idx };
+    }, [p.flatColumnsInRenderOrder, p.valueIndexByKey]);
+
+    // 👉 Правило "строка под RLS?"
+    const isRlsLockedValue = (val: unknown): boolean => {
+        if (val == null) return false;
+        if (typeof val === 'boolean') return val;
+        if (typeof val === 'number') return val !== 0;
+
+        const s = String(val).trim().toLowerCase();
+        return s === '1' || s === 'true' || s === 'да' || s === 'yes';
+    };
+
+
     return (
         <div className={s.tableScroll}>
             <table className={s.tbl}>
@@ -552,6 +576,9 @@ export const MainTable: React.FC<Props> = (p) => {
                     const isEditing = p.editingRowIdx === rowIdx;
                     const rowKey = p.pkToKey(row.primary_keys);
 
+                    const isRowLocked =
+                        rlsMeta != null ? isRlsLockedValue(row.values[rlsMeta.idx]) : false;
+
                     return (
                         <tr
                             key={rowKey}  // фиксированный ключ по первичному ключу
@@ -559,7 +586,7 @@ export const MainTable: React.FC<Props> = (p) => {
                             aria-selected={p.selectedKey === rowKey || undefined}
                             onClick={() => {
                                 if (isEditing) return;
-                                p.onRowClick({ row, idx: rowIdx });
+                                p.onRowClick({row, idx: rowIdx});
                             }}
                         >
                             {(() => {
@@ -584,7 +611,7 @@ export const MainTable: React.FC<Props> = (p) => {
                                                 <td
                                                     key={`edit-combo-${primary.widget_column_id}:${writeTcId}`}
                                                     colSpan={span}
-                                                    style={{ textAlign: 'center' }}
+                                                    style={{textAlign: 'center'}}
                                                 >
                                                     <ComboEditDisplay
                                                         group={group}
@@ -660,7 +687,7 @@ export const MainTable: React.FC<Props> = (p) => {
 
                                     if (isEditing) {
                                         cells.push(
-                                            <td key={`edit-${visKey}`} style={{ textAlign: 'center' }}>
+                                            <td key={`edit-${visKey}`} style={{textAlign: 'center'}}>
                                                 <InputCell
                                                     mode="edit"
                                                     col={col}
@@ -719,26 +746,36 @@ export const MainTable: React.FC<Props> = (p) => {
                                 return cells;
                             })()}
 
-                            <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
+                            <td style={{textAlign: 'center', whiteSpace: 'nowrap'}}>
                                 {isEditing ? (
                                     (() => {
-                                        const hasEditable = p.flatColumnsInRenderOrder.some(
-                                            c => c.visible !== false && !p.isColReadOnly(c)
-                                        );
+                                        // если строка залочена — вообще не даём сохранить
+                                        const hasEditable =
+                                            !isRowLocked &&
+                                            p.flatColumnsInRenderOrder.some(
+                                                c => c.visible !== false && !p.isColReadOnly(c),
+                                            );
+
                                         return (
                                             <>
                                                 {hasEditable && (
                                                     <button
-                                                        onClick={(e) => { e.stopPropagation(); p.onSubmitEdit(); }}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            p.onSubmitEdit();
+                                                        }}
                                                         disabled={p.editSaving}
                                                     >
                                                         {p.editSaving ? 'Сохр...' : '✓'}
                                                     </button>
                                                 )}
                                                 <button
-                                                    onClick={(e) => { e.stopPropagation(); p.onCancelEdit(); }}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        p.onCancelEdit();
+                                                    }}
                                                     disabled={p.editSaving}
-                                                    style={{ marginLeft: hasEditable ? 8 : 0 }}
+                                                    style={{marginLeft: hasEditable ? 8 : 0}}
                                                 >
                                                     х
                                                 </button>
@@ -747,33 +784,70 @@ export const MainTable: React.FC<Props> = (p) => {
                                     })()
                                 ) : (
                                     <>
-                                        <button
-                                            type="button"
-                                            style={{ background: 'none', border: 0, cursor: 'pointer', marginRight: 10 }}
-                                            onClick={(e) => { e.stopPropagation(); p.onStartEdit(rowIdx); }}
-                                            title="Редактировать"
-                                        >
-                                            <EditIcon className={s.actionIcon} />
-                                        </button>
+                                        {/* EDIT */}
                                         <button
                                             type="button"
                                             style={{
                                                 background: 'none',
                                                 border: 0,
-                                                cursor: 'pointer',
-                                                opacity: p.deletingRowIdx === rowIdx ? 0.6 : 1,
+                                                cursor: isRowLocked ? 'not-allowed' : 'pointer',
+                                                marginRight: 10,
+                                                opacity: isRowLocked ? 0.4 : 1,
                                             }}
                                             onClick={(e) => {
                                                 e.stopPropagation();
+                                                if (isRowLocked) return;
+                                                p.onStartEdit(rowIdx);
+                                            }}
+                                            title={isRowLocked ? 'Редактирование запрещено (RLS)' : 'Редактировать'}
+                                        >
+                                            <EditIcon style={{
+                                                pointerEvents: isRowLocked ? 'none' : 'auto',
+                                            }} className={s.actionIcon}/>
+                                        </button>
+
+                                        {/* DELETE */}
+                                        <button
+                                            type="button"
+                                            style={{
+                                                background: 'none',
+                                                border: 0,
+                                                cursor: isRowLocked ? 'not-allowed' : 'pointer',
+                                                opacity: isRowLocked || p.deletingRowIdx === rowIdx ? 0.6 : 1,
+                                            }}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                if (isRowLocked) return;
                                                 if (p.deletingRowIdx == null) p.onDeleteRow(rowIdx);
                                             }}
-                                            title="Удалить"
+                                            title={isRowLocked ? 'Удаление запрещено (RLS)' : 'Удалить'}
                                         >
-                                            <DeleteIcon className={s.actionIcon} />
+                                            <DeleteIcon style={{
+                                                pointerEvents: isRowLocked ? 'none' : 'auto',
+                                            }} className={s.actionIcon}/>
                                         </button>
+
+                                        {/* 🔒 замочек только на залоченных строках */}
+                                        {isRowLocked && (
+                                            <span
+                                                style={{
+                                                    marginLeft: 8,
+                                                    fontSize: 14,
+                                                    opacity: 0.8,
+                                                    verticalAlign: 'middle',
+                                                    cursor: isRowLocked ? 'not-allowed' : 'pointer',
+
+                                                }}
+                                                title="Строка защищена политикой RLS"
+                                            >
+                    <LockIcon   style={{ pointerEvents: 'none' }} className={s.actionIcon}/>
+                </span>
+                                        )}
                                     </>
                                 )}
                             </td>
+
+
                         </tr>
                     );
                 })}

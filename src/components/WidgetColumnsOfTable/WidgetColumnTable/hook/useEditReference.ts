@@ -34,6 +34,8 @@ export function useEditReference({
         ref_placeholder: '',
         ref_visible: true,
         ref_readOnly: false,
+
+        ref_datatype:null
     });
 
     const openEditById = useCallback((wcId: number, tableColumnId: number) => {
@@ -54,6 +56,7 @@ export function useEditReference({
             ref_placeholder: current.placeholder ?? '',
             ref_visible: current.visible ?? true,
             ref_readOnly: !!current.readonly,
+            ref_datatype: (current.table_column as any)?.datatype ?? null,
         });
     }, [localRefsRef]);
 
