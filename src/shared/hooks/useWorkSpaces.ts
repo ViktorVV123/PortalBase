@@ -736,42 +736,44 @@ export const useWorkSpaces = () => {
     const [subLoading, setSubLoading] = useState(false);
     const [subError, setSubError] = useState<string | null>(null);
 
+    // useWorkSpaces.ts
+
     const loadSubDisplay = useCallback(
-        /**
-         * primary — опционален: {} → БЕЗ фильтра.
-         */
-        async (
-            formId: number,
-            subOrder: number,
-            primary: Record<string, unknown> = {},   // ← default
-        ) => {
+        async (formId: number, subOrder: number, primary?: Record<string, unknown>) => {
+            if (!formId) return;
+
             setSubLoading(true);
             setSubError(null);
+
             try {
-                const {data} = await api.post<SubDisplay>(
-                    `/display/${formId}/sub`,
-                    {primary_keys: primary},
-                    {params: {sub_widget_order: subOrder}},
+                const params = new URLSearchParams({ sub_widget_order: String(subOrder) });
+
+                const body =
+                    primary && Object.keys(primary).length
+                        ? {
+                            primary_keys: Object.fromEntries(
+                                Object.entries(primary).map(([k, v]) => [k, v == null ? '' : String(v)])
+                            ),
+                        }
+                        : {};
+
+                const { data } = await api.post<SubDisplay>(`/display/${formId}/sub?${params}`, body);
+                setSubDisplay(data);
+            } catch (e: any) {
+                console.error('[useWorkSpaces][loadSubDisplay] error:', e);
+                setSubError(
+                    typeof e?.message === 'string'
+                        ? e.message
+                        : 'Ошибка загрузки подформы (subDisplay)'
                 );
-
-
-                /* сортируем заголовки */
-                const sorted = {
-                    ...data, sub_widgets: [...data.sub_widgets].sort(
-                        (a, b) => a.widget_order - b.widget_order
-                    )
-                };
-
-                setSubDisplay(sorted);
-
-            } catch {
-                setSubError('Не удалось загрузить данные sub-виджета');
+                setSubDisplay(null);
             } finally {
                 setSubLoading(false);
             }
         },
-        [],
+        []
     );
+
     /* --- новое состояние --- */
     const [formDisplay, setFormDisplay] = useState<FormDisplay | null>(null);
     const [formLoading, setFormLoading] = useState(false);
