@@ -2,6 +2,7 @@ import React, {useMemo, useState} from 'react';
 import {Checkbox, Menu, MenuItem, IconButton, Tooltip} from '@mui/material';
 import DeleteIcon from '@/assets/image/DeleteIcon.svg';
 import EditIcon from '@/assets/image/EditIcon.svg';
+import SwipeIcon from '@/assets/image/SwipeIcon.svg';
 import * as s from '@/components/setOfTables/SetOfTables.module.scss';
 import type {ComboItem, RefItem} from '../types';
 import {toFullPatch} from '../ref-helpers';
@@ -38,9 +39,9 @@ export type RefRowProps = {
         srcWcId: number,
         fromIdx: number,
         tableColumnId: number
-    ) => (e: React.DragEvent<HTMLTableRowElement>) => void;
+    ) => (e: React.DragEvent<HTMLElement>) => void;
     onDragEnd: () => void;
-    onDropRow: (dstWcId: number, toIdx: number) => (e: React.DragEvent<HTMLTableRowElement>) => void;
+    onDropRow: (dstWcId: number, toIdx: number) => (e: React.DragEvent<HTMLElement>) => void;
 
     // локальный стейт + синк
     setLocalRefs: React.Dispatch<React.SetStateAction<Record<number, RefItem[]>>>;
@@ -74,8 +75,6 @@ export const RefRow: React.FC<RefRowProps> = ({
     const type = r.type ?? '—';
     const visible = r.visible ?? true;
 
-
-    // combobox список
     const comboItems: ComboItem[] = useMemo(() => {
         const raw = Array.isArray((r as any).combobox) ? ((r as any).combobox as ComboItem[]) : [];
         return [...raw].sort((a: any, b: any) => {
@@ -89,18 +88,18 @@ export const RefRow: React.FC<RefRowProps> = ({
     const hasCombos = comboItems.length > 0;
     const iconFill = hasCombos ? '#f8f8f8' : '#757474';
 
-    // ключ версии — учитывает nested id
     const comboKey = useMemo(() => {
         const raw = Array.isArray((r as any).combobox) ? ((r as any).combobox as ComboItem[]) : [];
         return raw
             .map((it: any, idx: number) => {
                 const id = comboIdOf(it, idx);
-                return `${id}:${it.combobox_alias ?? ''}:${it.combobox_column_order ?? 0}:${it.is_primary ? 1 : 0}:${it.is_show ? 1 : 0}:${it.is_show_hidden ? 1 : 0}`;
+                return `${id}:${it.combobox_alias ?? ''}:${it.combobox_column_order ?? 0}:${
+                    it.is_primary ? 1 : 0
+                }:${it.is_show ? 1 : 0}:${it.is_show_hidden ? 1 : 0}`;
             })
             .join('|');
     }, [(r as any).combobox]);
 
-    // меню
     const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
     const menuOpen = Boolean(menuAnchor);
 
@@ -115,9 +114,7 @@ export const RefRow: React.FC<RefRowProps> = ({
         closeMenu();
     };
 
-    // Удаление по combobox_column.id
     const deleteComboItem = async (comboId: number) => {
-        // оптимистично — убрать из локального стора по nested id
         setLocalRefs(prev => {
             const list = prev[wcId] ?? [];
             const updated = list.map(row => {
@@ -140,23 +137,34 @@ export const RefRow: React.FC<RefRowProps> = ({
             await api.delete(`/widgets/tables/references/${wcId}/${tblColId}/${comboId}`);
             closeMenu();
         } catch (e) {
-            // мягкий откат — вернёмся к снапшоту
             const snapshot = localRefsRef.current;
             setLocalRefs(prev => ({...prev, [wcId]: snapshot[wcId] ?? prev[wcId]}));
             console.warn('[RefRow] DELETE combobox failed:', e);
         }
     };
 
+    const rowIndex = getIdxById(wcId, tblColId);
+
     return (
         <tr
             key={`${wcId}:${tblColId}`}
-            draggable
-            onDragStart={onDragStart(wcId, getIdxById(wcId, tblColId), tblColId)}
-            onDragEnd={onDragEnd}
-            onDrop={onDropRow(wcId, getIdxById(wcId, tblColId))}
-            style={{cursor: 'move'}}
+            onDrop={onDropRow(wcId, rowIndex)}
         >
-            <td style={{textAlign: 'center', opacity: 0.6}}>⋮⋮</td>
+            {/* drag-handle */}
+            <td
+                style={{
+                    textAlign: 'center',
+                    opacity: 0.6,
+                    cursor: 'grab',
+                    width: 24,
+                }}
+                draggable
+                onDragStart={onDragStart(wcId, rowIndex, tblColId)}
+                onDragEnd={onDragEnd}
+            >
+               <SwipeIcon/>
+            </td>
+
             <td>{tblCol?.name ?? '—'}</td>
             <td>{r.ref_alias ?? '—'}</td>
             <td>{type}</td>
@@ -175,26 +183,29 @@ export const RefRow: React.FC<RefRowProps> = ({
                         checked={!!r.readonly}
                         onChange={async (e) => {
                             const nextVal = e.target.checked;
-                            setLocalRefs((prev) => ({
+                            setLocalRefs(prev => ({
                                 ...prev,
-                                [wcId]: (prev[wcId] ?? []).map((item) =>
+                                [wcId]: (prev[wcId] ?? []).map(item =>
                                     item.table_column?.id === tblColId ? {...item, readonly: nextVal} : item
                                 ),
                             }));
                             try {
-                                const currentRow = (localRefsRef.current[wcId] ?? []).find((x) => x.table_column?.id === tblColId);
+                                const currentRow = (localRefsRef.current[wcId] ?? []).find(
+                                    x => x.table_column?.id === tblColId,
+                                );
                                 if (currentRow) {
-                                    await callUpdateReference(wcId, tblColId, toFullPatch({
-                                        ...currentRow,
-                                        readonly: nextVal
-                                    }));
+                                    await callUpdateReference(
+                                        wcId,
+                                        tblColId,
+                                        toFullPatch({...currentRow, readonly: nextVal}),
+                                    );
                                 } else {
                                     await callUpdateReference(wcId, tblColId, {readonly: nextVal});
                                 }
                             } catch {
-                                setLocalRefs((prev) => ({
+                                setLocalRefs(prev => ({
                                     ...prev,
-                                    [wcId]: (prev[wcId] ?? []).map((item) =>
+                                    [wcId]: (prev[wcId] ?? []).map(item =>
                                         item.table_column?.id === tblColId ? {...item, readonly: !nextVal} : item
                                     ),
                                 }));
@@ -223,26 +234,29 @@ export const RefRow: React.FC<RefRowProps> = ({
                         onChange={async (e) => {
                             const nextVal = e.target.checked;
                             if (visible === nextVal) return;
-                            setLocalRefs((prev) => ({
+                            setLocalRefs(prev => ({
                                 ...prev,
-                                [wcId]: (prev[wcId] ?? []).map((item) =>
+                                [wcId]: (prev[wcId] ?? []).map(item =>
                                     item.table_column?.id === tblColId ? {...item, visible: nextVal} : item
                                 ),
                             }));
                             try {
-                                const currentRow = (localRefsRef.current[wcId] ?? []).find((x) => x.table_column?.id === tblColId);
+                                const currentRow = (localRefsRef.current[wcId] ?? []).find(
+                                    x => x.table_column?.id === tblColId,
+                                );
                                 if (currentRow) {
-                                    await callUpdateReference(wcId, tblColId, toFullPatch({
-                                        ...currentRow,
-                                        visible: nextVal
-                                    }));
+                                    await callUpdateReference(
+                                        wcId,
+                                        tblColId,
+                                        toFullPatch({...currentRow, visible: nextVal}),
+                                    );
                                 } else {
                                     await callUpdateReference(wcId, tblColId, {visible: nextVal});
                                 }
                             } catch {
-                                setLocalRefs((prev) => ({
+                                setLocalRefs(prev => ({
                                     ...prev,
-                                    [wcId]: (prev[wcId] ?? []).map((item) =>
+                                    [wcId]: (prev[wcId] ?? []).map(item =>
                                         item.table_column?.id === tblColId ? {...item, visible: !nextVal} : item
                                     ),
                                 }));
@@ -254,7 +268,7 @@ export const RefRow: React.FC<RefRowProps> = ({
 
             <td>{r.ref_column_order ?? 0}</td>
 
-            {/* Combobox — меню с редактированием и удалением (по combobox_column.id) */}
+            {/* Combobox меню */}
             <td
                 onMouseDown={(e) => e.stopPropagation()}
                 onClick={(e) => e.stopPropagation()}
@@ -267,10 +281,10 @@ export const RefRow: React.FC<RefRowProps> = ({
                         title="Открыть список combobox"
                         sx={{color: '#fff', p: 0.5, '&:hover': {backgroundColor: 'rgba(255,255,255,0.08)'}}}
                     >
-                        <svg  width="20" height="20" viewBox="0 0 24 24" fill={iconFill} aria-hidden="true">
-                            <circle cx="5" cy="12" r="2"></circle>
-                            <circle cx="12" cy="12" r="2"></circle>
-                            <circle cx="19" cy="12" r="2"></circle>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill={iconFill} aria-hidden="true">
+                            <circle cx="5" cy="12" r="2" />
+                            <circle cx="12" cy="12" r="2" />
+                            <circle cx="19" cy="12" r="2" />
                         </svg>
                     </IconButton>
 
@@ -284,7 +298,6 @@ export const RefRow: React.FC<RefRowProps> = ({
                         MenuListProps={{dense: true, sx: {bgcolor: '#0f0f0f', color: '#fff'}}}
                         PaperProps={{sx: {bgcolor: '#0f0f0f', color: '#fff', border: '1px solid #444'}}}
                     >
-                        {/* Создать/Добавить */}
                         <MenuItem
                             onClick={() => {
                                 closeMenu();
@@ -299,11 +312,11 @@ export const RefRow: React.FC<RefRowProps> = ({
                         </MenuItem>
 
                         {comboItems.length > 0 && (
-                            <div style={{height: 1, background: '#333', margin: '4px 8px'}}/>
+                            <div style={{height: 1, background: '#333', margin: '4px 8px'}} />
                         )}
 
                         {comboItems.map((it, idx) => {
-                            const id = comboIdOf(it, idx); // ← nested id
+                            const id = comboIdOf(it, idx);
                             const label = (it as any)?.combobox_alias?.trim() || `id:${id}`;
 
                             return (
@@ -320,43 +333,44 @@ export const RefRow: React.FC<RefRowProps> = ({
                                     }}
                                     title={` width:${(it as any)?.combobox_width ?? 1} • id:${id}`}
                                 >
-                  <span onClick={() => {
-                      handlePick(it);
-                  }}>
-                    {label}
-                      {(it as any)?.is_primary}
-                      {(it as any)?.is_show === false}
-                  </span>
+                                    <span onClick={() => handlePick(it)}>
+                                        {label}
+                                        {(it as any)?.is_primary}
+                                        {(it as any)?.is_show === false}
+                                    </span>
 
-                                    <span onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
-                    <Tooltip title="Редактировать">
-                      <IconButton
-                          size="small"
-                          sx={{color: '#fff'}}
-                          onClick={() => {
-                              closeMenu();
-                              onOpenComboItem(wcId, tblColId, it);
-                          }}
-                      >
-                        <EditIcon/>
-                      </IconButton>
-                    </Tooltip>
+                                    <span
+                                        onMouseDown={e => e.stopPropagation()}
+                                        onClick={e => e.stopPropagation()}
+                                    >
+                                        <Tooltip title="Редактировать">
+                                            <IconButton
+                                                size="small"
+                                                sx={{color: '#fff'}}
+                                                onClick={() => {
+                                                    closeMenu();
+                                                    onOpenComboItem(wcId, tblColId, it);
+                                                }}
+                                            >
+                                                <EditIcon />
+                                            </IconButton>
+                                        </Tooltip>
 
-                    <Tooltip title="Удалить">
-                      <IconButton
-                          size="small"
-                          sx={{color: '#fff'}}
-                          onClick={async () => {
-                              closeMenu();
-                              const ok = confirm('Удалить элемент combobox?');
-                              if (!ok) return;
-                              await deleteComboItem(id); // ← удаляем по combobox_column.id
-                          }}
-                      >
-                        <DeleteIcon/>
-                      </IconButton>
-                    </Tooltip>
-                  </span>
+                                        <Tooltip title="Удалить">
+                                            <IconButton
+                                                size="small"
+                                                sx={{color: '#fff'}}
+                                                onClick={async () => {
+                                                    closeMenu();
+                                                    const ok = confirm('Удалить элемент combobox?');
+                                                    if (!ok) return;
+                                                    await deleteComboItem(id);
+                                                }}
+                                            >
+                                                <DeleteIcon />
+                                            </IconButton>
+                                        </Tooltip>
+                                    </span>
                                 </MenuItem>
                             );
                         })}
@@ -364,7 +378,7 @@ export const RefRow: React.FC<RefRowProps> = ({
                 </>
             </td>
 
-            {/* Form (clickable) */}
+            {/* Form */}
             <td
                 onClick={(e) => {
                     e.stopPropagation();
