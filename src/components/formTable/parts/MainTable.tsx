@@ -251,6 +251,7 @@ function getWriteTcIdForComboGroup(group: ExtCol[]): number | null {
 
 /** Отображение combobox в режиме редактирования с учётом editDraft */
 /** Отображение combobox в режиме редактирования с учётом editDraft */
+/** Отображение combobox в режиме редактирования с учётом editDraft */
 type ComboEditDisplayProps = {
     group: ExtCol[];
     row: FormDisplay['data'][number];
@@ -266,6 +267,8 @@ type ComboEditDisplayProps = {
         }
     ) => void;
     comboReloadToken?: number;
+    /** 👉 колбэк, чтобы менять draft по write_tc_id */
+    onChangeDraft: (tcId: number, v: string) => void;
 };
 
 const ComboEditDisplay: React.FC<ComboEditDisplayProps> = ({
@@ -275,6 +278,7 @@ const ComboEditDisplay: React.FC<ComboEditDisplayProps> = ({
                                                                editDraft,
                                                                onOpenDrill,
                                                                comboReloadToken,
+                                                               onChangeDraft,
                                                            }) => {
     const primary = pickPrimaryCombo(group);
     const writeTcId = (primary.__write_tc_id ?? primary.table_column_id) ?? null;
@@ -285,25 +289,32 @@ const ComboEditDisplay: React.FC<ComboEditDisplayProps> = ({
         comboReloadToken ?? 0,
     );
 
+    // есть ли вообще ключ в draft для этого writeTcId
+    const hasDraftKey =
+        writeTcId != null &&
+        Object.prototype.hasOwnProperty.call(editDraft, writeTcId);
+
     const draftId = writeTcId != null ? editDraft[writeTcId] : '';
 
     let display: string;
 
-    if (draftId) {
-        // 1) Есть draftId → пробуем красиво отрисовать по options
-        if (options.length) {
-            const opt = options.find(o => o.id === draftId);
-            if (opt) {
-                display = buildOptionLabel(opt);
+    if (hasDraftKey) {
+        // 👇 пользователь уже вносил изменения (или мы их проставили в startEdit)
+
+        if (!draftId) {
+            // явное пустое значение → показываем пусто
+            display = '—';
+        } else {
+            // есть draftId → пробуем красиво отрисовать по options
+            if (options.length) {
+                const opt = options.find(o => o.id === draftId);
+                display = opt ? buildOptionLabel(opt) : draftId;
             } else {
                 display = draftId;
             }
-        } else {
-            // options ещё грузятся — хотя бы покажем ID
-            display = draftId;
         }
     } else {
-        // 2) draftId нет → пытаемся понять, какая опция сейчас стоит по тексту из row.values
+        // 👇 fallback: ещё ни разу не трогали draft, берём текущий текст из row.values
         const viewParts = group
             .map(gcol => getShown(valueIndexByKey, row.values, gcol))
             .filter(Boolean);
@@ -332,56 +343,77 @@ const ComboEditDisplay: React.FC<ComboEditDisplayProps> = ({
                 }
             }
 
-            if (matched) {
-                // 👉 всегда показываем полный label из show + show_hidden
-                display = buildOptionLabel(matched);
-            } else {
-                display = viewLabel || '—';
-            }
+            display = matched ? buildOptionLabel(matched) : (viewLabel || '—');
         } else {
-            // нет options — просто показываем как есть из row.values
             display = viewLabel || '—';
         }
     }
 
     const clickable = primary.form_id != null && !!onOpenDrill;
 
-    if (!clickable) {
-        return <>{display}</>;
-    }
-
     return (
-        <button
-            type="button"
-            onClick={(e) => {
-                e.stopPropagation();
-                onOpenDrill?.(primary.form_id!, {
-                    originColumnType: 'combobox',
-                    primary: row.primary_keys,
-                    openedFromEdit: true,
-                    targetWriteTcId: writeTcId ?? undefined,
-                });
-                console.debug('[MainTable] drill click (combobox, edit mode)', {
-                    formId: primary.form_id,
-                    widget_column_id: primary.widget_column_id,
-                    table_column_id: primary.table_column_id,
-                    targetWriteTcId: writeTcId,
-                });
-            }}
-            style={{
-                padding: 0,
-                border: 'none',
-                background: 'none',
-                cursor: 'pointer',
-                textDecoration: 'underline',
-                color: 'var(--link,#66b0ff)',
-            }}
-            title={`Открыть форму #${primary.form_id} для выбора значения`}
-        >
-            {display}
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8,justifyContent:'center'}}>
+            {clickable ? (
+                <button
+                    type="button"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenDrill?.(primary.form_id!, {
+                            originColumnType: 'combobox',
+                            primary: row.primary_keys,
+                            openedFromEdit: true,
+                            targetWriteTcId: writeTcId ?? undefined,
+                        });
+                        console.debug('[MainTable] drill click (combobox, edit mode)', {
+                            formId: primary.form_id,
+                            widget_column_id: primary.widget_column_id,
+                            table_column_id: primary.table_column_id,
+                            targetWriteTcId: writeTcId,
+                        });
+                    }}
+                    style={{
+                        padding: 0,
+                        border: 'none',
+                        background: 'none',
+                        cursor: 'pointer',
+                        textDecoration: 'underline',
+                        color: 'var(--link,#66b0ff)',
+                    }}
+                    title={`Открыть форму #${primary.form_id} для выбора значения`}
+                >
+                    {display}
+                </button>
+            ) : (
+                <span >{display}</span>
+            )}
+
+            {writeTcId != null && (
+                <button
+                    type="button"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        // явное очищение: кладём пустую строку в draft
+                        onChangeDraft(writeTcId, '');
+                    }}
+                    title="Очистить значение"
+                    style={{
+                        border: 'none',
+                        background: 'none',
+                        cursor: 'pointer',
+                        opacity: 0.7,
+                        fontSize: 16,
+                        color:'white',
+                    }}
+                >
+                    ×
+                </button>
+            )}
+        </div>
     );
 };
+
+
+
 
 
 export const MainTable: React.FC<Props> = (p) => {
@@ -561,6 +593,7 @@ export const MainTable: React.FC<Props> = (p) => {
                                                         editDraft={p.editDraft}
                                                         onOpenDrill={p.onOpenDrill}
                                                         comboReloadToken={p.comboReloadToken}
+                                                        onChangeDraft={p.onEditDraftChange}   // 👈 вот этого раньше не было
                                                     />
                                                 </td>
                                             );

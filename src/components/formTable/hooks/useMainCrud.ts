@@ -55,20 +55,16 @@ type ComboOption = {
 };
 
 // кэш по ключу wcId:writeTcId
-const comboCache = new Map<string, ComboOption[]>();
+
 
 async function loadComboOptions(widgetColumnId: number, writeTcId: number): Promise<ComboOption[]> {
-    const key = `${widgetColumnId}:${writeTcId}`;
-    const cached = comboCache.get(key);
-    if (cached) return cached;
     const { data } = await api.get<ComboResp>(`/display/combobox/${widgetColumnId}/${writeTcId}`);
-    const options: ComboOption[] = data.data.map(r => ({
+
+    return data.data.map(r => ({
         id: String(r.primary?.[0] ?? ''),
         show: (r.show ?? []).map(v => String(v)),
         showHidden: (r.show_hidden ?? []).map(v => String(v)),
     }));
-    comboCache.set(key, options);
-    return options;
 }
 
 export function useMainCrud({
@@ -449,22 +445,46 @@ export function useMainCrud({
 
             // 1) считаем значения для отправки из editDraft (включая read-only/visible:false)
             const hasDefault = new Set<number>();
+            const comboWriteIds = new Set<number>();
+
             flatColumnsInRenderOrder.forEach((c) => {
                 const w = (c.__write_tc_id ?? c.table_column_id) ?? null;
                 if (w != null && c.default != null) hasDefault.add(w);
+                if (w != null && c.type === 'combobox') comboWriteIds.add(w);
             });
 
+            const getSendingValue = (tcId: number, raw: unknown): string => {
+                const isCombo = comboWriteIds.has(tcId);
+                const s = raw == null ? '' : String(raw);
+
+                if (isCombo && (s === '' || s == null)) {
+                    // 👇 для combobox пустое → строка "null"
+                    return 'null';
+                }
+
+                return s;
+            };
+
             const entries = Object.entries(editDraft).filter(([tcIdStr, v]) => {
-                if (v != null && String(v) !== '') return true;
                 const tcId = Number(tcIdStr);
+                const isCombo = comboWriteIds.has(tcId);
+
+                if (isCombo) {
+                    // combobox ВСЕГДА отправляем, даже если поле пустое (чтобы можно было очистить)
+                    return true;
+                }
+
+                if (v != null && String(v) !== '') return true;
                 return hasDefault.has(tcId); // даже пустое — если колонка имеет default
             });
 
-            const values = entries.map(([tcIdStr, v]) => ({
-                table_column_id: Number(tcIdStr),
-                value: String(v ?? ''),
-            }));
-
+            const values = entries.map(([tcIdStr, v]) => {
+                const tcId = Number(tcIdStr);
+                return {
+                    table_column_id: tcId,
+                    value: getSendingValue(tcId, v),
+                };
+            });
             // 2) body + url
             const body = {
                 pk: { primary_keys: pkObj as Record<string, string> },
@@ -498,7 +518,7 @@ export function useMainCrud({
                         widget_column_id: col.widget_column_id,
                         write_tc_id: writeTcId,
                         shown_before: shownVal == null ? '' : String(shownVal),
-                        sending_value: String(editDraft[writeTcId] ?? ''),
+                        sending_value: getSendingValue(writeTcId, editDraft[writeTcId]),
                     });
                 } else {
                     beforeAfter.push({
