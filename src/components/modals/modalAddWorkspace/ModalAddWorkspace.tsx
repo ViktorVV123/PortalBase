@@ -1,5 +1,5 @@
 /* ModalAddWorkspace.tsx */
-import {ChangeEvent, useState} from 'react';
+import {ChangeEvent, useEffect, useState} from 'react';
 import {
     Dialog, DialogTitle, DialogContent, DialogActions,
     TextField, Button, IconButton,
@@ -13,8 +13,8 @@ import EditIcon from '@/assets/image/EditIcon.svg';
 
 import {api} from '@/services/api';
 import {Connection} from '@/types/typesConnection';
-import * as styles from './ModalAddWorkspace.module.scss'
-import {dark} from "@/shared/themeUI/themeModal/ThemeModalUI";
+import * as styles from './ModalAddWorkspace.module.scss';
+import {dark} from '@/shared/themeUI/themeModal/ThemeModalUI';
 
 /** Если у твоего Connection уже есть эти поля — отдельный тип не нужен */
 type ConnectionItem = Connection & {
@@ -36,8 +36,6 @@ type Props = {
     setShowConnForm: (v: boolean) => void;
     open: boolean;
     deleteConnection: (id: number) => void;
-
-    /** ⬅️ добавили: проброс колбэка редактирования */
     onEditConnection?: (conn: ConnectionItem) => void;
 };
 
@@ -48,17 +46,16 @@ export const ModalAddWorkspace = ({
                                       onCancel,
                                       setShowConnForm,
                                       open,
-                                      onEditConnection,   // ⬅️ принимаем
+                                      onEditConnection,
                                   }: Props) => {
-
-    // Делаем connection_id типом number | '' чтобы Select работал без warning'ов
+    // Изначально выбираем ПОСЛЕДНЕЕ подключение
     const [form, setForm] = useState<{
         connection_id: any;
         group: string;
         name: string;
         description: string;
     }>({
-        connection_id: connections[0]?.id ?? '',
+        connection_id: connections[connections.length - 1]?.id ?? '',
         group: '',
         name: '',
         description: '',
@@ -67,22 +64,45 @@ export const ModalAddWorkspace = ({
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+    // 👉 Ключевой эффект: при изменении списка connections
+    // автоматически выбираем последнее подключение
+    useEffect(() => {
+        if (!connections.length) {
+            setForm(prev => ({ ...prev, connection_id: '' }));
+            return;
+        }
+
+        const lastId = connections[connections.length - 1]?.id;
+        if (lastId == null) return;
+
+        setForm(prev => {
+            // если уже выбран lastId — ничего не меняем, чтобы не дергать лишние рендеры
+            if (prev.connection_id === lastId) return prev;
+            return { ...prev, connection_id: lastId };
+        });
+    }, [connections]);
+
     const handle = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
         setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
 
     const handleSelect = (e: SelectChangeEvent) => {
         const val = e.target.value;
-        setForm(prev => ({ ...prev, connection_id: val === '' ? '' : Number(val) }));
+        setForm(prev => ({
+            ...prev,
+            connection_id: val === '' ? '' : Number(val),
+        }));
     };
 
     const submit = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
             setLoading(true);
-            // backend ожидает число — проверим
             const payload = {
                 ...form,
-                connection_id: typeof form.connection_id === 'number' ? form.connection_id : undefined,
+                connection_id:
+                    typeof form.connection_id === 'number'
+                        ? form.connection_id
+                        : undefined,
             };
             await api.post('/workspaces/', payload);
             onSuccess();
@@ -94,16 +114,16 @@ export const ModalAddWorkspace = ({
     };
 
     const handleDeleteConn = async (e: React.MouseEvent, id: number) => {
-        e.stopPropagation();   // ⬅️ не даём Select выбрать пункт
+        e.stopPropagation();
         e.preventDefault();
         if (!confirm('Удалить подключение?')) return;
         await deleteConnection(id);
     };
 
     const handleEditConn = (e: React.MouseEvent, conn: ConnectionItem) => {
-        e.stopPropagation();   // ⬅️ не даём Select выбрать пункт
+        e.stopPropagation();
         e.preventDefault();
-        onEditConnection?.(conn);  // ⬅️ дергаем внешний колбэк (Main откроет модалку)
+        onEditConnection?.(conn);
     };
 
     return (
@@ -121,13 +141,19 @@ export const ModalAddWorkspace = ({
                                     labelId="conn-label"
                                     name="connection_id"
                                     label="Подключение"
-                                    value={form.connection_id}         // ⬅️ значение number | ''
+                                    value={form.connection_id}
                                     onChange={handleSelect}
                                     renderValue={(value) => {
-                                        // value тут может быть number | '' | unknown
-                                        const id = typeof value === 'number' ? value : Number(value);
+                                        const id =
+                                            typeof value === 'number'
+                                                ? value
+                                                : Number(value);
                                         const conn = connections.find(c => c.id === id);
-                                        return conn ? (conn.name ?? conn.connection?.name ?? `#${id}`) : '';
+                                        return conn
+                                            ? (conn.name ??
+                                                conn.connection?.name ??
+                                                `#${id}`)
+                                            : '';
                                     }}
                                     required
                                 >
@@ -135,36 +161,86 @@ export const ModalAddWorkspace = ({
                                         <MenuItem
                                             key={c.id}
                                             value={c.id}
-                                            style={{ display: 'flex', flexDirection: 'column' }}
+                                            style={{
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                            }}
                                         >
-                      <span style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                        <span>{c.name ?? c.connection?.name ?? `#${c.id}`}</span>
-                          {/* КНОПКИ ДЕЙСТВИЙ: СТОПАЕМ СОБЫТИЯ */}
-                          <IconButton size="small" onClick={(e) => handleEditConn(e, c)} title="Редактировать">
-                          <EditIcon />
-                        </IconButton>
-                        <IconButton size="small" onClick={(e) => handleDeleteConn(e, c.id)} title="Удалить">
-                          <DeleteIcon />
-                        </IconButton>
-                      </span>
+                                            <span
+                                                style={{
+                                                    display: 'flex',
+                                                    gap: 10,
+                                                    alignItems: 'center',
+                                                }}
+                                            >
+                                                <span>
+                                                    {c.name ??
+                                                        c.connection?.name ??
+                                                        `#${c.id}`}
+                                                </span>
+                                                <IconButton
+                                                    size="small"
+                                                    onClick={(e) =>
+                                                        handleEditConn(e, c)
+                                                    }
+                                                    title="Редактировать"
+                                                >
+                                                    <EditIcon />
+                                                </IconButton>
+                                                <IconButton
+                                                    size="small"
+                                                    onClick={(e) =>
+                                                        handleDeleteConn(
+                                                            e,
+                                                            c.id,
+                                                        )
+                                                    }
+                                                    title="Удалить"
+                                                >
+                                                    <DeleteIcon />
+                                                </IconButton>
+                                            </span>
 
-                                            <span className={styles.descriptionModal}>
-                        {c.description || c.connection?.description
-                            ? <span><strong>Описание:</strong> {c.description ?? c.connection?.description}</span>
-                            : null}
+                                            <span
+                                                className={
+                                                    styles.descriptionModal
+                                                }
+                                            >
+                                                {c.description ||
+                                                c.connection?.description ? (
+                                                    <span>
+                                                        <strong>
+                                                            Описание:
+                                                        </strong>{' '}
+                                                        {c.description ??
+                                                            c.connection
+                                                                ?.description}
+                                                    </span>
+                                                ) : null}
                                                 {c['conn_type'] && (
-                                                    <span>&nbsp; <strong>Тип:</strong> {String(c['conn_type'])}</span>
+                                                    <span>
+                                                        &nbsp;
+                                                        <strong>Тип:</strong>{' '}
+                                                        {String(c['conn_type'])}
+                                                    </span>
                                                 )}
                                                 {c['conn_str'] && (
-                                                    <span>&nbsp; <strong>Строка подключения:</strong> {String(c['conn_str'])}</span>
+                                                    <span>
+                                                        &nbsp;
+                                                        <strong>
+                                                            Строка
+                                                            подключения:
+                                                        </strong>{' '}
+                                                        {String(c['conn_str'])}
+                                                    </span>
                                                 )}
-                      </span>
+                                            </span>
                                         </MenuItem>
                                     ))}
                                 </Select>
                             </FormControl>
 
-                            {/* кнопка «добавить коннектор» справа от селекта */}
+                            {/* кнопка «добавить коннектор» */}
                             <IconButton
                                 size="small"
                                 sx={{ alignSelf: 'flex-end', mt: -1.5 }}
@@ -199,13 +275,16 @@ export const ModalAddWorkspace = ({
                                 name="description"
                                 size="small"
                                 fullWidth
-                                multiline rows={3}
+                                multiline
+                                rows={3}
                                 value={form.description}
                                 onChange={handle}
                                 required
                             />
 
-                            {error && <span style={{ color: '#d33' }}>{error}</span>}
+                            {error && (
+                                <span style={{ color: '#d33' }}>{error}</span>
+                            )}
                         </Stack>
                     </DialogContent>
 
@@ -214,8 +293,14 @@ export const ModalAddWorkspace = ({
                         <Button
                             variant="contained"
                             type="submit"
-                            disabled={loading || !form.name.trim() || form.connection_id === ''}
-                            startIcon={loading && <CircularProgress size={16} />}
+                            disabled={
+                                loading ||
+                                !form.name.trim() ||
+                                form.connection_id === ''
+                            }
+                            startIcon={
+                                loading && <CircularProgress size={16} />
+                            }
                         >
                             {loading ? 'Создаю…' : 'Создать'}
                         </Button>
