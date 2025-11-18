@@ -3,6 +3,8 @@ import AddIcon from '@mui/icons-material/AddBox';
 import * as s from '@/components/setOfTables/SetOfTables.module.scss';
 import EditIcon from '@/assets/image/EditIcon.svg';
 import DeleteIcon from '@/assets/image/DeleteIcon.svg';
+import ArrowUpIcon from '@/assets/image/ArrowUpIcon.svg';
+import ArrowDownIcon from '@/assets/image/ArrowDownIcon.svg';
 import { RefRow, RefRowProps } from './RefRow';
 import type { RefItem } from '../types';
 
@@ -47,43 +49,51 @@ export const WidgetGroup: React.FC<Props> = ({
                 <h4 style={{ margin: 0 }}>{title}</h4>
                 <span style={{ color: 'grey' }}>({order})</span>
 
-                <div style={{ display: 'flex', gap: 6, marginLeft: 8, alignItems: 'center' }}>
-                    <button
-                        title="Переместить вверх"
+                <div style={{display: 'flex', gap: 6, marginLeft: 8, alignItems: 'center'}}>
+                    <ArrowUpIcon
+                        onClick={!isFirst ? () => moveGroup(wcId, 'up') : undefined}
                         aria-label="Переместить группу вверх"
-                        disabled={isFirst}
-                        onClick={() => moveGroup(wcId, 'up')}
-                        style={{ opacity: isFirst ? 0.4 : 1 }}
-                    >↑</button>
+                        style={{
+                            opacity: isFirst ? 0.3 : 1,
+                            cursor: isFirst ? 'default' : 'pointer',
+                            pointerEvents: isFirst ? 'none' : 'auto',
+                        }}
+                        className={s.actionIcon}
+                    />
 
-                    <button
-                        title="Переместить вниз"
+                    {/* Вниз */}
+                    <ArrowDownIcon
+                        onClick={!isLast ? () => moveGroup(wcId, 'down') : undefined}
                         aria-label="Переместить группу вниз"
-                        disabled={isLast}
-                        onClick={() => moveGroup(wcId, 'down')}
-                        style={{ opacity: isLast ? 0.4 : 1 }}
-                    >↓</button>
+                        style={{
+                            opacity: isLast ? 0.3 : 1,
+                            cursor: isLast ? 'default' : 'pointer',
+                            pointerEvents: isLast ? 'none' : 'auto',
+                        }}
+                        className={s.actionIcon}
+                    />
 
-                    <EditIcon className={s.actionIcon} onClick={onOpenAlias} aria-label="Переименовать alias" />
-                    <DeleteIcon className={s.actionIcon} onClick={onDeleteGroup} aria-label="Удалить группу" />
+
+                    <EditIcon className={s.actionIcon} onClick={onOpenAlias} aria-label="Переименовать alias"/>
+                    <DeleteIcon className={s.actionIcon} onClick={onDeleteGroup} aria-label="Удалить группу"/>
 
                     <button
                         className={s.okBtn}
-                        style={{ marginLeft: 12 }}
+                        style={{marginLeft: 12}}
                         onClick={onAddField}
                         title="Добавить поле в эту группу"
                         aria-label="Добавить поле в группу"
                         type="button"
                     >
-                        <AddIcon />
+                        <AddIcon/>
                     </button>
                 </div>
             </div>
 
-            <table className={s.tbl} style={{ marginTop: 8 }}>
+            <table className={s.tbl} style={{marginTop: 8}}>
                 <thead>
                 <tr>
-                    <th style={{ width: 28 }} />
+                    <th style={{width: 28}}/>
                     <th>Название</th>
                     <th>Подзаголовок</th>
                     <th>Тип</th>
@@ -96,7 +106,7 @@ export const WidgetGroup: React.FC<Props> = ({
                     <th>Combobox</th>
                     <th>Формы</th>
                     <th>id</th>
-                    <th />
+                    <th/>
                 </tr>
                 </thead>
 

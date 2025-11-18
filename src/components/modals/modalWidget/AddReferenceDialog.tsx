@@ -87,7 +87,7 @@ export const AddReferenceDialog: React.FC<Props> = ({
                     size="small"
                     value={value.ref_column_order}
                     onChange={e => onChange({ ref_column_order: (e.target as HTMLInputElement).value === '' ? 0 : Number(e.target.value) })}
-                    helperText="Позиция в группе (0…N). По умолчанию — в конец."
+
                 />
 
                 {/* выбор формы */}

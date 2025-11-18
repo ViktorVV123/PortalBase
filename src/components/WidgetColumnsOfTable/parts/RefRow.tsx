@@ -151,19 +151,28 @@ export const RefRow: React.FC<RefRowProps> = ({
             onDrop={onDropRow(wcId, rowIndex)}
         >
             {/* drag-handle */}
-            <td
-                style={{
-                    textAlign: 'center',
-                    opacity: 0.6,
-                    cursor: 'grab',
-                    width: 24,
-                }}
-                draggable
-                onDragStart={onDragStart(wcId, rowIndex, tblColId)}
-                onDragEnd={onDragEnd}
-            >
-               <SwipeIcon/>
-            </td>
+            <Tooltip title="Перетащите, чтобы изменить порядок" arrow>
+                <td
+                    style={{
+                        textAlign: 'center',
+                        opacity: 0.6,
+                        cursor: 'grab',
+                        width: 24,
+                    }}
+                    draggable
+                    onDragStart={onDragStart(wcId, rowIndex, tblColId)}
+                    onDragEnd={onDragEnd}
+                >
+
+        <span
+            style={{display: 'inline-flex', alignItems: 'center', justifyContent: 'center'}}
+        >
+            <SwipeIcon/>
+        </span>
+
+                </td>
+            </Tooltip>
+
 
             <td>{tblCol?.name ?? '—'}</td>
             <td>{r.ref_alias ?? '—'}</td>
@@ -282,9 +291,9 @@ export const RefRow: React.FC<RefRowProps> = ({
                         sx={{color: '#fff', p: 0.5, '&:hover': {backgroundColor: 'rgba(255,255,255,0.08)'}}}
                     >
                         <svg width="20" height="20" viewBox="0 0 24 24" fill={iconFill} aria-hidden="true">
-                            <circle cx="5" cy="12" r="2" />
-                            <circle cx="12" cy="12" r="2" />
-                            <circle cx="19" cy="12" r="2" />
+                            <circle cx="5" cy="12" r="2"/>
+                            <circle cx="12" cy="12" r="2"/>
+                            <circle cx="19" cy="12" r="2"/>
                         </svg>
                     </IconButton>
 
@@ -312,7 +321,7 @@ export const RefRow: React.FC<RefRowProps> = ({
                         </MenuItem>
 
                         {comboItems.length > 0 && (
-                            <div style={{height: 1, background: '#333', margin: '4px 8px'}} />
+                            <div style={{height: 1, background: '#333', margin: '4px 8px'}}/>
                         )}
 
                         {comboItems.map((it, idx) => {
@@ -352,7 +361,7 @@ export const RefRow: React.FC<RefRowProps> = ({
                                                     onOpenComboItem(wcId, tblColId, it);
                                                 }}
                                             >
-                                                <EditIcon />
+                                                <EditIcon/>
                                             </IconButton>
                                         </Tooltip>
 
@@ -367,7 +376,7 @@ export const RefRow: React.FC<RefRowProps> = ({
                                                     await deleteComboItem(id);
                                                 }}
                                             >
-                                                <DeleteIcon />
+                                                <DeleteIcon/>
                                             </IconButton>
                                         </Tooltip>
                                     </span>

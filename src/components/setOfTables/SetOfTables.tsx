@@ -268,7 +268,7 @@ export const SetOfTables: React.FC<Props> = (props) => {
             {/* PRIORITY 3: TABLE COLUMNS */}
             {!selectedFormId && !selectedWidget && (
                 columns.length === 0 ? (
-                    <p>Нет столбцов</p>
+                    <p>Выберите форму</p>
                 ) : (
                     <div>
                         {selectedTable && (
