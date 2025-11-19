@@ -4,17 +4,14 @@ import * as s from './TopComponent.module.scss';
 import { WorkSpaceTypes } from '@/types/typesWorkSpaces';
 import { DTable, NewFormPayload, Widget, WidgetForm } from '@/shared/hooks/useWorkSpaces';
 
-import { SideNav } from '@/components/sideNav/SideNav';
 import { EditWorkspaceModal } from '@/components/modals/editWorkspaceModal/EditWorkspaceModal';
 import { api } from '@/services/api';
-import {useTopMenuState} from "@/components/topComponent/hook/useTopMenuState";
-import {WorkspaceMenu} from "@/components/topComponent/workspaceMenu/WorkspaceMenu";
-import {Floating} from "@/components/topComponent/floating/Floating";
-import {TablesMenu} from "@/components/topComponent/tablesMenu/TablesMenu";
-import {WidgetsMenu} from "@/components/topComponent/widgetsMenu/WidgetsMenu";
-import {FormsMenu} from "@/components/topComponent/formsMenu/FormsMenu";
-
-
+import { useTopMenuState } from "@/components/topComponent/hook/useTopMenuState";
+import { WorkspaceMenu } from "@/components/topComponent/workspaceMenu/WorkspaceMenu";
+import { Floating } from "@/components/topComponent/floating/Floating";
+import { TablesMenu } from "@/components/topComponent/tablesMenu/TablesMenu";
+import { WidgetsMenu } from "@/components/topComponent/widgetsMenu/WidgetsMenu";
+import { FormsMenu } from "@/components/topComponent/formsMenu/FormsMenu";
 
 type Props = {
     workSpaces: WorkSpaceTypes[];
@@ -54,6 +51,9 @@ type Props = {
     formsById: Record<number, WidgetForm>;
     setFormToEdit: (f: WidgetForm) => void;
     setEditFormOpen: (v: boolean) => void;
+
+    /** 🔹 новый проп — вернуть всё к списку форм */
+    onLogoClick: () => void;
 };
 
 export const TopComponent: React.FC<Props> = (props) => {
@@ -87,6 +87,7 @@ export const TopComponent: React.FC<Props> = (props) => {
         setCreateFormWidget,
         setWsHover,
         setTblHover,
+        onLogoClick,
     } = props;
 
     const [editModalOpen, setEditModalOpen] = useState(false);
@@ -104,31 +105,16 @@ export const TopComponent: React.FC<Props> = (props) => {
         setTblHover,
     });
 
-    // SideNav: открыть форму с прелоадом (оставляем из исходника)
-    type ApiWidget = Widget & { table_id: number };
-    type ApiTable = DTable & { workspace_id: number };
-
-    const openFormWithPreload = async (widgetId: number, formId: number) => {
-        try {
-            const { data: widget } = await api.get<ApiWidget>(`/widgets/${widgetId}`);
-            const { data: table } = await api.get<ApiTable>(`/tables/${widget.table_id}`);
-            await loadTables(table.workspace_id, true);
-            await loadWidgetsForTable(table.id, true);
-            handleSelectTable(table);
-            handleSelectWidget(widget);
-            handleSelectForm(formId);
-            await loadFormTree(formId);
-        } catch (e) {
-            console.warn('openFormWithPreload error:', e);
-        } finally {
-            setNavOpen(false);
-            state.closeAll();
-        }
-    };
-
     return (
         <div className={s.bar}>
-            <div className={s.logo}>Портал ввода данных</div>
+            <div
+                className={s.logo}
+                onClick={onLogoClick}
+                role="button"
+                tabIndex={0}
+            >
+                Портал ввода данных
+            </div>
 
             <div className={s.menuWrapper} ref={state.menuRef}>
                 <button
@@ -139,16 +125,6 @@ export const TopComponent: React.FC<Props> = (props) => {
                 >
                     Рабочие&nbsp;пространства ▾
                 </button>
-
-                <SideNav
-                    open={navOpen}
-                    toggle={() => {
-                        setNavOpen(!navOpen);
-                        state.closeAll();
-                    }}
-                    forms={Object.values(formsById)}
-                    openForm={openFormWithPreload}
-                />
 
                 {state.open && (
                     <WorkspaceMenu
@@ -174,7 +150,7 @@ export const TopComponent: React.FC<Props> = (props) => {
                     />
                 )}
 
-                {/* LVL-3: Tables (Floating) */}
+                {/* дальше твои TablesMenu / WidgetsMenu / FormsMenu без изменений */}
                 {state.wsOpen.id != null && (
                     <Floating anchor={state.wsOpen.anchor} side={state.wsOpen.side} setNode={state.setWsNode}>
                         <TablesMenu
@@ -199,7 +175,6 @@ export const TopComponent: React.FC<Props> = (props) => {
                     </Floating>
                 )}
 
-                {/* LVL-4: Widgets (Floating) */}
                 {state.tblOpen.id != null && (
                     <Floating
                         anchor={state.tblOpen.anchor}
@@ -231,7 +206,6 @@ export const TopComponent: React.FC<Props> = (props) => {
                     </Floating>
                 )}
 
-                {/* LVL-5: Forms (Floating) */}
                 {state.wOpen.id != null && (
                     <Floating anchor={state.wOpen.anchor} side={state.wOpen.side} setNode={state.setWNode}>
                         <FormsMenu
@@ -276,13 +250,13 @@ export const TopComponent: React.FC<Props> = (props) => {
                     defaultName={selectedWS.name}
                     defaultDescription={selectedWS.description}
                     defaultGroup={selectedWS.group}
-                    onSubmit={async ({ name, description,group }) => {
+                    onSubmit={async ({ name, description, group }) => {
                         try {
                             await api.patch(`/workspaces/${selectedWS.id}`, {
                                 name,
                                 description,
                                 connection_id: selectedWS.connection_id ?? 0,
-                                group
+                                group,
                             });
                             await loadWorkSpaces();
                             setEditModalOpen(false);
