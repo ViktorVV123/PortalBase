@@ -17,11 +17,12 @@ import {
     WcReference,
     WidgetColumnsOfTable,
 } from '@/components/WidgetColumnsOfTable/WidgetColumnTable/WidgetColumnsOfTable';
+import {api} from '@/services/api';
 import {Breadcrumb, Crumb} from "@/shared/ui/Breadcrumb";
-import { SideNav } from '@/components/sideNav/SideNav';
 
 import {useHeaderPreviewFromWc} from "@/components/WidgetColumnsOfTable/WidgetColumnTable/hook/useHeaderPreviewFromWc";
 
+/** ─────────────────────── Пропсы ─────────────────────── */
 type Props = {
     // базовые
     columns: Column[];
@@ -48,7 +49,7 @@ type Props = {
     wColsError: string | null;
     selectedWidget: Widget | null;
     handleClearWidget: () => void;
-    handleSelectWidget: (widget: Widget | null) => void;
+    handleSelectWidget: (widget: Widget | null) => void; // оставляем для совместимости
     setSelectedWidget: React.Dispatch<React.SetStateAction<Widget | null>>;
     setWidgetsByTable: React.Dispatch<React.SetStateAction<Record<number, Widget[]>>>;
     updateWidgetColumn: (
@@ -73,7 +74,7 @@ type Props = {
     formDisplay: FormDisplay | null;
     formLoading: boolean;
     formError: string | null;
-    formsByWidget: Record<number, WidgetForm>;
+    formsByWidget: Record<number, WidgetForm>; // нужен order
     formsById: Record<number, WidgetForm>;
     formTrees: Record<number, FormTreeColumn[]>;
     loadFilteredFormDisplay: (
@@ -104,12 +105,33 @@ type Props = {
     // общее
     tablesByWs: Record<number, DTable[]>;
     loadWidgetForms: () => Promise<void> | void;
-
-    // для SideNav
-    openFormWithPreload: (widgetId: number, formId: number) => Promise<void>;
-    forceFormList: boolean;
 };
 
+/** ─────────────────────── Вспомогательные хуки ─────────────────────── */
+function useCurrentForm(
+    selectedFormId: number | null,
+    selectedWidget: Widget | null,
+    formsById: Record<number, WidgetForm>,
+    formsByWidget: Record<number, WidgetForm>,
+) {
+    return useMemo<WidgetForm | null>(() => {
+        if (selectedFormId != null) return formsById[selectedFormId] ?? null;
+        if (selectedWidget) return formsByWidget[selectedWidget.id] ?? null;
+        return null;
+    }, [selectedFormId, selectedWidget, formsById, formsByWidget]);
+}
+
+function useSubWidgetIdByOrder(currentForm: WidgetForm | null) {
+    return useMemo<Record<number, number>>(() => {
+        const map: Record<number, number> = {};
+        currentForm?.sub_widgets?.forEach((sw) => { map[sw.widget_order] = sw.sub_widget_id; });
+        return map;
+    }, [currentForm]);
+}
+
+
+
+/** ─────────────────────── Основной компонент ─────────────────────── */
 export const SetOfTables: React.FC<Props> = (props) => {
     const {
         // базовые
@@ -130,20 +152,17 @@ export const SetOfTables: React.FC<Props> = (props) => {
         updateTableMeta, publishTable, loadColumns,
         // прочее
         clearFormSelection, loadWidgetForms,
-        // SideNav
-        openFormWithPreload,
-        forceFormList,
     } = props;
 
+    // локально — только то, что реально нужно держать здесь
     const [referencesMap, setReferencesMap] = useState<Record<number, WcReference[]>>({});
     const [liveRefsForHeader, setLiveRefsForHeader] = useState<Record<number, WcReference[]> | null>(null);
 
-    const headerGroups = useHeaderPreviewFromWc(
-        widgetColumns,
-        referencesMap,
-        liveRefsForHeader ?? undefined
-    );
+    // группы заголовков: основная форма и саб-форма
+    const headerGroups = useHeaderPreviewFromWc(widgetColumns, referencesMap, liveRefsForHeader ?? undefined);
 
+
+    // хэндлеры навигации
     const goToTable = useCallback(() => {
         setSubDisplay(null);
         setFormDisplay(null);
@@ -159,17 +178,10 @@ export const SetOfTables: React.FC<Props> = (props) => {
     }, [clearFormSelection, loadColumnsWidget, selectedWidget, setFormDisplay, setSubDisplay]);
 
     const widgetTitle = useMemo(() => selectedWidget?.name ?? null, [selectedWidget]);
-    const formTitle = useMemo(
-        () =>
-            selectedFormId != null
-                ? (formsById[selectedFormId]?.name ?? `Форма #${selectedFormId}`)
-                : null,
-        [formsById, selectedFormId]
-    );
-    const subTitle = useMemo(
-        () => subDisplay?.displayed_widget?.name ?? null,
-        [subDisplay?.displayed_widget?.name]
-    );
+    const formTitle = useMemo(() => (
+        selectedFormId != null ? (formsById[selectedFormId]?.name ?? `Форма #${selectedFormId}`) : null
+    ), [formsById, selectedFormId]);
+    const subTitle = useMemo(() => subDisplay?.displayed_widget?.name ?? null, [subDisplay?.displayed_widget?.name]);
 
     const items = useMemo<Crumb[]>(() => {
         const arr: Crumb[] = [{ label: workspaceName }];
@@ -184,110 +196,95 @@ export const SetOfTables: React.FC<Props> = (props) => {
         return arr;
     }, [workspaceName, tableName, selectedWidget, widgetTitle, formTitle, subTitle, goToTable, goToWidget]);
 
-    if (loading && !selectedFormId && !selectedWidget && !selectedTable) {
-        return <p>тест…</p>;
-    }
 
+
+
+
+
+    // быстрые гварды
+    if (loading) return <p>Загрузка…</p>;
     if (error) return <p className={s.error}>{error}</p>;
-
-
-    const hasForms = Object.values(formsById).length > 0;
-
-    // 🔹 режим выбора формы:
-    // либо автоматически (ничего не выбрано),
-    // либо принудительно по клику на логотип (forceFormList)
-    const isFormSelectionStage =
-        forceFormList ||
-        (!selectedFormId && !selectedWidget && !selectedTable && hasForms);
 
     return (
         <div className={s.wrapper}>
-            {/* SideNav показывается ТОЛЬКО в режиме выбора формы */}
-            {isFormSelectionStage && (
-                <SideNav
-                    forms={Object.values(formsById)}
-                    openForm={openFormWithPreload}
-                />
-            )}
 
-            {/* крошки скрываем, пока просто выбираем форму из списка */}
-            {!isFormSelectionStage && (
-                <Breadcrumb items={items} className={s.headRow} />
-            )}
+            <Breadcrumb items={items} className={s.headRow} />
 
-            {/* FORM */}
+            {/* PRIORITY 1: FORM */}
             {selectedFormId ? (
-                formLoading ? (
-                    <p>Загрузка формы…</p>
-                ) : formError ? (
-                    <p className={s.error}>{formError}</p>
-                ) : formDisplay ? (
-                    <FormTable
-                        formsById={formsById}
-                        headerGroups={headerGroups}
-                        setSubDisplay={setSubDisplay}
-                        formTrees={formTrees}
-                        selectedFormId={selectedFormId}
-                        subDisplay={subDisplay}
-                        subError={subError}
-                        subLoading={subLoading}
-                        selectedWidget={selectedWidget}
-                        formsByWidget={formsByWidget}
-                        loadFilteredFormDisplay={loadFilteredFormDisplay}
-                        setFormDisplay={setFormDisplay}
-                        loadSubDisplay={loadSubDisplay}
-                        formDisplay={formDisplay}
-                    />
-                ) : null
+                formLoading ? <p>Загрузка формы…</p>
+                    : formError ? <p className={s.error}>{formError}</p>
+                        : formDisplay ? (
+                            <FormTable
+                                formsById={formsById}
+                                headerGroups={headerGroups}
+                                setSubDisplay={setSubDisplay}
+                                formTrees={formTrees}
+                                selectedFormId={selectedFormId}
+                                subDisplay={subDisplay}
+                                subError={subError}
+                                subLoading={subLoading}
+                                selectedWidget={selectedWidget}
+                                formsByWidget={formsByWidget}
+                                loadFilteredFormDisplay={loadFilteredFormDisplay}
+                                setFormDisplay={setFormDisplay}
+                                loadSubDisplay={loadSubDisplay}
+                                formDisplay={formDisplay}
+                            />
+                        ) : null
             ) : null}
 
-            {/* WIDGET */}
-            {!selectedFormId && selectedWidget && !isFormSelectionStage && (
-                wColsLoading ? (
-                    <p>Загрузка виджета…</p>
-                ) : wColsError ? (
-                    <p className={s.error}>{wColsError}</p>
-                ) : (
-                    <WidgetColumnsOfTable
-                        loadWidgetForms={loadWidgetForms}
-                        formsById={formsById}
-                        headerGroups={headerGroups}
-                        referencesMap={referencesMap}
-                        setLiveRefsForHeader={setLiveRefsForHeader}
-                        setReferencesMap={setReferencesMap}
-                        updateReference={updateReference}
-                        updateWidgetColumn={updateWidgetColumn}
-                        addWidgetColumn={addWidgetColumn}
-                        deleteReference={deleteReference}
-                        fetchReferences={fetchReferences}
-                        updateWidgetMeta={updateWidgetMeta}
-                        setWidgetsByTable={setWidgetsByTable}
-                        setSelectedWidget={setSelectedWidget}
-                        columns={columns}
-                        updateTableColumn={updateTableColumn}
-                        deleteColumnTable={deleteColumnTable}
-                        deleteColumnWidget={deleteColumnWidget}
-                        widgetColumns={widgetColumns}
-                        loadColumnsWidget={loadColumnsWidget}
-                        selectedWidget={selectedWidget}
-                    />
-                )
+            {/* PRIORITY 2: WIDGET */}
+            {!selectedFormId && selectedWidget && (
+                wColsLoading ? <p>Загрузка виджета…</p>
+                    : wColsError ? <p className={s.error}>{wColsError}</p>
+                        : (
+                            <WidgetColumnsOfTable
+                                loadWidgetForms={loadWidgetForms}
+                                formsById={formsById}
+                                headerGroups={headerGroups}
+                                referencesMap={referencesMap}
+                                setLiveRefsForHeader={setLiveRefsForHeader}
+                                setReferencesMap={setReferencesMap}
+                                updateReference={updateReference}
+                                updateWidgetColumn={updateWidgetColumn}
+                                addWidgetColumn={addWidgetColumn}
+                                deleteReference={deleteReference}
+                                fetchReferences={fetchReferences}
+                                updateWidgetMeta={updateWidgetMeta}
+                                setWidgetsByTable={setWidgetsByTable}
+                                setSelectedWidget={setSelectedWidget}
+                                columns={columns}
+                                updateTableColumn={updateTableColumn}
+                                deleteColumnTable={deleteColumnTable}
+                                deleteColumnWidget={deleteColumnWidget}
+                                widgetColumns={widgetColumns}
+                                loadColumnsWidget={loadColumnsWidget}
+                                selectedWidget={selectedWidget}
+                            />
+                        )
             )}
 
-            {/* TABLE COLUMNS */}
-            {!selectedFormId && !selectedWidget && selectedTable && !isFormSelectionStage && (
-                <div>
-                    <TableColumn
-                        publishTable={publishTable}
-                        selectedTable={selectedTable}
-                        updateTableMeta={updateTableMeta}
-                        columns={columns}
-                        tableId={selectedTable.id}
-                        deleteColumnTable={deleteColumnTable}
-                        updateTableColumn={updateTableColumn}
-                        onCreated={() => selectedTable && loadColumns(selectedTable)}
-                    />
-                </div>
+            {/* PRIORITY 3: TABLE COLUMNS */}
+            {!selectedFormId && !selectedWidget && (
+                columns.length === 0 ? (
+                    <p>Выберите форму</p>
+                ) : (
+                    <div>
+                        {selectedTable && (
+                            <TableColumn
+                                publishTable={publishTable}
+                                selectedTable={selectedTable}
+                                updateTableMeta={updateTableMeta}
+                                columns={columns}
+                                tableId={selectedTable.id}
+                                deleteColumnTable={deleteColumnTable}
+                                updateTableColumn={updateTableColumn}
+                                onCreated={() => selectedTable && loadColumns(selectedTable)}
+                            />
+                        )}
+                    </div>
+                )
             )}
         </div>
     );

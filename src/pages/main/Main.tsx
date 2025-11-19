@@ -1,23 +1,21 @@
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import * as styles from './Main.module.scss';
 
 import { useWorkSpaces } from '@/shared/hooks/useWorkSpaces';
+
 import { TopComponent } from '@/components/topComponent/TopComponent';
 import { SetOfTables } from '@/components/setOfTables/SetOfTables';
 import { useMainSelection } from '@/pages/main/hook/useMainSelection';
 import { useMainModals } from '@/pages/main/hook/useMainModals';
 import { ModalHost } from '@/components/modals/modalHost/ModalHost';
-import {api} from "@/services/api";
 
 export const Main = () => {
     const [navOpen, setNavOpen] = useState(false);
     const [wsHover, setWsHover] = useState<number | null>(null);
     const [tblHover, setTblHover] = useState<number | null>(null);
 
-    // 🔹 флаг "показывать список форм"
-    const [forceFormList, setForceFormList] = useState(false);
-
     const {
+        // загрузки/кэш
         loadWorkSpaces,
         columns,
         loadColumns,
@@ -76,12 +74,14 @@ export const Main = () => {
         deleteSubWidgetFromForm,
     } = useWorkSpaces();
 
+    // первичная загрузка (один эффект вместо трёх — меньше шумных ре-рендеров)
     useEffect(() => {
         loadWorkSpaces();
         loadWidgetForms();
         loadConnections();
     }, [loadWorkSpaces, loadWidgetForms, loadConnections]);
 
+    // выборы (вынесены)
     const selection = useMainSelection({
         loadColumns,
         loadWidgetsForTable,
@@ -92,6 +92,7 @@ export const Main = () => {
         formsByWidget,
     });
 
+    // модалки (вынесены)
     const modals = useMainModals({
         loadConnections,
         loadWorkSpaces,
@@ -103,6 +104,7 @@ export const Main = () => {
         openForm: selection.openForm,
     });
 
+    // выбранный workspace (для хлебных крошек/шапки)
     const selectedWs = useMemo(
         () =>
             selectedTable
@@ -111,32 +113,7 @@ export const Main = () => {
         [selectedTable, workSpaces]
     );
 
-    /** 🔹 открыть форму из списка (SideNav) — тут же выключаем режим списка */
-    const openFormWithPreload = useCallback(
-        async (widgetId: number, formId: number) => {
-            type ApiWidget = { id: number; table_id: number };
-            type ApiTable = { id: number; workspace_id: number; name: string };
-
-            try {
-                const { data: widget } = await api.get<ApiWidget>(`/widgets/${widgetId}`);
-                const { data: table } = await api.get<ApiTable>(`/tables/${widget.table_id}`);
-
-                await loadTables(table.workspace_id, true);
-                await loadWidgetsForTable(table.id, true);
-
-                selection.handleSelectTable(table as any);
-                selection.setSelectedWidget({ ...(selection.selectedWidget ?? {}), id: widget.id } as any);
-                selection.handleSelectForm(formId);
-                await loadFormTree(formId);
-            } catch (e) {
-                console.warn('openFormWithPreload error:', e);
-            } finally {
-                setForceFormList(false); // ← выходим из режима списка
-            }
-        },
-        [loadTables, loadWidgetsForTable, selection, loadFormTree]
-    );
-
+    // группировка пропсов для читабельности (контракты компонент не меняю)
     const topProps = {
         setEditFormOpen: modals.setEditFormOpen,
         setFormToEdit: modals.setFormToEdit,
@@ -171,15 +148,6 @@ export const Main = () => {
         setShowCreateFormModal: modals.setShowCreateFormModal,
         setCreateFormWidget: modals.setCreateFormWidget,
         formsListByWidget,
-
-        // 🔹 клик по логотипу → вернуть к списку форм
-        onLogoClick: () => {
-            setForceFormList(true);
-            selection.clearFormSelection();
-            selection.setSelectedWidget(null);
-            setFormDisplay(null);
-            setSubDisplay(null);
-        },
     };
 
     const setOfTablesProps = {
@@ -228,10 +196,6 @@ export const Main = () => {
         updateWidgetMeta,
         formsById,
         loadColumns,
-
-        // SideNav
-        openFormWithPreload,
-        forceFormList,
     };
 
     const modalHostProps = {
