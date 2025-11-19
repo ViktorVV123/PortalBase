@@ -207,6 +207,7 @@ export const Main = () => {
         deleteSubWidgetFromForm,
     };
 
+
     return (
         <div className={styles.layout}>
             <div className={styles.container}>
