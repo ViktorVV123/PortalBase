@@ -80,7 +80,7 @@ if (!isLocalhost && !accessToken) goToIdm(); // старт без AccessId
 
 export const api: AxiosInstance = axios.create({
     baseURL: API_URL,
-    headers: { 'Content-Type': 'application/json','access-id': 'eef86f09-3cd3-45df-8269-089c9aad1b6b' },
+    headers: { 'Content-Type': 'application/json','access-id': '4af1cdd7-9534-4e23-a5d2-5a0843c0d55a' },
 });
 
 /*'access-id': 'eef86f09-3cd3-45df-8269-089c9aad1b6b'*/
