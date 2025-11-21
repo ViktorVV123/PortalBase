@@ -208,7 +208,7 @@ export const SetOfTables: React.FC<Props> = (props) => {
     return (
         <div className={s.wrapper}>
 
-            <Breadcrumb items={items} className={s.headRow} />
+           {/* <Breadcrumb items={items} className={s.headRow} />*/}
 
             {/* PRIORITY 1: FORM */}
             {selectedFormId ? (

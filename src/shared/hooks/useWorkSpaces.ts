@@ -1,4 +1,4 @@
-import {useCallback, useState} from "react";
+import {useCallback, useRef, useState} from "react";
 import {api} from "@/services/api";
 import {WorkSpaceTypes} from "@/types/typesWorkSpaces";
 import {Connection} from "@/types/typesConnection";
@@ -247,19 +247,54 @@ export const useWorkSpaces = () => {
     const [columns, setColumns] = useState<Column[]>([]);
     const [selectedTable, setSelTable] = useState<DTable | null>(null);
 
+    // в начале useWorkSpaces
+    const workspacesStatusRef = useRef<'idle' | 'loading' | 'loaded' | 'forbidden'>('idle');
+
+    const forbiddenTablesWsRef = useRef<Set<number>>(new Set());
+
 
     /* — список WS — */
-    const loadWorkSpaces = useCallback(async () => {
-        setLoading(true);
-        try {
-            const {data} = await api.get<WorkSpaceTypes[]>('/workspaces');
-            setWorkSpaces(data.sort((a, b) => a.id - b.id));
-        } catch {
-            setError('Не удалось загрузить рабочие пространства');
-        } finally {
-            setLoading(false);
-        }
-    }, []);
+    const loadWorkSpaces = useCallback(
+        async (opts?: { force?: boolean }) => {
+            const force = opts?.force ?? false;
+
+            // 1) если не force и уже загрузили / запретили — выходим
+            if (!force) {
+                if (
+                    workspacesStatusRef.current === 'loading' ||
+                    workspacesStatusRef.current === 'loaded' ||
+                    workspacesStatusRef.current === 'forbidden'
+                ) {
+                    return;
+                }
+            }
+
+            workspacesStatusRef.current = 'loading';
+            setLoading(true);
+            setError(null);
+
+            try {
+                // ВАЖНО: сразу используем каноничный URL со слэшем
+                const { data } = await api.get<WorkSpaceTypes[]>('/workspaces/');
+                setWorkSpaces(data.sort((a, b) => a.id - b.id));
+                workspacesStatusRef.current = 'loaded';
+            } catch (e: any) {
+                const status = e?.response?.status;
+
+                if (status === 403) {
+                    workspacesStatusRef.current = 'forbidden';
+                    setError('У вас нет доступа к рабочим пространствам');
+                } else {
+                    workspacesStatusRef.current = 'idle'; // можно потом попробовать вручную ещё раз
+                    setError('Не удалось загрузить рабочие пространства');
+                }
+            } finally {
+                setLoading(false);
+            }
+        },
+        [],
+    );
+
 
     const updateTableMeta = useCallback(
         async (id: number, patch: Partial<DTable>) => {
@@ -309,27 +344,43 @@ export const useWorkSpaces = () => {
     const [wColsLoading, setWColsLoading] = useState(false);
     const [wColsError, setWColsError] = useState<string | null>(null);
 
+    const forbiddenWidgetsTablesRef = useRef<Set<number>>(new Set());
+
     /* — Загрузка виджетов конкретной таблицы — */
     const loadWidgetsForTable = useCallback(
-        /** force=true — игнорируем кэш */
         async (tableId: number, force = false): Promise<Widget[]> => {
+            if (!force) {
+                if (forbiddenWidgetsTablesRef.current.has(tableId)) {
+                    return widgetsByTable[tableId] ?? [];
+                }
+                if (widgetsByTable[tableId]) {
+                    return widgetsByTable[tableId];
+                }
+            }
+
             setWidgetsLoading(true);
             setWidgetsError(null);
 
-            if (!force && widgetsByTable[tableId]) {
-                setWidgetsLoading(false);
-                return widgetsByTable[tableId];
-            }
-
             try {
-                const {data} = await api.get<Widget[]>('/widgets', {
-                    params: {table_id: tableId},
+                const { data } = await api.get<Widget[]>('/widgets', {
+                    params: { table_id: tableId },
                 });
-                setWidgetsByTable(prev => ({...prev, [tableId]: data}));
+
+                setWidgetsByTable(prev => ({ ...prev, [tableId]: data }));
+                forbiddenWidgetsTablesRef.current.delete(tableId);
+
                 return data;
-            } catch {
-                setWidgetsError('Не удалось загрузить widgets');
-                return [];
+            } catch (e: any) {
+                const status = e?.response?.status;
+
+                if (status === 403 || status === 404) {
+                    forbiddenWidgetsTablesRef.current.add(tableId);
+                    setWidgetsError('Нет доступа к виджетам этой таблицы');
+                } else {
+                    setWidgetsError('Не удалось загрузить widgets');
+                }
+
+                return widgetsByTable[tableId] ?? [];
             } finally {
                 setWidgetsLoading(false);
             }
@@ -409,18 +460,42 @@ export const useWorkSpaces = () => {
 
     /* — таблицы конкретного WS — */
     const loadTables = useCallback(
-        /** force = true → игнорируем кэш и перезапрашиваем */
         async (wsId: number, force = false): Promise<DTable[]> => {
-            if (!force && tablesByWs[wsId]) return tablesByWs[wsId];
+            // 1) если уже знаем, что для этого WS нет прав — выходим
+            if (!force && forbiddenTablesWsRef.current.has(wsId)) {
+                return tablesByWs[wsId] ?? [];
+            }
 
-            const {data} = await api.get<DTable[]>('/tables', {
-                params: {workspace_id: wsId},
-            });
-            setTablesByWs(prev => ({...prev, [wsId]: data}));
-            return data;
+            // 2) если уже есть кэш и нас не заставили force'ом — возвращаем кэш
+            if (!force && tablesByWs[wsId]) {
+                return tablesByWs[wsId];
+            }
+
+            try {
+                const { data } = await api.get<DTable[]>('/tables', {
+                    params: { workspace_id: wsId },
+                });
+
+                setTablesByWs(prev => ({ ...prev, [wsId]: data }));
+                // если получилось загрузить — точно есть права, снимаем блокировку
+                forbiddenTablesWsRef.current.delete(wsId);
+
+                return data;
+            } catch (e: any) {
+                const status = e?.response?.status;
+
+                if (status === 403 || status === 404) {
+                    forbiddenTablesWsRef.current.add(wsId);
+                }
+
+                // можно записать более точное сообщение, если хочешь
+                setError('Не удалось загрузить таблицы рабочей области');
+                return tablesByWs[wsId] ?? [];
+            }
         },
         [tablesByWs],
     );
+
 
     //ВСЕ О ТАБЛИЦАХ
 //удалили таблицу
@@ -524,6 +599,8 @@ export const useWorkSpaces = () => {
     const [formsByWidget, setFormsByWidget] = useState<Record<number, WidgetForm>>({});
     const [formsById, setFormsById] = useState<Record<number, WidgetForm>>({});
     const [formsListByWidget, setFormsListByWidget] = useState<Record<number, WidgetForm[]>>({});
+    const formsStatusRef = useRef<'idle' | 'loading' | 'loaded' | 'forbidden'>('idle');
+
 
 // общий нормалайзер
     const normalizeForms = (data: WidgetForm[]) => {
@@ -548,13 +625,37 @@ export const useWorkSpaces = () => {
     };
 
     const loadWidgetForms = useCallback(async () => {
-        if (Object.keys(formsById).length) return;       // уже загружено
-        const {data} = await api.get<WidgetForm[]>('/forms');
-        normalizeForms(data);
-    }, [formsById]);
+        // уже грузим / уже загрузили / уже знаем, что запрещено
+        if (
+            formsStatusRef.current === 'loading' ||
+            formsStatusRef.current === 'loaded' ||
+            formsStatusRef.current === 'forbidden'
+        ) {
+            return;
+        }
+
+        formsStatusRef.current = 'loading';
+
+        try {
+            const { data } = await api.get<WidgetForm[]>('/forms/');
+            normalizeForms(data);
+            formsStatusRef.current = 'loaded';
+        } catch (e: any) {
+            const status = e?.response?.status;
+            console.warn('loadWidgetForms error', status ?? e);
+
+            if (status === 403) {
+                formsStatusRef.current = 'forbidden';
+                // если надо — можно завести отдельный formListError
+            } else {
+                formsStatusRef.current = 'idle'; // даём шанс ручному ретраю
+            }
+        }
+    }, []);
+
 
     const reloadWidgetForms = useCallback(async () => {
-        const {data} = await api.get<WidgetForm[]>('/forms');
+        const {data} = await api.get<WidgetForm[]>('/forms/');
         normalizeForms(data);
     }, []);
 
@@ -721,15 +822,23 @@ export const useWorkSpaces = () => {
             const {data} = await api.post<FormTreeColumn[] | FormTreeColumn>(`/display/${formId}/tree`);
 
             const normalized: FormTreeColumn[] = Array.isArray(data) ? data : [data];
-
             setFormTrees(prev => ({...prev, [formId]: normalized}));
         } catch (err: any) {
-            console.warn('Не удалось загрузить справочники:', err?.response?.status ?? err);
-            // Не считаем ошибкой — справочники могут отсутствовать
+            const status = err?.response?.status;
+
+            if (status === 403) {
+                setFormTreeError('Нет доступа к дереву фильтров формы');
+            } else if (status !== 404) {
+                // 404 можно считать "дерево не настроено"
+                setFormTreeError('Не удалось загрузить дерево фильтров');
+            }
+
+            console.warn('Не удалось загрузить справочники:', status ?? err);
         } finally {
             setFormTreeLoading(false);
         }
     }, []);
+
 
     /* --- sub форма --- */
     const [subDisplay, setSubDisplay] = useState<SubDisplay | null>(null);
@@ -760,12 +869,20 @@ export const useWorkSpaces = () => {
                 const { data } = await api.post<SubDisplay>(`/display/${formId}/sub?${params}`, body);
                 setSubDisplay(data);
             } catch (e: any) {
-                console.error('[useWorkSpaces][loadSubDisplay] error:', e);
-                setSubError(
-                    typeof e?.message === 'string'
-                        ? e.message
-                        : 'Ошибка загрузки подформы (subDisplay)'
-                );
+                const status = e?.response?.status;
+
+                if (status === 403) {
+                    setSubError('Нет доступа к подформе');
+                } else if (status === 404) {
+                    setSubError('Подформа не найдена');
+                } else {
+                    setSubError(
+                        typeof e?.message === 'string'
+                            ? e.message
+                            : 'Ошибка загрузки подформы (subDisplay)'
+                    );
+                }
+
                 setSubDisplay(null);
             } finally {
                 setSubLoading(false);
@@ -773,6 +890,7 @@ export const useWorkSpaces = () => {
         },
         []
     );
+
 
     /* --- новое состояние --- */
     const [formDisplay, setFormDisplay] = useState<FormDisplay | null>(null);
@@ -787,12 +905,23 @@ export const useWorkSpaces = () => {
         try {
             const {data} = await api.post<FormDisplay>(`/display/${formId}/main`);
             setFormDisplay(data);
-        } catch {
-            setFormError('Не удалось загрузить данные формы');
+        } catch (e: any) {
+            const status = e?.response?.status;
+
+            if (status === 403) {
+                setFormError('У вас нет доступа к этой форме');
+            } else if (status === 404) {
+                setFormError('Форма не найдена');
+            } else {
+                setFormError('Не удалось загрузить данные формы');
+            }
+
+            setFormDisplay(null);
         } finally {
             setFormLoading(false);
         }
     }, []);
+
 
     const loadFilteredFormDisplay = useCallback(
         async (
@@ -818,17 +947,40 @@ export const useWorkSpaces = () => {
 
 //connections
     const [connections, setConnections] = useState<Connection[]>([]);
+    const connectionsStatusRef = useRef<'idle' | 'loading' | 'loaded' | 'forbidden'>('idle');
 
     const loadConnections = useCallback(async () => {
+        // 1) если уже грузим или уже знаем, что запрещено/загружено — выходим
+        if (connectionsStatusRef.current === 'loading' ||
+            connectionsStatusRef.current === 'forbidden' ||
+            connectionsStatusRef.current === 'loaded') {
+            return;
+        }
+
+        connectionsStatusRef.current = 'loading';
+
+        // НЕ обязательно трогать глобальный loading, но если хочешь — оставим:
+        setLoading(true);
         try {
-            const {data} = await api.get<Connection[]>('/connections');
+            const { data } = await api.get<Connection[]>('/connections/');
             setConnections(data);
-        } catch {
-            setError('Не удалось загрузить список соединений');
+            setError(null);
+            connectionsStatusRef.current = 'loaded';
+        } catch (e: any) {
+            const status = e?.response?.status;
+
+            if (status === 403) {
+                connectionsStatusRef.current = 'forbidden';
+                setError('У вас нет доступа к списку подключений');
+            } else {
+                connectionsStatusRef.current = 'idle'; // можно дать возможность ручного ретрая
+                setError('Не удалось загрузить список соединений');
+            }
         } finally {
             setLoading(false);
         }
     }, []);
+
 
     /* ↓ рядом с loadConnections connections delete */
     const deleteConnection = useCallback(async (id: number) => {
