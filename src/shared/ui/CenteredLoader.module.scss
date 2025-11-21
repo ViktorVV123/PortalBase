@@ -1,0 +1,32 @@
+.container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px; // чтобы лоадер был в середине блока SetOfTables
+}
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.35); // лёгкое затемнение
+  z-index: 1300; // выше основного контента, но ниже модалок MUI (обычно 1300–1500)
+}
+
+.box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 24px 32px;
+  border-radius: 12px;
+  background: #202020;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+}
+
+.text {
+  font-size: 14px;
+  color: #fff;
+}

@@ -21,6 +21,7 @@ import {api} from '@/services/api';
 import {Breadcrumb, Crumb} from "@/shared/ui/Breadcrumb";
 
 import {useHeaderPreviewFromWc} from "@/components/WidgetColumnsOfTable/WidgetColumnTable/hook/useHeaderPreviewFromWc";
+import {CenteredLoader} from "@/shared/ui/CenteredLoader";
 
 /** ─────────────────────── Пропсы ─────────────────────── */
 type Props = {
@@ -202,8 +203,7 @@ export const SetOfTables: React.FC<Props> = (props) => {
 
 
     // быстрые гварды
-    if (loading) return <p>Загрузка…</p>;
-    if (error) return <p className={s.error}>{error}</p>;
+
 
     return (
         <div className={s.wrapper}>
@@ -212,9 +212,13 @@ export const SetOfTables: React.FC<Props> = (props) => {
 
             {/* PRIORITY 1: FORM */}
             {selectedFormId ? (
-                formLoading ? <p>Загрузка формы…</p>
-                    : formError ? <p className={s.error}>{formError}</p>
-                        : formDisplay ? (
+                formLoading ? (
+                    <div className={s.loaderArea}>
+                        <CenteredLoader label="Загружаем форму…" />
+                    </div>
+                ) : formError ? (
+                    <p className={s.error}>{formError}</p>
+                ) : formDisplay ? (
                             <FormTable
                                 formsById={formsById}
                                 headerGroups={headerGroups}
@@ -236,9 +240,13 @@ export const SetOfTables: React.FC<Props> = (props) => {
 
             {/* PRIORITY 2: WIDGET */}
             {!selectedFormId && selectedWidget && (
-                wColsLoading ? <p>Загрузка виджета…</p>
-                    : wColsError ? <p className={s.error}>{wColsError}</p>
-                        : (
+                wColsLoading ? (
+                    <div className={s.loaderArea}>
+                        <CenteredLoader label="Загружаем виджет…" />
+                    </div>
+                ) : wColsError ? (
+                    <p className={s.error}>{wColsError}</p>
+                ) : (
                             <WidgetColumnsOfTable
                                 loadWidgetForms={loadWidgetForms}
                                 formsById={formsById}

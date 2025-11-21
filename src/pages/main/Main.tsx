@@ -8,6 +8,7 @@ import { SetOfTables } from '@/components/setOfTables/SetOfTables';
 import { useMainSelection } from '@/pages/main/hook/useMainSelection';
 import { useMainModals } from '@/pages/main/hook/useMainModals';
 import { ModalHost } from '@/components/modals/modalHost/ModalHost';
+import {CenteredLoader} from "@/shared/ui/CenteredLoader";
 
 export const Main = () => {
     const [navOpen, setNavOpen] = useState(false);
@@ -210,6 +211,11 @@ export const Main = () => {
 
     return (
         <div className={styles.layout}>
+            {/* глобальный лоадер на стартовую загрузку */}
+            {loading && !selectedTable && !selection.selectedWidget && !selection.selectedFormId && (
+                <CenteredLoader fullScreen label="Загружаем рабочее пространство…"/>
+            )}
+
             <div className={styles.container}>
                 <div>
                     <TopComponent {...topProps} />
