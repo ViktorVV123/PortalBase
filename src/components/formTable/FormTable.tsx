@@ -103,6 +103,8 @@ export const FormTable: React.FC<Props> = ({
         [currentForm]
     );
 
+
+
     const {
         lastPrimary, setLastPrimary,
         selectedKey, setSelectedKey,
@@ -188,6 +190,7 @@ export const FormTable: React.FC<Props> = ({
         selectedWidget,
         selectedFormId,
         formsByWidget,
+        formsById,              // 👈 ДОБАВИЛИ ЭТО
         activeFilters,
         setFormDisplay: (v) => setFormDisplay(v),
         reloadTree,
@@ -200,7 +203,6 @@ export const FormTable: React.FC<Props> = ({
         setLastPrimary,
         setSelectedKey,
     });
-
     /** ───────── Поиск ───────── */
     const { showSearch, q, setQ, filteredRows } = useFormSearch(
         formDisplay,
@@ -273,6 +275,8 @@ export const FormTable: React.FC<Props> = ({
         },
         [drillTargetWriteTcId, setEditDraft]
     );
+
+
 
 
     /** ───────── UI ───────── */

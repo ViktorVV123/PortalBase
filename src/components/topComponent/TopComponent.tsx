@@ -7,14 +7,12 @@ import { DTable, NewFormPayload, Widget, WidgetForm } from '@/shared/hooks/useWo
 import { SideNav } from '@/components/sideNav/SideNav';
 import { EditWorkspaceModal } from '@/components/modals/editWorkspaceModal/EditWorkspaceModal';
 import { api } from '@/services/api';
-import {useTopMenuState} from "@/components/topComponent/hook/useTopMenuState";
-import {WorkspaceMenu} from "@/components/topComponent/workspaceMenu/WorkspaceMenu";
-import {Floating} from "@/components/topComponent/floating/Floating";
-import {TablesMenu} from "@/components/topComponent/tablesMenu/TablesMenu";
-import {WidgetsMenu} from "@/components/topComponent/widgetsMenu/WidgetsMenu";
-import {FormsMenu} from "@/components/topComponent/formsMenu/FormsMenu";
-
-
+import { useTopMenuState } from '@/components/topComponent/hook/useTopMenuState';
+import { WorkspaceMenu } from '@/components/topComponent/workspaceMenu/WorkspaceMenu';
+import { Floating } from '@/components/topComponent/floating/Floating';
+import { TablesMenu } from '@/components/topComponent/tablesMenu/TablesMenu';
+import { WidgetsMenu } from '@/components/topComponent/widgetsMenu/WidgetsMenu';
+import { FormsMenu } from '@/components/topComponent/formsMenu/FormsMenu';
 
 type Props = {
     workSpaces: WorkSpaceTypes[];
@@ -104,23 +102,22 @@ export const TopComponent: React.FC<Props> = (props) => {
         setTblHover,
     });
 
-    // SideNav: открыть форму с прелоадом (оставляем из исходника)
     type ApiWidget = Widget & { table_id: number };
     type ApiTable = DTable & { workspace_id: number };
 
-    const openFormWithPreload = async (widgetId: number, formId: number) => {
+// вариант "без двойной загрузки": просто открываем форму и дерево
+    const openFormWithPreload = async (_widgetId: number, formId: number) => {
+        // 1) Сразу открываем форму — это дернёт POST /display/{formId}/main
+        handleSelectForm(formId);
+
         try {
-            const { data: widget } = await api.get<ApiWidget>(`/widgets/${widgetId}`);
-            const { data: table } = await api.get<ApiTable>(`/tables/${widget.table_id}`);
-            await loadTables(table.workspace_id, true);
-            await loadWidgetsForTable(table.id, true);
-            handleSelectTable(table);
-            handleSelectWidget(widget);
-            handleSelectForm(formId);
+            // 2) При желании можно сразу подгрузить дерево формы
             await loadFormTree(formId);
-        } catch (e) {
-            console.warn('openFormWithPreload error:', e);
+        } catch (e: any) {
+            console.warn('[TopComponent] openFormWithPreload: ошибка загрузки дерева формы', e?.response?.status ?? e);
+            // даже если дерево не загрузилось — сама форма уже показана
         } finally {
+            // 3) В любом случае закрываем сайдбар и верхнее меню
             setNavOpen(false);
             state.closeAll();
         }
@@ -174,7 +171,6 @@ export const TopComponent: React.FC<Props> = (props) => {
                     />
                 )}
 
-                {/* LVL-3: Tables (Floating) */}
                 {state.wsOpen.id != null && (
                     <Floating anchor={state.wsOpen.anchor} side={state.wsOpen.side} setNode={state.setWsNode}>
                         <TablesMenu
@@ -199,7 +195,6 @@ export const TopComponent: React.FC<Props> = (props) => {
                     </Floating>
                 )}
 
-                {/* LVL-4: Widgets (Floating) */}
                 {state.tblOpen.id != null && (
                     <Floating
                         anchor={state.tblOpen.anchor}
@@ -231,7 +226,6 @@ export const TopComponent: React.FC<Props> = (props) => {
                     </Floating>
                 )}
 
-                {/* LVL-5: Forms (Floating) */}
                 {state.wOpen.id != null && (
                     <Floating anchor={state.wOpen.anchor} side={state.wOpen.side} setNode={state.setWNode}>
                         <FormsMenu
@@ -276,13 +270,13 @@ export const TopComponent: React.FC<Props> = (props) => {
                     defaultName={selectedWS.name}
                     defaultDescription={selectedWS.description}
                     defaultGroup={selectedWS.group}
-                    onSubmit={async ({ name, description,group }) => {
+                    onSubmit={async ({ name, description, group }) => {
                         try {
                             await api.patch(`/workspaces/${selectedWS.id}`, {
                                 name,
                                 description,
                                 connection_id: selectedWS.connection_id ?? 0,
-                                group
+                                group,
                             });
                             await loadWorkSpaces();
                             setEditModalOpen(false);

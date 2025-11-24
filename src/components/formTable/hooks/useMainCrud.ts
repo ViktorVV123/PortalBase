@@ -1,7 +1,7 @@
 // useMainCrud.ts
 import { useCallback, useState } from 'react';
 import { api } from '@/services/api';
-import type { DTable, FormDisplay, Widget } from '@/shared/hooks/useWorkSpaces';
+import type {DTable, FormDisplay, Widget, WidgetForm} from '@/shared/hooks/useWorkSpaces';
 
 const DEBUG_MAINCRUD = true;
 const log = (label: string, payload?: unknown) => {
@@ -29,6 +29,7 @@ export type UseMainCrudDeps = {
     selectedWidget: Widget | null;
     selectedFormId: number | null;
     formsByWidget: Record<number, { form_id: number }>;
+    formsById: Record<number, WidgetForm>;               // 👈 НОВОЕ ПОЛЕ
     activeFilters: Array<{ table_column_id: number; value: string | number }>;
     setFormDisplay: (v: FormDisplay) => void;
     reloadTree: () => Promise<void>;
@@ -41,6 +42,7 @@ export type UseMainCrudDeps = {
     setLastPrimary: (v: Record<string, unknown>) => void;
     setSelectedKey: React.Dispatch<React.SetStateAction<string | null>>;
     preflightTableId?: number | null;
+
 };
 
 type ComboColumnMeta = { ref_column_order: number; width: number; combobox_alias: string | null };
@@ -82,6 +84,7 @@ export function useMainCrud({
                                 pkToKey,
                                 lastPrimary,
                                 setLastPrimary,
+                                formsById,
                                 setSelectedKey,
                                 preflightTableId,
                             }: UseMainCrudDeps) {
@@ -101,32 +104,60 @@ export function useMainCrud({
         return formsByWidget[selectedWidget.id]?.form_id ?? null;
     }, [selectedFormId, selectedWidget, formsByWidget]);
 
+
+    const getEffectiveWidgetId = useCallback((): number | null => {
+        // 1) Если сверху уже явно выбран виджет — используем его
+        if (selectedWidget?.id) return selectedWidget.id;
+
+        // 2) Если выбрана форма — пробуем найти виджет по formsById
+        if (selectedFormId != null) {
+            const form = formsById[selectedFormId];
+            if (form && typeof (form as any).widget_id === 'number') {
+                return (form as any).widget_id as number;
+            }
+
+            // 3) Fallback: formsByWidget (старый маппер виджет → базовая форма)
+            for (const [widStr, f] of Object.entries(formsByWidget)) {
+                if (f?.form_id === selectedFormId) {
+                    const wid = Number(widStr);
+                    if (!Number.isNaN(wid)) return wid;
+                }
+            }
+        }
+
+        return null;
+    }, [selectedWidget, selectedFormId, formsById, formsByWidget]);
+
+
+
     const ensureQuery = useCallback(
         async (kind: EnsureQueryKind): Promise<{ ok: boolean; formId?: number }> => {
-            if (!selectedWidget && !preflightTableId) return { ok: false };
-
             const formId = getEffectiveFormId();
             if (!formId) return { ok: false };
+
+            const widgetId = getEffectiveWidgetId();
+            if (!widgetId && !preflightTableId) return { ok: false };
 
             try {
                 let tableId: number | null = preflightTableId ?? null;
 
+                // пробуем взять table_id из selectedWidget, если он есть
                 if (!tableId) {
                     const maybeTid = (selectedWidget as any)?.table_id as number | undefined;
                     if (maybeTid) tableId = maybeTid ?? null;
                 }
 
-                if (!tableId) {
-                    const wid = selectedWidget?.id;
-                    if (!wid) return { ok: false };
-                    const { data: widgetMeta } = await api.get<{ id: number; table_id: number }>(`/widgets/${wid}`);
+                // если всё ещё нет — дёргаем /widgets/{widgetId}
+                if (!tableId && widgetId) {
+                    const { data: widgetMeta } = await api.get<{ id: number; table_id: number }>(
+                        `/widgets/${widgetId}`
+                    );
                     tableId = widgetMeta?.table_id ?? null;
                 }
 
                 if (!tableId) return { ok: false };
 
-                // 👇 лог — какой tableId реально использован
-                log('ensureQuery → tableId used', { kind, formId, tableId });
+                log('ensureQuery → tableId used', { kind, formId, tableId, widgetId });
 
                 const { data: table } = await api.get<DTable>(`/tables/${tableId}`);
 
@@ -138,19 +169,24 @@ export function useMainCrud({
                             : table?.delete_query;
 
                 if (!q || !q.trim()) {
-                    if (kind === 'insert') alert('Для этой таблицы не настроен INSERT QUERY. Задайте его в метаданных таблицы.');
-                    else if (kind === 'update') alert('Для этой таблицы не настроен UPDATE QUERY. Задайте его в метаданных таблицы.');
-                    else alert('Для этой таблицы не настроен DELETE QUERY. Задайте его в метаданных таблицы.');
+                    if (kind === 'insert') {
+                        alert('Для этой таблицы не настроен INSERT QUERY. Задайте его в метаданных таблицы.');
+                    } else if (kind === 'update') {
+                        alert('Для этой таблицы не настроен UPDATE QUERY. Задайте его в метаданных таблицы.');
+                    } else {
+                        alert('Для этой таблицы не настроен DELETE QUERY. Задайте его в метаданных таблицы.');
+                    }
                     return { ok: false };
                 }
             } catch {
-                // префлайт — не критичен
+                // префлайт не критичен — не валим CRUD, просто молча
             }
 
             return { ok: true, formId };
         },
-        [selectedWidget, preflightTableId, getEffectiveFormId] // 👈 ДОБАВИЛИ preflightTableId
+        [selectedWidget, preflightTableId, getEffectiveFormId, getEffectiveWidgetId]
     );
+
 
 
     const preflightInsert = useCallback(() => ensureQuery('insert'), [ensureQuery]);
@@ -237,7 +273,9 @@ export function useMainCrud({
     }, []);
 
     const submitAdd = useCallback(async () => {
-        if (!selectedWidget) return;
+        const wid = getEffectiveWidgetId();
+        if (!wid) return;
+
         const pf = await preflightInsert();
         if (!pf.ok || !pf.formId) return;
 
@@ -286,7 +324,7 @@ export function useMainCrud({
             log('submitAdd → values[] (with null for empty combobox)', values);
 
             const body = { pk: { primary_keys: {} as Record<string, string> }, values };
-            const url = `/data/${pf.formId}/${selectedWidget.id}`;
+            const url = `/data/${pf.formId}/${wid}`;
             log('submitAdd → request', { url, body });
 
             try {
@@ -332,7 +370,7 @@ export function useMainCrud({
             setSaving(false);
         }
     }, [
-        selectedWidget,
+        getEffectiveWidgetId,
         preflightInsert,
         draft,
         activeFilters,
@@ -428,7 +466,11 @@ export function useMainCrud({
     }, []);
 
     const submitEdit = useCallback(async () => {
-        if (editingRowIdx == null || !selectedWidget) return;
+        if (editingRowIdx == null) return;
+
+        const wid = getEffectiveWidgetId();
+        if (!wid) return;
+
         const pf = await preflightUpdate();
         if (!pf.ok || !pf.formId) return;
 
@@ -490,7 +532,7 @@ export function useMainCrud({
                 pk: { primary_keys: pkObj as Record<string, string> },
                 values,
             };
-            const url = `/data/${pf.formId}/${selectedWidget.id}`;
+            const url = `/data/${pf.formId}/${wid}`;
 
             // 3) before/after лог по тем write_tc_id, которые реально отправляем (entries)
             type BeforeAfter = {
@@ -637,7 +679,9 @@ export function useMainCrud({
 // ───────── Удаление ─────────
     const deleteRow = useCallback(
         async (rowIdx: number) => {
-            if (!selectedWidget) return;
+            const wid = getEffectiveWidgetId();
+            if (!wid) return;
+
             const pf = await preflightDelete();
             if (!pf.ok || !pf.formId) return;
 
@@ -652,7 +696,7 @@ export function useMainCrud({
             setDeletingRowIdx(rowIdx);
             try {
                 const body = { primary_keys: pkObj };
-                const url = `/data/${pf.formId}/${selectedWidget.id}`;
+                const url = `/data/${pf.formId}/${wid}`;
 
                 try {
                     await api.delete(url, { data: body });
@@ -686,7 +730,7 @@ export function useMainCrud({
             }
         },
         [
-            selectedWidget,
+            getEffectiveWidgetId,
             preflightDelete,
             formDisplay.data,
             pkToKey,
@@ -695,7 +739,7 @@ export function useMainCrud({
             lastPrimary,
             setSubDisplay,
             setSelectedKey,
-            reloadTree,         // не забудь в зависимостях
+            reloadTree,
             setLastPrimary,
         ]
     );

@@ -1,6 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
 import type { DTable, Widget, WidgetForm } from '@/shared/hooks/useWorkSpaces';
-import type { WorkSpaceTypes } from '@/types/typesWorkSpaces';
 
 type Deps = {
     loadColumns: (t: DTable) => void;
@@ -9,7 +8,7 @@ type Deps = {
     loadFormDisplay: (formId: number) => void;
     loadFormTree: (formId: number) => Promise<void>;
     fetchWidgetAndTable: (widgetId: number) => Promise<{ widget: Widget; table: DTable }>;
-    formsByWidget: Record<number, any>;
+    formsByWidget: Record<number, WidgetForm>;
 };
 
 export function useMainSelection({
@@ -53,6 +52,7 @@ export function useMainSelection({
     const handleSelectForm = useCallback(
         (formId: number) => {
             setSelectedFormId(formId);
+            // 👇 здесь уже прямой вызов /display/{formId}/main
             loadFormDisplay(formId);
         },
         [loadFormDisplay]
@@ -63,13 +63,38 @@ export function useMainSelection({
         return formsByWidget[selectedWidget.id]?.name ?? '';
     }, [formsByWidget, selectedFormId, selectedWidget]);
 
+    /**
+     * Открытие формы (SideNav / модалки и т.п.).
+     * ВАЖНО: даже если нет прав на /widgets или /tables,
+     * мы всё равно должны открыть форму по formId.
+     */
     const openForm = useCallback(
         async (widgetId: number, formId: number) => {
-            const { widget, table } = await fetchWidgetAndTable(widgetId);
-            handleSelectTable(table);
-            handleSelectWidget(widget);
+            // 1) Пытаемся выбрать таблицу/виджет — но это не обязательно
+            try {
+                const { widget, table } = await fetchWidgetAndTable(widgetId);
+                handleSelectTable(table);
+                handleSelectWidget(widget);
+            } catch (e) {
+                console.warn(
+                    '[useMainSelection.openForm] Не удалось загрузить widget/table, продолжаем только с form:',
+                    { widgetId, formId, e }
+                );
+                // здесь ничего не делаем — просто идём дальше к форме
+            }
+
+            // 2) В любом случае — выбираем форму и грузим данные
             handleSelectForm(formId);
-            await loadFormTree(formId);
+
+            // 3) Дерево фильтров для этой формы
+            try {
+                await loadFormTree(formId);
+            } catch (e) {
+                console.warn('[useMainSelection.openForm] Не удалось загрузить дерево формы:', {
+                    formId,
+                    e,
+                });
+            }
         },
         [fetchWidgetAndTable, handleSelectForm, handleSelectTable, handleSelectWidget, loadFormTree]
     );

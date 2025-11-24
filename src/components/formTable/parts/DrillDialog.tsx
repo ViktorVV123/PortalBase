@@ -372,6 +372,7 @@ export const DrillDialog: React.FC<Props> = ({
         selectedWidget: selectedWidgetForPreflight,
         selectedFormId: currentFormId,
         formsByWidget: formsByWidget as any,
+        formsById,                              // 👈 ВОТ ЭТО ДОБАВЛЯЕМ
         activeFilters,
         setFormDisplay: setDisplayBoth,
         reloadTree,
@@ -385,6 +386,7 @@ export const DrillDialog: React.FC<Props> = ({
         setSelectedKey,
         preflightTableId: resolvedTableId,
     });
+
 
 
     const submitAddWithMark = useCallback(async () => {
