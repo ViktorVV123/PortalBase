@@ -1,17 +1,15 @@
 import React from 'react';
-import {TextField} from '@mui/material';
+import { TextField } from '@mui/material';
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
 import ArrowDropUpIcon from '@mui/icons-material/ArrowDropUp';
 import * as sub from './SubWormTable.module.scss';
 
 import EditIcon from '@/assets/image/EditIcon.svg';
 import DeleteIcon from '@/assets/image/DeleteIcon.svg';
-import type {SubDisplay} from '@/shared/hooks/useWorkSpaces';
-import type {HeaderModelItem} from '@/components/formTable/FormTable';
-import {formatCellValue} from '@/shared/utils/cellFormat';
-import {useSubWormTable, UseSubWormTableDeps} from "@/components/formTable/subForm/hook/useSubWormTable";
-
-
+import type { SubDisplay } from '@/shared/hooks/useWorkSpaces';
+import type { HeaderModelItem } from '@/components/formTable/FormTable';
+import { formatCellValue } from '@/shared/utils/cellFormat';
+import { useSubWormTable, UseSubWormTableDeps } from '@/components/formTable/subForm/hook/useSubWormTable';
 
 type SubformProps = {
     subDisplay: SubDisplay | null;
@@ -35,6 +33,17 @@ type SubformProps = {
     setIsAddingSub: React.Dispatch<React.SetStateAction<boolean>>;
     draftSub: Record<number, string>;
     setDraftSub: React.Dispatch<React.SetStateAction<Record<number, string>>>;
+
+    /** 🔗 открытие DrillDialog / других форм, как в MainTable */
+    onOpenDrill?: (
+        fid?: number | null,
+        meta?: {
+            originColumnType?: 'combobox' | null;
+            primary?: Record<string, unknown>;
+            openedFromEdit?: boolean;
+            targetWriteTcId?: number;
+        },
+    ) => void;
 };
 
 export const SubWormTable: React.FC<SubformProps> = (props) => {
@@ -57,6 +66,7 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
         setIsAddingSub,
         draftSub,
         setDraftSub,
+        onOpenDrill,
     } = props;
 
     const {
@@ -127,18 +137,18 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                             ))}
                             <th
                                 rowSpan={showSubHeaders ? 1 : 2}
-                                style={{textAlign: 'center', verticalAlign: 'middle'}}
+                                style={{ textAlign: 'center', verticalAlign: 'middle' }}
                             >
                                 <button
                                     type="button"
                                     onClick={() => setShowSubHeaders((v) => !v)}
                                     title={showSubHeaders ? 'Скрыть подзаголовки' : 'Показать подзаголовки'}
-                                    style={{background: 'none', border: 0, cursor: 'pointer'}}
+                                    style={{ background: 'none', border: 0, cursor: 'pointer' }}
                                 >
                                     {showSubHeaders ? (
-                                        <ArrowDropUpIcon style={{color: '#fff'}} />
+                                        <ArrowDropUpIcon style={{ color: '#fff' }} />
                                     ) : (
-                                        <ArrowDropDownIcon style={{color: '#fff'}} />
+                                        <ArrowDropDownIcon style={{ color: '#fff' }} />
                                     )}
                                 </button>
                             </th>
@@ -149,7 +159,7 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                                 {headerPlan.flatMap((g) =>
                                     g.labels.slice(0, g.cols.length).map((label, idx) => (
                                         <th key={`sub-g-sub-${g.id}-${idx}`}>{safe(label)}</th>
-                                    ))
+                                    )),
                                 )}
                                 <th />
                             </tr>
@@ -157,6 +167,7 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                         </thead>
 
                         <tbody>
+                        {/* строка добавления в саб */}
                         {isAddingSub && (
                             <tr>
                                 {flatColumnsInRenderOrder.map((col) => (
@@ -180,6 +191,7 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
 
                         {subDisplay.data.map((row, rowIdx) => {
                             const isEditing = editingRowIdx === rowIdx;
+
                             return (
                                 <tr key={rowIdx}>
                                     {flatColumnsInRenderOrder.map((col) => {
@@ -189,13 +201,16 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                                             col.table_column_id != null
                                                 ? -1_000_000 - Number(col.combobox_column_id)
                                                 : col.table_column_id ?? -1;
+
                                         const key = `${col.widget_column_id}:${syntheticTcId}`;
                                         const idx = valueIndexByKey.get(key);
                                         const val = idx != null ? row.values[idx] : '';
 
                                         if (isEditing) {
                                             return (
-                                                <td key={`sub-edit-r${rowIdx}-wc${col.widget_column_id}-tc${col.table_column_id}`}>
+                                                <td
+                                                    key={`sub-edit-r${rowIdx}-wc${col.widget_column_id}-tc${col.table_column_id}`}
+                                                >
                                                     <input
                                                         className={sub.inp}
                                                         value={editDraft[col.table_column_id!] ?? ''}
@@ -211,9 +226,48 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                                             );
                                         }
 
+                                        const display = formatCellValue(val);
+                                        const clickable = !!onOpenDrill && col.form_id != null;
+
                                         return (
-                                            <td key={`sub-r${rowIdx}-wc${col.widget_column_id}-tc${col.table_column_id}`}>
-                                                {formatCellValue(val)}
+                                            <td
+                                                key={`sub-r${rowIdx}-wc${col.widget_column_id}-tc${col.table_column_id}`}
+                                            >
+                                                {clickable ? (
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            onOpenDrill?.(col.form_id!, {
+                                                                originColumnType:
+                                                                    col.type === 'combobox' ? 'combobox' : null,
+                                                                primary: row.primary_keys as Record<
+                                                                    string,
+                                                                    unknown
+                                                                >,
+                                                                openedFromEdit: false,
+                                                            });
+                                                            console.debug('[SubWormTable] drill click', {
+                                                                formId: col.form_id,
+                                                                widget_column_id: col.widget_column_id,
+                                                                table_column_id: col.table_column_id,
+                                                            });
+                                                        }}
+                                                        style={{
+                                                            padding: 0,
+                                                            border: 'none',
+                                                            background: 'none',
+                                                            cursor: 'pointer',
+                                                            textDecoration: 'underline',
+                                                            color: 'var(--link,#66b0ff)',
+                                                        }}
+                                                        title={`Открыть форму #${col.form_id}`}
+                                                    >
+                                                        {display}
+                                                    </button>
+                                                ) : (
+                                                    <>{display}</>
+                                                )}
                                             </td>
                                         );
                                     })}
@@ -240,17 +294,22 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                                             </>
                                         ) : (
                                             <>
-                          <span
-                              style={{display: 'inline-flex', cursor: 'pointer', marginRight: 10}}
-                              onClick={() => startEdit(rowIdx)}
-                              title="Редактировать"
-                          >
-                            <EditIcon className={sub.actionIcon} />
-                          </span>
+                                                    <span
+                                                        style={{
+                                                            display: 'inline-flex',
+                                                            cursor: 'pointer',
+                                                            marginRight: 10,
+                                                        }}
+                                                        onClick={() => startEdit(rowIdx)}
+                                                        title="Редактировать"
+                                                    >
+                                                        <EditIcon className={sub.actionIcon} />
+                                                    </span>
                                                 <span
                                                     style={{
                                                         display: 'inline-flex',
-                                                        cursor: deletingRowIdx === rowIdx ? 'progress' : 'pointer',
+                                                        cursor:
+                                                            deletingRowIdx === rowIdx ? 'progress' : 'pointer',
                                                         opacity: deletingRowIdx === rowIdx ? 0.6 : 1,
                                                     }}
                                                     onClick={() => {
@@ -258,8 +317,8 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                                                     }}
                                                     title="Удалить"
                                                 >
-                            <DeleteIcon className={sub.actionIcon} />
-                          </span>
+                                                        <DeleteIcon className={sub.actionIcon} />
+                                                    </span>
                                             </>
                                         )}
                                     </td>

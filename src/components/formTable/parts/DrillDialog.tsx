@@ -388,6 +388,11 @@ export const DrillDialog: React.FC<Props> = ({
     });
 
 
+    useEffect(() => {
+        cancelEdit();      // editingRowIdx → null, editDraft очищается
+        cancelAdd();       // isAdding → false, draft очищается
+        setDraft({});      // на всякий случай полностью чистим драфт
+    }, [currentFormId, cancelEdit, cancelAdd, setDraft]);
 
     const submitAddWithMark = useCallback(async () => {
         try {
@@ -663,6 +668,7 @@ export const DrillDialog: React.FC<Props> = ({
                                    и модалка не открыта из редактирования (disableNestedDrill=false) */}
                                 {enableSub && (
                                     <SubWormTable
+                                        onOpenDrill={disableNestedDrill ? undefined : handleOpenDrill}
                                         editingRowIdx={null}
                                         setEditingRowIdx={() => {
                                         }}

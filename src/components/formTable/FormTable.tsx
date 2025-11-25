@@ -346,8 +346,8 @@ export const FormTable: React.FC<Props> = ({
                         comboReloadToken={comboReloadToken}
                     />
 
-                    <SubWormTable
-                        editingRowIdx={editingRowIdxSub}
+                    <SubWormTable  onOpenDrill={handleOpenDrillFromMain}
+                                   editingRowIdx={editingRowIdxSub}
                         setEditingRowIdx={setEditingRowIdxSub}
                         editDraft={editDraftSub}
                         setEditDraft={setEditDraftSub}
