@@ -163,52 +163,20 @@ export const SetOfTables: React.FC<Props> = (props) => {
     const headerGroups = useHeaderPreviewFromWc(widgetColumns, referencesMap, liveRefsForHeader ?? undefined);
 
 
-    // хэндлеры навигации
-    const goToTable = useCallback(() => {
-        setSubDisplay(null);
-        setFormDisplay(null);
-        handleClearWidget();
-    }, [handleClearWidget, setFormDisplay, setSubDisplay]);
-
-    const goToWidget = useCallback(() => {
-        if (!selectedWidget) return;
-        clearFormSelection();
-        setSubDisplay(null);
-        setFormDisplay(null);
-        loadColumnsWidget(selectedWidget.id);
-    }, [clearFormSelection, loadColumnsWidget, selectedWidget, setFormDisplay, setSubDisplay]);
-
-    const widgetTitle = useMemo(() => selectedWidget?.name ?? null, [selectedWidget]);
-    const formTitle = useMemo(() => (
-        selectedFormId != null ? (formsById[selectedFormId]?.name ?? `Форма #${selectedFormId}`) : null
-    ), [formsById, selectedFormId]);
-    const subTitle = useMemo(() => subDisplay?.displayed_widget?.name ?? null, [subDisplay?.displayed_widget?.name]);
-
-    const items = useMemo<Crumb[]>(() => {
-        const arr: Crumb[] = [{ label: workspaceName }];
-        if (selectedWidget) {
-            arr.push({ label: tableName, onClick: goToTable });
-            arr.push({ label: widgetTitle ?? 'Виджет', onClick: goToWidget });
-            if (formTitle) arr.push({ label: formTitle, active: !subTitle });
-            if (subTitle) arr.push({ label: subTitle, active: true });
-        } else {
-            arr.push({ label: tableName, active: true });
-        }
-        return arr;
-    }, [workspaceName, tableName, selectedWidget, widgetTitle, formTitle, subTitle, goToTable, goToWidget]);
 
 
 
 
 
 
-    // быстрые гварды
+
+
 
 
     return (
         <div className={s.wrapper}>
 
-           {/* <Breadcrumb items={items} className={s.headRow} />*/}
+
 
             {/* PRIORITY 1: FORM */}
             {selectedFormId ? (

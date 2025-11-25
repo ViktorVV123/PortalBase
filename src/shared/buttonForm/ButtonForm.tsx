@@ -1,79 +1,84 @@
+// ButtonForm.tsx
 import React from 'react';
-import AddIcon from '@mui/icons-material/AddBox';
-import CancelIcon from '@mui/icons-material/Cancel';
-import SaveIcon from '@mui/icons-material/Save';
-import AddBox from '@mui/icons-material/AddToPhotos';
+import AddIcon from '@mui/icons-material/Add';
+import DoneIcon from '@mui/icons-material/Done';
+import CloseIcon from '@mui/icons-material/Close';
+import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 
-type ButtonFormProps = {
+type Props = {
     isAdding: boolean;
-    startAdd: () => void;
-    selectedFormId?: number | null;
-    selectedWidget?: any;              // ← сделаем опциональным
-    submitAdd: () => void;
+    selectedFormId: number | null;
+    selectedWidget: any;
     saving: boolean;
+    startAdd: () => void;
+    submitAdd: () => void;
     cancelAdd: () => void;
 
-    /** передаём класс круглой кнопки из тулбара */
-    buttonClassName?: string;
-    /** true → это «саб»-кнопки (вторая группа в тулбаре) */
+    // для sub-режима
     showSubActions?: boolean;
+
+    buttonClassName?: string;
 };
 
-export const ButtonForm: React.FC<ButtonFormProps> = ({
-                                                          isAdding,
-                                                          showSubActions,
-                                                          startAdd,
-                                                          selectedFormId,
-                                                          selectedWidget,
-                                                          submitAdd,
-                                                          saving,
-                                                          cancelAdd,
-                                                          buttonClassName
-                                                      }) => {
-    // Для main (showSubActions=false) — не блокируем кнопку "Добавить" вообще.
-    // Для sub (showSubActions=true) — оставляем старую проверку.
-    const startDisabled = showSubActions ? (!selectedFormId || !selectedWidget) : false;
+export const ButtonForm: React.FC<Props> = ({
+                                                isAdding,
+                                                selectedFormId,
+                                                selectedWidget,
+                                                saving,
+                                                startAdd,
+                                                submitAdd,
+                                                cancelAdd,
+                                                showSubActions = false,
+                                                buttonClassName,
+                                            }) => {
 
+    const hasMainContext = Boolean(selectedFormId || selectedWidget);
+    const canAdd = showSubActions ? true : hasMainContext;
+    const disableAdd = saving || !canAdd;
 
+    const AddIconToUse = showSubActions ? AddCircleOutlineIcon : AddIcon;
+    // 👉 теперь AddIcon меняется в зависимости от режима
 
     if (!isAdding) {
         return (
             <button
                 type="button"
                 className={buttonClassName}
+                disabled={disableAdd}
                 onClick={startAdd}
-                disabled={startDisabled}
-                title={
-                    startDisabled
-                        ? 'Выбери форму и виджет'
-                        : (showSubActions ? 'Добавить запись в подформу' : 'Добавить запись')
+                title={showSubActions
+                    ? 'Добавить запись в подтаблицу'
+                    : 'Добавить запись'
                 }
             >
-                {showSubActions ? <AddBox/> : <AddIcon/>}
+                <AddIconToUse />
             </button>
         );
     }
 
     return (
-        <div style={{ display: 'inline-flex', gap: 8 }}>
+        <>
             <button
                 type="button"
                 className={buttonClassName}
+                disabled={saving}
                 onClick={submitAdd}
-                disabled={saving}             // блокируем только на сохранении
-                title="Сохранить"
+                title={showSubActions
+                    ? 'Сохранить запись подтаблицы'
+                    : 'Сохранить запись'
+                }
             >
-                <SaveIcon/>
+                <DoneIcon />
             </button>
             <button
                 type="button"
                 className={buttonClassName}
-                onClick={cancelAdd}
                 disabled={saving}
+                onClick={cancelAdd}
                 title="Отменить"
             >
-                <CancelIcon/>
+                <CloseIcon />
             </button>
-        </div>
+        </>
     );
 };

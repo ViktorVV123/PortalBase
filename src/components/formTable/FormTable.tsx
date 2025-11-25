@@ -161,20 +161,34 @@ export const FormTable: React.FC<Props> = ({
     });
 
     const handleResetFilters = useCallback(async () => {
-        if (!selectedFormId || !selectedWidget) return;
+        if (!selectedFormId) return;
+
         setActiveFilters([]);
         setActiveExpandedKey(null);
         setSelectedKey(null);
         setLastPrimary({});
         setSubDisplay(null);
         setActiveSubOrder(availableOrders[0] ?? 0);
+
         try {
             await resetFiltersHard();
             await reloadTree();
         } catch (e) {
             console.warn('❌ Ошибка при сбросе фильтров:', e);
         }
-    }, [selectedFormId, selectedWidget, availableOrders, setSubDisplay, resetFiltersHard, reloadTree, setActiveFilters, setActiveExpandedKey, setSelectedKey, setLastPrimary, setActiveSubOrder]);
+    }, [
+        selectedFormId,
+        availableOrders,
+        setSubDisplay,
+        resetFiltersHard,
+        reloadTree,
+        setActiveFilters,
+        setActiveExpandedKey,
+        setSelectedKey,
+        setLastPrimary,
+        setActiveSubOrder,
+    ]);
+
 
     /** ───────── CRUD main ───────── */
     const {
