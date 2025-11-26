@@ -4,11 +4,21 @@ import * as s from './SideNav.module.scss';
 
 import MenuIcon from '@/assets/image/FormaIcon1.svg';
 import FormaIcon from '@/assets/image/FormaIcon1.svg';
+import LineIcon from '@/assets/image/LineIcon.svg';
+
+type WorkSpaceTypesSide = {
+    connection_id:number;
+    group: string;
+    description: string;
+    id:number
+    name: string;
+}
 
 export type FormListItem = {
     form_id: number;
     name: string;
     main_widget_id: number;
+    workspace:WorkSpaceTypesSide
 };
 
 interface Props {
@@ -75,9 +85,17 @@ export const SideNav: React.FC<Props> = ({ open, toggle, forms, openForm }) => {
                             };
                             return (
                                 <li key={f.form_id}>
-                                    <button onClick={handleClick}>
-                                        <FormaIcon className={s.icon} />
-                                        <span className={s.name}>{f.name}</span>
+                                    <button
+                                        onClick={handleClick}
+                                        className={s.itemBtn}
+                                    >
+                                        <FormaIcon className={s.icon}/>
+
+                                        <span className={s.wsName}>{f.workspace.name}</span>
+
+                                        <LineIcon className={s.separator}/>
+
+                                        <span className={s.formName}>{f.name}</span>
                                     </button>
                                 </li>
                             );

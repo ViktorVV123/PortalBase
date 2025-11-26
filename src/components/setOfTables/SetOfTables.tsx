@@ -1,4 +1,4 @@
-import React, {useCallback, useMemo, useState} from 'react';
+import React, {useState} from 'react';
 import * as s from './SetOfTables.module.scss';
 import {
     Column,
@@ -17,8 +17,6 @@ import {
     WcReference,
     WidgetColumnsOfTable,
 } from '@/components/WidgetColumnsOfTable/WidgetColumnTable/WidgetColumnsOfTable';
-import {api} from '@/services/api';
-import {Breadcrumb, Crumb} from "@/shared/ui/Breadcrumb";
 
 import {useHeaderPreviewFromWc} from "@/components/WidgetColumnsOfTable/WidgetColumnTable/hook/useHeaderPreviewFromWc";
 import {CenteredLoader} from "@/shared/ui/CenteredLoader";
@@ -108,30 +106,6 @@ type Props = {
     loadWidgetForms: () => Promise<void> | void;
 };
 
-/** ─────────────────────── Вспомогательные хуки ─────────────────────── */
-function useCurrentForm(
-    selectedFormId: number | null,
-    selectedWidget: Widget | null,
-    formsById: Record<number, WidgetForm>,
-    formsByWidget: Record<number, WidgetForm>,
-) {
-    return useMemo<WidgetForm | null>(() => {
-        if (selectedFormId != null) return formsById[selectedFormId] ?? null;
-        if (selectedWidget) return formsByWidget[selectedWidget.id] ?? null;
-        return null;
-    }, [selectedFormId, selectedWidget, formsById, formsByWidget]);
-}
-
-function useSubWidgetIdByOrder(currentForm: WidgetForm | null) {
-    return useMemo<Record<number, number>>(() => {
-        const map: Record<number, number> = {};
-        currentForm?.sub_widgets?.forEach((sw) => { map[sw.widget_order] = sw.sub_widget_id; });
-        return map;
-    }, [currentForm]);
-}
-
-
-
 /** ─────────────────────── Основной компонент ─────────────────────── */
 export const SetOfTables: React.FC<Props> = (props) => {
     const {
@@ -161,17 +135,6 @@ export const SetOfTables: React.FC<Props> = (props) => {
 
     // группы заголовков: основная форма и саб-форма
     const headerGroups = useHeaderPreviewFromWc(widgetColumns, referencesMap, liveRefsForHeader ?? undefined);
-
-
-
-
-
-
-
-
-
-
-
 
     return (
         <div className={s.wrapper}>
