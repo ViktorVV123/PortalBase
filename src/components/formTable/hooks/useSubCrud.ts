@@ -134,6 +134,13 @@ export function useSubCrud({
             } catch (err: any) {
                 const status = err?.response?.status;
                 const detail  = err?.response?.data?.detail ?? err?.response?.data ?? err?.message;
+
+                if (status === 403) {
+                    console.warn('[submitEdit] 403 Forbidden', { url, body, detail });
+                    alert('У вас не хватает прав на добавление новой записи');
+                    return; // не валим дальше, не делаем reload
+                }
+
                 if (status === 404 && String(detail).includes('Insert query not found')) {
                     alert('Для саб-формы не настроен INSERT QUERY. Задайте его и повторите.');
                     return;

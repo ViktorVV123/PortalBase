@@ -333,6 +333,12 @@ export function useMainCrud({
                 const status = err?.response?.status;
                 const detail = err?.response?.data?.detail ?? err?.response?.data ?? err?.message;
 
+                if (status === 403) {
+                    console.warn('[submitEdit] 403 Forbidden', { url, body, detail });
+                    alert('У вас не хватает прав на добавление новой записи');
+                    return; // не валим дальше, не делаем reload
+                }
+
                 if (status === 404 && String(detail).includes('Insert query not found')) {
                     alert('Для этой таблицы не настроен INSERT QUERY. Задайте его в метаданных таблицы.');
                     return;
@@ -590,6 +596,12 @@ export function useMainCrud({
             } catch (err: any) {
                 const status = err?.response?.status;
                 const detail = err?.response?.data?.detail ?? err?.response?.data ?? err?.message;
+
+                if (status === 403) {
+                    console.warn('[submitEdit] 403 Forbidden', { url, body, detail });
+                    alert('У вас не хватает прав на редактирование этой записи');
+                    return; // не валим дальше, не делаем reload
+                }
 
                 if (status === 404 && String(detail).includes('Update query not found')) {
                     alert('Для этой таблицы не настроен UPDATE QUERY. Задайте его в метаданных таблицы.');

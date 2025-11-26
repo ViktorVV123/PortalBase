@@ -208,6 +208,12 @@ export function useSubWormTable({
             } catch (err: any) {
                 const status = err?.response?.status;
                 const detail = err?.response?.data?.detail ?? err?.response?.data ?? err?.message;
+
+                if (status === 403) {
+                    console.warn('[submitEdit] 403 Forbidden', { url, body, detail });
+                    alert('У вас не хватает прав на редактирование записи');
+                    return; // не валим дальше, не делаем reload
+                }
                 if (status === 404 && String(detail).includes('Update query not found')) {
                     alert('Для саб-формы не настроен UPDATE QUERY. Задайте его и повторите.');
                     return;
