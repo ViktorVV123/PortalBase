@@ -21,10 +21,10 @@ type TreeNode = {
 };
 
 /**
- * Строим дерево:
- * - если f.path есть → используем его как цепочку папок (разбиваем по "/");
- * - если path нет → корневая папка = workspace.name;
- * - лист (последний уровень) = form.name.
+ * Дерево:
+ * 1) Всегда корень – workspace.name (отдельная папка).
+ * 2) Если path есть → внутри workspace создаём подпапки по сегментам path.
+ * 3) Если path пуст → внутри workspace сразу листья с form.name.
  */
 const buildTreeFromForms = (forms: WidgetForm[]): TreeNode[] => {
     const roots: TreeNode[] = [];
@@ -40,33 +40,48 @@ const buildTreeFromForms = (forms: WidgetForm[]): TreeNode[] => {
     };
 
     for (const f of forms) {
-        const hasPath = f.path && f.path.trim().length > 0;
+        const workspaceLabel = f.workspace?.name ?? 'Без workspace';
+        const workspaceIdOrName = f.workspace?.id ?? workspaceLabel;
 
-        const segments = hasPath
-            ? f.path!
+        // 1) корневая папка — workspace
+        const wsKey = `ws-${workspaceIdOrName}`;
+        const wsNode = findOrCreateNode(roots, wsKey, workspaceLabel);
+
+        let currentList = wsNode.children!;
+        let currentKey = wsKey;
+
+        // 2) path → сегменты (если есть)
+        let pathSegments: string[] = [];
+
+        if (f.path && f.path.trim().length > 0) {
+            const segments = f.path
                 .split('/')
                 .map((p) => p.trim())
-                .filter(Boolean)
-            : [f.workspace?.name ?? 'Без workspace'];
+                .filter(Boolean);
 
-        let currentList = roots;
-        let currentKey = '';
+            // если первый сегмент совпадает с названием workspace — пропускаем, чтобы не дублировать
+            if (segments.length > 0 && segments[0] === workspaceLabel) {
+                segments.shift();
+            }
 
-        // создаём цепочку папок
-        for (const seg of segments) {
-            const key = currentKey ? `${currentKey}/${seg}` : seg;
+            pathSegments = segments;
+        }
+
+        // 3) создаём цепочку подпапок внутри workspace (если есть path)
+        for (const seg of pathSegments) {
+            const key = `${currentKey}/${seg}`;
             const node = findOrCreateNode(currentList, key, seg);
             currentList = node.children!;
             currentKey = key;
         }
 
-        // добавляем лист-форму под последнюю папку
+        // 4) добавляем лист-форму под последнюю папку (или прямо под workspace, если path пустой)
         const leafKey = `${currentKey}//form-${f.form_id}`;
         let leaf = currentList.find((n) => n.key === leafKey);
         if (!leaf) {
             leaf = {
                 key: leafKey,
-                label: f.name, // для совместимости, реальный текст возьмём из form.name
+                label: f.name, // реальный текст листа всё равно берём из form.name
                 form: f,
             };
             currentList.push(leaf);
@@ -104,12 +119,14 @@ const Tree: React.FC<TreeProps> = ({ nodes, expanded, toggleNode, onLeafClick })
                     }
                 };
 
-                // подписи
+                // title для подсказки по hover
                 const leafTitle =
                     isLeaf && node.form
-                        ? (node.form.path && node.form.path.trim().length
-                            ? `${node.form.path} / ${node.form.name}`
-                            : node.form.name)
+                        ? `${node.form.workspace?.name ?? ''}${
+                            node.form.path && node.form.path.trim().length
+                                ? ` / ${node.form.path}`
+                                : ''
+                        } / ${node.form.name}`
                         : undefined;
 
                 return (
@@ -126,20 +143,14 @@ const Tree: React.FC<TreeProps> = ({ nodes, expanded, toggleNode, onLeafClick })
 
                             {isLeaf && node.form ? (
                                 // ЛИСТ: показываем только form.name (обрезка по CSS)
-                                <span
-                                    className={s.formName}
-                                    title={leafTitle}
-                                >
-                    {node.form.name}
-                </span>
+                                <span className={s.formName} title={leafTitle}>
+                                    {node.form.name}
+                                </span>
                             ) : (
-                                // ПАПКА: показываем часть path или workspace.name
-                                <span
-                                    className={s.treeLabel}
-                                    title={node.label}
-                                >
-                    {node.label}
-                </span>
+                                // ПАПКА: workspace.name или сегмент path
+                                <span className={s.treeLabel} title={node.label}>
+                                    {node.label}
+                                </span>
                             )}
                         </div>
 
@@ -153,7 +164,6 @@ const Tree: React.FC<TreeProps> = ({ nodes, expanded, toggleNode, onLeafClick })
                         )}
                     </li>
                 );
-
             })}
         </ul>
     );
@@ -163,17 +173,16 @@ export const SideNav: React.FC<Props> = ({ open, toggle, forms, openForm }) => {
     const wrapRef = useRef<HTMLDivElement | null>(null);
     const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
-    /** Строим дерево из списка форм */
     const tree = useMemo(() => buildTreeFromForms(forms), [forms]);
 
-    /** Сбрасываем раскрытие при закрытии меню */
+    // сбрасываем раскрытие при закрытии меню
     useEffect(() => {
         if (!open) {
             setExpanded(new Set());
         }
     }, [open]);
 
-    /** Закрытие при клике вне блока + по Escape */
+    // закрытие по клику вне и по Escape
     useEffect(() => {
         if (!open) return;
 
