@@ -4,7 +4,7 @@ import * as s from './TopComponent.module.scss';
 import { WorkSpaceTypes } from '@/types/typesWorkSpaces';
 import { DTable, NewFormPayload, Widget, WidgetForm } from '@/shared/hooks/useWorkSpaces';
 
-import { SideNav } from '@/components/sideNav/SideNav';
+import { SideNav } from '@/components/topComponent/sideNav/SideNav';
 import { EditWorkspaceModal } from '@/components/modals/editWorkspaceModal/EditWorkspaceModal';
 import { api } from '@/services/api';
 import { useTopMenuState } from '@/components/topComponent/hook/useTopMenuState';

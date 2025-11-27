@@ -94,6 +94,13 @@ export type WidgetForm = {
         column_order: number;
         table_column_id: number;
     }[];
+    workspace: {
+        connection_id: number;
+        group: string | null;
+        description: string | null;
+        id: number,
+        name: string;
+    }
 };
 
 //типизация формы MAIN
