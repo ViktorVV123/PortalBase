@@ -24,7 +24,7 @@ export type FormListItem = {
 interface Props {
     open: boolean;
     toggle: () => void;
-    forms: FormListItem[];
+    forms: any;
     openForm: (widgetId: number, formId: number) => void;
 }
 
@@ -78,7 +78,7 @@ export const SideNav: React.FC<Props> = ({ open, toggle, forms, openForm }) => {
             {open && forms.length > 0 && (
                 <div className={s.popup}>
                     <ul>
-                        {forms.map((f) => {
+                        {forms.map((f:any) => {
                             const handleClick = () => {
                                 openForm(f.main_widget_id, f.form_id);
                                 toggle();

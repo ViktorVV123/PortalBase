@@ -949,38 +949,44 @@ export const useWorkSpaces = () => {
     const [connections, setConnections] = useState<Connection[]>([]);
     const connectionsStatusRef = useRef<'idle' | 'loading' | 'loaded' | 'forbidden'>('idle');
 
-    const loadConnections = useCallback(async () => {
-        // 1) если уже грузим или уже знаем, что запрещено/загружено — выходим
-        if (connectionsStatusRef.current === 'loading' ||
-            connectionsStatusRef.current === 'forbidden' ||
-            connectionsStatusRef.current === 'loaded') {
-            return;
-        }
+    const loadConnections = useCallback(
+        async (opts?: { force?: boolean }) => {
+            const force = opts?.force ?? false;
 
-        connectionsStatusRef.current = 'loading';
-
-        // НЕ обязательно трогать глобальный loading, но если хочешь — оставим:
-        setLoading(true);
-        try {
-            const { data } = await api.get<Connection[]>('/connections/');
-            setConnections(data);
-            setError(null);
-            connectionsStatusRef.current = 'loaded';
-        } catch (e: any) {
-            const status = e?.response?.status;
-
-            if (status === 403) {
-                connectionsStatusRef.current = 'forbidden';
-                setError('У вас нет доступа к списку подключений');
-            } else {
-                connectionsStatusRef.current = 'idle'; // можно дать возможность ручного ретрая
-                setError('Не удалось загрузить список соединений');
+            // 1) если уже грузим или запрещено/загружено — выходим ТОЛЬКО если не force
+            if (
+                !force &&
+                (connectionsStatusRef.current === 'loading' ||
+                    connectionsStatusRef.current === 'forbidden' ||
+                    connectionsStatusRef.current === 'loaded')
+            ) {
+                return;
             }
-        } finally {
-            setLoading(false);
-        }
-    }, []);
 
+            connectionsStatusRef.current = 'loading';
+
+            setLoading(true);
+            try {
+                const { data } = await api.get<Connection[]>('/connections/');
+                setConnections(data);
+                setError(null);
+                connectionsStatusRef.current = 'loaded';
+            } catch (e: any) {
+                const status = e?.response?.status;
+
+                if (status === 403) {
+                    connectionsStatusRef.current = 'forbidden';
+                    setError('У вас нет доступа к списку подключений');
+                } else {
+                    connectionsStatusRef.current = 'idle';
+                    setError('Не удалось загрузить список соединений');
+                }
+            } finally {
+                setLoading(false);
+            }
+        },
+        [],
+    );
 
     /* ↓ рядом с loadConnections connections delete */
     const deleteConnection = useCallback(async (id: number) => {

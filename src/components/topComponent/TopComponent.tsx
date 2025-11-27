@@ -13,6 +13,7 @@ import { Floating } from '@/components/topComponent/floating/Floating';
 import { TablesMenu } from '@/components/topComponent/tablesMenu/TablesMenu';
 import { WidgetsMenu } from '@/components/topComponent/widgetsMenu/WidgetsMenu';
 import { FormsMenu } from '@/components/topComponent/formsMenu/FormsMenu';
+import {ModalEditConnection} from "@/components/modals/modalEditConnection/ModalEditConnection";
 
 type Props = {
     workSpaces: WorkSpaceTypes[];
@@ -52,6 +53,7 @@ type Props = {
     formsById: Record<number, WidgetForm>;
     setFormToEdit: (f: WidgetForm) => void;
     setEditFormOpen: (v: boolean) => void;
+    loadConnections: (opts?: { force?: boolean }) => void;
 };
 
 export const TopComponent: React.FC<Props> = (props) => {
@@ -85,10 +87,13 @@ export const TopComponent: React.FC<Props> = (props) => {
         setCreateFormWidget,
         setWsHover,
         setTblHover,
+        loadConnections,
     } = props;
 
     const [editModalOpen, setEditModalOpen] = useState(false);
     const [selectedWS, setSelectedWS] = useState<WorkSpaceTypes | null>(null);
+    const [editConnOpen, setEditConnOpen] = useState(false);
+    const [connToEditId, setConnToEditId] = useState<number | null>(null);
 
     const state = useTopMenuState({
         loadTables,
@@ -102,8 +107,7 @@ export const TopComponent: React.FC<Props> = (props) => {
         setTblHover,
     });
 
-    type ApiWidget = Widget & { table_id: number };
-    type ApiTable = DTable & { workspace_id: number };
+
 
 // вариант "без двойной загрузки": просто открываем форму и дерево
     const openFormWithPreload = async (_widgetId: number, formId: number) => {
@@ -264,28 +268,54 @@ export const TopComponent: React.FC<Props> = (props) => {
             </div>
 
             {selectedWS && (
-                <EditWorkspaceModal
-                    open={editModalOpen}
-                    onClose={() => setEditModalOpen(false)}
-                    defaultName={selectedWS.name}
-                    defaultDescription={selectedWS.description}
-                    defaultGroup={selectedWS.group}
-                    onSubmit={async ({ name, description, group }) => {
-                        try {
-                            await api.patch(`/workspaces/${selectedWS.id}`, {
-                                name,
-                                description,
-                                connection_id: selectedWS.connection_id ?? 0,
-                                group,
-                            });
-                            await loadWorkSpaces();
-                            setEditModalOpen(false);
-                        } catch (err) {
-                            console.warn('Ошибка при обновлении:', err);
-                        }
-                    }}
-                />
+                <>
+                    <EditWorkspaceModal
+                        open={editModalOpen}
+                        onClose={() => setEditModalOpen(false)}
+                        defaultName={selectedWS.name}
+                        defaultDescription={selectedWS.description}
+                        defaultGroup={selectedWS.group}
+                        onSubmit={async ({ name, description, group }) => {
+                            try {
+                                await api.patch(`/workspaces/${selectedWS.id}`, {
+                                    name,
+                                    description,
+                                    connection_id: selectedWS.connection_id ?? 0,
+                                    group,
+                                });
+                                await loadWorkSpaces();
+                                setEditModalOpen(false);
+                            } catch (err) {
+                                console.warn('Ошибка при обновлении:', err);
+                            }
+                        }}
+                        // 👇 передаём id подключения и хендлер
+                        connectionId={selectedWS.connection_id ?? null}
+                        onEditConnection={(connectionId) => {
+                            setConnToEditId(connectionId);
+                            setEditConnOpen(true);
+                        }}
+                    />
+
+                    {connToEditId != null && (
+                        <ModalEditConnection
+                            open={editConnOpen}
+                            connectionId={connToEditId}
+                            onSuccess={async () => {
+                                // если нужно — можно подтянуть WS по connection_id:
+                                // await api.get(`/workspaces/?connection_id=${connToEditId}`)
+                                // и/или просто обновить список всех WS:
+                                await loadConnections({ force: true });
+                                await loadWorkSpaces();
+                                setEditConnOpen(false);
+                            }}
+                            onCancel={() => setEditConnOpen(false)}
+                        />
+                    )}
+                </>
             )}
+
+
         </div>
     );
 };

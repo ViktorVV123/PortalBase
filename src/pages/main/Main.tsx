@@ -149,6 +149,7 @@ export const Main = () => {
         setShowCreateFormModal: modals.setShowCreateFormModal,
         setCreateFormWidget: modals.setCreateFormWidget,
         formsListByWidget,
+        loadConnections,
     };
 
     const setOfTablesProps = {
