@@ -82,6 +82,7 @@ export type WidgetForm = {
     name: string;
     search_bar: boolean;
     description: string | null;
+    path?: string | null;
     form_id: number;
     sub_widgets: {
         widget_order: number;

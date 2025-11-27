@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, {useMemo, useState, useEffect} from 'react';
 import {
     Dialog, DialogTitle, DialogContent, DialogActions,
     Tabs, Tab, Box, Stack, TextField, Button, MenuItem,
@@ -7,10 +7,10 @@ import {
 } from '@mui/material';
 import DeleteIcon from "@mui/icons-material/Delete";
 import AddIcon from "@mui/icons-material/Add";
-import { WidgetForm, Widget, Column } from '@/shared/hooks/useWorkSpaces';
-import { api } from '@/services/api';
+import {WidgetForm, Widget, Column} from '@/shared/hooks/useWorkSpaces';
+import {api} from '@/services/api';
 
-const dark = createTheme({ palette: { mode: 'dark', primary: { main: '#ffffff' } } });
+const dark = createTheme({palette: {mode: 'dark', primary: {main: '#ffffff'}}});
 
 type Props = {
     open: boolean;
@@ -30,7 +30,7 @@ export const ModalEditForm: React.FC<Props> = ({
     // ---------- MAIN ----------
     const [mainName, setMainName] = useState(form.name);
     const [mainDesc, setMainDesc] = useState(form.description ?? '');
-    const [mainPath, setMainPath] = useState<string>('' as any);
+    const [mainPath, setMainPath] = useState<string>(form.path ?? '');
     const [mainWidgetId, setMainWidgetId] = useState<number>(form.main_widget_id);
     const [savingMain, setSavingMain] = useState(false);
     const [mainSearchBar, setMainSearchBar] = useState<boolean>(!!form.search_bar);
@@ -49,7 +49,7 @@ export const ModalEditForm: React.FC<Props> = ({
     const [treeList, setTreeList] = useState(form.tree_fields ?? []);
 
     const emitFormMutated = (formId: number) =>
-        window.dispatchEvent(new CustomEvent('portal:form-mutated', { detail: { formId } }));
+        window.dispatchEvent(new CustomEvent('portal:form-mutated', {detail: {formId}}));
 
     // Синхронизация при открытии / смене формы
     useEffect(() => {
@@ -60,7 +60,7 @@ export const ModalEditForm: React.FC<Props> = ({
         setTreeList(form.tree_fields ?? []);
         setMainName(form.name);
         setMainDesc(form.description ?? '');
-        setMainPath('' as any);
+        setMainPath(form.path ?? '');
         setMainWidgetId(form.main_widget_id);
         setMainSearchBar(!!form.search_bar);
     }, [open, form]);
@@ -72,13 +72,13 @@ export const ModalEditForm: React.FC<Props> = ({
             setListsLoading(true);
             try {
                 const widgetsRes = await api.get<Widget[]>('/widgets');
-                const widgets = widgetsRes.data.sort((a,b)=>a.id-b.id);
+                const widgets = widgetsRes.data.sort((a, b) => a.id - b.id);
                 const mainW = widgets.find(w => w.id === form.main_widget_id);
                 const tableId = mainW?.table_id ?? widgets[0]?.table_id ?? null;
                 const colsRes = tableId
                     ? await api.get<Column[]>(`/tables/${tableId}/columns`)
-                    : { data: [] as Column[] };
-                const cols = (colsRes as any).data.sort((a: Column,b: Column)=>a.id-b.id);
+                    : {data: [] as Column[]};
+                const cols = (colsRes as any).data.sort((a: Column, b: Column) => a.id - b.id);
 
                 if (!cancelled) {
                     setAvailableWidgets(widgets);
@@ -90,7 +90,9 @@ export const ModalEditForm: React.FC<Props> = ({
                 if (!cancelled) setListsLoading(false);
             }
         })();
-        return () => { cancelled = true; };
+        return () => {
+            cancelled = true;
+        };
     }, [open, form.main_widget_id]);
 
     // ---------- SUB (существующие) ----------
@@ -128,11 +130,15 @@ export const ModalEditForm: React.FC<Props> = ({
         setSavingSub(true);
         setErr(null);
         try {
-            const body = { widget_order: Number(subOrder), where_conditional: subWhere || null };
+            const body = {widget_order: Number(subOrder), where_conditional: subWhere || null};
             await api.patch(`/forms/${form.form_id}/sub/${subId}`, body);
             // оптимистично правим локальный список
             setSubList(prev => prev.map(it =>
-                it.sub_widget_id === subId ? { ...it, widget_order: body.widget_order, where_conditional: body.where_conditional } : it
+                it.sub_widget_id === subId ? {
+                    ...it,
+                    widget_order: body.widget_order,
+                    where_conditional: body.where_conditional
+                } : it
             ));
             emitFormMutated(form.form_id);
             setInfo('Сохранено');
@@ -174,10 +180,10 @@ export const ModalEditForm: React.FC<Props> = ({
         setSavingTree(true);
         setErr(null);
         try {
-            const body = { column_order: Number(treeOrder) };
+            const body = {column_order: Number(treeOrder)};
             await api.patch(`/forms/${form.form_id}/tree/${treeColId}`, body);
             setTreeList(prev => prev.map(it =>
-                it.table_column_id === treeColId ? { ...it, column_order: body.column_order } : it
+                it.table_column_id === treeColId ? {...it, column_order: body.column_order} : it
             ));
             setInfo('Сохранено');
             emitFormMutated(form.form_id);
@@ -222,12 +228,12 @@ export const ModalEditForm: React.FC<Props> = ({
                 where_conditional: newSubWhere || null,
             };
             // @ts-ignore
-            setSubList(prev => [...prev, newItem].sort((a,b)=> (a.widget_order??0)-(b.widget_order??0)));
+            setSubList(prev => [...prev, newItem].sort((a, b) => (a.widget_order ?? 0) - (b.widget_order ?? 0)));
             setSubId(newSubWidget.id);
             emitFormMutated(form.form_id);
             setNewSubWidget(null);
             setNewSubWhere('');
-            setNewSubOrder((prev)=> (prev||0) + 1);
+            setNewSubOrder((prev) => (prev || 0) + 1);
             await reloadWidgetForms();
         } catch (e: any) {
             // если сервер вернул конфликт — покажем понятнее
@@ -256,11 +262,11 @@ export const ModalEditForm: React.FC<Props> = ({
                 table_column_id: newTreeColumn.id,
                 column_order: Number(newTreeOrder) || 0,
             };
-            setTreeList(prev => [...prev, newItem].sort((a,b)=> (a.column_order??0)-(b.column_order??0)));
+            setTreeList(prev => [...prev, newItem].sort((a, b) => (a.column_order ?? 0) - (b.column_order ?? 0)));
             setTreeColId(newTreeColumn.id);
             setNewTreeColumn(null);
             emitFormMutated(form.form_id);
-            setNewTreeOrder((prev)=> (prev||0) + 1);
+            setNewTreeOrder((prev) => (prev || 0) + 1);
             await reloadWidgetForms();
         } catch (e: any) {
             const status = e?.response?.status;
@@ -333,7 +339,9 @@ export const ModalEditForm: React.FC<Props> = ({
             if (mainWidgetId !== form.main_widget_id) patch.main_widget_id = mainWidgetId;
             if (mainName !== form.name) patch.name = mainName;
             if ((mainDesc || null) !== (form.description ?? null)) patch.description = mainDesc || null;
-            if (mainPath !== ('' as any)) patch.path = mainPath || null;
+            if ((mainPath || null) !== (form.path ?? null)) {
+                patch.path = mainPath || null;
+            }
             if (Boolean(form.search_bar) !== mainSearchBar) patch.search_bar = mainSearchBar;
 
             if (Object.keys(patch).length > 0) {
@@ -349,22 +357,20 @@ export const ModalEditForm: React.FC<Props> = ({
     };
 
 
-
-
     return (
         <ThemeProvider theme={dark}>
             <Dialog open={open} onClose={onClose} fullWidth maxWidth="md">
                 <DialogTitle>Редактирование формы (ID: {form.form_id})</DialogTitle>
 
                 <Tabs value={tab} onChange={(_, v) => setTab(v)} variant="fullWidth">
-                    <Tab value="main" label="Main form" />
-                    <Tab value="sub" label="Sub forms" />
-                    <Tab value="tree" label="Tree fields" />
+                    <Tab value="main" label="Main form"/>
+                    <Tab value="sub" label="Sub forms"/>
+                    <Tab value="tree" label="Tree fields"/>
                 </Tabs>
 
                 <DialogContent dividers>
-                    {!!err && <Alert severity="error" sx={{mb:2}}>{err}</Alert>}
-                    {!!info && <Alert severity="success" sx={{mb:2}}>{info}</Alert>}
+                    {!!err && <Alert severity="error" sx={{mb: 2}}>{err}</Alert>}
+                    {!!info && <Alert severity="success" sx={{mb: 2}}>{info}</Alert>}
 
                     {/* MAIN */}
                     {tab === 'main' && (
@@ -376,9 +382,10 @@ export const ModalEditForm: React.FC<Props> = ({
                                     value={mainWidgetId}
                                     onChange={e => setMainWidgetId(Number(e.target.value))}
                                 />
-                                <TextField label="Name" value={mainName} onChange={e => setMainName(e.target.value)} />
-                                <TextField label="Description" value={mainDesc} onChange={e => setMainDesc(e.target.value)} />
-                                <TextField label="Path" value={mainPath} onChange={e => setMainPath(e.target.value)} />
+                                <TextField label="Name" value={mainName} onChange={e => setMainName(e.target.value)}/>
+                                <TextField label="Description" value={mainDesc}
+                                           onChange={e => setMainDesc(e.target.value)}/>
+                                <TextField label="Path" value={mainPath} onChange={e => setMainPath(e.target.value)}/>
                                 <Box
                                     sx={{
                                         p: 1.5,
@@ -386,7 +393,7 @@ export const ModalEditForm: React.FC<Props> = ({
                                 >
                                     <Stack direction="row" alignItems="center" justifyContent="space-between">
                                         <Box>
-                                            <Box sx={{ fontWeight: 600 }}>Строка поиска</Box>
+                                            <Box sx={{fontWeight: 600}}>Строка поиска</Box>
                                         </Box>
                                         <FormControlLabel
                                             control={
@@ -397,7 +404,7 @@ export const ModalEditForm: React.FC<Props> = ({
                                                 />
                                             }
                                             label={mainSearchBar ? 'Включена' : 'Выключена'}
-                                            sx={{ m: 0 }}
+                                            sx={{m: 0}}
                                         />
                                     </Stack>
                                 </Box>
@@ -415,7 +422,8 @@ export const ModalEditForm: React.FC<Props> = ({
                                         <Stack spacing={2}>
                                             <Stack direction="row" alignItems="center" spacing={1}>
                                                 <FormControl fullWidth>
-                                                    <InputLabel id="sub-select-label">Выбери sub-виджет (уже привязан)</InputLabel>
+                                                    <InputLabel id="sub-select-label">Выбери sub-виджет (уже
+                                                        привязан)</InputLabel>
                                                     <Select
                                                         labelId="sub-select-label"
                                                         label="Выбери sub-виджет (уже привязан)"
@@ -439,7 +447,7 @@ export const ModalEditForm: React.FC<Props> = ({
                                 disabled={!subId || deletingSub}
                                 size="small"
                             >
-                              <DeleteIcon />
+                              <DeleteIcon/>
                             </IconButton>
                           </span>
                                                 </Tooltip>
@@ -462,31 +470,32 @@ export const ModalEditForm: React.FC<Props> = ({
                                             />
                                         </Stack>
 
-                                        <Divider />
+                                        <Divider/>
                                     </>
                                 ) : null}
 
                                 {/* Добавление нового — показывается всегда (и единственный блок если нет ни одного) */}
                                 <Stack spacing={2}>
                                     <strong>Добавить новый sub-виджет</strong>
-                                    <Stack direction="row" spacing={1} alignItems="center" sx={{flexWrap:'wrap', rowGap:1}}>
+                                    <Stack direction="row" spacing={1} alignItems="center"
+                                           sx={{flexWrap: 'wrap', rowGap: 1}}>
                                         <TextField
                                             label="Порядок (widget_order)"
                                             type="number"
                                             size="small"
                                             value={newSubOrder}
                                             onChange={e => setNewSubOrder(Number(e.target.value))}
-                                            sx={{ width: 210 }}
+                                            sx={{width: 210}}
                                         />
 
                                         <Autocomplete
-                                            sx={{ minWidth: 320, flex: '0 0 auto' }}
+                                            sx={{minWidth: 320, flex: '0 0 auto'}}
                                             options={availableWidgets.filter(w => w.id !== form.main_widget_id)}
                                             loading={listsLoading}
                                             value={newSubWidget}
                                             onChange={(_, val) => setNewSubWidget(val)}
                                             getOptionLabel={(w) => w ? `${w.name}  (#${w.id}) · tbl:${w.table_id}` : ''}
-                                            isOptionEqualToValue={(a,b)=> a.id === b.id}
+                                            isOptionEqualToValue={(a, b) => a.id === b.id}
                                             renderInput={(params) => (
                                                 <TextField
                                                     {...params}
@@ -496,7 +505,7 @@ export const ModalEditForm: React.FC<Props> = ({
                                                         ...params.InputProps,
                                                         endAdornment: (
                                                             <>
-                                                                {listsLoading ? <CircularProgress size={16} /> : null}
+                                                                {listsLoading ? <CircularProgress size={16}/> : null}
                                                                 {params.InputProps.endAdornment}
                                                             </>
                                                         ),
@@ -510,7 +519,7 @@ export const ModalEditForm: React.FC<Props> = ({
                                             size="small"
                                             value={newSubWhere}
                                             onChange={e => setNewSubWhere(e.target.value)}
-                                            sx={{ flex: 1, minWidth: 240 }}
+                                            sx={{flex: 1, minWidth: 240}}
                                         />
 
                                         <Button
@@ -537,7 +546,8 @@ export const ModalEditForm: React.FC<Props> = ({
                                         <Stack spacing={2}>
                                             <Stack direction="row" alignItems="center" spacing={1}>
                                                 <FormControl fullWidth>
-                                                    <InputLabel id="tree-select-label">Выбери tree-поле (уже привязано)</InputLabel>
+                                                    <InputLabel id="tree-select-label">Выбери tree-поле (уже
+                                                        привязано)</InputLabel>
                                                     <Select
                                                         labelId="tree-select-label"
                                                         label="Выбери tree-поле (уже привязано)"
@@ -545,7 +555,8 @@ export const ModalEditForm: React.FC<Props> = ({
                                                         onChange={e => setTreeColId(Number(e.target.value))}
                                                     >
                                                         {treeList.map(tf => (
-                                                            <MenuItem key={tf.table_column_id} value={tf.table_column_id}>
+                                                            <MenuItem key={tf.table_column_id}
+                                                                      value={tf.table_column_id}>
                                                                 #{tf.table_column_id} • order: {tf.column_order ?? 0}
                                                                 {columnById.get(tf.table_column_id) ? ` • ${columnById.get(tf.table_column_id)!.name}` : ''}
                                                             </MenuItem>
@@ -561,7 +572,7 @@ export const ModalEditForm: React.FC<Props> = ({
                                 disabled={!treeColId || deletingTree}
                                 size="small"
                             >
-                              <DeleteIcon />
+                              <DeleteIcon/>
                             </IconButton>
                           </span>
                                                 </Tooltip>
@@ -577,31 +588,32 @@ export const ModalEditForm: React.FC<Props> = ({
                                             />
                                         </Stack>
 
-                                        <Divider />
+                                        <Divider/>
                                     </>
                                 ) : null}
 
                                 {/* Добавление нового — показывается всегда */}
                                 <Stack spacing={2}>
                                     <strong>Добавить новое tree-поле</strong>
-                                    <Stack direction="row" spacing={1} alignItems="center" sx={{flexWrap:'wrap', rowGap:1}}>
+                                    <Stack direction="row" spacing={1} alignItems="center"
+                                           sx={{flexWrap: 'wrap', rowGap: 1}}>
                                         <TextField
                                             label="Порядок (column_order)"
                                             type="number"
                                             size="small"
                                             value={newTreeOrder}
                                             onChange={e => setNewTreeOrder(Number(e.target.value))}
-                                            sx={{ width: 260 }}
+                                            sx={{width: 260}}
                                         />
 
                                         <Autocomplete
-                                            sx={{ minWidth: 320, flex: '0 0 auto' }}
+                                            sx={{minWidth: 320, flex: '0 0 auto'}}
                                             options={availableColumns}
                                             loading={listsLoading}
                                             value={newTreeColumn}
                                             onChange={(_, val) => setNewTreeColumn(val)}
                                             getOptionLabel={(c) => c ? `${c.name}  (#${c.id})` : ''}
-                                            isOptionEqualToValue={(a,b)=> a.id === b.id}
+                                            isOptionEqualToValue={(a, b) => a.id === b.id}
                                             renderInput={(params) => (
                                                 <TextField
                                                     {...params}
@@ -611,7 +623,7 @@ export const ModalEditForm: React.FC<Props> = ({
                                                         ...params.InputProps,
                                                         endAdornment: (
                                                             <>
-                                                                {listsLoading ? <CircularProgress size={16} /> : null}
+                                                                {listsLoading ? <CircularProgress size={16}/> : null}
                                                                 {params.InputProps.endAdornment}
                                                             </>
                                                         ),
