@@ -14,6 +14,7 @@ import { TablesMenu } from '@/components/topComponent/tablesMenu/TablesMenu';
 import { WidgetsMenu } from '@/components/topComponent/widgetsMenu/WidgetsMenu';
 import { FormsMenu } from '@/components/topComponent/formsMenu/FormsMenu';
 import {ModalEditConnection} from "@/components/modals/modalEditConnection/ModalEditConnection";
+import {Connection} from "@/types/typesConnection";
 
 type Props = {
     workSpaces: WorkSpaceTypes[];
@@ -43,8 +44,7 @@ type Props = {
     deleteWidget: (widgetId: number, tableId: number) => void;
 
     loadFormTree: (formId: number) => Promise<void>;
-    loadWorkSpaces: () => void;
-
+    loadWorkSpaces: (opts?: { force?: boolean }) => void;
     addForm: (payload: NewFormPayload) => Promise<WidgetForm>;
     setShowCreateFormModal: (v: boolean) => void;
     setCreateFormWidget: (w: Widget) => void;
@@ -54,11 +54,13 @@ type Props = {
     setFormToEdit: (f: WidgetForm) => void;
     setEditFormOpen: (v: boolean) => void;
     loadConnections: (opts?: { force?: boolean }) => void;
+    connections: Connection[];
 };
 
 export const TopComponent: React.FC<Props> = (props) => {
     const {
         workSpaces,
+        connections,
         tablesByWs,
         widgetsByTable,
         loadTables,
@@ -275,22 +277,26 @@ export const TopComponent: React.FC<Props> = (props) => {
                         defaultName={selectedWS.name}
                         defaultDescription={selectedWS.description}
                         defaultGroup={selectedWS.group}
-                        onSubmit={async ({ name, description, group }) => {
+                        connections={connections}
+                        connectionId={selectedWS.connection_id ?? null}
+                        onSubmit={async ({ name, description, group, connection_id }) => {
                             try {
                                 await api.patch(`/workspaces/${selectedWS.id}`, {
                                     name,
                                     description,
-                                    connection_id: selectedWS.connection_id ?? 0,
                                     group,
+                                    connection_id:
+                                        connection_id ?? selectedWS.connection_id ?? 0,
                                 });
-                                await loadWorkSpaces();
+
+                                // 🔥 форсим перезагрузку списка WS
+                                await loadWorkSpaces({ force: true });
+
                                 setEditModalOpen(false);
                             } catch (err) {
                                 console.warn('Ошибка при обновлении:', err);
                             }
                         }}
-                        // 👇 передаём id подключения и хендлер
-                        connectionId={selectedWS.connection_id ?? null}
                         onEditConnection={(connectionId) => {
                             setConnToEditId(connectionId);
                             setEditConnOpen(true);
@@ -302,11 +308,8 @@ export const TopComponent: React.FC<Props> = (props) => {
                             open={editConnOpen}
                             connectionId={connToEditId}
                             onSuccess={async () => {
-                                // если нужно — можно подтянуть WS по connection_id:
-                                // await api.get(`/workspaces/?connection_id=${connToEditId}`)
-                                // и/или просто обновить список всех WS:
                                 await loadConnections({ force: true });
-                                await loadWorkSpaces();
+                                await loadWorkSpaces({ force: true }); // ✅
                                 setEditConnOpen(false);
                             }}
                             onCancel={() => setEditConnOpen(false)}

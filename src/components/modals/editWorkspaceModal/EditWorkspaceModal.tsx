@@ -1,4 +1,4 @@
-// components/modals/EditWorkspaceModal.tsx
+// components/modals/editWorkspaceModal/EditWorkspaceModal.tsx
 import React, { useState, useEffect } from 'react';
 import {
     Dialog,
@@ -9,18 +9,32 @@ import {
     TextField,
     ThemeProvider,
     Stack,
+    FormControl,
+    InputLabel,
+    Select,
+    MenuItem,
 } from '@mui/material';
-import { dark } from "@/shared/themeUI/themeModal/ThemeModalUI";
+import { dark } from '@/shared/themeUI/themeModal/ThemeModalUI';
+import type { Connection } from '@/types/typesConnection';
+
+type FormState = {
+    name: string;
+    description: string;
+    group: string;
+    connection_id: number | null;
+};
 
 type Props = {
     open: boolean;
     onClose: () => void;
-    onSubmit: (form: { name: string; description: string; group: string }) => void;
+
+    onSubmit: (form: FormState) => void;
+
     defaultName: string;
     defaultDescription: string;
     defaultGroup: string;
 
-    // 👇 НОВОЕ
+    connections: Connection[];
     connectionId?: number | null;
     onEditConnection?: (connectionId: number) => void;
 };
@@ -32,6 +46,7 @@ export const EditWorkspaceModal: React.FC<Props> = ({
                                                         defaultName,
                                                         defaultDescription,
                                                         defaultGroup,
+                                                        connections,
                                                         connectionId,
                                                         onEditConnection,
                                                     }) => {
@@ -39,13 +54,38 @@ export const EditWorkspaceModal: React.FC<Props> = ({
     const [description, setDescription] = useState(defaultDescription);
     const [group, setGroup] = useState(defaultGroup);
 
+    // 👇 Храним id подключения как СТРОКУ (Select работает со строками)
+    const [selectedConnectionId, setSelectedConnectionId] = useState<string>(
+        connectionId != null ? String(connectionId) : ''
+    );
+
     useEffect(() => {
         if (open) {
             setName(defaultName);
             setDescription(defaultDescription);
             setGroup(defaultGroup);
+            setSelectedConnectionId(
+                connectionId != null ? String(connectionId) : ''
+            );
         }
-    }, [open, defaultName, defaultDescription, defaultGroup]);
+    }, [open, defaultName, defaultDescription, defaultGroup, connectionId]);
+
+    const handleSubmit = () => {
+        onSubmit({
+            name,
+            description,
+            group,
+            connection_id:
+                selectedConnectionId === '' ? null : Number(selectedConnectionId),
+        });
+    };
+
+    const handleEditConnectionClick = () => {
+        if (!onEditConnection) return;
+        if (selectedConnectionId === '') return;
+
+        onEditConnection(Number(selectedConnectionId));
+    };
 
     return (
         <ThemeProvider theme={dark}>
@@ -58,42 +98,63 @@ export const EditWorkspaceModal: React.FC<Props> = ({
                             margin="dense"
                             label="Название"
                             value={name}
-                            onChange={e => setName(e.target.value)}
+                            onChange={(e) => setName(e.target.value)}
                         />
                         <TextField
                             fullWidth
                             margin="dense"
                             label="Описание"
                             value={description}
-                            onChange={e => setDescription(e.target.value)}
+                            onChange={(e) => setDescription(e.target.value)}
                         />
                         <TextField
                             fullWidth
                             margin="dense"
-                            label="Группы"
+                            label="Группа"
                             value={group}
-                            onChange={e => setGroup(e.target.value)}
+                            onChange={(e) => setGroup(e.target.value)}
                         />
 
-                        {/* 👇 Кнопка для открытия ModalEditConnection */}
-                        {connectionId != null && onEditConnection && (
+                        <FormControl fullWidth margin="dense" size="small">
+                            <InputLabel id="workspace-connection-select-label">
+                                Подключение
+                            </InputLabel>
+                            <Select
+                                labelId="workspace-connection-select-label"
+                                label="Подключение"
+                                value={selectedConnectionId}
+                                onChange={(e) => {
+                                    const v = e.target.value as string; // ← строка
+                                    setSelectedConnectionId(v);
+                                }}
+                            >
+                                <MenuItem value="">
+                                    <em>Без подключения</em>
+                                </MenuItem>
+                                {connections.map((conn) => (
+                                    <MenuItem key={conn.id} value={String(conn.id)}>
+                                        {conn.name ?? `Подключение #${conn.id}`}
+                                    </MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
+
+                        {onEditConnection && (
                             <Button
                                 variant="outlined"
                                 size="small"
-                                sx={{ mt: 2, alignSelf: 'flex-start' }}
-                                onClick={() => onEditConnection(connectionId)}
+                                sx={{ mt: 1, alignSelf: 'flex-start' }}
+                                onClick={handleEditConnectionClick}
+                                disabled={selectedConnectionId === ''}
                             >
-                                Изменить подключение
+                                Изменить настройки подключения
                             </Button>
                         )}
                     </Stack>
                 </DialogContent>
                 <DialogActions>
                     <Button onClick={onClose}>Отмена</Button>
-                    <Button
-                        onClick={() => onSubmit({ name, description, group })}
-                        variant="contained"
-                    >
+                    <Button onClick={handleSubmit} variant="contained">
                         Сохранить
                     </Button>
                 </DialogActions>
