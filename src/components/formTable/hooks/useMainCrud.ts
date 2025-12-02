@@ -309,7 +309,7 @@ export function useMainCrud({
 
                 if (isCombo && (raw == null || raw === '')) {
                     // 👇 отправляем именно строку "null"
-                    value = 'null';
+                    value = null;
                 } else {
                     value = String(raw ?? '');
                 }
@@ -507,7 +507,7 @@ export function useMainCrud({
 
                 if (isCombo && (s === '' || s == null)) {
                     // 👇 для combobox пустое → строка "null"
-                    return 'null';
+                    return null;
                 }
 
                 return s;

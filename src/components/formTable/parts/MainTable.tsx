@@ -7,13 +7,13 @@ import LockIcon from '@/assets/image/LockIcon.svg';
 import type { FormDisplay } from '@/shared/hooks/useWorkSpaces';
 import { api } from '@/services/api';
 import { formatCellValue } from '@/shared/utils/cellFormat';
+import {fromInputValue, toInputValue} from "@/components/formTable/parts/ToInputValue";
+import {ExtCol, formatByDatatype} from "@/components/formTable/parts/FormatByDatatype";
+import dayjs from 'dayjs';
+import { DatePicker, TimePicker, DateTimePicker } from '@mui/x-date-pickers';
 
 
-// Расширенная колонка из useHeaderPlan (там добавляем служебные поля)
-type ExtCol = FormDisplay['columns'][number] & {
-    __write_tc_id?: number;             // реальный tcId для записи (для combobox)
-    __is_primary_combo_input?: boolean; // только одна колонка combobox редактируемая
-};
+
 
 type HeaderPlanGroup = {
     id: number;
@@ -167,6 +167,8 @@ function InputCell({
     if (isComboPrimary) {
         const { options } = useComboOptions(col.widget_column_id, writeTcId);
 
+
+
         return (
             <Select
                 size="small"
@@ -194,16 +196,63 @@ function InputCell({
         );
     }
 
+    // ───────── date / time / timestamp по datatype ─────────
+    const dt = col.datatype as string | undefined;
+
+    // для timestamptz/timetz запоминаем суффикс таймзоны, чтобы не потерять его при редактировании
+    let rawValue = value ?? '';
+    let tzSuffix = '';
+
+    if (dt === 'timestamptz' || dt === 'timetz') {
+        const m = rawValue.match(/([+-]\d{2}:\d{2}|Z)$/);
+        if (m) {
+            tzSuffix = m[1];
+            rawValue = rawValue.slice(0, -tzSuffix.length);
+        }
+    }
+
+    const inputType =
+        dt === 'date'
+            ? 'date'
+            : dt === 'time' || dt === 'timetz'
+                ? 'time'
+                : dt === 'timestamp' || dt === 'timestamptz'
+                    ? 'datetime-local'
+                    : undefined;
+
+    const inputValue = toInputValue(rawValue, dt);
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const raw = e.target.value;
+        let backend = fromInputValue(raw, dt);
+
+        // для timestamptz/timetz добавляем обратно исходный offset, если он был
+        if ((dt === 'timestamptz' || dt === 'timetz') && backend) {
+            backend += tzSuffix;
+        }
+
+        onChange(backend);
+    };
+
+    const isDateLike =
+        inputType === 'date' ||
+        inputType === 'time' ||
+        inputType === 'datetime-local';
+
     return (
         <TextField
             size="small"
             fullWidth
-            value={value ?? ''}
-            onChange={(e) => onChange(e.target.value)}
+            type={inputType}
+            value={inputValue}
+            onChange={handleChange}
             placeholder={placeholder}
+            inputProps={inputType === 'time' ? { step: 1 } : undefined} // чтобы были секунды
+            className={isDateLike ? s.dateTimeInput : undefined}
         />
     );
 }
+
 
 /** Хелпер: одинаковая ли группа combobox (для объединения в одну TD) */
 function isSameComboGroup(a: ExtCol, b: ExtCol): boolean {
@@ -250,6 +299,11 @@ function getWriteTcIdForComboGroup(group: ExtCol[]): number | null {
     console.warn('[MainTable][add] combobox group has no __write_tc_id', group);
     return null;
 }
+
+
+
+
+
 
 /** Отображение combobox в режиме редактирования с учётом editDraft */
 /** Отображение combobox в режиме редактирования с учётом editDraft */
@@ -702,6 +756,8 @@ export const MainTable: React.FC<Props> = (p) => {
                                         );
                                     } else {
                                         const clickable = col.form_id != null && !!p.onOpenDrill;
+                                        const pretty = formatByDatatype(shownVal, col);
+
                                         cells.push(
                                             <td key={`cell-${visKey}`}>
                                                 {clickable ? (
@@ -731,14 +787,15 @@ export const MainTable: React.FC<Props> = (p) => {
                                                         }}
                                                         title={`Открыть форму #${col.form_id}`}
                                                     >
-                                                        {formatCellValue(shownVal)}
+                                                        {pretty || '—'}
                                                     </button>
                                                 ) : (
-                                                    <>{formatCellValue(shownVal)}</>
+                                                    <>{pretty || '—'}</>
                                                 )}
                                             </td>
                                         );
                                     }
+
 
                                     i += 1;
                                 }

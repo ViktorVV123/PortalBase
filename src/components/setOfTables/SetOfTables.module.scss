@@ -478,3 +478,25 @@ h2 {
   border: 1px solid var(--border-color);
   padding: 2px 6px;
 }
+
+.dateTimeInput {
+  input {
+    color: #fff; // сам текст на всякий случай
+
+    // иконка календаря / часов
+    &::-webkit-calendar-picker-indicator {
+      filter: invert(1); // делает её белой на тёмном фоне
+      opacity: 1;
+    }
+
+    // стрелочки в time/datetime
+    &::-webkit-inner-spin-button {
+      filter: invert(1);
+    }
+
+    // крестик очистки (если появляется)
+    &::-webkit-clear-button {
+      filter: invert(1);
+    }
+  }
+}
