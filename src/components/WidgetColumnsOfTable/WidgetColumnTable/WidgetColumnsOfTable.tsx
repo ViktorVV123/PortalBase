@@ -121,7 +121,6 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                                                           selectedWidget,
                                                           columns,
                                                           loadColumnsWidget,
-
                                                           fetchReferences,
                                                           deleteReference,
                                                           updateWidgetMeta,

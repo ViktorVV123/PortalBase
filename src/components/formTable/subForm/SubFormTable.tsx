@@ -10,6 +10,8 @@ import type { SubDisplay } from '@/shared/hooks/useWorkSpaces';
 import type { HeaderModelItem } from '@/components/formTable/FormTable';
 import { formatCellValue } from '@/shared/utils/cellFormat';
 import { useSubWormTable, UseSubWormTableDeps } from '@/components/formTable/subForm/hook/useSubWormTable';
+import {InputCell} from "@/components/formTable/parts/InputCell";
+import {ExtCol, formatByDatatype} from "@/components/formTable/parts/FormatByDatatype";
 
 type SubformProps = {
     subDisplay: SubDisplay | null;
@@ -172,13 +174,15 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                             <tr>
                                 {flatColumnsInRenderOrder.map((col) => (
                                     <td key={`sub-add-wc${col.widget_column_id}-tc${col.table_column_id}`}>
-                                        <TextField
-                                            size="small"
+                                        <InputCell
+                                            mode="add"
+                                            col={col as ExtCol}
+                                            readOnly={false}
                                             value={draftSub[col.table_column_id!] ?? ''}
-                                            onChange={(e) =>
+                                            onChange={(v) =>
                                                 setDraftSub((prev) => ({
                                                     ...prev,
-                                                    [col.table_column_id!]: e.target.value,
+                                                    [col.table_column_id!]: v,
                                                 }))
                                             }
                                             placeholder={col.placeholder ?? col.column_name}
@@ -188,7 +192,6 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                                 <td />
                             </tr>
                         )}
-
                         {subDisplay.data.map((row, rowIdx) => {
                             const isEditing = editingRowIdx === rowIdx;
 
@@ -207,17 +210,20 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                                         const val = idx != null ? row.values[idx] : '';
 
                                         if (isEditing) {
+                                            const tcId = col.table_column_id!;
                                             return (
                                                 <td
                                                     key={`sub-edit-r${rowIdx}-wc${col.widget_column_id}-tc${col.table_column_id}`}
                                                 >
-                                                    <input
-                                                        className={sub.inp}
-                                                        value={editDraft[col.table_column_id!] ?? ''}
-                                                        onChange={(e) =>
+                                                    <InputCell
+                                                        mode="edit"
+                                                        col={col as ExtCol}
+                                                        readOnly={false}
+                                                        value={editDraft[tcId] ?? ''}
+                                                        onChange={(v) =>
                                                             setEditDraft((prev) => ({
                                                                 ...prev,
-                                                                [col.table_column_id!]: e.target.value,
+                                                                [tcId]: v,
                                                             }))
                                                         }
                                                         placeholder={col.placeholder ?? col.column_name}
@@ -226,7 +232,8 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                                             );
                                         }
 
-                                        const display = formatCellValue(val);
+                                        const raw = val == null ? '' : String(val);
+                                        const display = formatByDatatype(raw, col as ExtCol);
                                         const clickable = !!onOpenDrill && col.form_id != null;
 
                                         return (
