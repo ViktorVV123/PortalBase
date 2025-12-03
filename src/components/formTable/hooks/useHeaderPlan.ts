@@ -1,11 +1,9 @@
 // useHeaderPlan.ts
 import { useMemo } from 'react';
 import type { FormDisplay } from '@/shared/hooks/useWorkSpaces';
+import {ExtCol} from "@/components/formTable/parts/FormatByDatatype";
 
-type ExtCol = FormDisplay['columns'][number] & {
-    __write_tc_id?: number;             // реальный tcId для записи (для combobox)
-    __is_primary_combo_input?: boolean; // только одну колонку на группу делаем editable
-};
+
 
 export type HeaderPlanGroup = {
     id: number;
