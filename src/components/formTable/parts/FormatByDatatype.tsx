@@ -8,7 +8,7 @@ export type CanonicalType = 'date' | 'time' | 'timetz' | 'timestamp' | 'timestam
 export type ExtCol = FormDisplay['columns'][number] & {
     __write_tc_id?: number;
     __is_primary_combo_input?: boolean;
-    type?: string | null; // сюда бэк кладёт свой тип: date/time/timestampwtz/…
+    type?: string | null ; // сюда бэк кладёт свой тип: date/time/timestampwtz/…
 };
 
 export function getCanonicalType(col: ExtCol): CanonicalType | undefined {

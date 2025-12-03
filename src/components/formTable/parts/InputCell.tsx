@@ -1,10 +1,10 @@
 // src/components/formTable/parts/InputCell.tsx
 import React from 'react';
-import { MenuItem, Select, TextField } from '@mui/material';
 import * as s from '@/components/setOfTables/SetOfTables.module.scss';
 import { api } from '@/services/api';
 import {ExtCol, getCanonicalType} from '@/components/formTable/parts/FormatByDatatype';
 import { fromInputValue, toInputValue } from '@/components/formTable/parts/ToInputValue';
+import { MenuItem, Select, TextField, Checkbox } from '@mui/material';
 
 /** combobox-мета с бэка (если понадобится) */
 type ComboColumnMeta = { ref_column_order: number; width: number; combobox_alias: string | null };
@@ -126,6 +126,9 @@ export const InputCell: React.FC<InputCellProps> = ({
         comboReloadToken,
     );
 
+
+
+
     if (isComboPrimary) {
         return (
             <Select
@@ -174,6 +177,29 @@ export const InputCell: React.FC<InputCellProps> = ({
         const backend = fromInputValue(raw, dt);
         onChange(backend);
     };
+
+
+
+    const isCheckbox = col.type === 'checkbox' || col.type === 'bool'
+
+    if (isCheckbox) {
+        const checked =
+            value === 'true' ||
+            value === '1' ||
+            value === 't' ||
+            value === 'T' ||
+            value === 'yes' ||
+            value === 'да';
+
+        return (
+            <Checkbox
+                size="small"
+                checked={checked}
+                onChange={(e) => onChange(e.target.checked ? 'true' : 'false')}
+            />
+        );
+    }
+
 
     const isDateLike =
         inputType === 'date' ||

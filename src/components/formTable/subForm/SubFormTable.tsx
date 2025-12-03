@@ -1,15 +1,15 @@
 import React from 'react';
-import { TextField } from '@mui/material';
+import {Checkbox, TextField} from '@mui/material';
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
 import ArrowDropUpIcon from '@mui/icons-material/ArrowDropUp';
 import * as sub from './SubWormTable.module.scss';
 
 import EditIcon from '@/assets/image/EditIcon.svg';
 import DeleteIcon from '@/assets/image/DeleteIcon.svg';
-import type { SubDisplay } from '@/shared/hooks/useWorkSpaces';
-import type { HeaderModelItem } from '@/components/formTable/FormTable';
-import { formatCellValue } from '@/shared/utils/cellFormat';
-import { useSubWormTable, UseSubWormTableDeps } from '@/components/formTable/subForm/hook/useSubWormTable';
+import type {SubDisplay} from '@/shared/hooks/useWorkSpaces';
+import type {HeaderModelItem} from '@/components/formTable/FormTable';
+import {formatCellValue} from '@/shared/utils/cellFormat';
+import {useSubWormTable, UseSubWormTableDeps} from '@/components/formTable/subForm/hook/useSubWormTable';
 import {InputCell} from "@/components/formTable/parts/InputCell";
 import {ExtCol, formatByDatatype} from "@/components/formTable/parts/FormatByDatatype";
 
@@ -139,18 +139,18 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                             ))}
                             <th
                                 rowSpan={showSubHeaders ? 1 : 2}
-                                style={{ textAlign: 'center', verticalAlign: 'middle' }}
+                                style={{textAlign: 'center', verticalAlign: 'middle'}}
                             >
                                 <button
                                     type="button"
                                     onClick={() => setShowSubHeaders((v) => !v)}
                                     title={showSubHeaders ? 'Скрыть подзаголовки' : 'Показать подзаголовки'}
-                                    style={{ background: 'none', border: 0, cursor: 'pointer' }}
+                                    style={{background: 'none', border: 0, cursor: 'pointer'}}
                                 >
                                     {showSubHeaders ? (
-                                        <ArrowDropUpIcon style={{ color: '#fff' }} />
+                                        <ArrowDropUpIcon style={{color: '#fff'}}/>
                                     ) : (
-                                        <ArrowDropDownIcon style={{ color: '#fff' }} />
+                                        <ArrowDropDownIcon style={{color: '#fff'}}/>
                                     )}
                                 </button>
                             </th>
@@ -163,7 +163,7 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                                         <th key={`sub-g-sub-${g.id}-${idx}`}>{safe(label)}</th>
                                     )),
                                 )}
-                                <th />
+                                <th/>
                             </tr>
                         )}
                         </thead>
@@ -189,7 +189,7 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                                         />
                                     </td>
                                 ))}
-                                <td />
+                                <td/>
                             </tr>
                         )}
                         {subDisplay.data.map((row, rowIdx) => {
@@ -231,16 +231,45 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                                                 </td>
                                             );
                                         }
-
                                         const raw = val == null ? '' : String(val);
                                         const display = formatByDatatype(raw, col as ExtCol);
+                                        const isCheckboxCol =
+                                            (col as ExtCol).type === 'checkbox' ||
+                                            (col as ExtCol).type === 'bool';
+
+                                        const toBool = (v: unknown): boolean => {
+                                            if (v == null) return false;
+                                            if (typeof v === 'boolean') return v;
+                                            if (typeof v === 'number') return v !== 0;
+                                            const s = String(v).trim().toLowerCase();
+                                            return s === '1' || s === 'true' || s === 't' || s === 'yes' || s === 'да';
+                                        };
                                         const clickable = !!onOpenDrill && col.form_id != null;
 
                                         return (
                                             <td
                                                 key={`sub-r${rowIdx}-wc${col.widget_column_id}-tc${col.table_column_id}`}
                                             >
-                                                {clickable ? (
+                                                {isCheckboxCol ? (
+                                                    <Checkbox
+                                                        size="small"
+                                                        checked={toBool(val)}
+                                                        readOnly
+                                                        disabled
+                                                        sx={{
+                                                            // цвет рамки/иконки по умолчанию
+                                                            color: 'rgba(255, 255, 255, 0.4)',
+                                                            // цвет, когда чекбокс отмечен
+                                                            '&.Mui-checked': {
+                                                                color: 'rgba(255, 255, 255, 0.9)',
+                                                            },
+                                                            // чтобы при disabled не становился слишком тёмным
+                                                            '&.Mui-disabled': {
+                                                                color: 'rgba(255, 255, 255, 0.7)',
+                                                            },
+                                                        }}
+                                                    />
+                                                ) : clickable ? (
                                                     <button
                                                         type="button"
                                                         onClick={(e) => {
@@ -310,7 +339,7 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                                                         onClick={() => startEdit(rowIdx)}
                                                         title="Редактировать"
                                                     >
-                                                        <EditIcon className={sub.actionIcon} />
+                                                        <EditIcon className={sub.actionIcon}/>
                                                     </span>
                                                 <span
                                                     style={{
@@ -324,7 +353,7 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                                                     }}
                                                     title="Удалить"
                                                 >
-                                                        <DeleteIcon className={sub.actionIcon} />
+                                                        <DeleteIcon className={sub.actionIcon}/>
                                                     </span>
                                             </>
                                         )}

@@ -131,7 +131,7 @@ export interface FormColumn {
 
     // Ввод/рендер
     placeholder: string | null;
-    type: string | null;       // "combobox" и пр.
+    type: string | null | boolean;       // "combobox" и пр.
     default: string | null;
 
     // Доп. флаги (могут приходить)
