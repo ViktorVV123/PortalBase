@@ -415,6 +415,7 @@ export const MainTable: React.FC<Props> = (p) => {
                         >
                             {p.showSubHeaders ? '▴' : '▾'}
                         </button>
+
                     </th>
                 </tr>
                 {p.showSubHeaders && (

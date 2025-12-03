@@ -23,8 +23,7 @@ type Deps = {
 
 export type OpenComboResult =
     | { ok: true }
-    | { ok: false; reason: 'NO_FORM' | 'NO_TABLE' };
-
+    | { ok: false; reason: 'NO_FORM' | 'NO_TABLE' | 'NO_TYPE' };
 
 
 
@@ -136,6 +135,18 @@ export function useComboboxCreate({
     ): Promise<OpenComboResult> => {
         const row = findRow(wcId, tableColumnId);
         if (!row) return { ok: false, reason: 'NO_TABLE' };
+
+        const raw: any = row;
+        const rowType: string | null =
+            (raw.type as string | null) ??
+            (raw.ref_type as string | null) ??
+            null;
+
+        if (!rowType || rowType.toLowerCase() !== 'combobox') {
+            // тип не выбран или не combobox
+            return { ok: false, reason: 'NO_TYPE' };
+        }
+
 
         const mainWidgetId = await getMainWidgetId(row);
         if (!mainWidgetId) return { ok: false, reason: 'NO_FORM' };

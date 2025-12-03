@@ -188,14 +188,16 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
         const res: OpenComboResult = await openComboCreate(wcId, tblColId, preset);
 
         if (!res.ok && 'reason' in res) {
-            if (res.reason === 'NO_FORM') {
-                alert('Для этой строки не выбрана форма. Сначала выбери форму — тогда станет доступно создание combobox.');
+            if (res.reason === 'NO_FORM' || res.reason === 'NO_TYPE') {
+                alert(
+                    'Для этой строки не выбрана форма или тип поля. ' +
+                    'Сначала выбери форму и укажи тип "combobox" — тогда станет доступно создание combobox.'
+                );
             } else if (res.reason === 'NO_TABLE') {
                 alert('У выбранной формы не определена таблица. Свяжи форму с таблицей и повтори.');
             }
             return; // модалку не открываем
         }
-
         // ok:true — модалка уже открыта хуком (setDlg({ open:true, ... }))
     };
 

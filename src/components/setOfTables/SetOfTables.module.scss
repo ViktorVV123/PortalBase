@@ -73,7 +73,7 @@ h2 {
   display: flex;
   gap: 10px;
   position: relative;
-  height: calc(100vh - 160px); /* подстрой под свой верхний header/панели */
+  height: calc(100vh - 80px); /* подстрой под свой верхний header/панели */
   min-height: 0;
 }
 

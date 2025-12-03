@@ -64,11 +64,7 @@ export const TableListView: React.FC<Props> = ({selectedTable, updateTableMeta,p
             {!isAdding ? (
                 <AddIcon onClick={startAdd}/>
             ) : (
-                <>
-                    {savingNew ? 'Сохранение…' : <SaveIcon/>}
-                    {/*  <button className={s.cancelBtn} onClick={cancelAdd} disabled={savingNew}>✕ Отмена</button>*/}
-                    <CancelIcon onClick={cancelAdd}/>
-                </>
+               ''
             )}
 
             {selectedTable.published === true ? ( <span>
