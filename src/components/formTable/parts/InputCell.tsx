@@ -127,26 +127,37 @@ export const InputCell: React.FC<InputCellProps> = ({
     );
 
     if (isComboPrimary) {
-        // ... combobox-Select — как уже сделано ...
+        return (
+            <Select
+                size="small"
+                fullWidth
+                value={value ?? ''}
+                displayEmpty
+                onChange={(e) => onChange(String(e.target.value ?? ''))}
+                renderValue={(val) => {
+                    if (!val) {
+                        return <span style={{ opacity: 0.6 }}>{placeholder || '—'}</span>;
+                    }
+                    const opt = options.find(o => o.id === val);
+                    return opt ? buildOptionLabel(opt) : String(val);
+                }}
+            >
+                <MenuItem value=""><em>—</em></MenuItem>
+                {options.map(o => (
+                    <MenuItem
+                        key={o.id}
+                        value={o.id}
+                        title={o.showHidden.join(' / ')}
+                    >
+                        {buildOptionLabel(o)}
+                    </MenuItem>
+                ))}
+            </Select>
+        );
     }
 
-    // ───── дата / время / timestamp(+tz) ─────
-    const dt = getCanonicalType(col); // 'date' | 'time' | 'timetz' | 'timestamp' | 'timestamptz' | undefined
-
-    let rawValue = value ?? '';
-    let tzSuffix = '';
-
-    const isTz =
-        dt === 'timetz' || dt === 'timestamptz';
-
-    if (isTz) {
-        const m = rawValue.match(/([+-]\d{2}:\d{2}|Z)$/);
-        if (m) {
-            tzSuffix = m[1];
-            rawValue = rawValue.slice(0, -tzSuffix.length);
-        }
-    }
-
+    // ───── дата / время / timestamp (+tz) ─────
+    const dt = getCanonicalType(col);
     const inputType =
         dt === 'date'
             ? 'date'
@@ -156,16 +167,11 @@ export const InputCell: React.FC<InputCellProps> = ({
                     ? 'datetime-local'
                     : undefined;
 
-    const inputValue = toInputValue(rawValue, dt);
+    const inputValue = toInputValue(value ?? '', dt);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const raw = e.target.value;
-        let backend = fromInputValue(raw, dt);
-
-        if (isTz && backend) {
-            backend += tzSuffix; // сохраняем исходный +03:00 / +04:00 / Z
-        }
-
+        const backend = fromInputValue(raw, dt);
         onChange(backend);
     };
 

@@ -79,11 +79,12 @@ export const EditReferenceDialog: React.FC<Props> = ({ value, onChange, onClose,
                         {/* варианты */}
                         <MenuItem value="combobox">combobox</MenuItem>
                         <MenuItem value="rls">rls</MenuItem>
-                        <MenuItem value="date">date</MenuItem>
-                        <MenuItem value="timestampwtz">timestampwtz</MenuItem>
-                        <MenuItem value="timestamp">timestamp</MenuItem>
-                        <MenuItem value="timewtz">timewtz</MenuItem>
-                        <MenuItem value="time">time</MenuItem>
+                        <MenuItem value="date">Календарь</MenuItem>
+                        <MenuItem value="checkbox">Чекбокс</MenuItem>
+                        <MenuItem value="timestampwtz">Календарь со временем и тайм зоной</MenuItem>
+                        <MenuItem value="timestamp">Календарь со временем</MenuItem>
+                        <MenuItem value="timewtz">Время с тайм зоной</MenuItem>
+                        <MenuItem value="time">Время</MenuItem>
                     </Select>
                 </FormControl>
 
