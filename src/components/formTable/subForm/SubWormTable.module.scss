@@ -1,10 +1,9 @@
 @use '@/assets/styles/fluid-type' as *;
 
-/* те же переменные, что и в основной */
 $border: #e5e5e5;
 $error: #d33;
 
-/* высота 1-й строки шапки — как в основной */
+/* высота 1-й строки шапки — как в основной таблице */
 :root {
   --head-row-1: 40px;
 }
@@ -14,7 +13,7 @@ $error: #d33;
   position: relative;
 }
 
-/* ───── вкладки (копия стиля из основной) ───── */
+/* ───── вкладки ───── */
 .tabs {
   display: flex;
   list-style: none;
@@ -23,7 +22,8 @@ $error: #d33;
   gap: 2px;
 }
 
-.tab, .tabActive {
+.tab,
+.tabActive {
   padding: 4px 14px 6px;
   border: 1px solid #666;
   border-bottom: none;
@@ -33,10 +33,12 @@ $error: #d33;
   font-size: 16px;
   cursor: pointer;
   white-space: nowrap;
-  transition: background .15s;
+  transition: background 0.15s;
 }
 
-.tab:hover { background: #505050; }
+.tab:hover {
+  background: #505050;
+}
 
 .tabActive {
   background: #656464;
@@ -51,41 +53,44 @@ $error: #d33;
   padding: 16px 0;
 }
 
-/* плавающая панель действий (как у тебя было) */
-.floatActions {
-  position: absolute;
-  top: 15%;
-  right: 0%;
-  z-index: 5;
-}
-
-/* ───── скролл-обёртка: IDENT к основной ───── */
+/* ───── скролл-обёртка: как у MainTable, но ниже по высоте ───── */
 .tableScroll {
   flex: 1 1 auto;
   min-height: 0;
-  max-height: 25vh; /* можно 50vh — оставил твоё 20vh, чтобы была ниже */
+  max-height: 25vh;
   overflow-y: auto;
   overflow-x: auto;
   border-radius: 4px;
 
-  /* кастомный скроллбар (WebKit) */
-  &::-webkit-scrollbar { height: 5px; width: 8px; }
-  &::-webkit-scrollbar-thumb { background: #888; border-radius: 4px; }
-  &::-webkit-scrollbar-track { background: #3a3a3a; }
+  &::-webkit-scrollbar {
+    height: 5px;
+    width: 8px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: #3a3a3a;
+  }
 }
 
-/* ───── таблица: IDENT к основной ───── */
+/* ───── таблица: те же принципы, что и в MainTable ───── */
 .tbl {
-  width: 100%;
-  text-align: center;
-  table-layout: fixed;   /* стабильные ширины */
-  border-collapse: separate; /* sticky устойчивее */
+  width: max-content; /* ширина по содержимому */
+  min-width: 100%;    /* но не уже контейнера */
+  table-layout: fixed;
+  border-collapse: separate;
   border-spacing: 0;
+  text-align: center;
   @include fluid-type(13, 16);
 }
 
-/* ячейки */
-.tbl th, .tbl td {
+/* базовые ячейки */
+.tbl th,
+.tbl td {
   font-size: 14px;
   border: 1px solid $border;
   padding: 4px 8px;
@@ -103,15 +108,15 @@ $error: #d33;
   z-index: 2;
 }
 
-/* 1-я строка шапки (группы) */
+/* 1-я строка шапки (группы) – прилипает сверху */
 .tbl thead tr:nth-child(1) th {
   position: sticky;
   top: 0;
   z-index: 3;
-  height: var(--head-row-1); /* нужно, чтобы 2-я знала отступ */
+  height: var(--head-row-1);
 }
 
-/* 2-я строка шапки (подписи) */
+/* 2-я строка шапки (подписи) – прилипает под первой */
 .tbl thead tr:nth-child(2) th {
   position: sticky;
   top: var(--head-row-1);
@@ -129,18 +134,56 @@ $error: #d33;
   background: var(--hover-color);
 }
 
-/* курсор-рука только у тела */
+/* курсор-рука только по телу */
 .tbl tbody td {
   cursor: pointer;
 }
 
-/* выбранная строка (если используешь) */
+/* выбранная строка (если будешь использовать) */
 .selectedRow {
   background: var(--hover-color);
 }
-.selectedRow td { font-weight: 600; }
+.selectedRow td {
+  font-weight: 600;
+}
 
-/* ───── действия в последней ячейке (IDENT) ───── */
+/* ───── текст с обрезкой / переносом ───── */
+.ellipsis {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* во 2-й строке шапки разрешаем перенос,
+   чтобы длинные подписи НЕ растягивали таблицу по ширине */
+.tbl thead tr:nth-child(2) .ellipsis {
+  white-space: normal;
+  word-break: break-word;
+  text-overflow: clip;
+}
+
+/* ───── заголовок actions-колонки ───── */
+.actionsHeadCell {
+  text-align: center;
+  vertical-align: middle;
+  width: 1%;
+}
+
+/* кнопка-тогглер подзаголовков */
+.toggleBtn {
+  background: none;
+  border: 0;
+  cursor: pointer;
+  padding: 0;
+}
+
+.toggleIcon {
+  color: #fff;
+}
+
+/* ───── actions-колонка в теле ───── */
 .actionsCell {
   display: flex;
   align-items: center;
@@ -156,8 +199,9 @@ $error: #d33;
   height: 1.2em;
 }
 
-/* ✓/× */
-.okBtn, .cancelBtn {
+/* кнопки ✓ / × и иконки */
+.okBtn,
+.cancelBtn {
   background: none;
   border: 0;
   width: 18px;
@@ -171,16 +215,32 @@ $error: #d33;
   color: #ccc;
   fill: #ccc;
   cursor: pointer;
-  transition: color .15s, fill .15s;
+  transition: color 0.15s, fill 0.15s;
 }
 
-.actionIcon:hover, .okBtn:hover, .cancelBtn:hover {
+.iconBtn {
+  background: none;
+  border: 0;
+  padding: 0;
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.actionIcon:hover,
+.okBtn:hover,
+.cancelBtn:hover,
+.iconBtn:hover .actionIcon {
   color: #fff;
   fill: #fff;
 }
 
-/* ───── инпуты в ячейках (IDENT) ───── */
-.inp, .inpN {
+/* инпуты в ячейках (для add/edit) */
+.inp,
+.inpN {
   width: 100%;
   box-sizing: border-box;
   padding: 2px 4px;
@@ -190,18 +250,16 @@ $error: #d33;
   border-radius: 3px;
 }
 
-.inpN { text-align: right; }
+.inpN {
+  text-align: right;
+}
 
-/* (опционально) альтернативные обёртки — если где-то понадобятся 1в1 */
-.tableWrapper, .tableWrapperWidget {
-  overflow: auto;
-  border-radius: 4px;
-}
-.tableWrapper {
-  max-height: calc(85vh - 200px);
-  border: 1px solid var(--header-color);
-}
-.tableWrapperWidget {
-  max-height: calc(100vh - 200px);
-  text-align: center;
+/* ссылка-кнопка для drill */
+.linkButton {
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-decoration: underline;
+  color: var(--link, #66b0ff);
 }

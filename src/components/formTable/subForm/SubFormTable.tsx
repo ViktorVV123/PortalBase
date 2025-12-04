@@ -1,5 +1,5 @@
 import React from 'react';
-import {Checkbox, TextField} from '@mui/material';
+import {Checkbox} from '@mui/material';
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
 import ArrowDropUpIcon from '@mui/icons-material/ArrowDropUp';
 import * as sub from './SubWormTable.module.scss';
@@ -8,10 +8,9 @@ import EditIcon from '@/assets/image/EditIcon.svg';
 import DeleteIcon from '@/assets/image/DeleteIcon.svg';
 import type {SubDisplay} from '@/shared/hooks/useWorkSpaces';
 import type {HeaderModelItem} from '@/components/formTable/FormTable';
-import {formatCellValue} from '@/shared/utils/cellFormat';
 import {useSubWormTable, UseSubWormTableDeps} from '@/components/formTable/subForm/hook/useSubWormTable';
-import {InputCell} from "@/components/formTable/parts/InputCell";
-import {ExtCol, formatByDatatype} from "@/components/formTable/parts/FormatByDatatype";
+import {InputCell} from '@/components/formTable/parts/InputCell';
+import {ExtCol, formatByDatatype} from '@/components/formTable/parts/FormatByDatatype';
 
 type SubformProps = {
     subDisplay: SubDisplay | null;
@@ -134,23 +133,20 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                         <tr>
                             {headerPlan.map((g) => (
                                 <th key={`sub-g-top-${g.id}`} colSpan={g.cols.length || 1}>
-                                    {g.title}
+                                    <span className={sub.ellipsis}>{g.title}</span>
                                 </th>
                             ))}
-                            <th
-                                rowSpan={showSubHeaders ? 1 : 2}
-                                style={{textAlign: 'center', verticalAlign: 'middle'}}
-                            >
+                            <th className={sub.actionsHeadCell}>
                                 <button
                                     type="button"
                                     onClick={() => setShowSubHeaders((v) => !v)}
                                     title={showSubHeaders ? 'Скрыть подзаголовки' : 'Показать подзаголовки'}
-                                    style={{background: 'none', border: 0, cursor: 'pointer'}}
+                                    className={sub.toggleBtn}
                                 >
                                     {showSubHeaders ? (
-                                        <ArrowDropUpIcon style={{color: '#fff'}}/>
+                                        <ArrowDropUpIcon className={sub.toggleIcon}/>
                                     ) : (
-                                        <ArrowDropDownIcon style={{color: '#fff'}}/>
+                                        <ArrowDropDownIcon className={sub.toggleIcon}/>
                                     )}
                                 </button>
                             </th>
@@ -158,12 +154,16 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
 
                         {showSubHeaders && (
                             <tr>
-                                {headerPlan.flatMap((g) =>
-                                    g.labels.slice(0, g.cols.length).map((label, idx) => (
-                                        <th key={`sub-g-sub-${g.id}-${idx}`}>{safe(label)}</th>
-                                    )),
-                                )}
-                                <th/>
+                                {headerPlan.map((g) => {
+                                    const span = g.cols.length || 1;
+                                    const label = safe(g.labels?.[0] ?? '—');
+                                    return (
+                                        <th key={`sub-g-sub-${g.id}`} colSpan={span}>
+                                            <span className={sub.ellipsis}>{label}</span>
+                                        </th>
+                                    );
+                                })}
+                                <th className={sub.actionsHeadCell}/>
                             </tr>
                         )}
                         </thead>
@@ -189,11 +189,12 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                                         />
                                     </td>
                                 ))}
-                                <td/>
+                                <td className={sub.actionsCell}/>
                             </tr>
                         )}
+
                         {subDisplay.data.map((row, rowIdx) => {
-                            const isEditing = editingRowIdx === rowIdx;
+                            const isEditingRow = editingRowIdx === rowIdx;
 
                             return (
                                 <tr key={rowIdx}>
@@ -209,7 +210,7 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                                         const idx = valueIndexByKey.get(key);
                                         const val = idx != null ? row.values[idx] : '';
 
-                                        if (isEditing) {
+                                        if (isEditingRow) {
                                             const tcId = col.table_column_id!;
                                             return (
                                                 <td
@@ -231,6 +232,7 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                                                 </td>
                                             );
                                         }
+
                                         const raw = val == null ? '' : String(val);
                                         const display = formatByDatatype(raw, col as ExtCol);
                                         const isCheckboxCol =
@@ -242,8 +244,15 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                                             if (typeof v === 'boolean') return v;
                                             if (typeof v === 'number') return v !== 0;
                                             const s = String(v).trim().toLowerCase();
-                                            return s === '1' || s === 'true' || s === 't' || s === 'yes' || s === 'да';
+                                            return (
+                                                s === '1' ||
+                                                s === 'true' ||
+                                                s === 't' ||
+                                                s === 'yes' ||
+                                                s === 'да'
+                                            );
                                         };
+
                                         const clickable = !!onOpenDrill && col.form_id != null;
 
                                         return (
@@ -257,13 +266,10 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                                                         readOnly
                                                         disabled
                                                         sx={{
-                                                            // цвет рамки/иконки по умолчанию
                                                             color: 'rgba(255, 255, 255, 0.4)',
-                                                            // цвет, когда чекбокс отмечен
                                                             '&.Mui-checked': {
                                                                 color: 'rgba(255, 255, 255, 0.9)',
                                                             },
-                                                            // чтобы при disabled не становился слишком тёмным
                                                             '&.Mui-disabled': {
                                                                 color: 'rgba(255, 255, 255, 0.7)',
                                                             },
@@ -283,33 +289,27 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                                                                 >,
                                                                 openedFromEdit: false,
                                                             });
+                                                            // eslint-disable-next-line no-console
                                                             console.debug('[SubWormTable] drill click', {
                                                                 formId: col.form_id,
                                                                 widget_column_id: col.widget_column_id,
                                                                 table_column_id: col.table_column_id,
                                                             });
                                                         }}
-                                                        style={{
-                                                            padding: 0,
-                                                            border: 'none',
-                                                            background: 'none',
-                                                            cursor: 'pointer',
-                                                            textDecoration: 'underline',
-                                                            color: 'var(--link,#66b0ff)',
-                                                        }}
+                                                        className={sub.linkButton}
                                                         title={`Открыть форму #${col.form_id}`}
                                                     >
-                                                        {display}
+                                                        <span className={sub.ellipsis}>{display}</span>
                                                     </button>
                                                 ) : (
-                                                    <>{display}</>
+                                                    <span className={sub.ellipsis}>{display}</span>
                                                 )}
                                             </td>
                                         );
                                     })}
 
                                     <td className={sub.actionsCell}>
-                                        {isEditing ? (
+                                        {isEditingRow ? (
                                             <>
                                                 <button
                                                     className={sub.okBtn}
@@ -330,31 +330,25 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                                             </>
                                         ) : (
                                             <>
-                                                    <span
-                                                        style={{
-                                                            display: 'inline-flex',
-                                                            cursor: 'pointer',
-                                                            marginRight: 10,
-                                                        }}
-                                                        onClick={() => startEdit(rowIdx)}
-                                                        title="Редактировать"
-                                                    >
-                                                        <EditIcon className={sub.actionIcon}/>
-                                                    </span>
-                                                <span
-                                                    style={{
-                                                        display: 'inline-flex',
-                                                        cursor:
-                                                            deletingRowIdx === rowIdx ? 'progress' : 'pointer',
-                                                        opacity: deletingRowIdx === rowIdx ? 0.6 : 1,
-                                                    }}
+                                                <button
+                                                    type="button"
+                                                    className={sub.iconBtn}
+                                                    onClick={() => startEdit(rowIdx)}
+                                                    title="Редактировать"
+                                                >
+                                                    <EditIcon className={sub.actionIcon}/>
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className={sub.iconBtn}
                                                     onClick={() => {
                                                         if (deletingRowIdx == null) deleteRow(rowIdx);
                                                     }}
+                                                    disabled={deletingRowIdx === rowIdx}
                                                     title="Удалить"
                                                 >
-                                                        <DeleteIcon className={sub.actionIcon}/>
-                                                    </span>
+                                                    <DeleteIcon className={sub.actionIcon}/>
+                                                </button>
                                             </>
                                         )}
                                     </td>

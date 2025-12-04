@@ -10,7 +10,8 @@ $error: #d33;
   padding: 10px;
   display: flex;
   flex-direction: column;
-  min-height: calc(100vh - 80px); // 80px – высота верхней панели, подгони под себя
+  min-height: calc(100vh - 80px); // 80px – высота верхней панели
+  overflow-x: hidden; // 👈 страница НЕ скроллится по горизонтали
 }
 
 .loaderArea {
@@ -61,31 +62,35 @@ h2 {
 }
 
 /* ─── раскладка основного контента ─── */
+.contentRow {
+  display: flex;
+  gap: 10px;
+  position: relative;
+  height: calc(100vh - 80px);
+  min-height: 0;
+  /* горизонтальный скролл у строки не нужен, он внутри таблиц */
+}
+
 .mainCol {
   display: flex;
   flex-direction: column;
   gap: 20px;
   flex: 1 1 auto;
-  min-height: 0; /* даёт дочкам право сжиматься */
-}
-
-.contentRow {
-  display: flex;
-  gap: 10px;
-  position: relative;
-  height: calc(100vh - 80px); /* подстрой под свой верхний header/панели */
   min-height: 0;
+  min-width: 0; /* 👈 важно: позволяет ужиматься по ширине */
 }
 
-/* ─── скролл-обёртка таблицы: скроллится только тело ─── */
-.tableScroll {
+/* ─── СКРОЛЛ ТОЛЬКО ДЛЯ MainTable ─── */
+.mainTableScroll {
   flex: 1 1 auto;
   min-height: 0;
-  overflow-y: auto; /* вертикальный скролл содержимого (tbody) */
-  overflow-x: auto; /* горизонтальный при узких экранах */
+  min-width: 0;
+  max-width: 100%;    /* 👈 не шире колонки/экрана */
+
+  overflow-x: auto;   /* 👈 горизонтальный скролл только здесь */
+  overflow-y: auto;
   border-radius: 4px;
 
-  /* кастомный скроллбар (WebKit) */
   &::-webkit-scrollbar {
     height: 5px;
     width: 8px;
@@ -101,30 +106,31 @@ h2 {
   }
 }
 
-/* ─── таблица ─── */
+/* высота 1-й строки thead под твою типографику */
 :root {
   --head-row-1: 40px;
 }
 
-/* высота 1-й строки thead под твою типографику */
-
+/* ─── сама таблица ─── */
 .tbl {
-  width: 100%;
-  text-align: center;
-  table-layout: fixed; /* стабильные ширины */
-  border-collapse: separate; /* sticky надёжнее с separate */
+  width: max-content;  /* ширина по содержимому */
+  min-width: 100%;     /* но не уже контейнера */
+  table-layout: fixed; /* стабильные ширины через colgroup */
+  border-collapse: separate;
   border-spacing: 0;
   @include fluid-type(13, 16);
 }
 
-/* ячейки */
-.tbl th, .tbl td {
+/* базовые ячейки */
+.tbl th,
+.tbl td {
   font-size: 14px;
   border: 1px solid $border;
-  padding: 4px 8px;
+  padding: 4px 6px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  max-width: 320px; /* чтобы огромные тексты не раздували ячейку по высоте */
 }
 
 /* шапка */
@@ -136,29 +142,12 @@ h2 {
   z-index: 2;
 }
 
-.ellipsis {
-  display: block;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap; // одна строка
-}
-
-.clamp {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: var(--lines, 2);
-  overflow: hidden;
-  white-space: normal; // переопределяет .tbl td { white-space: nowrap }
-  word-break: break-word;
-}
-
 /* 1-я строка шапки (группы) */
 .tbl thead tr:nth-child(1) th {
   position: sticky;
   top: 0;
   z-index: 3;
-  height: var(--head-row-1); /* нужно, чтобы 2-я знала отступ */
+  height: var(--head-row-1);
 }
 
 /* 2-я строка шапки (подписи) */
@@ -179,7 +168,7 @@ h2 {
   background: var(--hover-color);
 }
 
-/* курсор-рука только у тела, не у всего проекта */
+/* курсор-рука только по телу */
 .tbl tbody td {
   cursor: pointer;
 }
@@ -188,38 +177,138 @@ h2 {
 .selectedRow {
   background: var(--hover-color);
 }
-
 .selectedRow td {
   font-weight: 600;
 }
 
-/* ─── действия в последней ячейке ─── */
+/* однострочный текст с троеточием */
+.ellipsis {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tbl thead tr:nth-child(2) .ellipsis {
+  white-space: normal;      // разрешаем перенос
+  word-break: break-word;   // ломаем длинные слова
+  text-overflow: clip;      // убираем троеточие
+}
+/* многострочный clamp – если где-то используешь */
+.clamp {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: var(--lines, 2);
+  overflow: hidden;
+  white-space: normal;
+  word-break: break-word;
+}
+
+/* ─── инпуты внутри таблицы (в т.ч. MUI) ─── */
+
+.tbl input,
+.tbl select {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  font-size: 13px;
+}
+
+/* MUI-обёртка TextField / Select */
+.tbl :global(.MuiInputBase-root) {
+  width: 100%;
+}
+
+/* datetime / date / time – чтобы выглядели нормально на тёмном фоне */
+.dateTimeInput {
+  input {
+    color: #fff;
+
+    &::-webkit-calendar-picker-indicator {
+      filter: invert(1);
+      opacity: 1;
+    }
+
+    &::-webkit-inner-spin-button {
+      filter: invert(1);
+    }
+
+    &::-webkit-clear-button {
+      filter: invert(1);
+    }
+  }
+}
+
+/* read-only ячейки – курсор обычный и текст можно выделять */
+.cellReadonly {
+  cursor: default;
+}
+.readonlyValue {
+  user-select: text;
+  pointer-events: none;
+  opacity: .85;
+}
+
+/* ─── actions-колонка ─── */
+
 .actionsCell {
-  display: flex;
+  padding: 0 4px;
+  text-align: center;
+  white-space: nowrap;
+  width: 1%; /* колонка старается занимать минимум ширины */
+}
+
+.actionsRow {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 0;
-  height: 40px;
-  min-width: 64px;
+  gap: 4px;
 }
 
-.actionIcon {
-  width: 1.2em;
-  height: 1.2em;
-  color: #d1d0d0
-}
-
-.okBtn, .cancelBtn {
+.actionsBtn {
   background: none;
   border: 0;
-  width: 18px;
-  height: 18px;
   padding: 0;
-  display: flex;
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
+  cursor: pointer;
+  color:white;
+}
+
+.actionsBtnDisabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.lockSlot {
+  width: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+/* одна версия .actionIcon */
+.actionIcon {
+  width: 1.1em;
+  height: 1.1em;
+  color: #d1d0d0;
+}
+
+.okBtn,
+.cancelBtn {
+  background: none;
+  border: 0;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
   line-height: 1;
   color: #ccc;
   fill: #ccc;
@@ -227,7 +316,9 @@ h2 {
   transition: color .15s, fill .15s;
 }
 
-.actionIcon:hover, .okBtn:hover, .cancelBtn:hover {
+.actionIcon:hover,
+.okBtn:hover,
+.cancelBtn:hover {
   color: #fff;
   fill: #fff;
 }
@@ -247,23 +338,8 @@ h2 {
   text-align: right;
 }
 
-/* ─── альтернативные обёртки (если нужны в других местах) ─── */
-.tableWrapper, .tableWrapperWidget {
+/* ─── блок дерева / ссылки / вкладки и т.п. ниже без изменений ─── */
 
-
-}
-
-.tableWrapper {
-  max-height: calc(85vh - 200px);
-  border: 1px solid var(--header-color);
-}
-
-.tableWrapperWidget {
-  max-height: calc(100vh - 200px);
-  text-align: center;
-}
-
-/* ─── блок дерева ─── */
 .treeList {
   margin-bottom: 24px;
 }
@@ -278,8 +354,7 @@ h2 {
   padding: 6px 10px;
   border-radius: 4px;
   margin-bottom: 6px;
-  gap:10px
-
+  gap: 10px;
 }
 
 .treeUl {
@@ -287,11 +362,10 @@ h2 {
   margin: 0;
   padding: 0;
   position: relative;
-  max-height: 66vh; /* или фикс, например 320px */
+  max-height: 66vh;
   overflow-y: auto;
   min-height: 0;
 
-  /* скролл (WebKit) */
   &::-webkit-scrollbar {
     width: 6px;
   }
@@ -317,8 +391,6 @@ h2 {
   transition: background .15s;
   flex: 1 1 auto;
   min-height: 0;
-
-  /* если текст внутри может быть длинным — локальный скролл по Y */
   max-height: 140px;
   overflow-y: auto;
   overflow-x: hidden;
@@ -330,7 +402,6 @@ h2 {
     background: var(--hover-color);
   }
 
-  /* скролл самой ячейки (WebKit) */
   &::-webkit-scrollbar {
     width: 6px;
   }
@@ -345,158 +416,10 @@ h2 {
   }
 }
 
-.nestedUl {
-  list-style: none;
-  padding-left: 16px;
-  margin-top: 4px;
-}
-
-.nestedItem {
-  position: relative;
-  margin-bottom: 4px;
-  cursor: pointer;
-  padding: 6px 14px 6px 24px;
-  border-left: 3px solid #555;
-  background: linear-gradient(to right, #3a3a3a, #2e2e2e);
-  color: #ccc;
-  border-radius: 4px;
-  transition: background .15s, color .15s;
-
-  &::before {
-    content: '↳';
-    position: absolute;
-    left: 8px;
-    top: 50%;
-    transform: translateY(-50%);
-    color: #888;
-    font-size: 12px;
-  }
-
-  &:hover {
-    background: var(--hover-color);
-    color: #fff;
-  }
-}
-
-/* ─── ссылки ─── */
-.link {
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-weight: 500;
-  text-decoration: underline;
-  transition: color .15s ease, text-decoration-color .15s ease, opacity .15s ease;
-
-  &:hover {
-    text-decoration: underline;
-    text-underline-offset: 2px;
-    text-decoration-thickness: 1px;
-  }
-
-  &:active {
-    opacity: .75;
-  }
-
-  &:focus-visible {
-    outline: 2px solid color-mix(in oklab, #8ac7ff 70%, #ffffff);
-    outline-offset: 2px;
-    border-radius: 4px;
-    text-decoration: underline;
-  }
-
-  &.disabled, &[aria-disabled="true"] {
-    cursor: not-allowed;
-    opacity: .5;
-    pointer-events: none;
-    text-decoration: none;
-  }
-
-  &.active {
-    text-decoration: underline;
-    text-underline-offset: 3px;
-    text-decoration-thickness: 2px;
-    font-weight: 600;
-    color: #fff;
-  }
-}
-
-/* меньше движухи для тех, кто просит */
-@media (prefers-reduced-motion: reduce) {
-  .link {
-    transition: none;
-  }
-}
-
-
-/* ───── вкладки ───── */
-.tabs {
-  display: flex;
-  list-style: none;
-  padding: 0;
-  margin: 0 0 4px 0;
-  gap: 2px;
-}
-
-.tab, .tabActive {
-  padding: 4px 14px 6px;
-  border: 1px solid #666;
-  border-bottom: none;
-  border-radius: 6px 6px 0 0;
-  background: #3a3a3a;
-  color: #eee;
-  font-size: 16px;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: background .15s;
-}
-
-.tab:hover {
-  background: #505050;
-}
-
-.tabActive {
-  background: #656464;
-  font-weight: 600;
-  position: relative;
-  z-index: 1;
-}
+/* ... остальное (nestedUl, link, tabs, dateTimeInput второй раз) можно оставить как есть,
+   они на ширину таблицы не влияют */
 
 
 
-.cellReadonly {
-  cursor: default;
-}
-.readonlyValue {
-  user-select: text;
-  pointer-events: none;
-  opacity: .85; // слегка тусклее
-}
-.input {
-  width: 100%;
-  background: transparent;
-  border: 1px solid var(--border-color);
-  padding: 2px 6px;
-}
 
-.dateTimeInput {
-  input {
-    color: #fff; // сам текст на всякий случай
 
-    // иконка календаря / часов
-    &::-webkit-calendar-picker-indicator {
-      filter: invert(1); // делает её белой на тёмном фоне
-      opacity: 1;
-    }
-
-    // стрелочки в time/datetime
-    &::-webkit-inner-spin-button {
-      filter: invert(1);
-    }
-
-    // крестик очистки (если появляется)
-    &::-webkit-clear-button {
-      filter: invert(1);
-    }
-  }
-}

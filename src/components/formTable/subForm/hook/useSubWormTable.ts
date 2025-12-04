@@ -12,7 +12,7 @@ export type UseSubWormTableDeps = {
     currentOrder: number | null;
     subHeaderGroups?: HeaderModelItem[];
     handleTabClick: (order: number) => void;
-
+    setSubDisplay: React.Dispatch<React.SetStateAction<SubDisplay | null>>;
     // внешнее управление состояниями редактирования/добавления — чтобы можно было шарить между экранами
     editingRowIdx: number | null;
     setEditingRowIdx: React.Dispatch<React.SetStateAction<number | null>>;
@@ -45,6 +45,7 @@ export function useSubWormTable({
                                     setIsAddingSub,
                                     draftSub,
                                     setDraftSub,
+                                    setSubDisplay,
                                 }: UseSubWormTableDeps) {
     const [deletingRowIdx, setDeletingRowIdx] = useState<number | null>(null);
     const [showSubHeaders, setShowSubHeaders] = useState(false);

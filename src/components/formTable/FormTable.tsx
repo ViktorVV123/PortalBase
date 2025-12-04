@@ -332,36 +332,39 @@ export const FormTable: React.FC<Props> = ({
                         expandedWidth={420}
                     />
 
-                    <MainTable
-                        headerPlan={headerPlan as any}
-                        showSubHeaders={showSubHeaders}
-                        onToggleSubHeaders={() => setShowSubHeaders(v => !v)}
-                        onOpenDrill={handleOpenDrillFromMain}
-                        isAdding={isAdding}
-                        draft={draft}
-                        onDraftChange={(tcId, v) => setDraft(prev => ({ ...prev, [tcId]: v }))}
-                        flatColumnsInRenderOrder={flatColumnsInRenderOrder}
-                        isColReadOnly={isColReadOnly}
-                        placeholderFor={(c) => c.placeholder ?? c.column_name}
-                        filteredRows={filteredRows}
-                        valueIndexByKey={valueIndexByKey}
-                        selectedKey={selectedKey}
-                        pkToKey={pkToKey}
-                        editingRowIdx={editingRowIdx}
-                        editDraft={editDraft}
-                        onEditDraftChange={(tcId, v) => setEditDraft(prev => ({ ...prev, [tcId]: v }))}
-                        onSubmitEdit={submitEdit}
-                        onCancelEdit={cancelEdit}
-                        editSaving={editSaving}
-                        onRowClick={handleRowClick}
-                        onStartEdit={startEdit}
-                        onDeleteRow={deleteRow}
-                        deletingRowIdx={deletingRowIdx}
-                        comboReloadToken={comboReloadToken}
-                    />
+                    {/* 👇 отдельная область, которая скроллится */}
 
-                    <SubWormTable  onOpenDrill={handleOpenDrillFromMain}
-                                   editingRowIdx={editingRowIdxSub}
+                        <MainTable
+                            headerPlan={headerPlan as any}
+                            showSubHeaders={showSubHeaders}
+                            onToggleSubHeaders={() => setShowSubHeaders(v => !v)}
+                            onOpenDrill={handleOpenDrillFromMain}
+                            isAdding={isAdding}
+                            draft={draft}
+                            onDraftChange={(tcId, v) => setDraft(prev => ({...prev, [tcId]: v}))}
+                            flatColumnsInRenderOrder={flatColumnsInRenderOrder}
+                            isColReadOnly={isColReadOnly}
+                            placeholderFor={(c) => c.placeholder ?? c.column_name}
+                            filteredRows={filteredRows}
+                            valueIndexByKey={valueIndexByKey}
+                            selectedKey={selectedKey}
+                            pkToKey={pkToKey}
+                            editingRowIdx={editingRowIdx}
+                            editDraft={editDraft}
+                            onEditDraftChange={(tcId, v) => setEditDraft(prev => ({...prev, [tcId]: v}))}
+                            onSubmitEdit={submitEdit}
+                            onCancelEdit={cancelEdit}
+                            editSaving={editSaving}
+                            onRowClick={handleRowClick}
+                            onStartEdit={startEdit}
+                            onDeleteRow={deleteRow}
+                            deletingRowIdx={deletingRowIdx}
+                            comboReloadToken={comboReloadToken}
+                        />
+
+                    <SubWormTable
+                        onOpenDrill={handleOpenDrillFromMain}
+                        editingRowIdx={editingRowIdxSub}
                         setEditingRowIdx={setEditingRowIdxSub}
                         editDraft={editDraftSub}
                         setEditDraft={setEditDraftSub}
@@ -381,6 +384,7 @@ export const FormTable: React.FC<Props> = ({
                         handleTabClick={handleTabClick}
                     />
                 </div>
+
             </div>
 
             {/* DRILL-модалка */}
@@ -391,7 +395,7 @@ export const FormTable: React.FC<Props> = ({
                     if (!fid) return;
 
                     try {
-                        const { data } = await api.post<FormDisplay | FormDisplay[]>(`/display/${fid}/main`, activeFilters);
+                        const {data} = await api.post<FormDisplay | FormDisplay[]>(`/display/${fid}/main`, activeFilters);
                         const next = Array.isArray(data) ? data[0] : data;
                         if (next) setFormDisplay(next);
                     } catch (e) {
@@ -404,7 +408,7 @@ export const FormTable: React.FC<Props> = ({
                 formsById={formsById}
                 disableNestedDrill={drillDisableNested}
                 comboboxMode={drillComboboxMode}
-                selectedWidget={selectedWidget ? { id: selectedWidget.id } : null}
+                selectedWidget={selectedWidget ? {id: selectedWidget.id} : null}
                 formsByWidget={formsByWidget}
                 loadSubDisplay={loadSubDisplay}
                 initialPrimary={drillInitialPrimary}

@@ -11,6 +11,11 @@ import {InputCell} from "@/components/formTable/parts/InputCell";
 import {Checkbox} from "@mui/material";
 
 
+// "логическая" ширина колонок из бэка → проценты
+const DEFAULT_COL_WIDTH = 10; // если width не задан
+const MIN_COL_WIDTH = 6;      // чтобы колонка не была совсем иголкой
+const MAX_COL_WIDTH = 40;     // чтобы одна не съедала весь экран
+
 type HeaderPlanGroup = {
     id: number;
     title: string;
@@ -352,8 +357,8 @@ const ComboEditDisplay: React.FC<ComboEditDisplayProps> = ({
 
 
 export const MainTable: React.FC<Props> = (p) => {
+    /** стабильный порядок строк (по person_id, как у тебя) */
     const stableRows = React.useMemo(() => {
-        // копия, чтобы не мутировать исходный массив
         const copy = [...p.filteredRows];
 
         copy.sort((a, b) => {
@@ -370,7 +375,7 @@ export const MainTable: React.FC<Props> = (p) => {
 
             if (Number.isNaN(na) || Number.isNaN(nb)) return 0;
 
-            return na - nb; // сортировка по person_id по возрастанию
+            return na - nb;
         });
 
         return copy;
@@ -384,7 +389,7 @@ export const MainTable: React.FC<Props> = (p) => {
         const idx = p.valueIndexByKey.get(key);
 
         if (idx == null) return null;
-        return {col, idx};
+        return { col, idx };
     }, [p.flatColumnsInRenderOrder, p.valueIndexByKey]);
 
     // 👉 Правило "строка под RLS?"
@@ -397,26 +402,62 @@ export const MainTable: React.FC<Props> = (p) => {
         return s === '1' || s === 'true' || s === 'да' || s === 'yes';
     };
 
+    const colWidths = React.useMemo(() => {
+        return p.flatColumnsInRenderOrder.map((col) => {
+            const raw = Number((col as any).width);
+
+            let w = Number.isFinite(raw) && raw > 0
+                ? raw
+                : DEFAULT_COL_WIDTH;
+
+            if (w < MIN_COL_WIDTH) w = MIN_COL_WIDTH;
+            if (w > MAX_COL_WIDTH) w = MAX_COL_WIDTH;
+
+            // интерпретируем как проценты от ширины таблицы
+            return `${w}%`;
+        });
+    }, [p.flatColumnsInRenderOrder]);
+
+    const drillDisabled = p.disableDrillWhileEditing && p.editingRowIdx != null;
 
     return (
-        <div className={s.tableScroll}>
+        <div className={s.mainTableScroll}>
             <table className={s.tbl}>
+                <colgroup>
+                    {p.flatColumnsInRenderOrder.map((col, idx) => (
+                        <col
+                            key={`col-${col.widget_column_id}-${col.table_column_id ?? 'null'}-${(col as any).combobox_column_id ?? 'null'}`}
+                            style={{width: colWidths[idx]}}
+                        />
+                    ))}
+                    {/* actions-колонка: минимальная ширина под иконки + не раздувается остатками ширины */}
+                    <col
+                        style={{
+                            width: '1%',      // браузер старается сделать колонку как можно уже
+                            minWidth: 56,     // но не меньше нужного под две иконки
+                            maxWidth: 80,
+                        }}
+                    />
+                </colgroup>
+
                 <thead>
                 <tr>
                     {p.headerPlan.map(g => (
-                        <th key={`g-top-${g.id}`} colSpan={g.cols.length || 1}>{g.title}</th>
+                        <th key={`g-top-${g.id}`} colSpan={g.cols.length || 1}>
+                            <span className={s.ellipsis}>{g.title}</span>
+                        </th>
                     ))}
-                    <th rowSpan={p.showSubHeaders ? 1 : 2} style={{textAlign: 'center', verticalAlign: 'middle'}}>
+                    <th className={s.actionsCell}>
                         <button
                             type="button"
+                            className={s.actionsBtn}
                             onClick={p.onToggleSubHeaders}
-                            style={{background: 'none', border: 0, cursor: 'pointer', color: 'white'}}
                             aria-label={p.showSubHeaders ? 'Скрыть подзаголовки' : 'Показать подзаголовки'}
                         >
                             {p.showSubHeaders ? '▴' : '▾'}
                         </button>
-
                     </th>
+
                 </tr>
                 {p.showSubHeaders && (
                     <tr>
@@ -425,11 +466,11 @@ export const MainTable: React.FC<Props> = (p) => {
                             const label = (g.labels?.[0] ?? '—');
                             return (
                                 <th key={`g-sub-${g.id}`} colSpan={span}>
-                                    {label}
+                                    <span className={s.ellipsis}>{label}</span>
                                 </th>
                             );
                         })}
-                        <th/>
+                        <th className={s.actionsCell}/>
                     </tr>
                 )}
                 </thead>
@@ -437,11 +478,12 @@ export const MainTable: React.FC<Props> = (p) => {
                 <tbody>
                 {/* ───────── Добавление ───────── */}
                 {p.isAdding && (
-                    <tr>
+                    <tr >
                         {(() => {
                             const cells: React.ReactNode[] = [];
                             const cols = p.flatColumnsInRenderOrder;
                             let i = 0;
+
                             while (i < cols.length) {
                                 const col = cols[i];
 
@@ -461,7 +503,6 @@ export const MainTable: React.FC<Props> = (p) => {
                                         <td
                                             key={`add-combo-${primary.widget_column_id}:${writeTcId ?? 'null'}`}
                                             colSpan={span}
-                                            style={{textAlign: 'center'}}
                                         >
                                             <InputCell
                                                 mode="add"
@@ -487,7 +528,6 @@ export const MainTable: React.FC<Props> = (p) => {
                                 cells.push(
                                     <td
                                         key={`add-${col.widget_column_id}:${col.table_column_id ?? -1}`}
-                                        style={{textAlign: 'center'}}
                                     >
                                         <InputCell
                                             mode="add"
@@ -503,9 +543,11 @@ export const MainTable: React.FC<Props> = (p) => {
                                 );
                                 i += 1;
                             }
+
                             return cells;
                         })()}
-                        <td/>
+                        {/* actions-ячейка при добавлении пока пустая */}
+                        <td className={s.actionsCell}/>
                     </tr>
                 )}
 
@@ -519,7 +561,8 @@ export const MainTable: React.FC<Props> = (p) => {
 
                     return (
                         <tr
-                            key={rowKey}  // фиксированный ключ по первичному ключу
+                            key={rowKey}
+                            style={{textAlign: 'center'}}
                             className={p.selectedKey === rowKey ? s.selectedRow : undefined}
                             aria-selected={p.selectedKey === rowKey || undefined}
                             onClick={() => {
@@ -549,16 +592,15 @@ export const MainTable: React.FC<Props> = (p) => {
                                                 <td
                                                     key={`edit-combo-${primary.widget_column_id}:${writeTcId}`}
                                                     colSpan={span}
-                                                    style={{textAlign: 'center'}}
                                                 >
                                                     <ComboEditDisplay
                                                         group={group}
                                                         row={row}
                                                         valueIndexByKey={p.valueIndexByKey}
                                                         editDraft={p.editDraft}
-                                                        onOpenDrill={p.onOpenDrill}
+                                                        onOpenDrill={drillDisabled ? undefined : p.onOpenDrill}
                                                         comboReloadToken={p.comboReloadToken}
-                                                        onChangeDraft={p.onEditDraftChange}   // 👈 вот этого раньше не было
+                                                        onChangeDraft={p.onEditDraftChange}
                                                     />
                                                 </td>
                                             );
@@ -570,7 +612,7 @@ export const MainTable: React.FC<Props> = (p) => {
                                             const display = shownParts.length
                                                 ? shownParts.map(formatCellValue).join(' · ')
                                                 : '—';
-                                            const clickable = primary.form_id != null && !!p.onOpenDrill;
+                                            const clickable = primary.form_id != null && !!p.onOpenDrill && !drillDisabled;
 
                                             cells.push(
                                                 <td
@@ -587,6 +629,7 @@ export const MainTable: React.FC<Props> = (p) => {
                                                                     primary: row.primary_keys,
                                                                     openedFromEdit: false,
                                                                 });
+                                                                // eslint-disable-next-line no-console
                                                                 console.debug('[MainTable] drill click (combobox)', {
                                                                     formId: primary.form_id,
                                                                     originColumnType: 'combobox',
@@ -607,7 +650,7 @@ export const MainTable: React.FC<Props> = (p) => {
                                                             {display}
                                                         </button>
                                                     ) : (
-                                                        <>{display}</>
+                                                        <span className={s.ellipsis}>{display}</span>
                                                     )}
                                                 </td>
                                             );
@@ -627,7 +670,7 @@ export const MainTable: React.FC<Props> = (p) => {
 
                                     if (isEditing) {
                                         cells.push(
-                                            <td key={`edit-${visKey}`} style={{textAlign: 'center'}}>
+                                            <td key={`edit-${visKey}`}>
                                                 <InputCell
                                                     mode="edit"
                                                     col={col}
@@ -641,32 +684,28 @@ export const MainTable: React.FC<Props> = (p) => {
                                             </td>
                                         );
                                     } else {
-                                        const clickable = col.form_id != null && !!p.onOpenDrill;
+                                        const clickable = col.form_id != null && !!p.onOpenDrill && !drillDisabled;
                                         const pretty = formatByDatatype(shownVal, col as ExtCol);
 
                                         const isCheckboxCol =
                                             col.type === 'checkbox' ||
-                                            (col as ExtCol).type === 'bool'; // 👈 тут была опечатка
+                                            (col as ExtCol).type === 'bool';
 
                                         if (isCheckboxCol) {
                                             const checked = isRlsLockedValue(rawVal);
                                             cells.push(
                                                 <td
                                                     key={`cell-${visKey}`}
-                                                    style={{textAlign: 'center'}}
                                                 >
                                                     <Checkbox
                                                         size="small"
                                                         checked={checked}
                                                         disabled
                                                         sx={{
-                                                            // цвет рамки/иконки по умолчанию
                                                             color: 'rgba(255, 255, 255, 0.4)',
-                                                            // цвет, когда чекбокс отмечен
                                                             '&.Mui-checked': {
                                                                 color: 'rgba(255, 255, 255, 0.9)',
                                                             },
-                                                            // чтобы при disabled не становился слишком тёмным
                                                             '&.Mui-disabled': {
                                                                 color: 'rgba(255, 255, 255, 0.7)',
                                                             },
@@ -675,6 +714,7 @@ export const MainTable: React.FC<Props> = (p) => {
                                                 </td>
                                             );
                                         } else {
+                                            const content = pretty || '—';
                                             cells.push(
                                                 <td key={`cell-${visKey}`}>
                                                     {clickable ? (
@@ -687,6 +727,7 @@ export const MainTable: React.FC<Props> = (p) => {
                                                                     primary: row.primary_keys,
                                                                     openedFromEdit: false,
                                                                 });
+                                                                // eslint-disable-next-line no-console
                                                                 console.debug('[MainTable] drill click (regular)', {
                                                                     formId: col.form_id,
                                                                     originColumnType: col.type ?? null,
@@ -704,16 +745,15 @@ export const MainTable: React.FC<Props> = (p) => {
                                                             }}
                                                             title={`Открыть форму #${col.form_id}`}
                                                         >
-                                                            {pretty || '—'}
+                                                            <span className={s.ellipsis}>{content}</span>
                                                         </button>
                                                     ) : (
-                                                        <>{pretty || '—'}</>
+                                                        <span className={s.ellipsis}>{content}</span>
                                                     )}
                                                 </td>
                                             );
                                         }
                                     }
-
 
                                     i += 1;
                                 }
@@ -721,10 +761,10 @@ export const MainTable: React.FC<Props> = (p) => {
                                 return cells;
                             })()}
 
-                            <td style={{textAlign: 'center', whiteSpace: 'nowrap'}}>
+                            {/* ───── actions-ячейка ───── */}
+                            <td className={s.actionsCell}>
                                 {isEditing ? (
                                     (() => {
-                                        // если строка залочена — вообще не даём сохранить
                                         const hasEditable =
                                             !isRowLocked &&
                                             p.flatColumnsInRenderOrder.some(
@@ -735,46 +775,35 @@ export const MainTable: React.FC<Props> = (p) => {
                                             <>
                                                 {hasEditable && (
                                                     <button
+                                                        className={s.okBtn}
                                                         onClick={(e) => {
                                                             e.stopPropagation();
                                                             p.onSubmitEdit();
                                                         }}
                                                         disabled={p.editSaving}
                                                     >
-                                                        {p.editSaving ? 'Сохр...' : '✓'}
+                                                        {p.editSaving ? '…' : '✓'}
                                                     </button>
                                                 )}
                                                 <button
+                                                    className={s.cancelBtn}
                                                     onClick={(e) => {
                                                         e.stopPropagation();
                                                         p.onCancelEdit();
                                                     }}
                                                     disabled={p.editSaving}
-                                                    style={{marginLeft: hasEditable ? 8 : 0}}
                                                 >
-                                                    х
+                                                    ×
                                                 </button>
                                             </>
                                         );
                                     })()
                                 ) : (
-                                    <div
-                                        style={{
-                                            display: 'flex',
-                                            justifyContent: 'center',
-                                            alignItems: 'center',
-                                            gap: 12, // одинаковый отступ между иконками
-                                        }}
-                                    >
+                                    <div className={s.actionsRow}>
                                         {/* EDIT */}
                                         <button
                                             type="button"
-                                            style={{
-                                                background: 'none',
-                                                border: 0,
-                                                cursor: isRowLocked ? 'not-allowed' : 'pointer',
-                                                opacity: isRowLocked ? 0.4 : 1,
-                                            }}
+                                            className={`${s.actionsBtn} ${isRowLocked ? s.actionsBtnDisabled : ''}`}
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 if (isRowLocked) return;
@@ -791,12 +820,9 @@ export const MainTable: React.FC<Props> = (p) => {
                                         {/* DELETE */}
                                         <button
                                             type="button"
-                                            style={{
-                                                background: 'none',
-                                                border: 0,
-                                                cursor: isRowLocked ? 'not-allowed' : 'pointer',
-                                                opacity: isRowLocked || p.deletingRowIdx === rowIdx ? 0.6 : 1,
-                                            }}
+                                            className={`${s.actionsBtn} ${
+                                                isRowLocked || p.deletingRowIdx === rowIdx ? s.actionsBtnDisabled : ''
+                                            }`}
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 if (isRowLocked) return;
@@ -810,25 +836,16 @@ export const MainTable: React.FC<Props> = (p) => {
                                             />
                                         </button>
 
-                                        {/* Слот под замок: всегда есть, но иногда "прозрачный" */}
+                                        {/* LOCK */}
                                         <span
-                                            style={{
-                                                width: 20, // фиксированный слот под иконку
-                                                display: 'inline-flex',
-                                                justifyContent: 'center',
-                                                opacity: isRowLocked ? 0.8 : 0,   // нет замка — просто прозрачный
-                                                pointerEvents: 'none',
-                                            }}
+                                            className={s.lockSlot}
                                             title={isRowLocked ? 'Строка защищена политикой RLS' : undefined}
                                         >
-        <LockIcon className={s.actionIcon}/>
-    </span>
+                                                {isRowLocked && <LockIcon className={s.actionIcon}/>}
+                                            </span>
                                     </div>
-
                                 )}
                             </td>
-
-
                         </tr>
                     );
                 })}
