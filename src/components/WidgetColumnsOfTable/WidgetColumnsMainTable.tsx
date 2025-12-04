@@ -191,7 +191,7 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
             if (res.reason === 'NO_FORM' || res.reason === 'NO_TYPE') {
                 alert(
                     'Для этой строки не выбрана форма или тип поля. ' +
-                    'Сначала выбери форму и укажи тип "combobox" — тогда станет доступно создание combobox.'
+                     'Сначала выбери форму и укажи тип "combobox" — тогда станет доступно создание combobox.'
                 );
             } else if (res.reason === 'NO_TABLE') {
                 alert('У выбранной формы не определена таблица. Свяжи форму с таблицей и повтори.');
@@ -204,7 +204,7 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
     /** ——— Render ——— */
     return (
         <div style={{padding: 5}}>
-            <h3 style={{margin: '24px 0 8px'}}>Настройка формы</h3>
+            <h3 style={{margin: '24px 0 8px',textAlign:'center'}}>Настройка формы</h3>
 
             {orderedWc.map((wc, idx) => {
                 const refs = localRefs[wc.id] ?? [];

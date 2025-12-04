@@ -1,6 +1,6 @@
 @use '@/assets/styles/fluid-type' as *;
 
-$border: #e5e5e5;
+$border: #f6f6f6;
 $gray-95: #fafafa;
 $gray-90: #f3f3f3;
 $error: #d33;
@@ -121,6 +121,49 @@ h2 {
   @include fluid-type(13, 16);
 }
 
+.tbl input,
+.tbl select {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  font-size: 13px;
+}
+/* ─── спец-стили для MUI TextField внутри ячейки ─── */
+
+/* корневая обёртка TextField внутри ячейки */
+.inpInCell {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+/* сам input MUI (то, что внутри рамки) */
+.inpInCell :global(.MuiInputBase-root) {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.inpInCell :global(.MuiInputBase-input) {
+  padding: 2px 4px;
+  font-size: 13px;
+  text-align: center; // чтобы текст был по центру, как в режиме просмотра
+}
+
+/* для Select (combobox primary), если будем использовать TextField+Select */
+.inpInCell :global(.MuiSelect-select) {
+  padding: 2px 4px;
+
+  text-align: center;
+}
+
+/* ячейка в режиме редактирования — убираем лишний padding,
+   чтобы рамка TextField не выглядела «съехавшей» */
+.editCell {
+  padding: 0 ;
+  overflow: hidden; // не даём содержимому вылезти за пределы td
+}
+
 /* базовые ячейки */
 .tbl th,
 .tbl td {
@@ -179,6 +222,57 @@ h2 {
 }
 .selectedRow td {
   font-weight: 600;
+}
+/* контейнер внутри ячейки для инпута */
+/* td в режиме редактирования */
+.editCell {
+  padding: 0;
+  overflow: hidden; // содержимое не выходит за границы ячейки
+}
+
+/* общий контейнер для любого редактора внутри td */
+.cellEditor {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 4px 6px; // те же, что у обычной ячейки
+  overflow: hidden;
+}
+
+/* именно combobox-редактор (текст + крестик) */
+.comboEditInner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+/* текст внутри редактируемой combobox-ячейки */
+.comboText {
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* кнопка очистки "×" рядом с текстом */
+.comboClearBtn {
+  border: none;
+  background: none;
+  cursor: pointer;
+  opacity: 0.7;
+  font-size: 16px;
+  color: #fff;
+  padding: 0;
+  flex: 0 0 auto; // не растягивается
+}
+.comboClearBtn:hover {
+  opacity: 1;
 }
 
 /* однострочный текст с троеточием */
@@ -385,7 +479,7 @@ h2 {
   margin-bottom: 4px;
   background: #2e2e2e;
   color: #eee;
-  border: 1px solid #444;
+  border: 1px solid #605f5f;
   border-radius: 4px;
   cursor: pointer;
   transition: background .15s;
@@ -416,10 +510,40 @@ h2 {
   }
 }
 
-/* ... остальное (nestedUl, link, tabs, dateTimeInput второй раз) можно оставить как есть,
-   они на ширину таблицы не влияют */
 
 
+//все для tree
+.nestedItem {
+  position: relative;
+  margin-bottom: 4px;
+  cursor: pointer;
+  padding: 6px 14px 6px 24px;
+  border-left: 3px solid #555;
+  background: linear-gradient(to right, #3a3a3a, #2e2e2e);
+  color: #ccc;
+  border-radius: 4px;
+  transition: background .15s, color .15s;
+
+  &::before {
+    content: '↳';
+    position: absolute;
+    left: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #888;
+    font-size: 12px;
+  }
+
+  &:hover {
+    background: var(--hover-color);
+    color: #fff;
+  }
+}
+.nestedUl {
+  list-style: none;
+  padding-left: 16px;
+  margin-top: 4px;
+}
 
 
 

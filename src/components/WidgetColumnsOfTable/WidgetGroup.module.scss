@@ -1,0 +1,145 @@
+@use '@/assets/styles/fluid-type' as *;
+
+$border: #e5e5e5;
+
+.root {
+  margin-bottom: 24px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.title {
+  margin: 0;
+}
+
+.order {
+  color: grey;
+}
+
+.headerActions {
+  display: flex;
+  gap: 6px;
+  margin-left: 8px;
+  align-items: center;
+}
+
+/* Обёртка для горизонтального скролла на узких экранах */
+.tableWrapper {
+  margin-top: 8px;
+  overflow-x: auto;
+}
+
+/* Таблица стабильной ширины под фиксированный набор колонок */
+.tbl {
+  width: 100%;
+  min-width: 1100px; // можно подправить под свои ощущения
+  border-collapse: collapse;
+  table-layout: fixed;
+  text-align: center;
+  @include fluid-type(13, 15);
+}
+
+.tbl th,
+.tbl td {
+  border: 1px solid $border;
+  padding: 4px 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* шапка */
+.tbl thead th {
+  background: var(--header-color, #333);
+  color: #eee;
+  font-weight: 600;
+}
+
+/* колонки — задаём относительные ширины */
+.colDrag {
+  width: 28px;
+}
+
+.colName {
+  width: 10%;
+}
+
+.colSub {
+  width: 10%;
+}
+
+.colType {
+  width: 10%;
+}
+
+.colBool {
+  width: 6%;
+}
+
+.colNumber {
+  width: 6%;
+}
+
+.colPlaceholder {
+  width: 16%;
+}
+
+.colCombo {
+  width: 10%;
+}
+
+.colForm {
+  width: 10%;
+}
+
+.colId {
+  width: 6%;
+}
+
+.colActions {
+  width: 40px;
+}
+
+/* строка "нет данных" */
+.emptyCell {
+  text-align: center;
+  opacity: 0.7;
+}
+
+/* иконки / кнопки действий */
+.actionIcon {
+  width: 1.2em;
+  height: 1.2em;
+  color: #EEEEEE
+}
+
+.iconBtn {
+  background: none;
+  border: none;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.addBtn {
+  background: none;
+  border: 0;
+  padding: 0 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #ccc;
+  transition: color .15s;
+}
+
+.addBtn:hover,
+.iconBtn:hover .actionIcon {
+  color: #fff;
+}

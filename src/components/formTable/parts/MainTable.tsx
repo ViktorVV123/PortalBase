@@ -9,6 +9,9 @@ import {formatCellValue} from '@/shared/utils/cellFormat';
 import {ExtCol, formatByDatatype} from "@/components/formTable/parts/FormatByDatatype";
 import {InputCell} from "@/components/formTable/parts/InputCell";
 import {Checkbox} from "@mui/material";
+import ArrowDropUpIcon from "@mui/icons-material/ArrowDropUp";
+import * as sub from "@/components/formTable/subForm/SubWormTable.module.scss";
+import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 
 
 // "логическая" ширина колонок из бэка → проценты
@@ -295,7 +298,7 @@ const ComboEditDisplay: React.FC<ComboEditDisplayProps> = ({
     const clickable = primary.form_id != null && !!onOpenDrill;
 
     return (
-        <div style={{display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center'}}>
+        <div className={s.comboEditInner}>
             {clickable ? (
                 <button
                     type="button"
@@ -314,6 +317,8 @@ const ComboEditDisplay: React.FC<ComboEditDisplayProps> = ({
                             targetWriteTcId: writeTcId,
                         });
                     }}
+                    className={s.comboText}
+                    title={display}
                     style={{
                         padding: 0,
                         border: 'none',
@@ -322,12 +327,14 @@ const ComboEditDisplay: React.FC<ComboEditDisplayProps> = ({
                         textDecoration: 'underline',
                         color: 'var(--link,#66b0ff)',
                     }}
-                    title={`Открыть форму #${primary.form_id} для выбора значения`}
+
                 >
                     {display}
                 </button>
             ) : (
-                <span>{display}</span>
+                <span className={s.comboText} title={display}>
+                {display}
+            </span>
             )}
 
             {writeTcId != null && (
@@ -339,14 +346,7 @@ const ComboEditDisplay: React.FC<ComboEditDisplayProps> = ({
                         onChangeDraft(writeTcId, '');
                     }}
                     title="Очистить значение"
-                    style={{
-                        border: 'none',
-                        background: 'none',
-                        cursor: 'pointer',
-                        opacity: 0.7,
-                        fontSize: 16,
-                        color: 'white',
-                    }}
+                    className={s.comboClearBtn}
                 >
                     ×
                 </button>
@@ -454,10 +454,12 @@ export const MainTable: React.FC<Props> = (p) => {
                             onClick={p.onToggleSubHeaders}
                             aria-label={p.showSubHeaders ? 'Скрыть подзаголовки' : 'Показать подзаголовки'}
                         >
-                            {p.showSubHeaders ? '▴' : '▾'}
+                            {p.showSubHeaders ?   <ArrowDropUpIcon /> :   <ArrowDropDownIcon />}
+
+
+
                         </button>
                     </th>
-
                 </tr>
                 {p.showSubHeaders && (
                     <tr>
@@ -528,17 +530,20 @@ export const MainTable: React.FC<Props> = (p) => {
                                 cells.push(
                                     <td
                                         key={`add-${col.widget_column_id}:${col.table_column_id ?? -1}`}
+                                        className={s.editCell}
                                     >
-                                        <InputCell
-                                            mode="add"
-                                            col={col}
-                                            readOnly={ro}
-                                            value={value}
-                                            onChange={(v) => {
-                                                if (writeTcId != null) p.onDraftChange(writeTcId, v);
-                                            }}
-                                            placeholder={p.placeholderFor(col)}
-                                        />
+                                        <div className={s.cellEditor}>
+                                            <InputCell
+                                                mode="add"
+                                                col={col}
+                                                readOnly={ro}
+                                                value={value}
+                                                onChange={(v) => {
+                                                    if (writeTcId != null) p.onDraftChange(writeTcId, v);
+                                                }}
+                                                placeholder={p.placeholderFor(col)}
+                                            />
+                                        </div>
                                     </td>
                                 );
                                 i += 1;
@@ -592,19 +597,22 @@ export const MainTable: React.FC<Props> = (p) => {
                                                 <td
                                                     key={`edit-combo-${primary.widget_column_id}:${writeTcId}`}
                                                     colSpan={span}
+                                                    className={s.editCell}
                                                 >
-                                                    <ComboEditDisplay
-                                                        group={group}
-                                                        row={row}
-                                                        valueIndexByKey={p.valueIndexByKey}
-                                                        editDraft={p.editDraft}
-                                                        onOpenDrill={drillDisabled ? undefined : p.onOpenDrill}
-                                                        comboReloadToken={p.comboReloadToken}
-                                                        onChangeDraft={p.onEditDraftChange}
-                                                    />
+                                                    <div className={s.cellEditor}>
+                                                        <ComboEditDisplay
+                                                            group={group}
+                                                            row={row}
+                                                            valueIndexByKey={p.valueIndexByKey}
+                                                            editDraft={p.editDraft}
+                                                            onOpenDrill={drillDisabled ? undefined : p.onOpenDrill}
+                                                            comboReloadToken={p.comboReloadToken}
+                                                            onChangeDraft={p.onEditDraftChange}
+                                                        />
+                                                    </div>
                                                 </td>
                                             );
-                                        } else {
+                                    } else {
                                             // просмотр
                                             const shownParts = group
                                                 .map(gcol => getShown(p.valueIndexByKey, row.values, gcol))
@@ -670,19 +678,22 @@ export const MainTable: React.FC<Props> = (p) => {
 
                                     if (isEditing) {
                                         cells.push(
-                                            <td key={`edit-${visKey}`}>
-                                                <InputCell
-                                                    mode="edit"
-                                                    col={col}
-                                                    readOnly={ro}
-                                                    value={writeTcId == null ? '' : (p.editDraft[writeTcId] ?? '')}
-                                                    onChange={(v) => {
-                                                        if (writeTcId != null) p.onEditDraftChange(writeTcId, v);
-                                                    }}
-                                                    placeholder={p.placeholderFor(col)}
-                                                />
+                                            <td key={`edit-${visKey}`} className={s.editCell}>
+                                                <div className={s.cellEditor}>
+                                                    <InputCell
+                                                        mode="edit"
+                                                        col={col}
+                                                        readOnly={ro}
+                                                        value={writeTcId == null ? '' : (p.editDraft[writeTcId] ?? '')}
+                                                        onChange={(v) => {
+                                                            if (writeTcId != null) p.onEditDraftChange(writeTcId, v);
+                                                        }}
+                                                        placeholder={p.placeholderFor(col)}
+                                                    />
+                                                </div>
                                             </td>
                                         );
+
                                     } else {
                                         const clickable = col.form_id != null && !!p.onOpenDrill && !drillDisabled;
                                         const pretty = formatByDatatype(shownVal, col as ExtCol);

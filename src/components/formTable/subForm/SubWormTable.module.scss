@@ -228,6 +228,7 @@ $error: #d33;
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  color: #EEEEEE;
 }
 
 .actionIcon:hover,
@@ -263,3 +264,4 @@ $error: #d33;
   text-decoration: underline;
   color: var(--link, #66b0ff);
 }
+

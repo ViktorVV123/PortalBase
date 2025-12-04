@@ -199,7 +199,7 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
     };
 
     return (
-        <div className={s.tableWrapperWidget}>
+        <div>
             {/* Верхние ссылки */}
             <div style={{display: 'flex', gap: 24}}>
                 <Typography

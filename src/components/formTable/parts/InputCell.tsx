@@ -215,7 +215,7 @@ export const InputCell: React.FC<InputCellProps> = ({
             onChange={handleChange}
             placeholder={placeholder}
             inputProps={inputType === 'time' ? { step: 1 } : undefined}
-            className={isDateLike ? s.dateTimeInput : undefined}
+            className={`${s.inpInCell} ${isDateLike ? s.dateTimeInput : ''}`}
         />
     );
 };
