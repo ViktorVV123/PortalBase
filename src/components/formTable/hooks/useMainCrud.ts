@@ -283,7 +283,6 @@ export function useMainCrud({
         try {
             // 1) Собираем список ВСЕХ write_tc_id из плоских колонок (уникально)
             const allWriteIds: number[] = [];
-            const comboWriteIds = new Set<number>(); // 👈 запоминаем combobox-поля
             const seen = new Set<number>();
 
             flatColumnsInRenderOrder.forEach((c) => {
@@ -291,10 +290,6 @@ export function useMainCrud({
                 if (w != null && !seen.has(w)) {
                     seen.add(w);
                     allWriteIds.push(w);
-
-                    if (c.type === 'combobox') {
-                        comboWriteIds.add(w);
-                    }
                 }
             });
 
@@ -303,20 +298,11 @@ export function useMainCrud({
             //    - для остальных: как раньше, пустое → ''
             const values = allWriteIds.map((tcId) => {
                 const raw = draft[tcId];
-                const isCombo = comboWriteIds.has(tcId);
-
-                let value: string;
-
-                if (isCombo && (raw == null || raw === '')) {
-                    // 👇 отправляем именно строку "null"
-                    value = "null";
-                } else {
-                    value = String(raw ?? '');
-                }
+                const s = raw == null ? '' : String(raw).trim();
 
                 return {
                     table_column_id: tcId,
-                    value,
+                    value: s === '' ? null : s, // <- критично: null вместо ''
                 };
             });
 
@@ -492,45 +478,20 @@ export function useMainCrud({
                 Object.keys(pk).sort().map(k => `${k}:${String(pk[k])}`).join('|');
 
             // 1) считаем значения для отправки из editDraft (включая read-only/visible:false)
-            const hasDefault = new Set<number>();
-            const comboWriteIds = new Set<number>();
-
-            flatColumnsInRenderOrder.forEach((c) => {
-                const w = (c.__write_tc_id ?? c.table_column_id) ?? null;
-                if (w != null && c.default != null) hasDefault.add(w);
-                if (w != null && c.type === 'combobox') comboWriteIds.add(w);
-            });
-
-            const getSendingValue = (tcId: number, raw: unknown): string => {
-                const isCombo = comboWriteIds.has(tcId);
-                const s = raw == null ? '' : String(raw);
-
-                if (isCombo && (s === '' || s == null)) {
-                    // 👇 для combobox пустое → строка "null"
-                    return "null";
-                }
-
-                return s;
+            const getSendingValue = (raw: unknown): string | null => {
+                const s = raw == null ? '' : String(raw).trim();
+                return s === '' ? null : s; // пустое → null
             };
 
-            const entries = Object.entries(editDraft).filter(([tcIdStr, v]) => {
-                const tcId = Number(tcIdStr);
-                const isCombo = comboWriteIds.has(tcId);
+// отправляем все поля из editDraft (включая очищенные)
+            const entries = Object.entries(editDraft);
 
-                if (isCombo) {
-                    // combobox ВСЕГДА отправляем, даже если поле пустое (чтобы можно было очистить)
-                    return true;
-                }
-
-                if (v != null && String(v) !== '') return true;
-                return hasDefault.has(tcId); // даже пустое — если колонка имеет default
-            });
 
             const values = entries.map(([tcIdStr, v]) => {
                 const tcId = Number(tcIdStr);
                 return {
                     table_column_id: tcId,
-                    value: getSendingValue(tcId, v),
+                    value: getSendingValue(v),
                 };
             });
             // 2) body + url
@@ -566,7 +527,7 @@ export function useMainCrud({
                         widget_column_id: col.widget_column_id,
                         write_tc_id: writeTcId,
                         shown_before: shownVal == null ? '' : String(shownVal),
-                        sending_value: getSendingValue(writeTcId, editDraft[writeTcId]),
+                        sending_value: getSendingValue(editDraft[writeTcId]),
                     });
                 } else {
                     beforeAfter.push({

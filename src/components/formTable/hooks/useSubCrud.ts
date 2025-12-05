@@ -112,12 +112,13 @@ export function useSubCrud({
 
         setSavingSub(true);
         try {
-            const values = Object.entries(draftSub)
-                .filter(([, v]) => v !== '' && v != null)
-                .map(([table_column_id, value]) => ({
+            const values = Object.entries(draftSub).map(([table_column_id, value]) => {
+                const s = value == null ? '' : String(value).trim();
+                return {
                     table_column_id: Number(table_column_id),
-                    value: String(value),
-                }));
+                    value: s === '' ? null : s, // пустое → null
+                };
+            });
 
             const body = {
                 pk: {

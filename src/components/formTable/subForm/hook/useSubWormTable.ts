@@ -187,12 +187,13 @@ export function useSubWormTable({
         setEditSaving(true);
         try {
             const row = subDisplay.data[editingRowIdx];
-            const values = Object.entries(editDraft)
-                .filter(([, v]) => v !== '' && v !== undefined && v !== null)
-                .map(([table_column_id, value]) => ({
+            const values = Object.entries(editDraft).map(([table_column_id, value]) => {
+                const s = value == null ? '' : String(value).trim();
+                return {
                     table_column_id: Number(table_column_id),
-                    value: String(value),
-                }));
+                    value: s === '' ? null : s, // пустое → null
+                };
+            });
 
             const body = {
                 pk: {
