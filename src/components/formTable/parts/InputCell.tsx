@@ -137,16 +137,25 @@ export const InputCell: React.FC<InputCellProps> = ({
                 value={value ?? ''}
                 displayEmpty
                 onChange={(e) => onChange(String(e.target.value ?? ''))}
-                renderValue={(val) => {
-                    if (!val) {
-                        return <span style={{ opacity: 0.6 }}>{placeholder || '—'}</span>;
-                    }
-                    const opt = options.find(o => o.id === val);
-                    return opt ? buildOptionLabel(opt) : String(val);
+                // те же классы, что и для TextField в ячейке
+                className={s.inpInCell}
+                // компактный вид и обрезка текста внутри
+                sx={{
+                    '& .MuiSelect-select': {
+                        padding: '2px 6px',              // меньше отступы
+                        minHeight: '32px',               // высота как у TextField small
+                        display: 'flex',
+                        alignItems: 'center',
+                        overflow: 'hidden',
+                        whiteSpace: 'nowrap',
+                        textOverflow: 'ellipsis',        // не растягивает колонку, а ставит …
+                    },
                 }}
             >
-                <MenuItem value=""><em>—</em></MenuItem>
-                {options.map(o => (
+                <MenuItem value="">
+                    <em>—</em>
+                </MenuItem>
+                {options.map((o) => (
                     <MenuItem
                         key={o.id}
                         value={o.id}

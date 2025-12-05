@@ -1,4 +1,4 @@
-import {useMemo, useState} from 'react';
+import {useEffect, useMemo, useState} from 'react';
 import {api} from '@/services/api';
 import type {SubDisplay, DTable, Widget, FormDisplay} from '@/shared/hooks/useWorkSpaces';
 import type {HeaderModelItem} from '@/components/formTable/FormTable';
@@ -49,9 +49,20 @@ export function useSubWormTable({
                                 }: UseSubWormTableDeps) {
     const [deletingRowIdx, setDeletingRowIdx] = useState<number | null>(null);
     const [showSubHeaders, setShowSubHeaders] = useState(false);
+    const [tabs, setTabs] = useState<SubDisplay['sub_widgets'] | null>(null);
+    const [displayedWidgetOrder, setDisplayedWidgetOrder] = useState<number | null>(null);
 
-    const hasTabs = !!subDisplay?.sub_widgets?.length;
+    const hasTabs = !!tabs?.length;
     const safe = (v?: string | null) => (v && v.trim() ? v.trim() : '—');
+
+    useEffect(() => {
+        if (subDisplay?.sub_widgets?.length) {
+            setTabs(subDisplay.sub_widgets);
+            setDisplayedWidgetOrder(
+                subDisplay.displayed_widget?.widget_order ?? null,
+            );
+        }
+    }, [subDisplay]);
 
     // ——— подготовка колонок и шапки через useHeaderPlan ———
     const pseudoFormDisplay = useMemo(() => {
@@ -307,6 +318,10 @@ export function useSubWormTable({
         headerPlan,
         flatColumnsInRenderOrder,
         valueIndexByKey,
+
+
+        tabs,
+        displayedWidgetOrder,
 
         // действия
         startEdit,

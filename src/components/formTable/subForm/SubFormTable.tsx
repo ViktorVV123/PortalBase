@@ -83,6 +83,9 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
         cancelEdit,
         submitEdit,
         deleteRow,
+
+        tabs,
+        displayedWidgetOrder,
     } = useSubWormTable({
         subDisplay,
         formId,
@@ -102,12 +105,17 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
         setDraftSub,
     } as UseSubWormTableDeps);
 
+
+    const activeOrder = currentOrder ?? displayedWidgetOrder ?? null;
+
     return (
         <div className={sub.root}>
-            {hasTabs && subDisplay && (
+            {hasTabs && tabs && (
                 <ul className={sub.tabs}>
-                    {subDisplay.sub_widgets.map((sw) => {
-                        const isActive = sw.widget_order === subDisplay.displayed_widget.widget_order;
+                    {tabs.map((sw) => {
+                        const isActive =
+                            activeOrder != null ? sw.widget_order === activeOrder : false;
+
                         return (
                             <li key={sw.widget_order}>
                                 <button
@@ -122,11 +130,15 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                 </ul>
             )}
 
-            {!subDisplay ? null : subLoading ? (
+            {subLoading ? (
                 <p>Загрузка sub-виджета…</p>
             ) : subError ? (
-                <p className={sub.error}>{subError}</p>
-            ) : (
+                <p className={sub.error}>
+                    Не удалось загрузить данные для выбранной вкладки саб-формы.
+                    <br />
+                    {subError}
+                </p>
+            ) : !subDisplay ? null : (
                 <div className={sub.tableScroll}>
                     <table className={sub.tbl}>
                         <thead>
