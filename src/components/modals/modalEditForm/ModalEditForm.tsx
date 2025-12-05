@@ -45,8 +45,35 @@ export const ModalEditForm: React.FC<Props> = ({
     const [listsLoading, setListsLoading] = useState(false);
 
     // Локальные списки связок (чтобы всё видно без перезагрузки)
-    const [subList, setSubList] = useState(form.sub_widgets ?? []);
-    const [treeList, setTreeList] = useState(form.tree_fields ?? []);
+    // Локальные списки связок (чтобы всё видно без перезагрузки)
+    const initialSubList = form.sub_widgets ?? [];
+    const initialTreeList = form.tree_fields ?? [];
+
+    const [subList, setSubList] = useState(initialSubList);
+    const [treeList, setTreeList] = useState(initialTreeList);
+
+// хелперы: следующий свободный order
+    const getNextSubOrder = (list: typeof subList | typeof initialSubList) =>
+        list.length ? Math.max(...list.map(it => it.widget_order ?? 0)) + 1 : 1;
+
+    const getNextTreeOrder = (list: typeof treeList | typeof initialTreeList) =>
+        list.length ? Math.max(...list.map(it => it.column_order ?? 0)) + 1 : 1;
+
+// защита от дублей order'ов
+    const hasSubOrderConflict = (order: number, ignoreSubWidgetId?: number) =>
+        subList.some(
+            s =>
+                (s.widget_order ?? 0) === order &&
+                (ignoreSubWidgetId == null || s.sub_widget_id !== ignoreSubWidgetId),
+        );
+
+    const hasTreeOrderConflict = (order: number, ignoreColumnId?: number) =>
+        treeList.some(
+            t =>
+                (t.column_order ?? 0) === order &&
+                (ignoreColumnId == null || t.table_column_id !== ignoreColumnId),
+        );
+
 
     const emitFormMutated = (formId: number) =>
         window.dispatchEvent(new CustomEvent('portal:form-mutated', {detail: {formId}}));
@@ -56,8 +83,14 @@ export const ModalEditForm: React.FC<Props> = ({
         if (!open) return;
         setErr(null);
         setInfo(null);
-        setSubList(form.sub_widgets ?? []);
-        setTreeList(form.tree_fields ?? []);
+        const freshSubList = form.sub_widgets ?? [];
+        const freshTreeList = form.tree_fields ?? [];
+
+        setSubList(freshSubList);
+        setTreeList(freshTreeList);
+
+        setNewSubOrder(getNextSubOrder(freshSubList));
+        setNewTreeOrder(getNextTreeOrder(freshTreeList));
         setMainName(form.name);
         setMainDesc(form.description ?? '');
         setMainPath(form.path ?? '');
@@ -127,30 +160,42 @@ export const ModalEditForm: React.FC<Props> = ({
 
     const saveSub = async () => {
         if (!subId) return;
-        setSavingSub(true);
+
         setErr(null);
+        const order = Number(subOrder) || 0;
+
+        if (order <= 0) {
+            setErr('Порядок sub-виджета должен быть больше 0');
+            return;
+        }
+
+        if (hasSubOrderConflict(order, subId)) {
+            setErr(`Порядок ${order} уже занят другим sub-виджетом. Выбери другое значение.`);
+            return;
+        }
+
+        setSavingSub(true);
         try {
-            const body = {widget_order: Number(subOrder), where_conditional: subWhere || null};
+            const body = { widget_order: order, where_conditional: subWhere || null };
             await api.patch(`/forms/${form.form_id}/sub/${subId}`, body);
-            // оптимистично правим локальный список
-            setSubList(prev => prev.map(it =>
-                it.sub_widget_id === subId ? {
-                    ...it,
-                    widget_order: body.widget_order,
-                    where_conditional: body.where_conditional
-                } : it
-            ));
+            setSubList(prev =>
+                prev.map(it =>
+                    it.sub_widget_id === subId
+                        ? { ...it, widget_order: body.widget_order, where_conditional: body.where_conditional }
+                        : it,
+                ),
+            );
             emitFormMutated(form.form_id);
             setInfo('Сохранено');
-            await reloadWidgetForms(); // не обязателен для UI, но синхронизирует родителя
+            await reloadWidgetForms();
         } catch (e: any) {
             setErr('Не удалось сохранить sub');
         } finally {
             setSavingSub(false);
-            // мелкий таймер скрыть "Сохранено"
             setTimeout(() => setInfo(null), 1200);
         }
     };
+
 
     // ---------- TREE (существующие) ----------
     const [treeColId, setTreeColId] = useState<number>(treeList[0]?.table_column_id ?? 0);
@@ -197,53 +242,75 @@ export const ModalEditForm: React.FC<Props> = ({
     };
 
     // ---------- Добавление новых ----------
-    const [newSubOrder, setNewSubOrder] = useState<number>((subList?.length ?? 0) + 1);
+    const [newSubOrder, setNewSubOrder] = useState<number>(getNextSubOrder(initialSubList));
     const [newSubWhere, setNewSubWhere] = useState<string>('');
     const [newSubWidget, setNewSubWidget] = useState<Widget | null>(null);
     const [addingSub, setAddingSub] = useState(false);
 
-    const [newTreeOrder, setNewTreeOrder] = useState<number>((treeList?.length ?? 0) + 1);
+    const [newTreeOrder, setNewTreeOrder] = useState<number>(getNextTreeOrder(initialTreeList));
     const [newTreeColumn, setNewTreeColumn] = useState<Column | null>(null);
     const [addingTree, setAddingTree] = useState(false);
 
     const addSub = async () => {
         setErr(null);
         if (!newSubWidget) return;
-        // защита от дублей
+
         if (subList.some(s => s.sub_widget_id === newSubWidget.id)) {
             setErr('Этот sub-виджет уже добавлен');
             return;
         }
+
+        const order = Number(newSubOrder) || 0;
+        if (order <= 0) {
+            setErr('Порядок sub-виджета должен быть больше 0');
+            return;
+        }
+        if (hasSubOrderConflict(order)) {
+            setErr(`Порядок ${order} уже использует другой sub-виджет. Укажи свободный order.`);
+            return;
+        }
+
         setAddingSub(true);
         try {
             await api.post(`/forms/${form.form_id}/sub`, {
                 sub_widget_id: newSubWidget.id,
-                widget_order: Number(newSubOrder) || 0,
+                widget_order: order,
                 where_conditional: newSubWhere || null,
             });
-            // оптимистично добавляем
-            const newItem = {
+
+            // важное место — тип берём из subList и НЕ теряем form_id
+            const newItem: (typeof subList)[number] = {
                 sub_widget_id: newSubWidget.id,
-                widget_order: Number(newSubOrder) || 0,
+                widget_order: order,
                 where_conditional: newSubWhere || null,
+                form_id: form.form_id,
             };
-            // @ts-ignore
-            setSubList(prev => [...prev, newItem].sort((a, b) => (a.widget_order ?? 0) - (b.widget_order ?? 0)));
+
+            setSubList(prev =>
+                [...prev, newItem].sort(
+                    (a, b) => (a.widget_order ?? 0) - (b.widget_order ?? 0),
+                ),
+            );
+
             setSubId(newSubWidget.id);
             emitFormMutated(form.form_id);
             setNewSubWidget(null);
             setNewSubWhere('');
-            setNewSubOrder((prev) => (prev || 0) + 1);
+            setNewSubOrder(order + 1);
+
             await reloadWidgetForms();
         } catch (e: any) {
-            // если сервер вернул конфликт — покажем понятнее
             const status = e?.response?.status;
-            if (status === 409 || status === 400) setErr('Этот sub-виджет уже существует в форме');
-            else setErr('Не удалось добавить sub-виджет');
+            if (status === 409 || status === 400) {
+                setErr('Этот sub-виджет уже существует в форме');
+            } else {
+                setErr('Не удалось добавить sub-виджет');
+            }
         } finally {
             setAddingSub(false);
         }
     };
+
 
     const addTree = async () => {
         setErr(null);
@@ -420,7 +487,7 @@ export const ModalEditForm: React.FC<Props> = ({
                                     <>
                                         {/* Редактирование существующих — автосейв по blur */}
                                         <Stack spacing={2}>
-                                            <Stack direction="row" alignItems="center" spacing={1}>
+                                            <Stack  direction="row" alignItems="center" spacing={1}>
                                                 <FormControl fullWidth>
                                                     <InputLabel id="sub-select-label">Выбери sub-виджет (уже
                                                         привязан)</InputLabel>
@@ -475,63 +542,73 @@ export const ModalEditForm: React.FC<Props> = ({
                                 ) : null}
 
                                 {/* Добавление нового — показывается всегда (и единственный блок если нет ни одного) */}
-                                <Stack spacing={2}>
-                                    <strong>Добавить новый sub-виджет</strong>
-                                    <Stack direction="row" spacing={1} alignItems="center"
-                                           sx={{flexWrap: 'wrap', rowGap: 1}}>
-                                        <TextField
-                                            label="Порядок (widget_order)"
-                                            type="number"
-                                            size="small"
-                                            value={newSubOrder}
-                                            onChange={e => setNewSubOrder(Number(e.target.value))}
-                                            sx={{width: 210}}
-                                        />
+                                <Stack
+                                    direction="row"
+                                    alignItems="center"
+                                    sx={{
+                                        flexWrap: 'wrap',
+                                        rowGap: 1,
+                                        columnGap: 1, // горизонтальные отступы вместо spacing
+                                    }}
+                                >
+                                    <TextField
+                                        label="Порядок (widget_order)"
+                                        type="number"
+                                        size="small"
+                                        value={newSubOrder}
+                                        onChange={e => setNewSubOrder(Number(e.target.value))}
+                                        sx={{ width: 210 }}
+                                    />
 
-                                        <Autocomplete
-                                            sx={{minWidth: 320, flex: '0 0 auto'}}
-                                            options={availableWidgets.filter(w => w.id !== form.main_widget_id)}
-                                            loading={listsLoading}
-                                            value={newSubWidget}
-                                            onChange={(_, val) => setNewSubWidget(val)}
-                                            getOptionLabel={(w) => w ? `${w.name}  (#${w.id}) · tbl:${w.table_id}` : ''}
-                                            isOptionEqualToValue={(a, b) => a.id === b.id}
-                                            renderInput={(params) => (
-                                                <TextField
-                                                    {...params}
-                                                    label="Sub-widget (по имени)"
-                                                    size="small"
-                                                    InputProps={{
-                                                        ...params.InputProps,
-                                                        endAdornment: (
-                                                            <>
-                                                                {listsLoading ? <CircularProgress size={16}/> : null}
-                                                                {params.InputProps.endAdornment}
-                                                            </>
-                                                        ),
-                                                    }}
-                                                />
-                                            )}
-                                        />
+                                    <Autocomplete
+                                        sx={{ minWidth: 320, flex: '0 0 auto' }}
+                                        options={availableWidgets.filter(w => w.id !== form.main_widget_id)}
+                                        loading={listsLoading}
+                                        value={newSubWidget}
+                                        onChange={(_, val) => setNewSubWidget(val)}
+                                        getOptionLabel={w => (w ? `${w.name}  (#${w.id}) · tbl:${w.table_id}` : '')}
+                                        isOptionEqualToValue={(a, b) => a.id === b.id}
+                                        renderInput={params => (
+                                            <TextField
+                                                {...params}
+                                                label="Sub-widget (по имени)"
+                                                size="small"
+                                                InputProps={{
+                                                    ...params.InputProps,
+                                                    endAdornment: (
+                                                        <>
+                                                            {listsLoading ? <CircularProgress size={16} /> : null}
+                                                            {params.InputProps.endAdornment}
+                                                        </>
+                                                    ),
+                                                }}
+                                            />
+                                        )}
+                                    />
 
-                                        <TextField
-                                            label="where_conditional (SQL)"
-                                            size="small"
-                                            value={newSubWhere}
-                                            onChange={e => setNewSubWhere(e.target.value)}
-                                            sx={{flex: 1, minWidth: 240}}
-                                        />
+                                    <TextField
+                                        label="where_conditional (SQL)"
+                                        size="small"
+                                        value={newSubWhere}
+                                        onChange={e => setNewSubWhere(e.target.value)}
+                                        sx={{ flex: 1, minWidth: 240 }}
+                                    />
 
-                                        <Button
-                                            startIcon={<AddIcon/>}
-                                            variant="outlined"
-                                            onClick={addSub}
-                                            disabled={addingSub || !newSubWidget}
-                                        >
-                                            {addingSub ? 'Добавляю…' : 'Добавить sub-виджет'}
-                                        </Button>
-                                    </Stack>
+                                    <Button
+                                        startIcon={<AddIcon />}
+                                        variant="outlined"
+                                        onClick={addSub}
+                                        disabled={addingSub || !newSubWidget}
+                                        sx={{
+                                            flexBasis: { xs: '100%', sm: 'auto' },
+                                            mt: { xs: 1, sm: 0 },
+                                            justifyContent: 'flex-start',
+                                        }}
+                                    >
+                                        {addingSub ? 'Добавляю…' : 'Добавить sub-виджет'}
+                                    </Button>
                                 </Stack>
+
                             </Stack>
                         </Box>
                     )}
