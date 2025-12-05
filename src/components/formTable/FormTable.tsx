@@ -360,6 +360,7 @@ export const FormTable: React.FC<Props> = ({
                             onDeleteRow={deleteRow}
                             deletingRowIdx={deletingRowIdx}
                             comboReloadToken={comboReloadToken}
+
                         />
 
                     <SubWormTable
@@ -382,6 +383,7 @@ export const FormTable: React.FC<Props> = ({
                         subError={subError}
                         subDisplay={subDisplay}
                         handleTabClick={handleTabClick}
+                        comboReloadToken={comboReloadToken}
                     />
                 </div>
 
@@ -414,6 +416,7 @@ export const FormTable: React.FC<Props> = ({
                 initialPrimary={drillInitialPrimary}
                 onPickFromDrill={drillDisableNested ? handlePickFromDrill : undefined}
                 onComboboxChanged={() => setComboReloadToken(v => v + 1)}
+
 
             />
         </ThemeProvider>

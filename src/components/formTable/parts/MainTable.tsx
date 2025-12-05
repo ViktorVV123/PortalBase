@@ -10,7 +10,6 @@ import {ExtCol, formatByDatatype} from "@/components/formTable/parts/FormatByDat
 import {InputCell} from "@/components/formTable/parts/InputCell";
 import {Checkbox} from "@mui/material";
 import ArrowDropUpIcon from "@mui/icons-material/ArrowDropUp";
-import * as sub from "@/components/formTable/subForm/SubWormTable.module.scss";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 
 
@@ -46,7 +45,7 @@ type Props = {
 
     selectedKey: string | null;
     pkToKey: (pk: Record<string, unknown>) => string;
-
+    comboReloadToken?: number;
     editingRowIdx: number | null;
     editDraft: Record<number, string>;
     onEditDraftChange: (tcId: number, v: string) => void;
@@ -72,7 +71,8 @@ type Props = {
     ) => void;
 
     /** триггер для перезагрузки combobox-опций после CRUD в DrillDialog */
-    comboReloadToken?: number;
+
+
 };
 
 /** Кэш вариантов combobox по ключу wcId:writeTcId */
@@ -215,6 +215,7 @@ type ComboEditDisplayProps = {
     comboReloadToken?: number;
     /** 👉 колбэк, чтобы менять draft по write_tc_id */
     onChangeDraft: (tcId: number, v: string) => void;
+
 };
 
 const ComboEditDisplay: React.FC<ComboEditDisplayProps> = ({
@@ -515,6 +516,7 @@ export const MainTable: React.FC<Props> = (p) => {
                                                     if (writeTcId != null) p.onDraftChange(writeTcId, v);
                                                 }}
                                                 placeholder={p.placeholderFor(primary)}
+                                                comboReloadToken={p.comboReloadToken}
                                             />
                                         </td>
                                     );
@@ -542,6 +544,7 @@ export const MainTable: React.FC<Props> = (p) => {
                                                     if (writeTcId != null) p.onDraftChange(writeTcId, v);
                                                 }}
                                                 placeholder={p.placeholderFor(col)}
+                                                comboReloadToken={p.comboReloadToken}
                                             />
                                         </div>
                                     </td>
@@ -689,6 +692,7 @@ export const MainTable: React.FC<Props> = (p) => {
                                                             if (writeTcId != null) p.onEditDraftChange(writeTcId, v);
                                                         }}
                                                         placeholder={p.placeholderFor(col)}
+                                                        comboReloadToken={p.comboReloadToken}
                                                     />
                                                 </div>
                                             </td>

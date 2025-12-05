@@ -20,7 +20,7 @@ type SubformProps = {
     formId: number | null;
     subHeaderGroups?: HeaderModelItem[];
     currentWidgetId?: number;
-
+    comboReloadToken: number;
     editingRowIdx: number | null;
     setEditingRowIdx: React.Dispatch<React.SetStateAction<number | null>>;
     editDraft: Record<number, string>;
@@ -68,6 +68,8 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
         draftSub,
         setDraftSub,
         onOpenDrill,
+        comboReloadToken,
+
     } = props;
 
     const {
@@ -198,6 +200,7 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                                                 }))
                                             }
                                             placeholder={col.placeholder ?? col.column_name}
+                                            comboReloadToken={comboReloadToken}
                                         />
                                     </td>
                                 ))}
@@ -240,6 +243,7 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                                                             }))
                                                         }
                                                         placeholder={col.placeholder ?? col.column_name}
+                                                        comboReloadToken={comboReloadToken}
                                                     />
                                                 </td>
                                             );
