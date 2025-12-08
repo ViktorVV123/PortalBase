@@ -4,7 +4,7 @@ import type { WorkSpaceTypes } from '@/types/typesWorkSpaces';
 
 type Deps = {
     // loaders / actions из useWorkSpaces и selection-хука
-    loadConnections: () => void;
+    loadConnections: (opts?: { force?: boolean }) => Promise<void> | void;
     loadWorkSpaces: () => void;
     loadTables: (wsId: number, force?: boolean) => Promise<DTable[]>;
     loadWidgetsForTable: (tableId: number, force?: boolean) => void;
@@ -54,10 +54,13 @@ export function useMainModals({
     const [editingConnInitial, setEditingConnInitial] = useState<any>(null);
 
     // onSuccess shortcuts for modals
-    const onConnAddSuccess = useCallback(() => {
+    const onConnAddSuccess = useCallback(async () => {
+        // 1) перезагружаем подключения с принудительным запросом
+        await loadConnections({ force: true });
+        // 2) закрываем модалку подключения
         setShowConnForm(false);
-        loadConnections();
     }, [loadConnections]);
+
 
     const onWorkspaceAddSuccess = useCallback(() => {
         setShowCreateForm(false);
