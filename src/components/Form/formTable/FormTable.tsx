@@ -1,24 +1,29 @@
-import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import * as s from '@/components/setOfTables/SetOfTables.module.scss';
 import {
-    FormDisplay, SubDisplay, WidgetForm, FormTreeColumn, Widget,
+    FormDisplay,
+    SubDisplay,
+    WidgetForm,
+    FormTreeColumn,
+    Widget,
 } from '@/shared/hooks/useWorkSpaces';
-import {api} from '@/services/api';
+import { api } from '@/services/api';
 
-import {ThemeProvider} from '@mui/material';
-import {dark} from '@/shared/themeUI/themeModal/ThemeModalUI';
-import {TableToolbar} from '@/components/table/tableToolbar/TableToolbar';
-import {useMainCrud} from '@/components/Form/mainTable/hook/useMainCrud';
-import {useFiltersTree} from '@/components/Form/formTable/hooks/useFiltersTree';
-import {TreeFormTable} from '@/components/Form/treeForm/TreeFormTable';
-import {MainTable} from '@/components/Form/mainTable/MainTable';
-import {SubWormTable} from '@/components/Form/subForm/SubFormTable';
-import {DrillDialog} from '@/components/Form/drillDialog/DrillDialog';
-import {useHeaderPlan} from '@/components/Form/formTable/hooks/useHeaderPlan';
-import {useSubCrud} from '@/components/Form/subForm/hook/useSubCrud';
-import {useSubNav} from '@/components/Form/subForm/hook/useSubNav';
-import {useFormSearch} from '@/components/Form/formTable/hooks/useFormSearch';
-import {useTreeHandlers} from '@/components/Form/treeForm/hooks/useTreeHandlers';
+import { ThemeProvider } from '@mui/material';
+import { dark } from '@/shared/themeUI/themeModal/ThemeModalUI';
+import { TableToolbar } from '@/components/table/tableToolbar/TableToolbar';
+
+import { useMainCrud } from '@/components/Form/mainTable/hook/useMainCrud';
+import { useFiltersTree } from '@/components/Form/formTable/hooks/useFiltersTree';
+import { TreeFormTable } from '@/components/Form/treeForm/TreeFormTable';
+import { MainTable } from '@/components/Form/mainTable/MainTable';
+import { SubWormTable } from '@/components/Form/subForm/SubFormTable';
+import { DrillDialog } from '@/components/Form/drillDialog/DrillDialog';
+import { useHeaderPlan } from '@/components/Form/formTable/hooks/useHeaderPlan';
+import { useSubCrud } from '@/components/Form/subForm/hook/useSubCrud';
+import { useSubNav } from '@/components/Form/subForm/hook/useSubNav';
+import { useFormSearch } from '@/components/Form/formTable/hooks/useFormSearch';
+import { useTreeHandlers } from '@/components/Form/treeForm/hooks/useTreeHandlers';
 
 export type HeaderModelItem = {
     id: number;
@@ -41,7 +46,7 @@ type Props = {
     formTrees: Record<number, FormTreeColumn[]>;
     loadFilteredFormDisplay: (formId: number, filter: {
         table_column_id: number;
-        value: string | number
+        value: string | number;
     }) => Promise<void>;
     subHeaderGroups?: HeaderModelItem[];
     setFormDisplay: (value: FormDisplay | null) => void;
@@ -81,6 +86,7 @@ export const FormTable: React.FC<Props> = ({
     const [drillTargetWriteTcId, setDrillTargetWriteTcId] = useState<number | null>(null);
 
     const [comboReloadToken, setComboReloadToken] = useState(0);
+    const [liveTree, setLiveTree] = useState<FormTreeColumn[] | null>(null);
 
     /** ───────── форма/сабы ───────── */
     const baseForm: WidgetForm | null = useMemo(() => {
@@ -91,52 +97,67 @@ export const FormTable: React.FC<Props> = ({
 
     const [overrideForm, setOverrideForm] = useState<WidgetForm | null>(null);
     const currentForm: WidgetForm | null = overrideForm ?? baseForm;
+
+    // ВАЖНО: если меняется выбранная форма или виджет сверху — сбрасываем override,
+    // чтобы не тянуть за собой старую форму в другой контекст.
     useEffect(() => {
         setOverrideForm(null);
-    }, [selectedFormId]);
+    }, [selectedFormId, selectedWidget?.id]);
 
     const subWidgetIdByOrder = useMemo(() => {
         const map: Record<number, number> = {};
-        currentForm?.sub_widgets?.forEach(sw => {
+        currentForm?.sub_widgets?.forEach((sw) => {
             map[sw.widget_order] = sw.sub_widget_id;
         });
         return map;
     }, [currentForm]);
 
     const hasSubWidgets = !!(currentForm?.sub_widgets && currentForm.sub_widgets.length > 0);
-
     const formIdForSub = selectedFormId ?? currentForm?.form_id ?? null;
-
+    // Саб-блок показываем только, когда:
+    // 1) у формы вообще есть сабы
+    // 2) и уже пошла работа с сабом (загрузка / данные / ошибка)
     const shouldShowSubSection =
         hasSubWidgets && (subLoading || !!subDisplay || !!subError);
 
     const availableOrders = useMemo(
-        () => (currentForm?.sub_widgets ?? []).map(sw => sw.widget_order).sort((a, b) => a - b),
-        [currentForm]
+        () => (currentForm?.sub_widgets ?? [])
+            .map((sw) => sw.widget_order)
+            .sort((a, b) => a - b),
+        [currentForm],
     );
 
-
     const {
-        lastPrimary, setLastPrimary,
-        selectedKey, setSelectedKey,
-        activeSubOrder, setActiveSubOrder,
-        pkToKey, handleRowClick, handleTabClick,
-    } = useSubNav({formIdForSub, availableOrders, loadSubDisplay});
+        lastPrimary,
+        setLastPrimary,
+        selectedKey,
+        setSelectedKey,
+        activeSubOrder,
+        setActiveSubOrder,
+        pkToKey,
+        handleRowClick,
+        handleTabClick,
+    } = useSubNav({ formIdForSub, availableOrders, loadSubDisplay });
 
+    // если набор вкладок поменялся — аккуратно переезжаем на первый order и чистим саб
     useEffect(() => {
-        setActiveSubOrder(prev => availableOrders.includes(prev) ? prev : (availableOrders[0] ?? 0));
+        setActiveSubOrder((prev) => (
+            availableOrders.includes(prev) ? prev : (availableOrders[0] ?? 0)
+        ));
         setSubDisplay(null);
     }, [availableOrders, setSubDisplay, setActiveSubOrder]);
 
     const currentOrder = useMemo(
         () => (availableOrders.includes(activeSubOrder) ? activeSubOrder : (availableOrders[0] ?? 0)),
-        [activeSubOrder, availableOrders]
+        [activeSubOrder, availableOrders],
     );
+
     const currentWidgetId = currentOrder != null ? subWidgetIdByOrder[currentOrder] : undefined;
 
     /** ───────── дерево ───────── */
     const tree = selectedFormId ? formTrees[selectedFormId] : null;
-    const [liveTree, setLiveTree] = useState<FormTreeColumn[] | null>(null);
+
+
     useEffect(() => {
         setLiveTree(tree ?? null);
     }, [tree, selectedFormId]);
@@ -145,25 +166,37 @@ export const FormTable: React.FC<Props> = ({
         const fid = selectedFormId ?? currentForm?.form_id ?? null;
         if (!fid) return;
         try {
-            const {data} = await api.post<FormTreeColumn[] | FormTreeColumn>(`/display/${fid}/tree`);
+            const { data } = await api.post<FormTreeColumn[] | FormTreeColumn>(`/display/${fid}/tree`);
             setLiveTree(Array.isArray(data) ? data : [data]);
         } catch (e) {
+            // eslint-disable-next-line no-console
             console.warn('Не удалось обновить справочники (tree):', e);
         }
     }, [selectedFormId, currentForm]);
 
     /** ───────── шапка/план ───────── */
-    const {headerPlan, flatColumnsInRenderOrder, valueIndexByKey, isColReadOnly} = useHeaderPlan(formDisplay);
+    const {
+        headerPlan,
+        flatColumnsInRenderOrder,
+        valueIndexByKey,
+        isColReadOnly,
+    } = useHeaderPlan(formDisplay);
 
     /** ───────── фильтры/дерево ───────── */
     const {
-        activeFilters, setActiveFilters,
-        nestedTrees, setNestedTrees,
-        activeExpandedKey, setActiveExpandedKey,
+        activeFilters,
+        setActiveFilters,
+        nestedTrees,
+        setNestedTrees,
+        activeExpandedKey,
+        setActiveExpandedKey,
         resetFiltersHard,
     } = useFiltersTree(selectedFormId, (v) => setFormDisplay(v));
 
-    const {handleNestedValueClick, handleTreeValueClick} = useTreeHandlers({
+    const {
+        handleNestedValueClick,
+        handleTreeValueClick,
+    } = useTreeHandlers({
         selectedFormId,
         activeFilters,
         setActiveFilters,
@@ -176,17 +209,18 @@ export const FormTable: React.FC<Props> = ({
     const handleResetFilters = useCallback(async () => {
         if (!selectedFormId) return;
 
-        setActiveFilters([]);
-        setActiveExpandedKey(null);
+        // Сброс только того, что относится к выбору строки / сабам.
         setSelectedKey(null);
         setLastPrimary({});
         setSubDisplay(null);
         setActiveSubOrder(availableOrders[0] ?? 0);
 
         try {
+            // Фильтры/дерево/activeFilters/expanded внутри себя чистит useFiltersTree.resetFiltersHard
             await resetFiltersHard();
             await reloadTree();
         } catch (e) {
+            // eslint-disable-next-line no-console
             console.warn('❌ Ошибка при сбросе фильтров:', e);
         }
     }, [
@@ -195,29 +229,35 @@ export const FormTable: React.FC<Props> = ({
         setSubDisplay,
         resetFiltersHard,
         reloadTree,
-        setActiveFilters,
-        setActiveExpandedKey,
         setSelectedKey,
         setLastPrimary,
         setActiveSubOrder,
     ]);
 
-
     /** ───────── CRUD main ───────── */
     const {
-        isAdding, draft, saving,
-        editingRowIdx, editDraft, editSaving,
+        isAdding,
+        draft,
+        saving,
+        editingRowIdx,
+        editDraft,
+        editSaving,
         deletingRowIdx,
-        startAdd, cancelAdd, submitAdd,
-        startEdit, cancelEdit, submitEdit,
+        startAdd,
+        cancelAdd,
+        submitAdd,
+        startEdit,
+        cancelEdit,
+        submitEdit,
         deleteRow,
-        setDraft, setEditDraft,
+        setDraft,
+        setEditDraft,
     } = useMainCrud({
         formDisplay,
         selectedWidget,
         selectedFormId,
         formsByWidget,
-        formsById,              // 👈 ДОБАВИЛИ ЭТО
+        formsById,
         activeFilters,
         setFormDisplay: (v) => setFormDisplay(v),
         reloadTree,
@@ -230,19 +270,31 @@ export const FormTable: React.FC<Props> = ({
         setLastPrimary,
         setSelectedKey,
     });
+
     /** ───────── Поиск ───────── */
-    const {showSearch, q, setQ, filteredRows} = useFormSearch(
+    const {
+        showSearch,
+        q,
+        setQ,
+        filteredRows,
+    } = useFormSearch(
         formDisplay,
         flatColumnsInRenderOrder,
         valueIndexByKey,
         currentForm?.search_bar,
-        {threshold: 0.35, distance: 120, debounceMs: 250}
+        { threshold: 0.35, distance: 120, debounceMs: 250 },
     );
 
     /** ───────── SUB CRUD ───────── */
     const {
-        isAddingSub, setIsAddingSub, draftSub, setDraftSub, savingSub,
-        startAddSub, cancelAddSub, submitAddSub,
+        isAddingSub,
+        setIsAddingSub,
+        draftSub,
+        setDraftSub,
+        savingSub,
+        startAddSub,
+        cancelAddSub,
+        submitAddSub,
     } = useSubCrud({
         formIdForSub,
         currentWidgetId,
@@ -253,26 +305,23 @@ export const FormTable: React.FC<Props> = ({
     });
 
     /** ───────── Открытие DRILL из MainTable ───────── */
-    const handleOpenDrillFromMain = useCallback(
-        (
-            fid?: number | null,
-            meta?: {
-                originColumnType?: 'combobox' | null;
-                primary?: Record<string, unknown>;
-                openedFromEdit?: boolean;
-                targetWriteTcId?: number;
-            }
-        ) => {
-            if (!fid) return;
-            setDrillFormId(fid);
-            setDrillComboboxMode(meta?.originColumnType === 'combobox');
-            setDrillInitialPrimary(meta?.primary || undefined);
-            setDrillDisableNested(!!meta?.openedFromEdit);
-            setDrillTargetWriteTcId(meta?.targetWriteTcId ?? null);
-            setDrillOpen(true);
+    const handleOpenDrillFromMain = useCallback((
+        fid?: number | null,
+        meta?: {
+            originColumnType?: 'combobox' | null;
+            primary?: Record<string, unknown>;
+            openedFromEdit?: boolean;
+            targetWriteTcId?: number;
         },
-        []
-    );
+    ) => {
+        if (!fid) return;
+        setDrillFormId(fid);
+        setDrillComboboxMode(meta?.originColumnType === 'combobox');
+        setDrillInitialPrimary(meta?.primary || undefined);
+        setDrillDisableNested(!!meta?.openedFromEdit);
+        setDrillTargetWriteTcId(meta?.targetWriteTcId ?? null);
+        setDrillOpen(true);
+    }, []);
 
     /** очистка при закрытии модалки */
     useEffect(() => {
@@ -285,24 +334,22 @@ export const FormTable: React.FC<Props> = ({
     }, [drillOpen]);
 
     /** ───────── Приём выбранной строки из DrillDialog ───────── */
-    const handlePickFromDrill = useCallback(
-        ({primary}: { row: FormDisplay['data'][number]; primary: Record<string, unknown> }) => {
-            if (drillTargetWriteTcId == null) return;
+    const handlePickFromDrill = useCallback((
+        { primary }: { row: FormDisplay['data'][number]; primary: Record<string, unknown> },
+    ) => {
+        if (drillTargetWriteTcId == null) return;
 
-            const pkValues = Object.values(primary ?? {});
-            const nextId = pkValues.length ? String(pkValues[0]) : '';
+        const pkValues = Object.values(primary ?? {});
+        const nextId = pkValues.length ? String(pkValues[0]) : '';
 
-            setEditDraft(prev => ({
-                ...prev,
-                [drillTargetWriteTcId]: nextId,
-            }));
+        setEditDraft((prev) => ({
+            ...prev,
+            [drillTargetWriteTcId]: nextId,
+        }));
 
-            // 👇 важное место: сигналим, что нужно перезагрузить combobox-опции
-            setComboReloadToken(v => v + 1);
-        },
-        [drillTargetWriteTcId, setEditDraft]
-    );
-
+        // сигналим, что нужно перезагрузить combobox-опции
+        setComboReloadToken((v) => v + 1);
+    }, [drillTargetWriteTcId, setEditDraft]);
 
     /** ───────── UI ───────── */
     return (
@@ -343,16 +390,14 @@ export const FormTable: React.FC<Props> = ({
                         expandedWidth={420}
                     />
 
-                    {/* 👇 отдельная область, которая скроллится */}
-
                     <MainTable
                         headerPlan={headerPlan as any}
                         showSubHeaders={showSubHeaders}
-                        onToggleSubHeaders={() => setShowSubHeaders(v => !v)}
+                        onToggleSubHeaders={() => setShowSubHeaders((v) => !v)}
                         onOpenDrill={handleOpenDrillFromMain}
                         isAdding={isAdding}
                         draft={draft}
-                        onDraftChange={(tcId, v) => setDraft(prev => ({...prev, [tcId]: v}))}
+                        onDraftChange={(tcId, v) => setDraft((prev) => ({ ...prev, [tcId]: v }))}
                         flatColumnsInRenderOrder={flatColumnsInRenderOrder}
                         isColReadOnly={isColReadOnly}
                         placeholderFor={(c) => c.placeholder ?? c.column_name}
@@ -362,7 +407,7 @@ export const FormTable: React.FC<Props> = ({
                         pkToKey={pkToKey}
                         editingRowIdx={editingRowIdx}
                         editDraft={editDraft}
-                        onEditDraftChange={(tcId, v) => setEditDraft(prev => ({...prev, [tcId]: v}))}
+                        onEditDraftChange={(tcId, v) => setEditDraft((prev) => ({ ...prev, [tcId]: v }))}
                         onSubmitEdit={submitEdit}
                         onCancelEdit={cancelEdit}
                         editSaving={editSaving}
@@ -371,8 +416,8 @@ export const FormTable: React.FC<Props> = ({
                         onDeleteRow={deleteRow}
                         deletingRowIdx={deletingRowIdx}
                         comboReloadToken={comboReloadToken}
-
                     />
+
                     {shouldShowSubSection && (
                         <SubWormTable
                             onOpenDrill={handleOpenDrillFromMain}
@@ -398,21 +443,20 @@ export const FormTable: React.FC<Props> = ({
                         />
                     )}
                 </div>
-
             </div>
 
             {/* DRILL-модалка */}
             <DrillDialog
                 onSyncParentMain={async () => {
-                    // 👇 определяем, какую форму сейчас показывает formTable
                     const fid = selectedFormId ?? currentForm?.form_id ?? null;
                     if (!fid) return;
 
                     try {
-                        const {data} = await api.post<FormDisplay | FormDisplay[]>(`/display/${fid}/main`, activeFilters);
+                        const { data } = await api.post<FormDisplay | FormDisplay[]>(`/display/${fid}/main`, activeFilters);
                         const next = Array.isArray(data) ? data[0] : data;
                         if (next) setFormDisplay(next);
                     } catch (e) {
+                        // eslint-disable-next-line no-console
                         console.warn('[formTable] onSyncParentMain failed:', e);
                     }
                 }}
@@ -422,14 +466,13 @@ export const FormTable: React.FC<Props> = ({
                 formsById={formsById}
                 disableNestedDrill={drillDisableNested}
                 comboboxMode={drillComboboxMode}
-                selectedWidget={selectedWidget ? {id: selectedWidget.id} : null}
+                selectedWidget={selectedWidget ? { id: selectedWidget.id } : null}
                 formsByWidget={formsByWidget}
                 loadSubDisplay={loadSubDisplay}
                 initialPrimary={drillInitialPrimary}
                 onPickFromDrill={drillDisableNested ? handlePickFromDrill : undefined}
-                onComboboxChanged={() => setComboReloadToken(v => v + 1)}
+                onComboboxChanged={() => setComboReloadToken((v) => v + 1)}
                 comboReloadToken={comboReloadToken}
-
             />
         </ThemeProvider>
     );

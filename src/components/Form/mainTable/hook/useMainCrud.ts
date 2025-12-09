@@ -1,7 +1,8 @@
 // useMainCrud.ts
 import { useCallback, useState } from 'react';
 import { api } from '@/services/api';
-import type {DTable, FormDisplay, Widget, WidgetForm} from '@/shared/hooks/useWorkSpaces';
+import type { DTable, FormDisplay, Widget, WidgetForm } from '@/shared/hooks/useWorkSpaces';
+import type { ExtCol } from '@/components/Form/formTable/parts/FormatByDatatype';
 
 const DEBUG_MAINCRUD = true;
 const log = (label: string, payload?: unknown) => {
@@ -18,18 +19,12 @@ const log = (label: string, payload?: unknown) => {
 
 type EnsureQueryKind = 'insert' | 'update' | 'delete';
 
-// Синхронно с MainTable/useHeaderPlan
-type ExtCol = FormDisplay['columns'][number] & {
-    __write_tc_id?: number;
-    __is_primary_combo_input?: boolean;
-};
-
 export type UseMainCrudDeps = {
     formDisplay: FormDisplay;
     selectedWidget: Widget | null;
     selectedFormId: number | null;
     formsByWidget: Record<number, { form_id: number }>;
-    formsById: Record<number, WidgetForm>;               // 👈 НОВОЕ ПОЛЕ
+    formsById: Record<number, WidgetForm>;
     activeFilters: Array<{ table_column_id: number; value: string | number }>;
     setFormDisplay: (v: FormDisplay) => void;
     reloadTree: () => Promise<void>;
@@ -42,7 +37,6 @@ export type UseMainCrudDeps = {
     setLastPrimary: (v: Record<string, unknown>) => void;
     setSelectedKey: React.Dispatch<React.SetStateAction<string | null>>;
     preflightTableId?: number | null;
-
 };
 
 type ComboColumnMeta = { ref_column_order: number; width: number; combobox_alias: string | null };
@@ -51,13 +45,10 @@ type ComboResp = {
     data: Array<{ primary: (string | number)[]; show: (string | number)[]; show_hidden: (string | number)[] }>;
 };
 type ComboOption = {
-    id: string;           // primary[0] как строка
-    show: string[];       // короткая подпись
-    showHidden: string[]; // полная подпись
+    id: string;
+    show: string[];
+    showHidden: string[];
 };
-
-// кэш по ключу wcId:writeTcId
-
 
 async function loadComboOptions(widgetColumnId: number, writeTcId: number): Promise<ComboOption[]> {
     const { data } = await api.get<ComboResp>(`/display/combobox/${widgetColumnId}/${writeTcId}`);
@@ -104,7 +95,6 @@ export function useMainCrud({
         return formsByWidget[selectedWidget.id]?.form_id ?? null;
     }, [selectedFormId, selectedWidget, formsByWidget]);
 
-
     const getEffectiveWidgetId = useCallback((): number | null => {
         // 1) Если сверху уже явно выбран виджет — используем его
         if (selectedWidget?.id) return selectedWidget.id;
@@ -128,8 +118,6 @@ export function useMainCrud({
         return null;
     }, [selectedWidget, selectedFormId, formsById, formsByWidget]);
 
-
-
     const ensureQuery = useCallback(
         async (kind: EnsureQueryKind): Promise<{ ok: boolean; formId?: number }> => {
             const formId = getEffectiveFormId();
@@ -141,16 +129,14 @@ export function useMainCrud({
             try {
                 let tableId: number | null = preflightTableId ?? null;
 
-                // пробуем взять table_id из selectedWidget, если он есть
                 if (!tableId) {
                     const maybeTid = (selectedWidget as any)?.table_id as number | undefined;
                     if (maybeTid) tableId = maybeTid ?? null;
                 }
 
-                // если всё ещё нет — дёргаем /widgets/{widgetId}
                 if (!tableId && widgetId) {
                     const { data: widgetMeta } = await api.get<{ id: number; table_id: number }>(
-                        `/widgets/${widgetId}`
+                        `/widgets/${widgetId}`,
                     );
                     tableId = widgetMeta?.table_id ?? null;
                 }
@@ -184,16 +170,12 @@ export function useMainCrud({
 
             return { ok: true, formId };
         },
-        [selectedWidget, preflightTableId, getEffectiveFormId, getEffectiveWidgetId]
+        [selectedWidget, preflightTableId, getEffectiveFormId, getEffectiveWidgetId],
     );
-
-
 
     const preflightInsert = useCallback(() => ensureQuery('insert'), [ensureQuery]);
     const preflightUpdate = useCallback(() => ensureQuery('update'), [ensureQuery]);
     const preflightDelete = useCallback(() => ensureQuery('delete'), [ensureQuery]);
-
-
 
     function isSameComboGroupCRUD(a: ExtCol, b: ExtCol): boolean {
         if (!a || !b) return false;
@@ -219,9 +201,6 @@ export function useMainCrud({
         return null;
     }
 
-
-
-
     // ───────── Добавление ─────────
     const startAdd = useCallback(async () => {
         const pf = await preflightInsert();
@@ -233,17 +212,17 @@ export function useMainCrud({
         const init: Record<number, string> = {};
         const seen = new Set<number>();
 
-        // Идём как в рендере: слева-направо, склеиваем combobox в группы, кладём ОДИН write-id на группу
         for (let i = 0; i < flatColumnsInRenderOrder.length; ) {
             const c = flatColumnsInRenderOrder[i];
 
             if (c.type === 'combobox') {
                 let j = i + 1;
-                while (j < flatColumnsInRenderOrder.length && isSameComboGroupCRUD(c, flatColumnsInRenderOrder[j])) j += 1;
+                while (j < flatColumnsInRenderOrder.length && isSameComboGroupCRUD(c, flatColumnsInRenderOrder[j])) {
+                    j += 1;
+                }
                 const group = flatColumnsInRenderOrder.slice(i, j);
                 const writeTcId = getWriteTcIdForComboGroupCRUD(group);
                 if (writeTcId != null && !seen.has(writeTcId)) {
-                    // Для добавления по умолчанию пусто — пользователь выберет
                     init[writeTcId] = '';
                     seen.add(writeTcId);
                 }
@@ -251,7 +230,6 @@ export function useMainCrud({
                 continue;
             }
 
-            // Обычная колонка
             const writeTcId = (c.__write_tc_id ?? c.table_column_id) ?? null;
             if (writeTcId != null && !seen.has(writeTcId)) {
                 init[writeTcId] = String(c.default ?? '');
@@ -262,10 +240,7 @@ export function useMainCrud({
 
         log('startAdd → init draft (unique write ids)', init);
         setDraft(init);
-        setIsAdding(true);
-        setEditingRowIdx(null);
     }, [preflightInsert, flatColumnsInRenderOrder]);
-
 
     const cancelAdd = useCallback(() => {
         setIsAdding(false);
@@ -281,11 +256,10 @@ export function useMainCrud({
 
         setSaving(true);
         try {
-            // 1) Собираем список ВСЕХ write_tc_id из плоских колонок (уникально)
             const allWriteIds: number[] = [];
             const seen = new Set<number>();
 
-            flatColumnsInRenderOrder.forEach((c) => {
+            flatColumnsInRenderOrder.forEach(c => {
                 const w = (c.__write_tc_id ?? c.table_column_id) ?? null;
                 if (w != null && !seen.has(w)) {
                     seen.add(w);
@@ -293,16 +267,13 @@ export function useMainCrud({
                 }
             });
 
-            // 2) Формируем values:
-            //    - для combobox: пустое → null
-            //    - для остальных: как раньше, пустое → ''
-            const values = allWriteIds.map((tcId) => {
+            const values = allWriteIds.map(tcId => {
                 const raw = draft[tcId];
                 const s = raw == null ? '' : String(raw).trim();
 
                 return {
                     table_column_id: tcId,
-                    value: s === '' ? null : s, // <- критично: null вместо ''
+                    value: s === '' ? null : s,
                 };
             });
 
@@ -322,7 +293,7 @@ export function useMainCrud({
                 if (status === 403) {
                     console.warn('[submitEdit] 403 Forbidden', { url, body, detail });
                     alert('У вас не хватает прав на добавление новой записи');
-                    return; // не валим дальше, не делаем reload
+                    return;
                 }
 
                 if (status === 404 && String(detail).includes('Insert query not found')) {
@@ -332,7 +303,6 @@ export function useMainCrud({
                 if (status === 404) {
                     await api.post(`${url}/`, body);
                 } else if (status === 422) {
-                    // 👇 Лог в консоль, чтобы увидеть, ЧТО именно не нравится бэку
                     console.error('[submitAdd] 422 от бэка', {
                         detail,
                         body,
@@ -340,7 +310,7 @@ export function useMainCrud({
 
                     alert(
                         `Не удалось добавить строку (422).\n` +
-                        `detail: ${typeof detail === 'string' ? detail : JSON.stringify(detail)}`
+                        `detail: ${typeof detail === 'string' ? detail : JSON.stringify(detail)}`,
                     );
                     return;
                 } else {
@@ -357,21 +327,15 @@ export function useMainCrud({
         } catch (e: any) {
             const status = e?.response?.status;
             const msg = e?.response?.data ?? e?.message;
-            alert(`Не удалось добавить строку: ${status ?? ''} ${typeof msg === 'string' ? msg : JSON.stringify(msg)}`);
+            alert(
+                `Не удалось добавить строку: ${status ?? ''} ${
+                    typeof msg === 'string' ? msg : JSON.stringify(msg)
+                }`,
+            );
         } finally {
             setSaving(false);
         }
-    }, [
-        getEffectiveWidgetId,
-        preflightInsert,
-        draft,
-        activeFilters,
-        setFormDisplay,
-        reloadTree,
-        flatColumnsInRenderOrder,
-    ]);
-
-
+    }, [getEffectiveWidgetId, preflightInsert, draft, activeFilters, setFormDisplay, reloadTree, flatColumnsInRenderOrder]);
 
     // ───────── Редактирование ─────────
     const startEdit = useCallback(
@@ -382,11 +346,10 @@ export function useMainCrud({
 
             const row = formDisplay.data[rowIdx];
 
-            // 1) Сбор исходных значений и групп combobox
             const init: Record<number, string> = {};
             const comboGroups = new Map<string, { wcId: number; writeTcId: number; tokens: string[] }>();
 
-            flatColumnsInRenderOrder.forEach((col) => {
+            flatColumnsInRenderOrder.forEach(col => {
                 const writeTcId = (col.__write_tc_id ?? col.table_column_id) ?? null;
                 if (writeTcId == null) return;
 
@@ -397,19 +360,19 @@ export function useMainCrud({
 
                 if (col.type === 'combobox') {
                     const gKey = `${col.widget_column_id}:${writeTcId}`;
-                    const g = comboGroups.get(gKey) ?? { wcId: col.widget_column_id, writeTcId, tokens: [] };
+                    const g = comboGroups.get(gKey) ?? {
+                        wcId: col.widget_column_id,
+                        writeTcId,
+                        tokens: [],
+                    };
                     if (shownStr) g.tokens.push(shownStr);
                     comboGroups.set(gKey, g);
-                    // init для combobox будет выставлен ниже после маппинга на id
                 } else {
-                    init[writeTcId] = shownStr; // даже если read-only → кладём текущее видимое значение
+                    init[writeTcId] = shownStr;
                 }
             });
 
-            // 2) Для каждой combobox-группы подтягиваем опции и пытаемся сопоставить по tokens
-            //    Стратегия: ищем опцию, у которой show_hidden содержит максимум из tokens.
-            //    Если ровно один кандидат с максимальным score (>0) — берём его id.
-            const groups = Array.from(comboGroups.values()); // массив, чтобы не было проблем с TS2802
+            const groups = Array.from(comboGroups.values());
             for (let i = 0; i < groups.length; i += 1) {
                 const g = groups[i];
                 try {
@@ -426,7 +389,7 @@ export function useMainCrud({
                         const hay: string[] = o.showHidden.map((x: string) => x.toLowerCase());
                         const score = tokens.reduce(
                             (acc: number, t: string) => acc + (hay.includes(t) ? 1 : 0),
-                            0
+                            0,
                         );
                         if (score > bestScore) {
                             bestScore = score;
@@ -437,8 +400,8 @@ export function useMainCrud({
                         }
                     }
 
-                    // если сопоставилось однозначно — авто-проставим ID, иначе оставим пусто (пусть выберут явно)
-                    init[g.writeTcId] = (bestScore > 0 && bestCount === 1 && bestId) ? bestId : (init[g.writeTcId] ?? '');
+                    init[g.writeTcId] =
+                        bestScore > 0 && bestCount === 1 && bestId ? bestId : init[g.writeTcId] ?? '';
                 } catch {
                     init[g.writeTcId] = init[g.writeTcId] ?? '';
                 }
@@ -448,7 +411,7 @@ export function useMainCrud({
             setEditingRowIdx(rowIdx);
             setEditDraft(init);
         },
-        [preflightUpdate, formDisplay.data, flatColumnsInRenderOrder, valueIndexByKey, isColReadOnly]
+        [preflightUpdate, formDisplay.data, flatColumnsInRenderOrder, valueIndexByKey],
     );
 
     const cancelEdit = useCallback(() => {
@@ -470,22 +433,21 @@ export function useMainCrud({
         try {
             const row = formDisplay.data[editingRowIdx];
 
-            // 0) PK утилиты
             const pkObj = Object.fromEntries(
-                Object.entries(row.primary_keys).map(([k, v]) => [k, String(v)])
+                Object.entries(row.primary_keys).map(([k, v]) => [k, String(v)]),
             );
             const pkToString = (pk: Record<string, unknown>) =>
-                Object.keys(pk).sort().map(k => `${k}:${String(pk[k])}`).join('|');
+                Object.keys(pk)
+                    .sort()
+                    .map(k => `${k}:${String(pk[k])}`)
+                    .join('|');
 
-            // 1) считаем значения для отправки из editDraft (включая read-only/visible:false)
             const getSendingValue = (raw: unknown): string | null => {
                 const s = raw == null ? '' : String(raw).trim();
-                return s === '' ? null : s; // пустое → null
+                return s === '' ? null : s;
             };
 
-// отправляем все поля из editDraft (включая очищенные)
             const entries = Object.entries(editDraft);
-
 
             const values = entries.map(([tcIdStr, v]) => {
                 const tcId = Number(tcIdStr);
@@ -494,14 +456,13 @@ export function useMainCrud({
                     value: getSendingValue(v),
                 };
             });
-            // 2) body + url
+
             const body = {
                 pk: { primary_keys: pkObj as Record<string, string> },
                 values,
             };
             const url = `/data/${pf.formId}/${wid}`;
 
-            // 3) before/after лог по тем write_tc_id, которые реально отправляем (entries)
             type BeforeAfter = {
                 widget_column_id: number;
                 write_tc_id: number;
@@ -539,7 +500,6 @@ export function useMainCrud({
                 }
             }
 
-            // 4) Логи
             console.groupCollapsed('[CRUD][submitEdit]');
             console.log('PK:', pkObj, 'pkKey:', pkToString(pkObj));
             console.log('editDraft (raw):', editDraft);
@@ -549,7 +509,6 @@ export function useMainCrud({
             console.log('BEFORE (shown) & SENDING values by write_tc_id:', beforeAfter);
             console.groupEnd();
 
-            // 5) PATCH
             let patchRespData: unknown = null;
             try {
                 const resp = await api.patch(url, body);
@@ -561,7 +520,7 @@ export function useMainCrud({
                 if (status === 403) {
                     console.warn('[submitEdit] 403 Forbidden', { url, body, detail });
                     alert('У вас не хватает прав на редактирование этой записи');
-                    return; // не валим дальше, не делаем reload
+                    return;
                 }
 
                 if (status === 404 && String(detail).includes('Update query not found')) {
@@ -580,12 +539,17 @@ export function useMainCrud({
             console.log(patchRespData);
             console.groupEnd();
 
-            // 6) Релоад main + сравнение after
-            const { data: newDisplay } = await api.post<FormDisplay>(`/display/${pf.formId}/main`, activeFilters);
+            const { data: newDisplay } = await api.post<FormDisplay>(
+                `/display/${pf.formId}/main`,
+                activeFilters,
+            );
 
             const findRowByPk = (fd: FormDisplay, pk: Record<string, unknown>) => {
                 const key = (obj: Record<string, unknown>) =>
-                    Object.keys(obj).sort().map(k => `${k}:${String(obj[k])}`).join('|');
+                    Object.keys(obj)
+                        .sort()
+                        .map(k => `${k}:${String(obj[k])}`)
+                        .join('|');
                 const target = key(pk);
                 for (let i = 0; i < fd.data.length; i += 1) {
                     const k = key(fd.data[i].primary_keys as Record<string, unknown>);
@@ -598,7 +562,7 @@ export function useMainCrud({
 
             const after: Array<BeforeAfter & { shown_after: string }> = [];
             if (updatedRow) {
-                beforeAfter.forEach((ba) => {
+                beforeAfter.forEach(ba => {
                     const related = flatColumnsInRenderOrder.filter(c => {
                         const w = (c.__write_tc_id ?? c.table_column_id) ?? null;
                         return w === ba.write_tc_id;
@@ -607,7 +571,10 @@ export function useMainCrud({
                     if (col) {
                         const visKey = `${col.widget_column_id}:${col.table_column_id ?? -1}`;
                         const idx = valueIndexByKey.get(visKey);
-                        const shownVal = (idx != null ? updatedRow.values[idx] : '') as string | number | null;
+                        const shownVal = (idx != null ? updatedRow.values[idx] : '') as
+                            | string
+                            | number
+                            | null;
                         after.push({
                             ...ba,
                             shown_after: shownVal == null ? '' : String(shownVal),
@@ -634,7 +601,7 @@ export function useMainCrud({
         }
     }, [
         editingRowIdx,
-        selectedWidget,
+        getEffectiveWidgetId,
         preflightUpdate,
         formDisplay.data,
         editDraft,
@@ -644,12 +611,9 @@ export function useMainCrud({
         cancelEdit,
         flatColumnsInRenderOrder,
         valueIndexByKey,
-        isColReadOnly, // остаётся в deps как и раньше
     ]);
 
-
     // ───────── Удаление ─────────
-// ───────── Удаление ─────────
     const deleteRow = useCallback(
         async (rowIdx: number) => {
             const wid = getEffectiveWidgetId();
@@ -660,10 +624,10 @@ export function useMainCrud({
 
             const row = formDisplay.data[rowIdx];
             const rowKey = pkToKey(row.primary_keys);
-            setSelectedKey((prev) => (prev === rowKey ? null : prev));
+            setSelectedKey(prev => (prev === rowKey ? null : prev));
 
             const pkObj = Object.fromEntries(
-                Object.entries(row.primary_keys).map(([k, v]) => [k, String(v)])
+                Object.entries(row.primary_keys).map(([k, v]) => [k, String(v)]),
             );
 
             setDeletingRowIdx(rowIdx);
@@ -691,8 +655,9 @@ export function useMainCrud({
                 const { data } = await api.post<FormDisplay>(`/display/${pf.formId}/main`, activeFilters);
                 setFormDisplay(data);
 
-                // ✅ ВАЖНО: обновляем дерево после удаления
-                try { await reloadTree(); } catch {}
+                try {
+                    await reloadTree();
+                } catch {}
 
                 if (pkToKey(lastPrimary) === rowKey) {
                     setLastPrimary({});
@@ -714,9 +679,8 @@ export function useMainCrud({
             setSelectedKey,
             reloadTree,
             setLastPrimary,
-        ]
+        ],
     );
-
 
     return {
         isAdding,
