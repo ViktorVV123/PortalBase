@@ -57,6 +57,42 @@ type Props = {
 
 const safe = (v?: string | null) => (v?.trim() ? v.trim() : '—');
 
+
+/** Сравнение двух main-строк по primary_keys.
+ *  Если PK один и числовой → сортируем численно.
+ *  Иначе — строковое сравнение с numeric: true.
+ */
+function compareByPrimaryRow(
+    a: FormDisplay['data'][number],
+    b: FormDisplay['data'][number],
+): number {
+    const aPk = a.primary_keys ?? {};
+    const bPk = b.primary_keys ?? {};
+
+    const aKeys = Object.keys(aPk);
+    const bKeys = Object.keys(bPk);
+
+    // простой кейс: один и тот же числовой PK (например, id)
+    if (aKeys.length === 1 && bKeys.length === 1 && aKeys[0] === bKeys[0]) {
+        const key = aKeys[0];
+        const av = aPk[key] as unknown;
+        const bv = bPk[key] as unknown;
+
+        if (typeof av === 'number' && typeof bv === 'number') {
+            return av - bv;
+        }
+
+        const sa = String(av);
+        const sb = String(bv);
+        return sa.localeCompare(sb, undefined, { numeric: true, sensitivity: 'base' });
+    }
+
+    // составной PK или разные наборы ключей — сортируем по строковому представлению
+    const sa = JSON.stringify(aPk);
+    const sb = JSON.stringify(bPk);
+    return sa.localeCompare(sb, undefined, { numeric: true, sensitivity: 'base' });
+}
+
 export const DrillDialog: React.FC<Props> = ({
                                                  open,
                                                  formId,
@@ -561,6 +597,12 @@ export const DrillDialog: React.FC<Props> = ({
         onClose();
     }, [hasCrudChanges, onSyncParentMain, onComboboxChanged, formId, onClose]);
 
+    const sortedFilteredRows = useMemo<RowView[]>(() => {
+        // filteredRows уже содержит RowView { row, idx } с учётом поиска/фильтров
+        if (!filteredRows || !filteredRows.length) return filteredRows;
+        return [...filteredRows].sort((a, b) => compareByPrimaryRow(a.row, b.row));
+    }, [filteredRows]);
+
 
     return (
         <Dialog open={open} onClose={onClose} fullWidth maxWidth="xl">
@@ -646,7 +688,7 @@ export const DrillDialog: React.FC<Props> = ({
                                     flatColumnsInRenderOrder={flatColumnsInRenderOrder}
                                     isColReadOnly={isColReadOnly}
                                     placeholderFor={(c) => c.placeholder ?? c.column_name}
-                                    filteredRows={filteredRows}
+                                    filteredRows={sortedFilteredRows}
                                     valueIndexByKey={valueIndexByKey}
                                     selectedKey={selectedKey}
                                     pkToKey={pkToKey}
