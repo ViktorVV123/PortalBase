@@ -7,18 +7,18 @@ import {api} from '@/services/api';
 
 import {ThemeProvider} from '@mui/material';
 import {dark} from '@/shared/themeUI/themeModal/ThemeModalUI';
-import {TableToolbar} from '@/components/tableToolbar/TableToolbar';
-import {useMainCrud} from '@/components/formTable/hooks/useMainCrud';
-import {useFiltersTree} from '@/components/formTable/hooks/useFiltersTree';
-import {TreeFormTable} from '@/components/formTable/treeForm/TreeFormTable';
-import {MainTable} from '@/components/formTable/parts/MainTable';
-import {SubWormTable} from '@/components/formTable/subForm/SubFormTable';
-import {DrillDialog} from '@/components/formTable/parts/DrillDialog';
-import {useHeaderPlan} from '@/components/formTable/hooks/useHeaderPlan';
-import {useSubCrud} from '@/components/formTable/hooks/useSubCrud';
-import {useSubNav} from '@/components/formTable/hooks/useSubNav';
-import {useFormSearch} from '@/components/formTable/hooks/useFormSearch';
-import {useTreeHandlers} from '@/components/formTable/hooks/useTreeHandlers';
+import {TableToolbar} from '@/components/table/tableToolbar/TableToolbar';
+import {useMainCrud} from '@/components/Form/mainTable/hook/useMainCrud';
+import {useFiltersTree} from '@/components/Form/formTable/hooks/useFiltersTree';
+import {TreeFormTable} from '@/components/Form/treeForm/TreeFormTable';
+import {MainTable} from '@/components/Form/mainTable/MainTable';
+import {SubWormTable} from '@/components/Form/subForm/SubFormTable';
+import {DrillDialog} from '@/components/Form/drillDialog/DrillDialog';
+import {useHeaderPlan} from '@/components/Form/formTable/hooks/useHeaderPlan';
+import {useSubCrud} from '@/components/Form/subForm/hook/useSubCrud';
+import {useSubNav} from '@/components/Form/subForm/hook/useSubNav';
+import {useFormSearch} from '@/components/Form/formTable/hooks/useFormSearch';
+import {useTreeHandlers} from '@/components/Form/treeForm/hooks/useTreeHandlers';
 
 export type HeaderModelItem = {
     id: number;
@@ -39,7 +39,10 @@ type Props = {
     subLoading: boolean;
     subError: string | null;
     formTrees: Record<number, FormTreeColumn[]>;
-    loadFilteredFormDisplay: (formId: number, filter: { table_column_id: number; value: string | number }) => Promise<void>;
+    loadFilteredFormDisplay: (formId: number, filter: {
+        table_column_id: number;
+        value: string | number
+    }) => Promise<void>;
     subHeaderGroups?: HeaderModelItem[];
     setFormDisplay: (value: FormDisplay | null) => void;
     setSubDisplay: (value: SubDisplay | null) => void;
@@ -88,15 +91,24 @@ export const FormTable: React.FC<Props> = ({
 
     const [overrideForm, setOverrideForm] = useState<WidgetForm | null>(null);
     const currentForm: WidgetForm | null = overrideForm ?? baseForm;
-    useEffect(() => { setOverrideForm(null); }, [selectedFormId]);
+    useEffect(() => {
+        setOverrideForm(null);
+    }, [selectedFormId]);
 
     const subWidgetIdByOrder = useMemo(() => {
         const map: Record<number, number> = {};
-        currentForm?.sub_widgets?.forEach(sw => { map[sw.widget_order] = sw.sub_widget_id; });
+        currentForm?.sub_widgets?.forEach(sw => {
+            map[sw.widget_order] = sw.sub_widget_id;
+        });
         return map;
     }, [currentForm]);
 
+    const hasSubWidgets = !!(currentForm?.sub_widgets && currentForm.sub_widgets.length > 0);
+
     const formIdForSub = selectedFormId ?? currentForm?.form_id ?? null;
+
+    const shouldShowSubSection =
+        hasSubWidgets && (subLoading || !!subDisplay || !!subError);
 
     const availableOrders = useMemo(
         () => (currentForm?.sub_widgets ?? []).map(sw => sw.widget_order).sort((a, b) => a - b),
@@ -104,13 +116,12 @@ export const FormTable: React.FC<Props> = ({
     );
 
 
-
     const {
         lastPrimary, setLastPrimary,
         selectedKey, setSelectedKey,
         activeSubOrder, setActiveSubOrder,
         pkToKey, handleRowClick, handleTabClick,
-    } = useSubNav({ formIdForSub, availableOrders, loadSubDisplay });
+    } = useSubNav({formIdForSub, availableOrders, loadSubDisplay});
 
     useEffect(() => {
         setActiveSubOrder(prev => availableOrders.includes(prev) ? prev : (availableOrders[0] ?? 0));
@@ -126,7 +137,9 @@ export const FormTable: React.FC<Props> = ({
     /** ───────── дерево ───────── */
     const tree = selectedFormId ? formTrees[selectedFormId] : null;
     const [liveTree, setLiveTree] = useState<FormTreeColumn[] | null>(null);
-    useEffect(() => { setLiveTree(tree ?? null); }, [tree, selectedFormId]);
+    useEffect(() => {
+        setLiveTree(tree ?? null);
+    }, [tree, selectedFormId]);
 
     const reloadTree = useCallback(async () => {
         const fid = selectedFormId ?? currentForm?.form_id ?? null;
@@ -140,7 +153,7 @@ export const FormTable: React.FC<Props> = ({
     }, [selectedFormId, currentForm]);
 
     /** ───────── шапка/план ───────── */
-    const { headerPlan, flatColumnsInRenderOrder, valueIndexByKey, isColReadOnly } = useHeaderPlan(formDisplay);
+    const {headerPlan, flatColumnsInRenderOrder, valueIndexByKey, isColReadOnly} = useHeaderPlan(formDisplay);
 
     /** ───────── фильтры/дерево ───────── */
     const {
@@ -150,7 +163,7 @@ export const FormTable: React.FC<Props> = ({
         resetFiltersHard,
     } = useFiltersTree(selectedFormId, (v) => setFormDisplay(v));
 
-    const { handleNestedValueClick, handleTreeValueClick } = useTreeHandlers({
+    const {handleNestedValueClick, handleTreeValueClick} = useTreeHandlers({
         selectedFormId,
         activeFilters,
         setActiveFilters,
@@ -218,12 +231,12 @@ export const FormTable: React.FC<Props> = ({
         setSelectedKey,
     });
     /** ───────── Поиск ───────── */
-    const { showSearch, q, setQ, filteredRows } = useFormSearch(
+    const {showSearch, q, setQ, filteredRows} = useFormSearch(
         formDisplay,
         flatColumnsInRenderOrder,
         valueIndexByKey,
         currentForm?.search_bar,
-        { threshold: 0.35, distance: 120, debounceMs: 250 }
+        {threshold: 0.35, distance: 120, debounceMs: 250}
     );
 
     /** ───────── SUB CRUD ───────── */
@@ -273,7 +286,7 @@ export const FormTable: React.FC<Props> = ({
 
     /** ───────── Приём выбранной строки из DrillDialog ───────── */
     const handlePickFromDrill = useCallback(
-        ({ primary }: { row: FormDisplay['data'][number]; primary: Record<string, unknown> }) => {
+        ({primary}: { row: FormDisplay['data'][number]; primary: Record<string, unknown> }) => {
             if (drillTargetWriteTcId == null) return;
 
             const pkValues = Object.values(primary ?? {});
@@ -289,8 +302,6 @@ export const FormTable: React.FC<Props> = ({
         },
         [drillTargetWriteTcId, setEditDraft]
     );
-
-
 
 
     /** ───────── UI ───────── */
@@ -334,57 +345,58 @@ export const FormTable: React.FC<Props> = ({
 
                     {/* 👇 отдельная область, которая скроллится */}
 
-                        <MainTable
-                            headerPlan={headerPlan as any}
-                            showSubHeaders={showSubHeaders}
-                            onToggleSubHeaders={() => setShowSubHeaders(v => !v)}
-                            onOpenDrill={handleOpenDrillFromMain}
-                            isAdding={isAdding}
-                            draft={draft}
-                            onDraftChange={(tcId, v) => setDraft(prev => ({...prev, [tcId]: v}))}
-                            flatColumnsInRenderOrder={flatColumnsInRenderOrder}
-                            isColReadOnly={isColReadOnly}
-                            placeholderFor={(c) => c.placeholder ?? c.column_name}
-                            filteredRows={filteredRows}
-                            valueIndexByKey={valueIndexByKey}
-                            selectedKey={selectedKey}
-                            pkToKey={pkToKey}
-                            editingRowIdx={editingRowIdx}
-                            editDraft={editDraft}
-                            onEditDraftChange={(tcId, v) => setEditDraft(prev => ({...prev, [tcId]: v}))}
-                            onSubmitEdit={submitEdit}
-                            onCancelEdit={cancelEdit}
-                            editSaving={editSaving}
-                            onRowClick={handleRowClick}
-                            onStartEdit={startEdit}
-                            onDeleteRow={deleteRow}
-                            deletingRowIdx={deletingRowIdx}
-                            comboReloadToken={comboReloadToken}
-
-                        />
-
-                    <SubWormTable
+                    <MainTable
+                        headerPlan={headerPlan as any}
+                        showSubHeaders={showSubHeaders}
+                        onToggleSubHeaders={() => setShowSubHeaders(v => !v)}
                         onOpenDrill={handleOpenDrillFromMain}
-                        editingRowIdx={editingRowIdxSub}
-                        setEditingRowIdx={setEditingRowIdxSub}
-                        editDraft={editDraftSub}
-                        setEditDraft={setEditDraftSub}
-                        editSaving={editSavingSub}
-                        setEditSaving={setEditSavingSub}
-                        isAddingSub={isAddingSub}
-                        setIsAddingSub={setIsAddingSub}
-                        draftSub={draftSub}
-                        setDraftSub={setDraftSub}
-                        currentOrder={currentOrder}
-                        currentWidgetId={currentWidgetId}
-                        subHeaderGroups={subHeaderGroups}
-                        formId={formIdForSub}
-                        subLoading={subLoading}
-                        subError={subError}
-                        subDisplay={subDisplay}
-                        handleTabClick={handleTabClick}
+                        isAdding={isAdding}
+                        draft={draft}
+                        onDraftChange={(tcId, v) => setDraft(prev => ({...prev, [tcId]: v}))}
+                        flatColumnsInRenderOrder={flatColumnsInRenderOrder}
+                        isColReadOnly={isColReadOnly}
+                        placeholderFor={(c) => c.placeholder ?? c.column_name}
+                        filteredRows={filteredRows}
+                        valueIndexByKey={valueIndexByKey}
+                        selectedKey={selectedKey}
+                        pkToKey={pkToKey}
+                        editingRowIdx={editingRowIdx}
+                        editDraft={editDraft}
+                        onEditDraftChange={(tcId, v) => setEditDraft(prev => ({...prev, [tcId]: v}))}
+                        onSubmitEdit={submitEdit}
+                        onCancelEdit={cancelEdit}
+                        editSaving={editSaving}
+                        onRowClick={handleRowClick}
+                        onStartEdit={startEdit}
+                        onDeleteRow={deleteRow}
+                        deletingRowIdx={deletingRowIdx}
                         comboReloadToken={comboReloadToken}
+
                     />
+                    {shouldShowSubSection && (
+                        <SubWormTable
+                            onOpenDrill={handleOpenDrillFromMain}
+                            editingRowIdx={editingRowIdxSub}
+                            setEditingRowIdx={setEditingRowIdxSub}
+                            editDraft={editDraftSub}
+                            setEditDraft={setEditDraftSub}
+                            editSaving={editSavingSub}
+                            setEditSaving={setEditSavingSub}
+                            isAddingSub={isAddingSub}
+                            setIsAddingSub={setIsAddingSub}
+                            draftSub={draftSub}
+                            setDraftSub={setDraftSub}
+                            currentOrder={currentOrder}
+                            currentWidgetId={currentWidgetId}
+                            subHeaderGroups={subHeaderGroups}
+                            formId={formIdForSub}
+                            subLoading={subLoading}
+                            subError={subError}
+                            subDisplay={subDisplay}
+                            handleTabClick={handleTabClick}
+                            comboReloadToken={comboReloadToken}
+                        />
+                    )}
                 </div>
 
             </div>
@@ -392,7 +404,7 @@ export const FormTable: React.FC<Props> = ({
             {/* DRILL-модалка */}
             <DrillDialog
                 onSyncParentMain={async () => {
-                    // 👇 определяем, какую форму сейчас показывает FormTable
+                    // 👇 определяем, какую форму сейчас показывает formTable
                     const fid = selectedFormId ?? currentForm?.form_id ?? null;
                     if (!fid) return;
 
@@ -401,7 +413,7 @@ export const FormTable: React.FC<Props> = ({
                         const next = Array.isArray(data) ? data[0] : data;
                         if (next) setFormDisplay(next);
                     } catch (e) {
-                        console.warn('[FormTable] onSyncParentMain failed:', e);
+                        console.warn('[formTable] onSyncParentMain failed:', e);
                     }
                 }}
                 open={drillOpen}

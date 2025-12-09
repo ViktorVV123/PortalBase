@@ -1,4 +1,4 @@
-// src/components/formTable/hooks/useSubCrud.ts
+// src/components/Form/hooks/useSubCrud.ts
 import {useCallback, useMemo, useState} from 'react';
 import {api} from '@/services/api';
 import type {FormDisplay, SubDisplay} from '@/shared/hooks/useWorkSpaces';

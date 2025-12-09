@@ -1,7 +1,7 @@
 // useHeaderPlan.ts
 import { useMemo } from 'react';
 import type { FormDisplay } from '@/shared/hooks/useWorkSpaces';
-import {ExtCol} from "@/components/formTable/parts/FormatByDatatype";
+import {ExtCol} from "@/components/Form/formTable/parts/FormatByDatatype";
 
 
 

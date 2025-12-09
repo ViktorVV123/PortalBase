@@ -11,8 +11,8 @@ import {
     WidgetForm,
     ReferenceItem,
 } from '@/shared/hooks/useWorkSpaces';
-import {FormTable} from '@/components/formTable/FormTable';
-import {TableColumn} from '@/components/tableColumn/TableColumn';
+import {FormTable} from '@/components/Form/formTable/FormTable';
+import {TableColumn} from '@/components/table/tableColumn/TableColumn';
 import {
     WcReference,
     WidgetColumnsOfTable,

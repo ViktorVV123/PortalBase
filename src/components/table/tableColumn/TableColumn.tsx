@@ -4,7 +4,7 @@ import EditIcon from '@/assets/image/EditIcon.svg';
 import DeleteIcon from '@/assets/image/DeleteIcon.svg';
 import { Column, DTable } from '@/shared/hooks/useWorkSpaces';
 import { api } from '@/services/api';
-import { TableListView } from '@/components/tableColumn/TableListView';
+import { TableListView } from '@/components/table/tableColumn/TableListView';
 import { EllipsizeSmart } from '@/shared/utils/EllipsizeSmart';
 
 type TableColumnProps = {

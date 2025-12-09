@@ -1,9 +1,9 @@
 import {useEffect, useMemo, useState} from 'react';
 import {api} from '@/services/api';
 import type {SubDisplay, DTable, Widget, FormDisplay} from '@/shared/hooks/useWorkSpaces';
-import type {HeaderModelItem} from '@/components/formTable/FormTable';
+import type {HeaderModelItem} from '@/components/Form/formTable/FormTable';
 import {isEditableValue} from '@/shared/utils/cellFormat';
-import {useHeaderPlan} from '@/components/formTable/hooks/useHeaderPlan';
+import {useHeaderPlan} from '@/components/Form/formTable/hooks/useHeaderPlan';
 
 export type UseSubWormTableDeps = {
     subDisplay: SubDisplay | null;

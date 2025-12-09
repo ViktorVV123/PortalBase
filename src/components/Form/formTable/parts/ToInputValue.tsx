@@ -47,7 +47,7 @@ export function toInputValue(raw: string, type?: string): string {
     }
 }
 
-// src/components/formTable/parts/FromInputValue.ts
+// src/components/Form/parts/FromInputValue.ts
 function getBrowserOffsetSuffix(): string {
     const d = new Date();
     const offsetMin = d.getTimezoneOffset(); // минуты "от UTC": Москва → -180

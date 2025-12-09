@@ -5,18 +5,18 @@ import * as s from '@/components/setOfTables/SetOfTables.module.scss';
 import {dark} from '@/shared/themeUI/themeModal/ThemeModalUI';
 import {api} from '@/services/api';
 
-import {TableToolbar} from '@/components/tableToolbar/TableToolbar';
-import {TreeFormTable} from '@/components/formTable/treeForm/TreeFormTable';
-import {MainTable} from '@/components/formTable/parts/MainTable';
-import {SubWormTable} from '@/components/formTable/subForm/SubFormTable';
+import {TableToolbar} from '@/components/table/tableToolbar/TableToolbar';
+import {TreeFormTable} from '@/components/Form/treeForm/TreeFormTable';
+import {MainTable} from '@/components/Form/mainTable/MainTable';
+import {SubWormTable} from '@/components/Form/subForm/SubFormTable';
 
-import {useHeaderPlan} from '@/components/formTable/hooks/useHeaderPlan';
-import {useFiltersTree} from '@/components/formTable/hooks/useFiltersTree';
-import {useSubNav} from '@/components/formTable/hooks/useSubNav';
-import {useFormSearch} from '@/components/formTable/hooks/useFormSearch';
-import {useSubCrud} from '@/components/formTable/hooks/useSubCrud';
-import {useTreeHandlers} from '@/components/formTable/hooks/useTreeHandlers';
-import {useMainCrud} from '@/components/formTable/hooks/useMainCrud';
+import {useHeaderPlan} from '@/components/Form/formTable/hooks/useHeaderPlan';
+import {useFiltersTree} from '@/components/Form/formTable/hooks/useFiltersTree';
+import {useSubNav} from '@/components/Form/subForm/hook/useSubNav';
+import {useFormSearch} from '@/components/Form/formTable/hooks/useFormSearch';
+import {useSubCrud} from '@/components/Form/subForm/hook/useSubCrud';
+import {useTreeHandlers} from '@/components/Form/treeForm/hooks/useTreeHandlers';
+import {useMainCrud} from '@/components/Form/mainTable/hook/useMainCrud';
 
 import type {FormDisplay, SubDisplay, WidgetForm, FormTreeColumn} from '@/shared/hooks/useWorkSpaces';
 

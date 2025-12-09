@@ -1,7 +1,7 @@
 // components/WidgetColumnsOfTable/WidgetColumnTable/hook/useHeaderPreviewFromWc.ts
 import {useMemo} from 'react';
 import type {WidgetColumn} from '@/shared/hooks/useWorkSpaces';
-import type {HeaderModelItem} from '@/components/formTable/FormTable';
+import type {HeaderModelItem} from '@/components/Form/formTable/FormTable';
 
 type WcReference = WidgetColumn['reference'][number];
 

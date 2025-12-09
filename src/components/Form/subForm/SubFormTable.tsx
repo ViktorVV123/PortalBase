@@ -7,10 +7,10 @@ import * as sub from './SubWormTable.module.scss';
 import EditIcon from '@/assets/image/EditIcon.svg';
 import DeleteIcon from '@/assets/image/DeleteIcon.svg';
 import type {SubDisplay} from '@/shared/hooks/useWorkSpaces';
-import type {HeaderModelItem} from '@/components/formTable/FormTable';
-import {useSubWormTable, UseSubWormTableDeps} from '@/components/formTable/subForm/hook/useSubWormTable';
-import {InputCell} from '@/components/formTable/parts/InputCell';
-import {ExtCol, formatByDatatype} from '@/components/formTable/parts/FormatByDatatype';
+import type {HeaderModelItem} from '@/components/Form/formTable/FormTable';
+import {useSubWormTable, UseSubWormTableDeps} from '@/components/Form/subForm/hook/useSubWormTable';
+import {InputCell} from '@/components/Form/mainTable/InputCell';
+import {ExtCol, formatByDatatype} from '@/components/Form/formTable/parts/FormatByDatatype';
 
 type SubformProps = {
     subDisplay: SubDisplay | null;

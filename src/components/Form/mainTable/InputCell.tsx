@@ -1,9 +1,9 @@
-// src/components/formTable/parts/InputCell.tsx
+// src/components/Form/parts/InputCell.tsx
 import React from 'react';
 import * as s from '@/components/setOfTables/SetOfTables.module.scss';
 import { api } from '@/services/api';
-import {ExtCol, getCanonicalType} from '@/components/formTable/parts/FormatByDatatype';
-import { fromInputValue, toInputValue } from '@/components/formTable/parts/ToInputValue';
+import {ExtCol, getCanonicalType} from '@/components/Form/formTable/parts/FormatByDatatype';
+import { fromInputValue, toInputValue } from '@/components/Form/formTable/parts/ToInputValue';
 import { MenuItem, Select, TextField, Checkbox } from '@mui/material';
 
 /** combobox-мета с бэка (если понадобится) */

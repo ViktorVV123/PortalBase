@@ -1,4 +1,4 @@
-// src/components/formTable/parts/FormatByDatatype.ts
+// src/components/Form/parts/FormatByDatatype.ts
 import { formatCellValue } from '@/shared/utils/cellFormat';
 import { FormDisplay } from '@/shared/hooks/useWorkSpaces';
 import { format, parseISO } from 'date-fns';

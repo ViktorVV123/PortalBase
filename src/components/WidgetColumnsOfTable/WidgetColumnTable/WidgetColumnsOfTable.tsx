@@ -6,7 +6,7 @@ import {
     WidgetColumn,
     WidgetForm,
 } from '@/shared/hooks/useWorkSpaces';
-import {TableColumn} from '@/components/tableColumn/TableColumn';
+import {TableColumn} from '@/components/table/tableColumn/TableColumn';
 import {
     Box,
     createTheme,
@@ -17,7 +17,7 @@ import {WidgetColumnsMainTable} from '@/components/WidgetColumnsOfTable/WidgetCo
 import EditIcon from '@/assets/image/EditIcon.svg';
 import {WidgetMetaDialog} from "@/components/modals/modalWidget/WidgetMetaDialog";
 import {AddWidgetColumnDialog} from "@/components/modals/modalWidget/AddWidgetColumnDialog";
-import {HeaderModelItem} from "@/components/formTable/FormTable";
+import {HeaderModelItem} from "@/components/Form/formTable/FormTable";
 
 export type WcReference = WidgetColumn['reference'][number];
 
