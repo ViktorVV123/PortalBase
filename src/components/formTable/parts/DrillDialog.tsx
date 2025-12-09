@@ -46,7 +46,7 @@ type Props = {
 
     /** Синхронизировать основной экран после CRUD в модалке */
 
-
+    comboReloadToken: number;
     /** Выбор строки в режиме disableNestedDrill (редактирование combobox в MainTable) */
     onPickFromDrill?: (payload: {
         row: FormDisplay['data'][number];
@@ -72,6 +72,7 @@ export const DrillDialog: React.FC<Props> = ({
                                                  onSyncParentMain,
                                                  onPickFromDrill,
                                                  onComboboxChanged,
+                                                 comboReloadToken,
                                              }) => {
     if (!open || !formId) return null;
 
@@ -667,7 +668,7 @@ export const DrillDialog: React.FC<Props> = ({
                                 {/* SubWormTable только если у формы действительно есть sub_widgets
                                    и модалка не открыта из редактирования (disableNestedDrill=false) */}
                                 {enableSub && (
-                                    <SubWormTable
+                                    <SubWormTable comboReloadToken={comboReloadToken}
                                         onOpenDrill={disableNestedDrill ? undefined : handleOpenDrill}
                                         editingRowIdx={null}
                                         setEditingRowIdx={() => {

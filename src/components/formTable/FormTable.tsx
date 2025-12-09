@@ -416,7 +416,7 @@ export const FormTable: React.FC<Props> = ({
                 initialPrimary={drillInitialPrimary}
                 onPickFromDrill={drillDisableNested ? handlePickFromDrill : undefined}
                 onComboboxChanged={() => setComboReloadToken(v => v + 1)}
-
+                comboReloadToken={comboReloadToken}
 
             />
         </ThemeProvider>

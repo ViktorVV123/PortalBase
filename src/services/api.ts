@@ -75,7 +75,7 @@ const setCookie = (n: string, v: string, days = 1) => {
 /* ───────── 3. токены из cookie + локальные переменные -------------------- */
 
 /// Читаем AccessId из cookie (если нет — подставляем пустую строку)
-let accessToken = getCookie('accessToken') ?? '0eb72f5d-333b-43a8-a717-5375afd86663';
+let accessToken = getCookie('accessToken') ?? '';
 /// Читаем RefreshId из cookie
 let refreshToken = getCookie('refreshToken') ?? '';
 
@@ -126,30 +126,51 @@ export const api: AxiosInstance = axios.create({
     headers: { 'Content-Type': 'application/json' }, // дефолтный заголовок
 });
 
+let refreshPromise: Promise<void> | null = null;
+
+async function runRefreshOnce(): Promise<void> {
+    const liveRefresh = getCookie('refreshToken');
+
+    if (!liveRefresh) {
+        throw new Error('no refresh token');
+    }
+
+    const { data } = await axios.post<{
+        AccessId: string;
+        RefreshId: string;
+    }>(
+        REFRESH_URL,
+        undefined,
+        {
+            params: { refresh_id: liveRefresh },
+            headers: { accept: 'application/json' },
+        },
+    );
+
+    // сохраняем новую пару
+    setCookie('accessToken', data.AccessId);
+    setCookie('refreshToken', data.RefreshId);
+
+    accessToken = data.AccessId;
+    refreshToken = data.RefreshId;
+}
+
+
+
+
 /* --- request: auth-заголовок --------------------------------------------- */
 
 /// Интерцептор запросов: перед каждым запросом подставляем актуальный accessToken
 api.interceptors.request.use((cfg) => {
-    // Берём самый свежий accessToken: приоритет у cookie, затем локальная переменная
     const fresh = getCookie('accessToken') ?? accessToken;
 
     if (fresh) {
-        // В axios v1 cfg.headers имеет тип AxiosHeaders (класс),
-        // поэтому TS ругался на присвоение {}.
-        // Делаем инициализацию через cfg as any, чтобы не спорить с типами.
         if (!cfg.headers) {
             (cfg as any).headers = {};
         }
-
-        // Шлём AccessId в заголовке, который ожидает бэк:
-        //   access-id: <AccessId>
         (cfg.headers as any)['access-id'] = fresh;
-
-        // При желании можно ещё явно задать Accept
-        // (cfg.headers as any).Accept = 'application/json';
     }
 
-    // Обязательно возвращаем config, чтобы запрос продолжился
     return cfg;
 });
 
@@ -157,73 +178,41 @@ api.interceptors.request.use((cfg) => {
 
 /// Интерцептор ответов: если получили 401, пробуем тихо обновить токены через /refresh
 api.interceptors.response.use(
-    // Успешный ответ — просто возвращаем как есть
     (res: AxiosResponse) => res,
 
-    // Ошибка — обрабатываем 401 (просроченные токены)
     async (err: AxiosError) => {
-        // Достаём ответ и конфиг, который был у исходного запроса
         const { response, config } = err;
 
-        // Если нет response (например, сеть упала),
-        // или статус НЕ 401, или нет config — отдаем ошибку наверх
         if (!response || response.status !== 401 || !config) {
             return Promise.reject(err);
         }
 
-        // Расширяем тип config, чтобы добавить флаг _retry
         const cfg = config as AxiosRequestConfig & { _retry?: boolean };
 
-        // Если _retry уже стоял — значит, мы уже пытались обновить токен
-        // и снова получили 401 → уходим на IdM и отдаём ошибку
+        // если уже пробовали ретраить этот запрос — идём в IdM
         if (cfg._retry) {
             goToIdm();
             return Promise.reject(err);
         }
 
-        // Помечаем этот запрос как «уже ретраили», чтобы не попасть в цикл
         cfg._retry = true;
 
-        // Берём актуальный refreshToken из cookie
-        const liveRefresh = getCookie('refreshToken');
-
-        // Если refreshToken нет — нам нечем обновляться, отправляем на IdM
-        if (!liveRefresh) {
-            goToIdm();
-            return Promise.reject(err);
+        // если refresh ещё не запущен — запускаем
+        if (!refreshPromise) {
+            refreshPromise = (async () => {
+                try {
+                    await runRefreshOnce();
+                } finally {
+                    // обязательно очищаем, чтобы следующие 401 могли заново дернуть refresh
+                    refreshPromise = null;
+                }
+            })();
         }
 
         try {
-            // Тихий refresh по спецификации Swagger:
-            // POST https://.../api/refresh?refresh_id=<RefreshId>
-            // без тела, с accept: application/json
-
-            const { data } = await axios.post<{
-                AccessId: string;
-                RefreshId: string;
-            }>(
-                REFRESH_URL,            // https://csc-fv.pro.lukoil.com/api/refresh
-                undefined,              // тела нет, как в curl (-d '')
-                {
-                    params: {
-                        refresh_id: liveRefresh, // передаём RefreshId как query-параметр
-                    },
-                    headers: {
-                        accept: 'application/json', // подчёркиваем формат ответа
-                    },
-                },
-            );
-
-            // Сохраняем новую пару токенов в cookie
-            setCookie('accessToken', data.AccessId);
-            setCookie('refreshToken', data.RefreshId);
-
-            // И в локальные переменные тоже, чтобы fallback был консистентный
-            accessToken = data.AccessId;
-            refreshToken = data.RefreshId;
-
-            // Повторяем оригинальный запрос уже с новым токеном.
-            // В request-интерцепторе выше новый accessToken подставится сам.
+            // ждём, пока ОДИН общий refresh выполнится
+            await refreshPromise;
+            // и повторяем исходный запрос — интерцептор подставит новый accessToken
             return api(cfg);
         } catch (refreshErr) {
             console.error('silent refresh failed:', refreshErr);
