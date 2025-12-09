@@ -46,6 +46,19 @@ export function useSubCrud({
     const [draftSub, setDraftSub] = useState<Record<number, string>>({});
     const [savingSub, setSavingSub] = useState(false);
 
+
+    const subColumnsById = useMemo(() => {
+        const map = new Map<number, SubDisplay['columns'][number]>();
+        const cols = subDisplay?.columns ?? [];
+        for (const c of cols) {
+            if (c.table_column_id != null) {
+                map.set(c.table_column_id as number, c);
+            }
+        }
+        return map;
+    }, [subDisplay?.columns]);
+
+
     // Оставляем только редактируемые колонки саб-таблицы
     const subEditableTcIds = useMemo(() => {
         const cols = subDisplay?.columns ?? [];
@@ -113,10 +126,27 @@ export function useSubCrud({
         setSavingSub(true);
         try {
             const values = Object.entries(draftSub).map(([table_column_id, value]) => {
+                const tcId = Number(table_column_id);
+                const col = subColumnsById.get(tcId);
+
+                const isCheckbox =
+                    col?.type === 'checkbox' ||
+                    col?.type === 'bool';
+
                 const s = value == null ? '' : String(value).trim();
+
+                let final: string | null;
+                if (isCheckbox) {
+                    // для чекбокса пустое значение считаем false
+                    final = s === '' ? 'false' : s;
+                } else {
+                    // как раньше: пустое → null
+                    final = s === '' ? null : s;
+                }
+
                 return {
-                    table_column_id: Number(table_column_id),
-                    value: s === '' ? null : s, // пустое → null
+                    table_column_id: tcId,
+                    value: final,
                 };
             });
 

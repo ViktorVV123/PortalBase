@@ -267,13 +267,33 @@ export function useMainCrud({
                 }
             });
 
-            const values = allWriteIds.map(tcId => {
+            const values = allWriteIds.map((tcId) => {
                 const raw = draft[tcId];
                 const s = raw == null ? '' : String(raw).trim();
 
+                // ищем колонку, которая пишет в этот write_tc_id
+                const colForTc = flatColumnsInRenderOrder.find((c) => {
+                    const w = (c.__write_tc_id ?? c.table_column_id) ?? null;
+                    return w === tcId;
+                });
+
+                const isCheckboxCol =
+                    colForTc?.type === 'checkbox' ||
+                    colForTc?.type === 'bool';
+
+                let value: string | null;
+
+                if (isCheckboxCol) {
+                    // если чекбокс вообще не трогали → считаем его false по умолчанию
+                    value = s === '' ? 'false' : s;
+                } else {
+                    // как и раньше: пустое → null
+                    value = s === '' ? null : s;
+                }
+
                 return {
                     table_column_id: tcId,
-                    value: s === '' ? null : s,
+                    value,
                 };
             });
 
