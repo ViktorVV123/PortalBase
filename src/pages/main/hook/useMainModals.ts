@@ -5,7 +5,7 @@ import type { WorkSpaceTypes } from '@/types/typesWorkSpaces';
 type Deps = {
     // loaders / actions из useWorkSpaces и selection-хука
     loadConnections: (opts?: { force?: boolean }) => Promise<void> | void;
-    loadWorkSpaces: () => void;
+    loadWorkSpaces: (opts?: { force?: boolean }) => Promise<void> | void;
     loadTables: (wsId: number, force?: boolean) => Promise<DTable[]>;
     loadWidgetsForTable: (tableId: number, force?: boolean) => void;
 
@@ -62,9 +62,11 @@ export function useMainModals({
     }, [loadConnections]);
 
 
-    const onWorkspaceAddSuccess = useCallback(() => {
+    const onWorkspaceAddSuccess = useCallback(async () => {
+        // 1) перезагружаем список WS, игнорируя статус `loaded`
+        await loadWorkSpaces({ force: true });
+        // 2) закрываем модалку
         setShowCreateForm(false);
-        loadWorkSpaces();
     }, [loadWorkSpaces]);
 
     const onTableAddSuccess = useCallback(
