@@ -7,8 +7,9 @@ import type { ExtCol } from '@/components/Form/formTable/parts/FormatByDatatype'
 
 // ⬇️ Берём общие вещи из InputCell, не дублируем
 import {
-    useComboOptions,
     buildOptionLabel,
+    useComboOptions,
+
 } from '@/components/Form/mainTable/InputCell';
 
 /** Хелпер: одинаковая ли группа combobox (для объединения в одну TD) */
@@ -33,12 +34,23 @@ export function pickPrimaryCombo(cols: ExtCol[]): ExtCol {
 }
 
 /** Хелпер: взять показанное значение для визуальной колонки */
+function getValueKey(col: ExtCol): string {
+    const syntheticTcId =
+        col.type === 'combobox' &&
+        col.combobox_column_id != null &&
+        col.table_column_id != null
+            ? -1_000_000 - Number(col.combobox_column_id)
+            : col.table_column_id ?? -1;
+
+    return `${col.widget_column_id}:${syntheticTcId}`;
+}
+
 export function getShown(
     valIndexByKey: Map<string, number>,
     rowValues: (string | number | null)[],
     col: ExtCol,
 ) {
-    const key = `${col.widget_column_id}:${col.table_column_id ?? -1}`;
+    const key = getValueKey(col);
     const idx = valIndexByKey.get(key);
     const shownVal = idx != null ? rowValues[idx] : '';
     return shownVal == null ? '' : String(shownVal);

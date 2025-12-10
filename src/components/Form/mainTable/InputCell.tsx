@@ -2,7 +2,7 @@
 import React from 'react';
 import * as s from '@/components/setOfTables/SetOfTables.module.scss';
 import { api } from '@/services/api';
-import {ExtCol, getCanonicalType} from '@/components/Form/formTable/parts/FormatByDatatype';
+import { ExtCol, getCanonicalType } from '@/components/Form/formTable/parts/FormatByDatatype';
 import { fromInputValue, toInputValue } from '@/components/Form/formTable/parts/ToInputValue';
 import { MenuItem, Select, TextField, Checkbox } from '@mui/material';
 
@@ -26,7 +26,30 @@ export type ComboOption = {
 /** общий кеш для combobox-опций */
 const comboCache = new Map<string, { options: ComboOption[]; columns: ComboColumnMeta[] }>();
 
-/** Собираем красивую подпись из show + show_hidden */
+const makeComboKey = (widgetColumnId: number, writeTcId: number) =>
+    `${widgetColumnId}:${writeTcId}`;
+
+/** 👇 ОДИН общий loader, который можно вызывать и из хуков, и из useMainCrud */
+export async function loadComboOptionsOnce(
+    widgetColumnId: number,
+    writeTcId: number,
+): Promise<ComboOption[]> {
+    const key = makeComboKey(widgetColumnId, writeTcId);
+    const cached = comboCache.get(key);
+    if (cached) return cached.options;
+
+    const { data } = await api.get<ComboResp>(`/display/combobox/${widgetColumnId}/${writeTcId}`);
+    const opts: ComboOption[] = data.data.map((row) => ({
+        id: String(row.primary?.[0] ?? ''),
+        show: (row.show ?? []).map(String),
+        showHidden: (row.show_hidden ?? []).map(String),
+    }));
+
+    comboCache.set(key, { options: opts, columns: data.columns });
+    return opts;
+}
+
+/** Собираем красивую подпись из show + show_hidden (как у тебя было) */
 export function buildOptionLabel(opt: ComboOption): string {
     const base = opt.show ?? [];
     const extra = (opt.showHidden ?? []).filter(v => !base.includes(v));
@@ -44,45 +67,51 @@ export function useComboOptions(
     const [options, setOptions] = React.useState<ComboOption[]>([]);
     const [error, setError] = React.useState<string | null>(null);
 
-    const key = `${widgetColumnId}:${writeTcId ?? 'null'}:${reloadToken}`;
-
     React.useEffect(() => {
         if (!widgetColumnId || !writeTcId) return;
 
-        const cached = comboCache.get(key);
-        if (!reloadToken && cached) {
-            setOptions(cached.options);
-            return;
-        }
-
         let cancelled = false;
-        setLoading(true);
-        setError(null);
 
-        api
-            .get<ComboResp>(`/display/combobox/${widgetColumnId}/${writeTcId}`)
-            .then(({ data }) => {
-                if (cancelled) return;
-                const opts: ComboOption[] = data.data.map((row) => ({
-                    id: String(row.primary?.[0] ?? ''),
-                    show: (row.show ?? []).map(String),
-                    showHidden: (row.show_hidden ?? []).map(String),
-                }));
-                comboCache.set(key, { options: opts, columns: data.columns });
-                setOptions(opts);
-            })
-            .catch((e: any) => {
-                if (cancelled) return;
-                setError(String(e?.message ?? 'Ошибка загрузки combobox'));
-            })
-            .finally(() => {
-                if (!cancelled) setLoading(false);
-            });
+        const load = async () => {
+            setLoading(true);
+            setError(null);
+
+            try {
+                const key = makeComboKey(widgetColumnId, writeTcId);
+
+                if (reloadToken === 0) {
+                    // пробуем взять из кеша
+                    const cached = comboCache.get(key);
+                    if (cached) {
+                        setOptions(cached.options);
+                        return;
+                    }
+                } else {
+                    // после CRUD в DrillDialog принудительно сбрасываем кеш
+                    comboCache.delete(key);
+                }
+
+                const opts = await loadComboOptionsOnce(widgetColumnId, writeTcId);
+                if (!cancelled) {
+                    setOptions(opts);
+                }
+            } catch (e: any) {
+                if (!cancelled) {
+                    setError(String(e?.message ?? 'Ошибка загрузки combobox'));
+                }
+            } finally {
+                if (!cancelled) {
+                    setLoading(false);
+                }
+            }
+        };
+
+        load();
 
         return () => {
             cancelled = true;
         };
-    }, [key, widgetColumnId, writeTcId, reloadToken]);
+    }, [widgetColumnId, writeTcId, reloadToken]);
 
     return { loading, options, error };
 }

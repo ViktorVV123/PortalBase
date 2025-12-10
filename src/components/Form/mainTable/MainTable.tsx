@@ -70,27 +70,41 @@ type Props = {
 };
 
 export const MainTable: React.FC<Props> = (p) => {
+
+
+    function compareByPrimaryRow(a: RowView, b: RowView): number {
+        const aPk = a.row.primary_keys ?? {};
+        const bPk = b.row.primary_keys ?? {};
+
+        const aKeys = Object.keys(aPk);
+        const bKeys = Object.keys(bPk);
+
+        // если PK нет — не трогаем порядок
+        if (!aKeys.length || !bKeys.length) return 0;
+
+        // простой кейс: один и тот же ключ и он числовой
+        if (aKeys.length === 1 && bKeys.length === 1 && aKeys[0] === bKeys[0]) {
+            const key = aKeys[0];
+            const av = aPk[key];
+            const bv = bPk[key];
+
+            const na = typeof av === 'number' ? av : Number(av);
+            const nb = typeof bv === 'number' ? bv : Number(bv);
+
+            if (!Number.isNaN(na) && !Number.isNaN(nb)) {
+                return na - nb;
+            }
+        }
+
+        // составной PK или разные ключи — сортируем по строковому представлению
+        const sa = JSON.stringify(aPk);
+        const sb = JSON.stringify(bPk);
+        return sa.localeCompare(sb, undefined, { numeric: true, sensitivity: 'base' });
+    }
     /** стабильный порядок строк (по person_id, как у тебя) */
     const stableRows = React.useMemo(() => {
         const copy = [...p.filteredRows];
-
-        copy.sort((a, b) => {
-            const aPk: any = a.row.primary_keys || {};
-            const bPk: any = b.row.primary_keys || {};
-
-            const aId = aPk.person_id;
-            const bId = bPk.person_id;
-
-            if (aId == null || bId == null) return 0;
-
-            const na = typeof aId === 'number' ? aId : parseInt(String(aId), 10);
-            const nb = typeof bId === 'number' ? bId : parseInt(String(bId), 10);
-
-            if (Number.isNaN(na) || Number.isNaN(nb)) return 0;
-
-            return na - nb;
-        });
-
+        copy.sort(compareByPrimaryRow);
         return copy;
     }, [p.filteredRows]);
 

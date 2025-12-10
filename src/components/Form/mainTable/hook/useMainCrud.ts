@@ -3,6 +3,7 @@ import { useCallback, useState } from 'react';
 import { api } from '@/services/api';
 import type { DTable, FormDisplay, Widget, WidgetForm } from '@/shared/hooks/useWorkSpaces';
 import type { ExtCol } from '@/components/Form/formTable/parts/FormatByDatatype';
+import {loadComboOptionsOnce} from "@/components/Form/mainTable/InputCell";
 
 const DEBUG_MAINCRUD = true;
 const log = (label: string, payload?: unknown) => {
@@ -38,27 +39,6 @@ export type UseMainCrudDeps = {
     setSelectedKey: React.Dispatch<React.SetStateAction<string | null>>;
     preflightTableId?: number | null;
 };
-
-type ComboColumnMeta = { ref_column_order: number; width: number; combobox_alias: string | null };
-type ComboResp = {
-    columns: ComboColumnMeta[];
-    data: Array<{ primary: (string | number)[]; show: (string | number)[]; show_hidden: (string | number)[] }>;
-};
-type ComboOption = {
-    id: string;
-    show: string[];
-    showHidden: string[];
-};
-
-async function loadComboOptions(widgetColumnId: number, writeTcId: number): Promise<ComboOption[]> {
-    const { data } = await api.get<ComboResp>(`/display/combobox/${widgetColumnId}/${writeTcId}`);
-
-    return data.data.map(r => ({
-        id: String(r.primary?.[0] ?? ''),
-        show: (r.show ?? []).map(v => String(v)),
-        showHidden: (r.show_hidden ?? []).map(v => String(v)),
-    }));
-}
 
 export function useMainCrud({
                                 formDisplay,
@@ -396,7 +376,7 @@ export function useMainCrud({
             for (let i = 0; i < groups.length; i += 1) {
                 const g = groups[i];
                 try {
-                    const options = await loadComboOptions(g.wcId, g.writeTcId);
+                    const options = await loadComboOptionsOnce(g.wcId, g.writeTcId);
 
                     const tokens: string[] = g.tokens.map((t: string) => t.toLowerCase());
 
