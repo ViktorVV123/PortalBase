@@ -645,8 +645,9 @@ export const DrillDialog: React.FC<Props> = ({
                             )}
 
                             <div className={s.mainCol}>
-                                {enable && (
+
                                     <TableToolbar
+                                        showMainActions={effectiveComboboxMode}
                                         showSubActions={
                                             effectiveComboboxMode &&
                                             hasSubWidgets &&
@@ -668,12 +669,10 @@ export const DrillDialog: React.FC<Props> = ({
                                         onResetFilters={handleResetFilters}
                                         collapsedWidth={160}
                                         expandedWidth={420}
-
                                         startAdd={startAddSafe}
                                         submitAdd={submitAddWithMark}
                                         cancelAdd={cancelAdd}
                                     />
-                                )}
 
                                 <MainTable
                                     headerPlan={headerPlan as any}

@@ -3,7 +3,7 @@ import { useCallback, useState } from 'react';
 import { api } from '@/services/api';
 import type { DTable, FormDisplay, Widget, WidgetForm } from '@/shared/hooks/useWorkSpaces';
 import type { ExtCol } from '@/components/Form/formTable/parts/FormatByDatatype';
-import {loadComboOptionsOnce} from "@/components/Form/mainTable/InputCell";
+import {loadComboOptionsOnce, normalizeValueForColumn} from "@/components/Form/mainTable/InputCell";
 
 const DEBUG_MAINCRUD = true;
 const log = (label: string, payload?: unknown) => {
@@ -181,6 +181,8 @@ export function useMainCrud({
         return null;
     }
 
+
+
     // ───────── Добавление ─────────
     const startAdd = useCallback(async () => {
         const pf = await preflightInsert();
@@ -249,7 +251,7 @@ export function useMainCrud({
 
             const values = allWriteIds.map((tcId) => {
                 const raw = draft[tcId];
-                const s = raw == null ? '' : String(raw).trim();
+                const s = raw == null ? '' : String(raw);
 
                 // ищем колонку, которая пишет в этот write_tc_id
                 const colForTc = flatColumnsInRenderOrder.find((c) => {
@@ -265,10 +267,12 @@ export function useMainCrud({
 
                 if (isCheckboxCol) {
                     // если чекбокс вообще не трогали → считаем его false по умолчанию
-                    value = s === '' ? 'false' : s;
+                    const normalized = s.trim();
+                    value = normalized === '' ? 'false' : normalized;
                 } else {
-                    // как и раньше: пустое → null
-                    value = s === '' ? null : s;
+                    // 👇 вот тут запятые → точки ТОЛЬКО для числовых колонок
+                    const normalized = normalizeValueForColumn(tcId, s, flatColumnsInRenderOrder);
+                    value = normalized === '' ? null : normalized;
                 }
 
                 return {

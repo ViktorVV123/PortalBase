@@ -29,6 +29,42 @@ const comboCache = new Map<string, { options: ComboOption[]; columns: ComboColum
 const makeComboKey = (widgetColumnId: number, writeTcId: number) =>
     `${widgetColumnId}:${writeTcId}`;
 
+const isNumericLike = (dt: unknown): boolean =>
+    typeof dt === 'string' &&
+    /int|numeric|number|float|double|real|money|decimal/i.test(dt);
+
+
+export const normalizeValueForColumn = (
+    writeTcId: number,
+    raw: string,
+    cols: ExtCol[],
+): string => {
+    const trimmed = raw.trim();
+    if (!trimmed.includes(',')) return trimmed;
+
+    // находим колонку по write_tc_id
+    const col = cols.find(c => {
+        const w = (c.__write_tc_id ?? c.table_column_id) ?? null;
+        return w === writeTcId;
+    });
+    if (!col) return trimmed;
+
+    const canonical = getCanonicalType(col);
+    const rawDt = (col as any).datatype ?? null;
+
+    const isNumeric =
+        isNumericLike(canonical) ||
+        isNumericLike(rawDt);
+
+    if (!isNumeric) {
+        // текстовые поля с запятыми не трогаем
+        return trimmed;
+    }
+
+    // для числовых меняем ВСЕ запятые на точки
+    return trimmed.replace(/,/g, '.');
+};
+
 /** 👇 ОДИН общий loader, который можно вызывать и из хуков, и из useMainCrud */
 export async function loadComboOptionsOnce(
     widgetColumnId: number,
@@ -155,9 +191,7 @@ export const InputCell: React.FC<InputCellProps> = ({
         comboReloadToken,
     );
 
-
-
-
+    // ───── combobox primary ─────
     if (isComboPrimary) {
         return (
             <Select
@@ -166,18 +200,16 @@ export const InputCell: React.FC<InputCellProps> = ({
                 value={value ?? ''}
                 displayEmpty
                 onChange={(e) => onChange(String(e.target.value ?? ''))}
-                // те же классы, что и для TextField в ячейке
                 className={s.inpInCell}
-                // компактный вид и обрезка текста внутри
                 sx={{
                     '& .MuiSelect-select': {
-                        padding: '2px 6px',              // меньше отступы
-                        minHeight: '32px',               // высота как у TextField small
+                        padding: '2px 6px',
+                        minHeight: '32px',
                         display: 'flex',
                         alignItems: 'center',
                         overflow: 'hidden',
                         whiteSpace: 'nowrap',
-                        textOverflow: 'ellipsis',        // не растягивает колонку, а ставит …
+                        textOverflow: 'ellipsis',
                     },
                 }}
             >
@@ -197,8 +229,9 @@ export const InputCell: React.FC<InputCellProps> = ({
         );
     }
 
-    // ───── дата / время / timestamp (+tz) ─────
+    // ───── дата / время / timestamp (+tz) И ЧИСЛА / ТЕКСТ ─────
     const dt = getCanonicalType(col);
+
     const inputType =
         dt === 'date'
             ? 'date'
@@ -208,17 +241,7 @@ export const InputCell: React.FC<InputCellProps> = ({
                     ? 'datetime-local'
                     : undefined;
 
-    const inputValue = toInputValue(value ?? '', dt);
-
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const raw = e.target.value;
-        const backend = fromInputValue(raw, dt);
-        onChange(backend);
-    };
-
-
-
-    const isCheckbox = col.type === 'checkbox' || col.type === 'bool'
+    const isCheckbox = col.type === 'checkbox' || col.type === 'bool';
 
     if (isCheckbox) {
         const checked =
@@ -238,11 +261,42 @@ export const InputCell: React.FC<InputCellProps> = ({
         );
     }
 
-
     const isDateLike =
         inputType === 'date' ||
         inputType === 'time' ||
         inputType === 'datetime-local';
+
+    // числовые типы — сюда тащим переложение запятая → точка
+
+
+
+
+
+    let inputValue: string;
+    let handleChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+
+    if (isDateLike) {
+        // даты/время обрабатываем как раньше
+        inputValue = toInputValue(value ?? '', dt);
+        handleChange = (e) => {
+            const raw = e.target.value;
+            const backend = fromInputValue(raw, dt);
+            onChange(backend);
+        };
+    } else {
+        // обычный текст/число
+        inputValue = value ?? '';
+        handleChange = (e) => {
+            let raw = e.target.value;
+
+            // 👇 если это числовая колонка — заменяем запятые на точки
+            if (isNumericLike && raw.includes(',')) {
+                raw = raw.replace(/,/g, '.');
+            }
+
+            onChange(raw);
+        };
+    }
 
     return (
         <TextField

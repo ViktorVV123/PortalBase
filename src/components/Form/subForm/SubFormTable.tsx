@@ -51,35 +51,7 @@ type SubformProps = {
  *  Если PK один и он числовой (как phone_id) → сортируем численно.
  *  Иначе — строковое сравнение с numeric: true.
  */
-function compareByPrimary(
-    a: SubDisplay['data'][number],
-    b: SubDisplay['data'][number],
-): number {
-    const aPk = a.primary_keys ?? {};
-    const bPk = b.primary_keys ?? {};
 
-    const aKeys = Object.keys(aPk);
-    const bKeys = Object.keys(bPk);
-
-    if (aKeys.length === 1 && bKeys.length === 1 && aKeys[0] === bKeys[0]) {
-        const key = aKeys[0];
-        const av = aPk[key] as unknown;
-        const bv = bPk[key] as unknown;
-
-        if (typeof av === 'number' && typeof bv === 'number') {
-            return av - bv;
-        }
-
-        const sa = String(av);
-        const sb = String(bv);
-        return sa.localeCompare(sb, undefined, { numeric: true, sensitivity: 'base' });
-    }
-
-    // Фолбэк для составных PK: сортируем по строковому представлению
-    const sa = JSON.stringify(aPk);
-    const sb = JSON.stringify(bPk);
-    return sa.localeCompare(sb, undefined, { numeric: true, sensitivity: 'base' });
-}
 
 export const SubWormTable: React.FC<SubformProps> = (props) => {
     const {
@@ -106,18 +78,6 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
     } = props;
 
     // ⚙️ Стабильная сортировка саб-строк по primary_keys
-    const sortedSubDisplay = React.useMemo<SubDisplay | null>(() => {
-        if (!subDisplay) return null;
-
-        // не мутируем проп: делаем поверхностную копию + сортируем data
-        const dataCopy = [...subDisplay.data];
-        dataCopy.sort(compareByPrimary);
-
-        return {
-            ...subDisplay,
-            data: dataCopy,
-        };
-    }, [subDisplay]);
 
     const {
         deletingRowIdx,
@@ -136,7 +96,7 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
         tabs,
         displayedWidgetOrder,
     } = useSubWormTable({
-        subDisplay: sortedSubDisplay,
+        subDisplay:subDisplay,
         formId,
         currentWidgetId,
         currentOrder,
@@ -186,7 +146,7 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                     <br />
                     {subError}
                 </p>
-            ) : !sortedSubDisplay ? null : (
+            ) : !subDisplay ? null : (
                 <div className={sub.tableScroll}>
                     <table className={sub.tbl}>
                         <thead>
@@ -260,7 +220,7 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                             </tr>
                         )}
 
-                        {sortedSubDisplay.data.map((row, rowIdx) => {
+                        {subDisplay.data.map((row, rowIdx) => {
                             const isEditingRow = editingRowIdx === rowIdx;
 
                             return (

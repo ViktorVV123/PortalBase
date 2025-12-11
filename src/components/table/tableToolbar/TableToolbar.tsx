@@ -33,6 +33,7 @@ type Props = {
     submitAddSub: any
     savingSub: any
     showSubActions: boolean;
+    showMainActions?: boolean;
 
 
 };
@@ -58,6 +59,7 @@ export const TableToolbar = ({
                                  onResetFilters,
                                  collapsedWidth = 170,
                                  expandedWidth = 380,
+                                 showMainActions = true,
                              }: Props) => {
     const [focused, setFocused] = useState(false);
     const expanded = focused || !!value;
@@ -71,24 +73,29 @@ export const TableToolbar = ({
         <div className={cls.root}>
             <div className={cls.bar}>
                 <div className={cls.leftGroup}>
+
                     <button className={cls.iconBtn} onClick={onResetFilters} title="Сбросить фильтры">
                         <FilterOffIcon/>
                     </button>
 
                     <div className={cls.divider}/>
 
-                    <ButtonForm
+                    {showMainActions && (
+                        <>
+                            <ButtonForm
+                                isAdding={isAdding}
+                                selectedFormId={selectedFormId}
+                                selectedWidget={selectedWidget}
+                                saving={saving}
+                                startAdd={startAdd}
+                                submitAdd={submitAdd}
+                                cancelAdd={cancelAdd}
+                                buttonClassName={cls.iconBtn}
+                            />
+                            <div className={cls.divider}/>
+                        </>
+                    )}
 
-                        isAdding={isAdding}
-                        selectedFormId={selectedFormId}
-                        selectedWidget={selectedWidget}
-                        saving={saving}
-                        startAdd={startAdd}
-                        submitAdd={submitAdd}
-                        cancelAdd={cancelAdd}
-                        buttonClassName={cls.iconBtn}   // ← ключевое: одинаковый стиль
-                    />
-                    <div className={cls.divider}/>
                     {showSubActions && (
                         <>
                             <ButtonForm
@@ -106,6 +113,7 @@ export const TableToolbar = ({
                         </>
                     )}
                 </div>
+
 
                 {showSearch && (
                     <div
