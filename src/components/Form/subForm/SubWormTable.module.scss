@@ -11,15 +11,52 @@ $error: #d33;
 /* корень компонента */
 .root {
   position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
+.scrollArea {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+
+  /* прокидываем из JSX: 0px / 44px */
+  --tabsH: 0px;
+  --head-row-1: 40px;
+
+  border-radius: 4px;
+
+  &::-webkit-scrollbar {
+    height: 5px;
+    width: 8px;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+  }
+  &::-webkit-scrollbar-track {
+    background: #3a3a3a;
+  }
+}
+
 
 /* ───── вкладки ───── */
 .tabs {
-  display: flex;
+  display: inline-flex;      /* важно: не растягивать на всю ширину */
+  width: max-content;        /* как у таблицы */
+  min-width: 100%;           /* но не уже контейнера */
+  box-sizing: border-box;
+
   list-style: none;
-  padding: 0;
+  padding: 4px 0 0;
   margin: 0 0 4px 0;
   gap: 2px;
+
+  position: sticky;
+  top: 0;
+  z-index: 6;
+
 }
 
 .tab,
@@ -80,6 +117,7 @@ $error: #d33;
 /* ───── таблица: те же принципы, что и в MainTable ───── */
 .tbl {
   width: max-content; /* ширина по содержимому */
+
   min-width: 100%;    /* но не уже контейнера */
   table-layout: fixed;
   border-collapse: separate;
@@ -93,13 +131,13 @@ $error: #d33;
 .tbl td {
   font-size: 14px;
   border: 1px solid $border;
-  padding: 4px 8px;
+  padding: 4px 6px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  max-width: 320px; /* чтобы огромные тексты не раздували ячейку по высоте */
 }
 
-/* шапка */
 .tbl thead th {
   background: var(--header-color);
   color: #eee;
@@ -108,7 +146,7 @@ $error: #d33;
   z-index: 2;
 }
 
-/* 1-я строка шапки (группы) – прилипает сверху */
+/* липкая шапка — ниже вкладок */
 .tbl thead tr:nth-child(1) th {
   position: sticky;
   top: 0;
@@ -116,7 +154,7 @@ $error: #d33;
   height: var(--head-row-1);
 }
 
-/* 2-я строка шапки (подписи) – прилипает под первой */
+/* 2-я строка шапки (подписи) */
 .tbl thead tr:nth-child(2) th {
   position: sticky;
   top: var(--head-row-1);

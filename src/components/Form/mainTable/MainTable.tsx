@@ -10,9 +10,9 @@ import { MainTableAddRow } from './MainTableAddRow';
 import { MainTableRow } from './MainTableRow';
 
 // "логическая" ширина колонок из бэка → проценты
-const DEFAULT_COL_WIDTH = 10; // если width не задан
-const MIN_COL_WIDTH = 6;      // чтобы колонка не была совсем иголкой
-const MAX_COL_WIDTH = 40;     // чтобы одна не съедала весь экран
+const DEFAULT_COL_WIDTH = 20; // если width не задан
+const MIN_COL_WIDTH = 15;      // чтобы колонка не была совсем иголкой
+const MAX_COL_WIDTH = 850;     // чтобы одна не съедала весь экран
 
 type HeaderPlanGroup = {
     id: number;
@@ -100,7 +100,7 @@ export const MainTable: React.FC<Props> = (p) => {
     const drillDisabled = p.disableDrillWhileEditing && p.editingRowIdx != null;
 
     return (
-        <div className={s.mainTableScroll}>
+        <div>
             <table className={s.tbl}>
                 <colgroup>
                     {p.flatColumnsInRenderOrder.map((col, idx) => (

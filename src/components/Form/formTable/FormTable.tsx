@@ -351,98 +351,115 @@ export const FormTable: React.FC<Props> = ({
         setComboReloadToken((v) => v + 1);
     }, [drillTargetWriteTcId, setEditDraft]);
 
+    const hasTree = !!(liveTree && liveTree.length);
+
     /** ───────── UI ───────── */
     return (
         <ThemeProvider theme={dark}>
-            <div className={s.contentRow}>
-                {/* LEFT: TREE */}
-                <TreeFormTable
-                    tree={liveTree}
-                    widgetForm={currentForm}
-                    activeExpandedKey={activeExpandedKey}
-                    nestedTrees={nestedTrees}
-                    handleResetFilters={handleResetFilters}
-                    handleNestedValueClick={handleNestedValueClick}
-                    handleTreeValueClick={handleTreeValueClick}
-                />
 
-                {/* RIGHT: MAIN + SUB */}
-                <div className={s.mainCol}>
-                    <TableToolbar
-                        showSubActions={!!subDisplay && Object.keys(lastPrimary).length > 0}
-                        cancelAddSub={cancelAddSub}
-                        startAddSub={startAddSub}
-                        isAddingSub={isAddingSub}
-                        submitAddSub={submitAddSub}
-                        savingSub={savingSub}
-                        isAdding={isAdding}
-                        selectedFormId={selectedFormId}
-                        selectedWidget={selectedWidget}
-                        saving={saving}
-                        startAdd={startAdd}
-                        submitAdd={submitAdd}
-                        cancelAdd={cancelAdd}
-                        showSearch={showSearch}
-                        value={q}
-                        onChange={setQ}
-                        onResetFilters={handleResetFilters}
-                        collapsedWidth={160}
-                        expandedWidth={420}
-                    />
+            {/* LEFT: TREE */}
 
-                    <MainTable
-                        headerPlan={headerPlan as any}
-                        showSubHeaders={showSubHeaders}
-                        onToggleSubHeaders={() => setShowSubHeaders((v) => !v)}
-                        onOpenDrill={handleOpenDrillFromMain}
-                        isAdding={isAdding}
-                        draft={draft}
-                        onDraftChange={(tcId, v) => setDraft((prev) => ({ ...prev, [tcId]: v }))}
-                        flatColumnsInRenderOrder={flatColumnsInRenderOrder}
-                        isColReadOnly={isColReadOnly}
-                        placeholderFor={(c) => c.placeholder ?? c.column_name}
-                        filteredRows={filteredRows}
-                        valueIndexByKey={valueIndexByKey}
-                        selectedKey={selectedKey}
-                        pkToKey={pkToKey}
-                        editingRowIdx={editingRowIdx}
-                        editDraft={editDraft}
-                        onEditDraftChange={(tcId, v) => setEditDraft((prev) => ({ ...prev, [tcId]: v }))}
-                        onSubmitEdit={submitEdit}
-                        onCancelEdit={cancelEdit}
-                        editSaving={editSaving}
-                        onRowClick={handleRowClick}
-                        onStartEdit={startEdit}
-                        onDeleteRow={deleteRow}
-                        deletingRowIdx={deletingRowIdx}
-                        comboReloadToken={comboReloadToken}
-                    />
+            <div className={s.formLayout} data-has-tree={hasTree ? 'true' : 'false'}>
+                {/* LEFT: TREE (опционально) */}
+                {hasTree && (
+                    <aside className={s.treePane}>
+                        <TreeFormTable
+                            tree={liveTree}
+                            widgetForm={currentForm}
+                            activeExpandedKey={activeExpandedKey}
+                            nestedTrees={nestedTrees}
+                            handleResetFilters={handleResetFilters}
+                            handleNestedValueClick={handleNestedValueClick}
+                            handleTreeValueClick={handleTreeValueClick}
+                        />
+                    </aside>
+                )}
 
-                    {shouldShowSubSection && (
-                        <SubWormTable
-                            onOpenDrill={handleOpenDrillFromMain}
-                            editingRowIdx={editingRowIdxSub}
-                            setEditingRowIdx={setEditingRowIdxSub}
-                            editDraft={editDraftSub}
-                            setEditDraft={setEditDraftSub}
-                            editSaving={editSavingSub}
-                            setEditSaving={setEditSavingSub}
+                {/* RIGHT: TOOLBAR + MAIN + SUB */}
+                <section className={s.rightPane}>
+                    <div className={s.toolbarPane}>
+                        <TableToolbar
+                            showSubActions={!!subDisplay && Object.keys(lastPrimary).length > 0}
+                            cancelAddSub={cancelAddSub}
+                            startAddSub={startAddSub}
                             isAddingSub={isAddingSub}
-                            setIsAddingSub={setIsAddingSub}
-                            draftSub={draftSub}
-                            setDraftSub={setDraftSub}
-                            currentOrder={currentOrder}
-                            currentWidgetId={currentWidgetId}
-                            subHeaderGroups={subHeaderGroups}
-                            formId={formIdForSub}
-                            subLoading={subLoading}
-                            subError={subError}
-                            subDisplay={subDisplay}
-                            handleTabClick={handleTabClick}
+                            submitAddSub={submitAddSub}
+                            savingSub={savingSub}
+                            isAdding={isAdding}
+                            selectedFormId={selectedFormId}
+                            selectedWidget={selectedWidget}
+                            saving={saving}
+                            startAdd={startAdd}
+                            submitAdd={submitAdd}
+                            cancelAdd={cancelAdd}
+                            showSearch={showSearch}
+                            value={q}
+                            onChange={setQ}
+                            onResetFilters={handleResetFilters}
+                            collapsedWidth={160}
+                            expandedWidth={420}
+                        />
+                    </div>
+
+                    {/* MAIN (свой скролл) */}
+                    <div className={s.mainPane}>
+                        <MainTable
+                            headerPlan={headerPlan as any}
+                            showSubHeaders={showSubHeaders}
+                            onToggleSubHeaders={() => setShowSubHeaders((v) => !v)}
+                            onOpenDrill={handleOpenDrillFromMain}
+                            isAdding={isAdding}
+                            draft={draft}
+                            onDraftChange={(tcId, v) => setDraft((prev) => ({...prev, [tcId]: v}))}
+                            flatColumnsInRenderOrder={flatColumnsInRenderOrder}
+                            isColReadOnly={isColReadOnly}
+                            placeholderFor={(c) => c.placeholder ?? c.column_name}
+                            filteredRows={filteredRows}
+                            valueIndexByKey={valueIndexByKey}
+                            selectedKey={selectedKey}
+                            pkToKey={pkToKey}
+                            editingRowIdx={editingRowIdx}
+                            editDraft={editDraft}
+                            onEditDraftChange={(tcId, v) => setEditDraft((prev) => ({...prev, [tcId]: v}))}
+                            onSubmitEdit={submitEdit}
+                            onCancelEdit={cancelEdit}
+                            editSaving={editSaving}
+                            onRowClick={handleRowClick}
+                            onStartEdit={startEdit}
+                            onDeleteRow={deleteRow}
+                            deletingRowIdx={deletingRowIdx}
                             comboReloadToken={comboReloadToken}
                         />
+                    </div>
+
+                    {/* SUB (появляется не всегда, свой скролл, высота меньше) */}
+                    {shouldShowSubSection && (
+                        <div className={s.subPane}>
+                            <SubWormTable
+                                onOpenDrill={handleOpenDrillFromMain}
+                                editingRowIdx={editingRowIdxSub}
+                                setEditingRowIdx={setEditingRowIdxSub}
+                                editDraft={editDraftSub}
+                                setEditDraft={setEditDraftSub}
+                                editSaving={editSavingSub}
+                                setEditSaving={setEditSavingSub}
+                                isAddingSub={isAddingSub}
+                                setIsAddingSub={setIsAddingSub}
+                                draftSub={draftSub}
+                                setDraftSub={setDraftSub}
+                                currentOrder={currentOrder}
+                                currentWidgetId={currentWidgetId}
+                                subHeaderGroups={subHeaderGroups}
+                                formId={formIdForSub}
+                                subLoading={subLoading}
+                                subError={subError}
+                                subDisplay={subDisplay}
+                                handleTabClick={handleTabClick}
+                                comboReloadToken={comboReloadToken}
+                            />
+                        </div>
                     )}
-                </div>
+                </section>
             </div>
 
             {/* DRILL-модалка */}
@@ -452,7 +469,7 @@ export const FormTable: React.FC<Props> = ({
                     if (!fid) return;
 
                     try {
-                        const { data } = await api.post<FormDisplay | FormDisplay[]>(`/display/${fid}/main`, activeFilters);
+                        const {data} = await api.post<FormDisplay | FormDisplay[]>(`/display/${fid}/main`, activeFilters);
                         const next = Array.isArray(data) ? data[0] : data;
                         if (next) setFormDisplay(next);
                     } catch (e) {
@@ -466,7 +483,7 @@ export const FormTable: React.FC<Props> = ({
                 formsById={formsById}
                 disableNestedDrill={drillDisableNested}
                 comboboxMode={drillComboboxMode}
-                selectedWidget={selectedWidget ? { id: selectedWidget.id } : null}
+                selectedWidget={selectedWidget ? {id: selectedWidget.id} : null}
                 formsByWidget={formsByWidget}
                 loadSubDisplay={loadSubDisplay}
                 initialPrimary={drillInitialPrimary}

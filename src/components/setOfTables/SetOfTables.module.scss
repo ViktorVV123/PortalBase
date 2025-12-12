@@ -80,31 +80,6 @@ h2 {
   min-width: 0; /* 👈 важно: позволяет ужиматься по ширине */
 }
 
-/* ─── СКРОЛЛ ТОЛЬКО ДЛЯ MainTable ─── */
-.mainTableScroll {
-  flex: 1 1 auto;
-  min-height: 0;
-  min-width: 0;
-  max-width: 100%;    /* 👈 не шире колонки/экрана */
-
-  overflow-x: auto;   /* 👈 горизонтальный скролл только здесь */
-  overflow-y: auto;
-  border-radius: 4px;
-
-  &::-webkit-scrollbar {
-    height: 5px;
-    width: 8px;
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background: #888;
-    border-radius: 4px;
-  }
-
-  &::-webkit-scrollbar-track {
-    background: #3a3a3a;
-  }
-}
 
 /* высота 1-й строки thead под твою типографику */
 :root {
@@ -113,8 +88,8 @@ h2 {
 
 /* ─── сама таблица ─── */
 .tbl {
-  width: max-content;  /* ширина по содержимому */
-  min-width: 100%;     /* но не уже контейнера */
+  width: max-content; /* ширина по содержимому */
+  min-width: 100%; /* но не уже контейнера */
   table-layout: fixed; /* стабильные ширины через colgroup */
   border-collapse: separate;
   border-spacing: 0;
@@ -128,6 +103,7 @@ h2 {
   box-sizing: border-box;
   font-size: 13px;
 }
+
 /* ─── спец-стили для MUI TextField внутри ячейки ─── */
 
 /* корневая обёртка TextField внутри ячейки */
@@ -160,7 +136,7 @@ h2 {
 /* ячейка в режиме редактирования — убираем лишний padding,
    чтобы рамка TextField не выглядела «съехавшей» */
 .editCell {
-  padding: 0 ;
+  padding: 0;
   overflow: hidden; // не даём содержимому вылезти за пределы td
 }
 
@@ -220,9 +196,11 @@ h2 {
 .selectedRow {
   background: var(--hover-color);
 }
+
 .selectedRow td {
   font-weight: 600;
 }
+
 /* контейнер внутри ячейки для инпута */
 /* td в режиме редактирования */
 .editCell {
@@ -271,6 +249,7 @@ h2 {
   padding: 0;
   flex: 0 0 auto; // не растягивается
 }
+
 .comboClearBtn:hover {
   opacity: 1;
 }
@@ -283,11 +262,13 @@ h2 {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
 .tbl thead tr:nth-child(2) .ellipsis {
-  white-space: normal;      // разрешаем перенос
-  word-break: break-word;   // ломаем длинные слова
-  text-overflow: clip;      // убираем троеточие
+  white-space: normal; // разрешаем перенос
+  word-break: break-word; // ломаем длинные слова
+  text-overflow: clip; // убираем троеточие
 }
+
 /* многострочный clamp – если где-то используешь */
 .clamp {
   display: -webkit-box;
@@ -337,6 +318,7 @@ h2 {
 .cellReadonly {
   cursor: default;
 }
+
 .readonlyValue {
   user-select: text;
   pointer-events: none;
@@ -369,7 +351,7 @@ h2 {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color:white;
+  color: white;
 }
 
 .actionsBtnDisabled {
@@ -511,7 +493,6 @@ h2 {
 }
 
 
-
 //все для tree
 .nestedItem {
   position: relative;
@@ -539,6 +520,7 @@ h2 {
     color: #fff;
   }
 }
+
 .nestedUl {
   list-style: none;
   padding-left: 16px;
@@ -547,3 +529,94 @@ h2 {
 
 
 
+
+
+
+/* ───────────────── FormTable layout ───────────────── */
+
+.formLayout {
+  /* чтобы скроллились именно таблицы, а не вся страница */
+  height: calc(100dvh - var(--appHeaderH, 80px));
+  min-height: 0;
+
+  display: grid;
+  grid-template-columns: var(--treeW, 300px) minmax(0, 1fr);
+  gap: 12px;
+
+  overflow: hidden; /* запрещаем общий скролл контейнера */
+  padding: 10px;
+
+
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, .2);
+    border-radius: 6px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+}
+
+.formLayout[data-has-tree='false'] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.treePane {
+  min-height: 0;
+  overflow: auto; /* отдельный скролл дерева */
+  padding-right: 6px;
+
+}
+
+.rightPane {
+  min-height: 0;
+  overflow: hidden;
+
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto; /* toolbar, main, sub */
+  gap: 10px;
+
+}
+
+.toolbarPane {
+  /* просто “липнет” сверху, без скролла */
+}
+
+.mainPane {
+  min-height: 0;
+  overflow: auto; /* отдельный скролл MAIN */
+  overscroll-behavior: contain;
+
+
+  &::-webkit-scrollbar {
+    width: 6px;
+    height: 10px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 6px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: #4c4c4c;
+  }
+}
+
+.subPane {
+  min-height: 0;
+  max-height: clamp(170px, 28vh, 360px); /* саб меньше по высоте */
+  overflow: auto; /* отдельный скролл SUB */
+  overscroll-behavior: contain;
+}
+
+/* чтобы горизонтальный скролл появлялся корректно */
+.mainPane :global(table) {
+  min-width: 100%;
+  width: max-content;
+}

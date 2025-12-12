@@ -31,10 +31,10 @@
 .popup {
   position: absolute;
   top: 120%;
-  right: -1100%;
+  right: -1300%;
   margin-top: 8px;
-  min-width: 380px;
-  max-width: 500px;
+  min-width: 450px;
+  max-width: 600px;
   max-height: 60vh;
   background-color: #131313;
   border-radius: 6px;
@@ -157,8 +157,8 @@
 .treeLabel,
 .formName {
 
-  flex: 0 1 250px;   // базовая ширина ~220px, можно менять число
-  max-width: 250px;  // жёсткий потолок
+  flex: 0 1 350px;   // базовая ширина ~220px, можно менять число
+  max-width: 350px;  // жёсткий потолок
   min-width: 0;
   white-space: nowrap;
   overflow: hidden;
