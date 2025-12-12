@@ -70,6 +70,12 @@ type Props = {
 };
 
 export const MainTable: React.FC<Props> = (p) => {
+
+    const safeRows = React.useMemo(
+        () => (p.filteredRows ?? []).filter((v) => v?.row && (v.row as any).primary_keys != null),
+        [p.filteredRows],
+    );
+
     const rlsMeta = React.useMemo(() => {
         const col = p.flatColumnsInRenderOrder.find(c => c.type === 'rls');
         if (!col) return null;
@@ -166,7 +172,7 @@ export const MainTable: React.FC<Props> = (p) => {
                 )}
 
                 {/* ───────── Основные строки ───────── */}
-                {p.filteredRows.map((rowView) => (
+                {safeRows.map((rowView) => (
                     <MainTableRow
                         key={p.pkToKey(rowView.row.primary_keys)}
                         rowView={rowView}

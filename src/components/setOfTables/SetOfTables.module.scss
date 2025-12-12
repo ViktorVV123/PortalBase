@@ -619,6 +619,7 @@ h2 {
   max-height: clamp(170px, 28vh, 360px); /* саб меньше по высоте */
   overflow: auto; /* отдельный скролл SUB */
   overscroll-behavior: contain;
+  padding-bottom:20px ;
 }
 
 /* чтобы горизонтальный скролл появлялся корректно */
