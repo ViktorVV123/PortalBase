@@ -201,13 +201,6 @@ export interface FormTreeColumn {
     values: (string | number | null)[];
 }
 
-export type HeaderGroup = {
-    id: number;
-    order: number;
-    title: string;
-    span: number;
-    labels: string[];
-};
 
 export type NewFormPayload = {
     main_widget_id: number;

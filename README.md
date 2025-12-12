@@ -329,3 +329,201 @@ npm run build:descktop
 ---
 
 
+
+
+src
+├── app
+│   ├── App.tsx
+│   ├── App.module.scss
+│   ├── providers
+│   │   └── ErrorBoundary.tsx
+│   └── index.tsx           # можно оставить на корне src, если не хочется двигать
+│
+├── assets
+│   ├── color/
+│   ├── image/
+│   ├── styles/
+│   └── data.ts
+│
+├── pages
+│   └── main
+│       ├── Main.tsx
+│       ├── Main.module.scss
+│       └── hooks
+│           ├── useMainModals.ts
+│           └── useMainSelection.ts
+│
+├── widgets                 # крупные «виджеты/контейнеры» интерфейса
+│   ├── TopComponent
+│   │   ├── TopComponent.tsx
+│   │   ├── TopComponent.module.scss
+│   │   ├── hook
+│   │   │   └── useTopMenuState.ts
+│   │   ├── floating
+│   │   │   └── Floating.tsx
+│   │   ├── sideNav
+│   │   │   ├── SideNav.tsx
+│   │   │   └── SideNav.module.scss
+│   │   └── menus
+│   │       ├── FormsMenu.tsx
+│   │       ├── TablesMenu.tsx
+│   │       ├── WidgetsMenu.tsx
+│   │       └── WorkspaceMenu.tsx
+│   │
+│   ├── SetOfTables
+│   │   ├── SetOfTables.tsx
+│   │   └── SetOfTables.module.scss
+│   │
+│   └── WidgetSelect
+│       ├── WidgetSelect.tsx
+│       └── WidgetSelect.module.scss
+│
+├── features                # доменные фичи (логика + их специфичные UI)
+│   ├── forms
+│   │   ├── ui
+│   │   │   ├── FormTable.tsx
+│   │   │   ├── AllFormStyle.module.scss
+│   │   │   ├── drillDialog
+│   │   │   │   └── DrillDialog.tsx
+│   │   │   ├── mainTable
+│   │   │   │   ├── MainTable.tsx
+│   │   │   │   ├── MainTableRow.tsx
+│   │   │   │   ├── MainTableAddRow.tsx
+│   │   │   │   ├── MainTableCombo.tsx
+│   │   │   │   └── InputCell.tsx
+│   │   │   ├── subForm
+│   │   │   │   ├── SubFormTable.tsx
+│   │   │   │   └── SubWormTable.module.scss
+│   │   │   └── treeForm
+│   │   │       ├── TreeFormTable.tsx
+│   │   │       └── types.ts
+│   │   ├── model
+│   │   │   ├── useMainCrud.ts
+│   │   │   ├── useSubCrud.ts
+│   │   │   ├── useSubNav.ts
+│   │   │   ├── useSubWormTable.ts
+│   │   │   ├── useTreeHandlers.ts
+│   │   │   ├── useFiltersTree.ts
+│   │   │   ├── useFormSearch.ts
+│   │   │   ├── useHeaderPlan.ts
+│   │   │   └── useDrillDialog.ts
+│   │   └── types.ts        # твой Form/types.ts
+│   │
+│   ├── tables
+│   │   ├── ui
+│   │   │   ├── tableColumn
+│   │   │   │   ├── TableColumn.tsx
+│   │   │   │   ├── Table.module.scss
+│   │   │   │   └── TableListView.tsx
+│   │   │   ├── tableToolbar
+│   │   │   │   ├── TableToolbar.tsx
+│   │   │   │   └── TableToolbar.module.scss
+│   │   │   └── tableWidget
+│   │   │       ├── TableWidget.tsx
+│   │   │       └── TableWidget.module.scss
+│   │   └── types
+│   │       ├── tableColumn.ts
+│   │       └── tableDraft.ts
+│   │
+│   ├── widgetColumns
+│   │   ├── ui
+│   │   │   ├── WidgetColumnsOfTable.tsx
+│   │   │   ├── WidgetColumnsMainTable.tsx
+│   │   │   ├── WidgetGroup.module.scss
+│   │   │   └── parts
+│   │   │       ├── RefRow.tsx
+│   │   │       └── WidgetGroups.tsx
+│   │   ├── model
+│   │   │   ├── hooks
+│   │   │   │   ├── useRefsDnd.ts
+│   │   │   │   └── useRefsSync.ts
+│   │   │   └── widgetColumnTable
+│   │   │       └── hooks
+│   │   │           ├── useAddReference.ts
+│   │   │           ├── useAliasDialog.ts
+│   │   │           ├── useComboboxCreate.ts
+│   │   │           ├── useComboboxEditor.ts
+│   │   │           ├── useEditReference.ts
+│   │   │           ├── useFormPicker.ts
+│   │   │           ├── useHeaderPreviewFromWc.ts
+│   │   │           └── useLocalRefs.ts
+│   │   ├── lib
+│   │   │   ├── ref-helpers.tsx
+│   │   │   └── types.ts
+│   │   └── modals        # именно модалки по WidgetColumns
+│   │       ├── AddReferenceDialog.tsx
+│   │       ├── AddWidgetColumnDialog.tsx
+│   │       ├── AliasDialog.tsx
+│   │       ├── EditReferenceDialog.tsx
+│   │       ├── FormPickerDialog.tsx
+│   │       └── WidgetMetaDialog.tsx
+│   │
+│   ├── workspaces
+│   │   ├── model
+│   │   │   ├── useWorkSpaces.ts
+│   │   │   └── typesWorkSpaces.ts
+│   │   └── modals
+│   │       ├── ModalAddWorkspace.tsx
+│   │       ├── ModalAddWorkspace.module.scss
+│   │       └── EditWorkspaceModal.tsx
+│   │
+│   ├── connections
+│   │   ├── model
+│   │   │   ├── typesConnection.ts
+│   │   │   └── typesCreateConnections.ts
+│   │   └── ui
+│   │       ├── ModalAddConnection.tsx
+│   │       └── ModalEditConnection.tsx
+│   │
+│   ├── formsManagement
+│   │   └── ui
+│   │       ├── ModalAddForm.tsx
+│   │       └── ModalEditForm.tsx
+│   │
+│   ├── tablesMeta
+│   │   └── ui
+│   │       └── ModalEditTableMeta.tsx
+│   │
+│   ├── combobox
+│   │   └── ui
+│   │       ├── ComboboxAddDialog.tsx
+│   │       └── ComboboxItemDialog.tsx
+│   │
+│   └── modalHost
+│       └── ModalHost.tsx
+│
+├── shared                 # реально переиспользуемые штуки
+│   ├── ui
+│   │   ├── common
+│   │   │   ├── HighlightedText.tsx
+│   │   │   ├── SearchBox.tsx
+│   │   │   └── SearchBox.module.scss
+│   │   ├── ButtonForm.tsx
+│   │   ├── Breadcrumb.tsx
+│   │   ├── Breadcrumb.module.scss
+│   │   ├── CenteredLoader.tsx
+│   │   └── CenteredLoader.module.scss
+│   │
+│   ├── hooks
+│   │   ├── useDebounced.ts
+│   │   ├── useFuzzySearch.ts
+│   │   └── useLoadConnections.ts
+│   │
+│   ├── api
+│   │   └── api.ts          # axios-инстанс / общий клиент
+│   │
+│   ├── theme
+│   │   └── ThemeModalUI.ts
+│   │
+│   ├── utils
+│   │   ├── cellFormat.ts
+│   │   ├── EllipsizeSmart.tsx
+│   │   └── normalize.ts
+│   │
+│   └── types              # здесь можно оставить только общие типы, если появятся
+│
+├── assets (уже выше, просто напоминаю)
+│
+├── global.scss            # можно оставить на корне
+├── global.d.ts
+└── (index.tsx если не переносишь в app/)

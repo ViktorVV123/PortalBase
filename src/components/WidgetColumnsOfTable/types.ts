@@ -88,4 +88,5 @@ export type Props = {
     formsById: Record<number, { form_id: number; name: string }>;
     loadWidgetForms: () => Promise<void> | void;
     allColumns: Column[];
+    workspaceId: number | null;
 };

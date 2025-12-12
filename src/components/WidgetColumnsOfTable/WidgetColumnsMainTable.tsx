@@ -52,7 +52,7 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
                                                             formsById,
                                                             loadWidgetForms,
                                                             allColumns,
-                                                            deleteColumnWidget,
+                                                            deleteColumnWidget, workspaceId,
                                                         }) => {
     /** ——— API wrappers ——— */
     const callUpdateReference = useCallback(async (wcId: number, tblColId: number, patch: RefPatch) => {
@@ -149,11 +149,14 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
         closeFormDialog,
         saveFormDialog,
     } = useFormPicker({
+        workspaceId,             // 👈 сюда прокинули ws
         formsById,
         loadWidgetForms,
-        callUpdateReference: (wcId, tblColId, patch) => callUpdateReference(wcId, tblColId, patch as any),
+        callUpdateReference: (wcId, tblColId, patch) =>
+            callUpdateReference(wcId, tblColId, patch as any),
         setLocalRefs,
     });
+
 
     const {dlg, open: openComboEditor, close: closeComboEditor, onChange: changeComboEditor, save: saveComboEditor} =
         useComboboxEditor({

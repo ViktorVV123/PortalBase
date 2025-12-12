@@ -1,11 +1,17 @@
-// src/components/WidgetColumnsOfTable/hooks/useFormPicker.ts
 import {useCallback, useEffect, useMemo, useState} from 'react';
 import {RefItem} from "@/components/WidgetColumnsOfTable/types";
 
-
 export type UseFormPickerDeps = {
-    /** формы, пришедшие снаружи */
-    formsById?: Record<number, { form_id: number; name?: string }>;
+    /** текущий workspace */
+    workspaceId: number | null;
+
+    /** формы, пришедшие снаружи (Record<form_id, WidgetForm>) */
+    formsById?: Record<number, {
+        form_id: number;
+        name?: string;
+        workspace?: { id: number };  // важно для фильтрации
+    }>;
+
     /** лениво подгрузить формы, если их нет */
     loadWidgetForms?: () => void;
 
@@ -19,6 +25,7 @@ export type UseFormPickerDeps = {
 export type FormOption = { id: number | null; name: string };
 
 export function useFormPicker({
+                                  workspaceId,
                                   formsById,
                                   loadWidgetForms,
                                   callUpdateReference,
@@ -27,12 +34,18 @@ export function useFormPicker({
     /** список опций для селектора форм */
     const formOptions: FormOption[] = useMemo(() => {
         const base: FormOption[] = [{ id: null, name: '— Без формы —' }];
-        const rest: FormOption[] = Object.values(formsById ?? {}).map(f => ({
-            id: (f?.form_id as number) ?? null,
-            name: f?.name || `Форма #${f?.form_id}`,
-        }));
+
+        const rest: FormOption[] = Object
+            .values(formsById ?? {})
+            // ← тут отфильтровали по workspace
+            .filter(f => !workspaceId || f.workspace?.id === workspaceId)
+            .map(f => ({
+                id: (f?.form_id as number) ?? null,
+                name: f?.name || `Форма #${f?.form_id}`,
+            }));
+
         return base.concat(rest);
-    }, [formsById]);
+    }, [formsById, workspaceId]);
 
     /** мапа id -> name (для отображения под заголовком группы) */
     const formNameById = useMemo(() => {
@@ -83,8 +96,6 @@ export function useFormPicker({
 
             closeFormDialog();
         } catch (e) {
-            // глушим, лог пусть будет на уровне вызывающего
-            // (или можно сюда добавить console.warn)
             console.warn('[useFormPicker] save failed:', e);
         }
     }, [formDlg, callUpdateReference, setLocalRefs, closeFormDialog]);

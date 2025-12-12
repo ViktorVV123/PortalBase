@@ -132,7 +132,7 @@ export const SetOfTables: React.FC<Props> = (props) => {
     // локально — только то, что реально нужно держать здесь
     const [referencesMap, setReferencesMap] = useState<Record<number, WcReference[]>>({});
     const [liveRefsForHeader, setLiveRefsForHeader] = useState<Record<number, WcReference[]> | null>(null);
-
+    const workspaceId = selectedTable?.workspace_id ?? null;
     // группы заголовков: основная форма и саб-форма
     const headerGroups = useHeaderPreviewFromWc(widgetColumns, referencesMap, liveRefsForHeader ?? undefined);
 
@@ -179,6 +179,7 @@ export const SetOfTables: React.FC<Props> = (props) => {
                     <p className={s.error}>{wColsError}</p>
                 ) : (
                             <WidgetColumnsOfTable
+                                workspaceId={workspaceId}
                                 loadWidgetForms={loadWidgetForms}
                                 formsById={formsById}
                                 headerGroups={headerGroups}

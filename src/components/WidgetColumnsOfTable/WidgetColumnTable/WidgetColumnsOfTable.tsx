@@ -83,6 +83,7 @@ interface Props {
     headerGroups: HeaderModelItem[];
     formsById: Record<number, WidgetForm>;
     loadWidgetForms: () => Promise<void> | void;
+    workspaceId: number | null;
 }
 
 const modalStyle = {
@@ -136,6 +137,7 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                                                           referencesMap,
                                                           headerGroups,
                                                           formsById,
+                                                          workspaceId,
                                                           loadWidgetForms,
                                                       }) => {
     const [addOpen, setAddOpen] = useState(false);
@@ -278,6 +280,7 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
 
             {/* Основная таблица */}
             <WidgetColumnsMainTable
+                workspaceId={workspaceId}
                 formsById={formsById}
                 loadWidgetForms={loadWidgetForms}
                 onRefsChange={setLiveRefsForHeader}
