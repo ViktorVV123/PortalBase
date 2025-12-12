@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import * as s from '@/components/setOfTables/SetOfTables.module.scss';
 import {
     FormDisplay,
@@ -7,23 +7,23 @@ import {
     FormTreeColumn,
     Widget,
 } from '@/shared/hooks/useWorkSpaces';
-import { api } from '@/services/api';
+import {api} from '@/services/api';
 
-import { ThemeProvider } from '@mui/material';
-import { dark } from '@/shared/themeUI/themeModal/ThemeModalUI';
-import { TableToolbar } from '@/components/table/tableToolbar/TableToolbar';
+import {ThemeProvider} from '@mui/material';
+import {dark} from '@/shared/themeUI/themeModal/ThemeModalUI';
+import {TableToolbar} from '@/components/table/tableToolbar/TableToolbar';
 
-import { useMainCrud } from '@/components/Form/mainTable/hook/useMainCrud';
-import { useFiltersTree } from '@/components/Form/formTable/hooks/useFiltersTree';
-import { TreeFormTable } from '@/components/Form/treeForm/TreeFormTable';
-import { MainTable } from '@/components/Form/mainTable/MainTable';
-import { SubWormTable } from '@/components/Form/subForm/SubFormTable';
-import { DrillDialog } from '@/components/Form/drillDialog/DrillDialog';
-import { useHeaderPlan } from '@/components/Form/formTable/hooks/useHeaderPlan';
-import { useSubCrud } from '@/components/Form/subForm/hook/useSubCrud';
-import { useSubNav } from '@/components/Form/subForm/hook/useSubNav';
-import { useFormSearch } from '@/components/Form/formTable/hooks/useFormSearch';
-import { useTreeHandlers } from '@/components/Form/treeForm/hooks/useTreeHandlers';
+import {useMainCrud} from '@/components/Form/mainTable/hook/useMainCrud';
+import {useFiltersTree} from '@/components/Form/formTable/hooks/useFiltersTree';
+import {TreeFormTable} from '@/components/Form/treeForm/TreeFormTable';
+import {MainTable} from '@/components/Form/mainTable/MainTable';
+import {SubWormTable} from '@/components/Form/subForm/SubFormTable';
+import {DrillDialog} from '@/components/Form/drillDialog/DrillDialog';
+import {useHeaderPlan} from '@/components/Form/formTable/hooks/useHeaderPlan';
+import {useSubCrud} from '@/components/Form/subForm/hook/useSubCrud';
+import {useSubNav} from '@/components/Form/subForm/hook/useSubNav';
+import {useFormSearch} from '@/components/Form/formTable/hooks/useFormSearch';
+import {useTreeHandlers} from '@/components/Form/treeForm/hooks/useTreeHandlers';
 
 export type HeaderModelItem = {
     id: number;
@@ -137,7 +137,7 @@ export const FormTable: React.FC<Props> = ({
         pkToKey,
         handleRowClick,
         handleTabClick,
-    } = useSubNav({ formIdForSub, availableOrders, loadSubDisplay });
+    } = useSubNav({formIdForSub, availableOrders, loadSubDisplay});
 
     // если набор вкладок поменялся — аккуратно переезжаем на первый order и чистим саб
     useEffect(() => {
@@ -166,7 +166,7 @@ export const FormTable: React.FC<Props> = ({
         const fid = selectedFormId ?? currentForm?.form_id ?? null;
         if (!fid) return;
         try {
-            const { data } = await api.post<FormTreeColumn[] | FormTreeColumn>(`/display/${fid}/tree`);
+            const {data} = await api.post<FormTreeColumn[] | FormTreeColumn>(`/display/${fid}/tree`);
             setLiveTree(Array.isArray(data) ? data : [data]);
         } catch (e) {
             // eslint-disable-next-line no-console
@@ -282,7 +282,7 @@ export const FormTable: React.FC<Props> = ({
         flatColumnsInRenderOrder,
         valueIndexByKey,
         currentForm?.search_bar,
-        { threshold: 0.35, distance: 120, debounceMs: 250 },
+        {threshold: 0.35, distance: 120, debounceMs: 250},
     );
 
     /** ───────── SUB CRUD ───────── */
@@ -335,7 +335,7 @@ export const FormTable: React.FC<Props> = ({
 
     /** ───────── Приём выбранной строки из DrillDialog ───────── */
     const handlePickFromDrill = useCallback((
-        { primary }: { row: FormDisplay['data'][number]; primary: Record<string, unknown> },
+        {primary}: { row: FormDisplay['data'][number]; primary: Record<string, unknown> },
     ) => {
         if (drillTargetWriteTcId == null) return;
 
@@ -403,33 +403,35 @@ export const FormTable: React.FC<Props> = ({
 
                     {/* MAIN (свой скролл) */}
                     <div className={s.mainPane}>
-                        <MainTable
-                            headerPlan={headerPlan as any}
-                            showSubHeaders={showSubHeaders}
-                            onToggleSubHeaders={() => setShowSubHeaders((v) => !v)}
-                            onOpenDrill={handleOpenDrillFromMain}
-                            isAdding={isAdding}
-                            draft={draft}
-                            onDraftChange={(tcId, v) => setDraft((prev) => ({...prev, [tcId]: v}))}
-                            flatColumnsInRenderOrder={flatColumnsInRenderOrder}
-                            isColReadOnly={isColReadOnly}
-                            placeholderFor={(c) => c.placeholder ?? c.column_name}
-                            filteredRows={filteredRows}
-                            valueIndexByKey={valueIndexByKey}
-                            selectedKey={selectedKey}
-                            pkToKey={pkToKey}
-                            editingRowIdx={editingRowIdx}
-                            editDraft={editDraft}
-                            onEditDraftChange={(tcId, v) => setEditDraft((prev) => ({...prev, [tcId]: v}))}
-                            onSubmitEdit={submitEdit}
-                            onCancelEdit={cancelEdit}
-                            editSaving={editSaving}
-                            onRowClick={handleRowClick}
-                            onStartEdit={startEdit}
-                            onDeleteRow={deleteRow}
-                            deletingRowIdx={deletingRowIdx}
-                            comboReloadToken={comboReloadToken}
-                        />
+                        <div className={s.mainTableScroll}>
+                            <MainTable
+                                headerPlan={headerPlan as any}
+                                showSubHeaders={showSubHeaders}
+                                onToggleSubHeaders={() => setShowSubHeaders((v) => !v)}
+                                onOpenDrill={handleOpenDrillFromMain}
+                                isAdding={isAdding}
+                                draft={draft}
+                                onDraftChange={(tcId, v) => setDraft((prev) => ({...prev, [tcId]: v}))}
+                                flatColumnsInRenderOrder={flatColumnsInRenderOrder}
+                                isColReadOnly={isColReadOnly}
+                                placeholderFor={(c) => c.placeholder ?? c.column_name}
+                                filteredRows={filteredRows}
+                                valueIndexByKey={valueIndexByKey}
+                                selectedKey={selectedKey}
+                                pkToKey={pkToKey}
+                                editingRowIdx={editingRowIdx}
+                                editDraft={editDraft}
+                                onEditDraftChange={(tcId, v) => setEditDraft((prev) => ({...prev, [tcId]: v}))}
+                                onSubmitEdit={submitEdit}
+                                onCancelEdit={cancelEdit}
+                                editSaving={editSaving}
+                                onRowClick={handleRowClick}
+                                onStartEdit={startEdit}
+                                onDeleteRow={deleteRow}
+                                deletingRowIdx={deletingRowIdx}
+                                comboReloadToken={comboReloadToken}
+                            />
+                        </div>
                     </div>
 
                     {/* SUB (появляется не всегда, свой скролл, высота меньше) */}

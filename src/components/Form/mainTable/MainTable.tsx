@@ -100,7 +100,7 @@ export const MainTable: React.FC<Props> = (p) => {
     const drillDisabled = p.disableDrillWhileEditing && p.editingRowIdx != null;
 
     return (
-        <div>
+        <div style={{paddingBottom:20}}>
             <table className={s.tbl}>
                 <colgroup>
                     {p.flatColumnsInRenderOrder.map((col, idx) => (
