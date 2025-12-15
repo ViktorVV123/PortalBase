@@ -1,1107 +1,220 @@
-import {useCallback, useRef, useState} from "react";
-import {api} from "@/services/api";
-import {WorkSpaceTypes} from "@/types/typesWorkSpaces";
-import {Connection} from "@/types/typesConnection";
+// src/shared/hooks/useWorkSpaces.ts
 
+/**
+ * ФАСАД для обратной совместимости
+ *
+ * Этот хук объединяет все доменные хуки в один интерфейс,
+ * чтобы существующий код продолжал работать без изменений.
+ *
+ * РЕКОМЕНДАЦИЯ: В новом коде используйте отдельные хуки напрямую:
+ * - useWorkspacesStore
+ * - useTablesStore
+ * - useWidgetsStore
+ * - useFormsStore
+ * - useConnectionsStore
+ */
 
+import { useCallback } from 'react';
+import { api } from '@/services/api';
 
-export interface DTable {
-    id: number;
-    workspace_id: number;
-    name: string;
-    description: string;
-    published: boolean;
-    select_query?: string;
-    insert_query?: string;
-    update_query?: string;
-    delete_query: string;
-}
+import { useWorkspacesStore } from './stores/useWorkspacesStore';
+import { useTablesStore } from './stores/useTablesStore';
+import { useWidgetsStore } from './stores/useWidgetsStore';
+import { useFormsStore } from './stores/useFormsStore';
+import { useConnectionsStore } from './stores/useConnectionsStore';
 
-export interface Column {
-    id: number;
-    table_id: number;
-    name: string;
-    description: string | null
-    datatype: string;
-    required: boolean;
-    length: number | null | string;
-    precision: number | null | string;
-    primary: boolean;
-    increment: boolean;
-    datetime: number | null | string | boolean;
-    // остальные поля по желанию
-}
+import type { DTable, Widget } from './stores/types';
 
-export type Widget = {
-    id: number;
-    table_id: number;
-    name: string;
-    description: string | null;
-    published: boolean;
-}
+// Re-export types for backward compatibility
+export type {
+    DTable,
+    Column,
+    Widget,
+    WidgetColumn,
+    ReferenceItem,
+    WidgetForm,
+    FormColumn,
+    FormRow,
+    DisplayedWidget,
+    FormDisplay,
+    SubDisplayedWidget,
+    SubFormColumn,
+    SubFormRow,
+    SubDisplay,
+    FormTreeColumn,
+    NewFormPayload,
+    NewSubWidgetItem,
+    NewTreeFieldItem,
+    AddFormRequest,
+} from './stores/types';
 
-
-export type WidgetColumn = {
-    widget_id: number;
-    alias: string | null;
-    column_order: number;
-    id: number;
-    reference: {
-        ref_column_order: number;
-        ref_alias: string | null;
-        combobox: any
-        form:any
-        // ↓ эти поля теперь на уровне reference
-        placeholder: string | null;
-        width: number;
-        type: string | null;
-        default: string | null;
-        visible: boolean;
-        readonly: boolean;
-
-        table_column: {
-            table_id: number;
-            name: string;
-            datatype: string;
-            precision: number | null;
-            increment: boolean;
-            id: number;
-            description: string | null;
-            length: number | null;
-            primary: boolean;
-            required: boolean;
-        };
-    }[];
-};
-
-
-
-/** Объект формы, связанной с «главным» виджетом */
-export type WidgetForm = {
-    main_widget_id: number;
-    name: string;
-    search_bar: boolean;
-    description: string | null;
-    path?: string | null;
-    form_id: number;
-    sub_widgets: {
-        widget_order: number;
-        sub_widget_id: number;
-        form_id: number;
-        where_conditional: string | null;
-    }[];
-    tree_fields: {
-        column_order: number;
-        table_column_id: number;
-    }[];
-    workspace: {
-        connection_id: number;
-        group: string | null;
-        description: string | null;
-        id: number,
-        name: string;
-    }
-};
-
-//типизация формы MAIN
-
-/** Колонка формы — один «столбец рендера» */
-export interface FormColumn {
-    // Порядки
-    column_order: number;                 // порядок групп (верхняя шапка)
-    ref_column_order: number | null;      // порядок внутри группы
-    combobox_column_order: number | null; // порядок внутри "комбо" вариантов
-
-    // Имена/подписи
-    column_name: string;            // заголовок группы
-    ref_column_name: string | null; // подпись подколонки (если нет combobox_alias)
-    combobox_alias: string | null;  // подпись комбо-варианта (приоритетнее ref_column_name)
-
-    // Привязки
-    widget_column_id: number;          // id группы
-    table_column_id: number | null;    // id таблицы (может отсутствовать у вычисляемых колонок)
-    combobox_column_id: number | null; // id колонки-комбо (для уникальности ключей)
-    form_id: number | null;            // для drill-ссылок
-
-    // Валидация/видимость/поведение
-    readonly: boolean | null;  // приходит в данных; иногда вместо этого могут быть другие флаги
-    required: boolean;
-    visible: boolean;          // по примеру тоже приходит true/false
-    width: number;
-
-    // Ввод/рендер
-    placeholder: string | null;
-    type: string | null | boolean;       // "combobox" и пр.
-    default: string | null;
-
-    // Доп. флаги (могут приходить)
-    published?: boolean;
-    primary?: boolean;
-    increment?: boolean;
-    read_only?: boolean;
-    is_readonly?: boolean;
-    meta?: { readonly?: boolean; [k: string]: unknown };
-}
-
-export interface FormRow {
-    primary_keys: Record<string, number | string>;
-    values: (string | number | null)[]; // порядок совпадает с FormDisplay.columns
-}
-
-
-
-/** Заголовок блока “displayed_widget” */
-export interface DisplayedWidget {
-    name: string;
-    description: string | null;
-}
-/** Итоговый объект ответа */
-export interface FormDisplay {
-    displayed_widget: DisplayedWidget;
-    columns: FormColumn[];
-    data: FormRow[];
-}
-
-
-export interface SubDisplayedWidget {
-    widget_order: number;
-    name: string;
-    description: string | null;
-}
-
-export interface SubFormColumn {
-    column_order: number;
-    column_name: string;
-    placeholder: string | null;
-    type: string | null;
-    default: string | null;
-    published: boolean;
-    required: boolean;
-    width: number;
-    widget_column_id: number;
-    table_column_id: number;
-    combobox_column_id:number
-}
-
-export interface SubFormRow {
-    primary_keys: Record<string, number | string>;
-    values: (number | string | null)[];
-}
-
-export interface SubDisplay {
-    sub_widgets: SubDisplayedWidget[];  // список заголовков
-    displayed_widget: SubDisplayedWidget;    // активный
-    columns: SubFormColumn[];
-    data: SubFormRow[];
-}
-
-export interface FormTreeColumn {
-    table_column_id: number;
-    name: string;
-    values: (string | number | null)[];
-}
-
-
-export type NewFormPayload = {
-    main_widget_id: number;
-    name: string;
-    description?: string | null;
-    path?: string | null;
-};
-
-export type NewSubWidgetItem = {
-    widget_order: number;
-    where_conditional?: string | null;
-    sub_widget_id: number;
-};
-
-export type NewTreeFieldItem = {
-    column_order: number;
-    table_column_id: number;
-};
-
-export type AddFormRequest = {
-    form: NewFormPayload;
-    sub_widgets_lst?: NewSubWidgetItem[];
-    tree_fields_lst?: NewTreeFieldItem[];
-};
-type RefPatch = Partial<{
-    ref_column_order: number;
-    width: number;
-    type: string | null;
-    ref_alias: string | null;
-    default: string | null;
-    placeholder: string | null;
-    visible: boolean;
-    readonly: boolean;
-}>;
-
-
-export type ReferenceItem = WidgetColumn['reference'][number];
-
-// shared/hooks/useWorkSpaces.ts
 export const useWorkSpaces = () => {
-    const [workSpaces, setWorkSpaces] = useState<WorkSpaceTypes[]>([]);
-    const [tablesByWs, setTablesByWs] = useState<Record<number, DTable[]>>({});
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    const [columns, setColumns] = useState<Column[]>([]);
-    const [selectedTable, setSelTable] = useState<DTable | null>(null);
-
-    // в начале useWorkSpaces
-    const workspacesStatusRef = useRef<'idle' | 'loading' | 'loaded' | 'forbidden'>('idle');
-
-    const forbiddenTablesWsRef = useRef<Set<number>>(new Set());
-
-
-    /* — список WS — */
-    const loadWorkSpaces = useCallback(
-        async (opts?: { force?: boolean }) => {
-            const force = opts?.force ?? false;
-
-            // 1) если не force и уже загрузили / запретили — выходим
-            if (!force) {
-                if (
-                    workspacesStatusRef.current === 'loading' ||
-                    workspacesStatusRef.current === 'loaded' ||
-                    workspacesStatusRef.current === 'forbidden'
-                ) {
-                    return;
-                }
-            }
-
-            workspacesStatusRef.current = 'loading';
-            setLoading(true);
-            setError(null);
-
-            try {
-                // ВАЖНО: сразу используем каноничный URL со слэшем
-                const { data } = await api.get<WorkSpaceTypes[]>('/workspaces/');
-                setWorkSpaces(data.sort((a, b) => a.id - b.id));
-                workspacesStatusRef.current = 'loaded';
-            } catch (e: any) {
-                const status = e?.response?.status;
-
-                if (status === 403) {
-                    workspacesStatusRef.current = 'forbidden';
-                    setError('У вас нет доступа к рабочим пространствам');
-                } else {
-                    workspacesStatusRef.current = 'idle'; // можно потом попробовать вручную ещё раз
-                    setError('Не удалось загрузить рабочие пространства');
-                }
-            } finally {
-                setLoading(false);
-            }
-        },
-        [],
-    );
-
-
-    const updateTableMeta = useCallback(
-        async (id: number, patch: Partial<DTable>) => {
-            try {
-                const {data} = await api.patch<DTable>(`/tables/${id}`, patch);
-
-                setTablesByWs(prev => {
-                    const copy = {...prev};
-                    const wsId = data.workspace_id;
-                    copy[wsId] = (copy[wsId] || []).map(t => t.id === id ? {...t, ...data} : t);
-                    return copy;
-                });
-
-                // 👇 Обновим selectedTable вручную
-                setSelTable(prev => prev && prev.id === id ? {...prev, ...data} : prev);
-            } catch (err) {
-                console.warn('Ошибка при обновлении таблицы:', err);
-            }
-        },
-        []
-    );
-
-
-    const loadColumns = useCallback(
-        async (table: DTable) => {
-            setLoading(true);
-            setError(null);
-            setSelTable(table);             // сохраняем выбрано-е имя
-            try {
-                const {data} = await api.get<Column[]>(`/tables/${table.id}/columns`);
-                setColumns(data.sort((a, b) => a.id - b.id));
-            } catch {
-                setError('Не удалось загрузить столбцы');
-            } finally {
-                setLoading(false);
-            }
-        },
-        [],
-    );
-
-
-    const [widgetsByTable, setWidgetsByTable] = useState<Record<number, Widget[]>>({});
-    const [widgetsLoading, setWidgetsLoading] = useState(false);
-    const [widgetsError, setWidgetsError] = useState<string | null>(null);
-
-    const [widgetColumns, setWidgetColumns] = useState<WidgetColumn[]>([]);
-    const [wColsLoading, setWColsLoading] = useState(false);
-    const [wColsError, setWColsError] = useState<string | null>(null);
-
-    const forbiddenWidgetsTablesRef = useRef<Set<number>>(new Set());
-
-    /* — Загрузка виджетов конкретной таблицы — */
-    const loadWidgetsForTable = useCallback(
-        async (tableId: number, force = false): Promise<Widget[]> => {
-            if (!force) {
-                if (forbiddenWidgetsTablesRef.current.has(tableId)) {
-                    return widgetsByTable[tableId] ?? [];
-                }
-                if (widgetsByTable[tableId]) {
-                    return widgetsByTable[tableId];
-                }
-            }
-
-            setWidgetsLoading(true);
-            setWidgetsError(null);
-
-            try {
-                const { data } = await api.get<Widget[]>('/widgets', {
-                    params: { table_id: tableId },
-                });
-
-                setWidgetsByTable(prev => ({ ...prev, [tableId]: data }));
-                forbiddenWidgetsTablesRef.current.delete(tableId);
-
-                return data;
-            } catch (e: any) {
-                const status = e?.response?.status;
-
-                if (status === 403 || status === 404) {
-                    forbiddenWidgetsTablesRef.current.add(tableId);
-                    setWidgetsError('Нет доступа к виджетам этой таблицы');
-                } else {
-                    setWidgetsError('Не удалось загрузить widgets');
-                }
-
-                return widgetsByTable[tableId] ?? [];
-            } finally {
-                setWidgetsLoading(false);
-            }
-        },
-        [widgetsByTable],
-    );
-
-
-    // ↓ добавьте сразу под addReference
-    /** GET /widgets/tables/references/{widgetColumnId} */
-    const fetchReferences = useCallback(
-        async (widgetColumnId: number) => {
-            const {data} = await api.get<ReferenceItem[]>(
-                `/widgets/tables/references/${widgetColumnId}`
-            );
-            return data;
-        },
-        [],
-    );
-
-
-    /** DELETE /widgets/tables/references/{widgetColumnId}/{tableColumnId} */
-    const deleteReference = useCallback(
-        async (widgetColumnId: number, tableColumnId: number) => {
-            await api.delete(
-                `/widgets/tables/references/${widgetColumnId}/${tableColumnId}`,
-            );
-        },
-        [],
-    );
-    // внутри useWorkSpaces
-    const updateWidgetMeta = useCallback(
-        async (id: number, patch: Partial<Widget>): Promise<Widget> => {
-            const {data} = await api.patch<Widget>(`/widgets/${id}`, patch);
-            setWidgetsByTable(prev => {
-                const tbl = data.table_id;
-                return {
-                    ...prev,
-                    [tbl]: (prev[tbl] ?? []).map(w => (w.id === id ? data : w)),
-                };
-            });
-            return data;
-        },
-        [setWidgetsByTable] // ← см. п.2
-    );
-
-
-    /** GET /widgets/{id}/columns */
-    const loadColumnsWidget = useCallback(async (widgetId: number) => {
-        setWColsLoading(true);
-        setWColsError(null);
-        try {
-            const {data} = await api.get<WidgetColumn[]>(`/widgets/${widgetId}/columns`);
-            setWidgetColumns(data.sort((a, b) => a.id - b.id));
-        } catch {
-            setWColsError('Не удалось загрузить столбцы виджета');
-        } finally {
-            setWColsLoading(false);
-        }
-    }, []);
-
-    //удалили workspace
-    const deleteWorkspace = useCallback(async (wsId: number) => {
-        setWorkSpaces(prev => prev.filter(w => w.id !== wsId));
-        setTablesByWs(prev => {
-            const clone = {...prev};
-            delete clone[wsId];
-            return clone;
-        });
-        try {
-            await api.delete(`/workspaces/${wsId}`);
-        } catch {
-            /* если не удалось ‒ перезагрузим список полностью */
-            await loadWorkSpaces();
-        }
-    }, [loadWorkSpaces]);
-
-    /* — таблицы конкретного WS — */
-    const loadTables = useCallback(
-        async (wsId: number, force = false): Promise<DTable[]> => {
-            // 1) если уже знаем, что для этого WS нет прав — выходим
-            if (!force && forbiddenTablesWsRef.current.has(wsId)) {
-                return tablesByWs[wsId] ?? [];
-            }
-
-            // 2) если уже есть кэш и нас не заставили force'ом — возвращаем кэш
-            if (!force && tablesByWs[wsId]) {
-                return tablesByWs[wsId];
-            }
-
-            try {
-                const { data } = await api.get<DTable[]>('/tables', {
-                    params: { workspace_id: wsId },
-                });
-
-                setTablesByWs(prev => ({ ...prev, [wsId]: data }));
-                // если получилось загрузить — точно есть права, снимаем блокировку
-                forbiddenTablesWsRef.current.delete(wsId);
-
-                return data;
-            } catch (e: any) {
-                const status = e?.response?.status;
-
-                if (status === 403 || status === 404) {
-                    forbiddenTablesWsRef.current.add(wsId);
-                }
-
-                // можно записать более точное сообщение, если хочешь
-                setError('Не удалось загрузить таблицы рабочей области');
-                return tablesByWs[wsId] ?? [];
-            }
-        },
-        [tablesByWs],
-    );
-
-
-    //ВСЕ О ТАБЛИЦАХ
-//удалили таблицу
-    const deleteTable = useCallback(
-        async (table: DTable) => {
-            /* ————————— 1. optimistic UI ————————— */
-            setTablesByWs(prev => {
-                const copy = {...prev};
-                copy[table.workspace_id] =
-                    (copy[table.workspace_id] ?? []).filter(t => t.id !== table.id);
-                return copy;
-            });
-
-            /* если мы просматривали именно эту таблицу — сбрасываем выбор */
-            if (selectedTable?.id === table.id) {
-                setSelTable(null);
-                setColumns([]);
-            }
-
-            try {
-                await api.delete(`/tables/${table.id}`);
-            } catch {
-                /* «откат» — подтягиваем свежий список с сервера */
-                await loadTables(table.workspace_id, /* force */ true);
-            }
-        },
-        [selectedTable, loadTables],
-    );
-
-
-    /** PATCH /tables/columns/{id}  — обновить одну колонку */
-    const updateTableColumn = useCallback(
-        async (id: number, patch: Partial<Omit<Column, 'id'>>) => {
-            try {
-                /* 1. запрос к бэку */
-                const {data} = await api.patch<Column>(`/tables/columns/${id}`, patch);
-
-                /* 2. локально подменяем в state */
-                setColumns(prev =>
-                    prev
-                        .map(col => (col.id === id ? {...col, ...data} : col))
-                        .sort((a, b) => a.id - b.id)           // порядок сохраняем
-                );
-            } catch {
-                setError('Ошибка при сохранении изменений');
-                throw new Error('update failed');
-            }
-        },
-        []
-    );
-
-
-    //удаляем строку в Table
-    const deleteColumnTable = useCallback(
-        async (id: number) => {
-            try {
-                await api.delete(`/tables/columns/${id}`);
-                setColumns(prev => prev.filter(c => c.id !== id));   // ← убираем локально
-            } catch {
-                setError('Ошибка при удалении столбца');
-                throw new Error('delete failed');
-            }
-        },
-        [],
-    );
-
-    /* сразу после updateTableMeta */
-    const publishTable = useCallback(
-        async (id: number): Promise<void> => {
-            try {
-                /* PATCH — сервер может вернуть 204 */
-                const res = await api.patch<DTable | ''>(`/tables/${id}/publish`);
-
-                /* если бэк вернул тело — используем его,
-                   иначе подтягиваем свежую таблицу */
-                const table: DTable = typeof res.data === 'object' && res.data !== null
-                    ? res.data
-                    : (await api.get<DTable>(`/tables/${id}`)).data;
-
-                /* синхронизируем кэши */
-                setTablesByWs(prev => {
-                    const wsId = table.workspace_id;
-                    return {
-                        ...prev,
-                        [wsId]: (prev[wsId] ?? []).map(t => t.id === id ? table : t),
-                    };
-                });
-                setSelTable(prev => (prev && prev.id === id ? table : prev));
-            } catch (err: any) {
-                if (err?.response?.status === 400) {
-                    throw new Error('Нужно указать хотя бы один PRIMARY KEY');
-                }
-                throw err;
-            }
-        },
-        [setTablesByWs, setSelTable],
-    );
-    //НАЧАЛО WIDGET (удаление ,update b т.д)
-
-    // useWorkSpaces.ts
-    const [formsByWidget, setFormsByWidget] = useState<Record<number, WidgetForm>>({});
-    const [formsById, setFormsById] = useState<Record<number, WidgetForm>>({});
-    const [formsListByWidget, setFormsListByWidget] = useState<Record<number, WidgetForm[]>>({});
-    const formsStatusRef = useRef<'idle' | 'loading' | 'loaded' | 'forbidden'>('idle');
-
-
-// общий нормалайзер
-    const normalizeForms = (data: WidgetForm[]) => {
-        const byWidget: Record<number, WidgetForm> = {};
-        const byId: Record<number, WidgetForm> = {};
-        const listByWidget: Record<number, WidgetForm[]> = {};
-
-        data.forEach(f => {
-            const sortedSubs = [...f.sub_widgets].sort((a, b) => a.widget_order - b.widget_order);
-            const normalized = {...f, sub_widgets: sortedSubs};
-
-            byId[f.form_id] = normalized;
-            (listByWidget[f.main_widget_id] ??= []).push(normalized);
-
-            // «дефолт» форма для совместимости (первая встреченная)
-            if (!byWidget[f.main_widget_id]) byWidget[f.main_widget_id] = normalized;
-        });
-
-        setFormsByWidget(byWidget);
-        setFormsById(byId);
-        setFormsListByWidget(listByWidget);
-    };
-
-    const loadWidgetForms = useCallback(async () => {
-        // уже грузим / уже загрузили / уже знаем, что запрещено
-        if (
-            formsStatusRef.current === 'loading' ||
-            formsStatusRef.current === 'loaded' ||
-            formsStatusRef.current === 'forbidden'
-        ) {
-            return;
-        }
-
-        formsStatusRef.current = 'loading';
-
-        try {
-            const { data } = await api.get<WidgetForm[]>('/forms/');
-            normalizeForms(data);
-            formsStatusRef.current = 'loaded';
-        } catch (e: any) {
-            const status = e?.response?.status;
-            console.warn('loadWidgetForms error', status ?? e);
-
-            if (status === 403) {
-                formsStatusRef.current = 'forbidden';
-                // если надо — можно завести отдельный formListError
-            } else {
-                formsStatusRef.current = 'idle'; // даём шанс ручному ретраю
-            }
-        }
-    }, []);
-
-
-    const reloadWidgetForms = useCallback(async () => {
-        const {data} = await api.get<WidgetForm[]>('/forms/');
-        normalizeForms(data);
-    }, []);
-
-
-    // ⬇️ создание формы
-    const addForm = useCallback(
-        async (payload: NewFormPayload | AddFormRequest) => {
-            // поддерживаем старый вызов: addForm({ main_widget_id, name, ... })
-            const body: AddFormRequest = 'form' in payload ? payload : {form: payload};
-
-            const {data} = await api.post<WidgetForm>('/forms/', body);
-
-            // аккуратно обновим кеш (если у тебя один form на widget — оставляем как есть)
-            setFormsByWidget(prev => ({
-                ...prev,
-                [data.main_widget_id]: {
-                    ...data,
-                    sub_widgets: [...data.sub_widgets].sort((a, b) => a.widget_order - b.widget_order)
-                }
-            }));
-
-            await reloadWidgetForms();
-            return data;
-        },
-        [reloadWidgetForms]
-    );
-
-    // ⬇️ НОВОЕ: удаление формы
-    const deleteForm = useCallback(async (formId: number) => {
-        try {
-            await api.delete(`/forms/${formId}`);
-        } catch (err: any) {
-            // на случай, если роут ожидает слэш
-            if (err?.response?.status === 404) {
-                await api.delete(`/forms/${formId}/`);
-            } else {
-                throw err;
-            }
-        }
-        await reloadWidgetForms(); // синхронизируем меню
-    }, [reloadWidgetForms]);
-
-
-    //удаляем строку в Widget
-    const deleteColumnWidget = useCallback(
-        async (widgetColumnId: number) => {
-            try {
-                await api.delete(`/widgets/columns/${widgetColumnId}`);
-
-                /* из стейта убираем весь объект WidgetColumnsOfTable с этим id */
-                setWidgetColumns(prev => prev.filter(wc => wc.id !== widgetColumnId));
-            } catch {
-                setError('Ошибка при удалении столбца виджета');
-            }
-        },
-        [],
-    );
-
-    const deleteWidget = useCallback(
-        async (widgetId: number, tableId: number) => {
-            try {
-                await api.delete(`/widgets/${widgetId}`);
-
-                /* 1. убираем из списка виджетов конкретной таблицы */
-                setWidgetsByTable(prev => ({
-                    ...prev,
-                    [tableId]: (prev[tableId] ?? []).filter(w => w.id !== widgetId),
-                }));
-
-                /* 2. если этот виджет сейчас открыт — очищаем его столбцы */
-                setWidgetColumns(prev => prev.filter(wc => wc.widget_id !== widgetId));
-            } catch {
-                setError('Ошибка при удалении виджета');
-            }
-        },
-        [],
-    );
-
-
-    /* ---------- WIDGET-COLUMNS PATCH  обновляем значения в widget/columns ---------- */
+    // ─────────────────────────────────────────────────────────────
+    // Инициализируем все доменные хуки
+    // ─────────────────────────────────────────────────────────────
+
+    const workspacesStore = useWorkspacesStore();
+    const tablesStore = useTablesStore();
+    const widgetsStore = useWidgetsStore();
+    const formsStore = useFormsStore();
+    const connectionsStore = useConnectionsStore();
+
+    // ─────────────────────────────────────────────────────────────
+    // Комбинированный loading/error (для обратной совместимости)
+    // ─────────────────────────────────────────────────────────────
+
+    const loading =
+        workspacesStore.loading ||
+        tablesStore.loading ||
+        widgetsStore.loading ||
+        formsStore.formLoading ||
+        connectionsStore.loading;
+
+    const error =
+        workspacesStore.error ||
+        tablesStore.error ||
+        widgetsStore.error ||
+        formsStore.formError ||
+        connectionsStore.error;
+
+    // ─────────────────────────────────────────────────────────────
+    // Адаптеры для совместимости API
+    // ─────────────────────────────────────────────────────────────
+
+    /**
+     * fetchWidgetAndTable — возвращает { widget, table }
+     * Старый API ожидает table, а не tableId
+     */
     const fetchWidgetAndTable = useCallback(async (widgetId: number) => {
-        // widget
-        let widget = Object.values(widgetsByTable)
+        const { widget, tableId } = await widgetsStore.fetchWidgetAndTable(widgetId);
+
+        // Ищем таблицу в кэше
+        let table = Object.values(tablesStore.tablesByWs)
             .flat()
-            .find(w => w?.id === widgetId);
+            .find(t => t?.id === tableId);
 
-        if (!widget) {
-            const {data} = await api.get<Widget>(`/widgets/${widgetId}`);
-            widget = data;
-            setWidgetsByTable(prev => ({
-                ...prev,
-                [data.table_id]: [data],        // кэшируем
-            }));
-        }
-
-
-        // table
-        let table = Object.values(tablesByWs)
-            .flat()
-            .find(t => t?.id === widget.table_id);
-
+        // Если нет в кэше — загружаем
         if (!table) {
-            const {data} = await api.get<DTable>(`/tables/${widget.table_id}`);
+            const { data } = await api.get<DTable>(`/tables/${tableId}`);
             table = data;
-            setTablesByWs(prev => ({
+
+            // Кэшируем
+            tablesStore.setTablesByWs(prev => ({
                 ...prev,
                 [data.workspace_id]: [...(prev[data.workspace_id] ?? []), data],
             }));
         }
 
-        return {widget, table};
-    }, [widgetsByTable, tablesByWs]);
+        return { widget, table };
+    }, [widgetsStore, tablesStore]);
 
-
-    const updateWidgetColumn = useCallback(
-        async (
-            id: number,
-            patch: Partial<Omit<WidgetColumn, 'id' | 'widget_id' | 'reference'>>
-        ) => {
-            const clean: any = {...patch};
-            ['alias', 'default', 'promt', 'column_order'].forEach(f => {
-                if (clean[f] === '') delete clean[f];
-            });
-
-            try {
-                const {data} = await api.patch<WidgetColumn>(`/widgets/columns/${id}`, clean);
-
-                setWidgetColumns(prev =>
-                    [...prev]                              // создаём копию
-                        .map(wc => (wc.id === id ? {...wc, ...data} : wc))
-                        .sort((a, b) => a.id - b.id)        // !!! сортируем по id
-                );
-            } catch {
-                setWColsError('Ошибка при сохранении столбца виджета');
-                throw new Error('update failed');
-            }
-        },
-        []
-    );
-
-    // useWorkSpaces.ts
-    const updateReference = useCallback(
-        async (widgetColumnId: number, tableColumnId: number, patch: RefPatch) => {
-            const {data} = await api.patch<ReferenceItem>(
-                `/widgets/tables/references/${widgetColumnId}/${tableColumnId}`,
-                patch
-            );
-            return data;
-        },
-        []
-    );
-
-
-
-    //ВСЕ ДЛЯ ФОРМ (они у нас самые последние из вывода таблиц и тд)
-    const [formTrees, setFormTrees] = useState<Record<number, FormTreeColumn[]>>({});
-    const [formTreeLoading, setFormTreeLoading] = useState(false);
-    const [formTreeError, setFormTreeError] = useState<string | null>(null);
-
-    const loadFormTree = useCallback(async (formId: number): Promise<void> => {
-        setFormTreeLoading(true);
-        setFormTreeError(null);
-        try {
-            const {data} = await api.post<FormTreeColumn[] | FormTreeColumn>(`/display/${formId}/tree`);
-
-            const normalized: FormTreeColumn[] = Array.isArray(data) ? data : [data];
-            setFormTrees(prev => ({...prev, [formId]: normalized}));
-        } catch (err: any) {
-            const status = err?.response?.status;
-
-            if (status === 403) {
-                setFormTreeError('Нет доступа к дереву фильтров формы');
-            } else if (status !== 404) {
-                // 404 можно считать "дерево не настроено"
-                setFormTreeError('Не удалось загрузить дерево фильтров');
-            }
-
-            console.warn('Не удалось загрузить справочники:', status ?? err);
-        } finally {
-            setFormTreeLoading(false);
-        }
-    }, []);
-
-
-    /* --- sub форма --- */
-    const [subDisplay, setSubDisplay] = useState<SubDisplay | null>(null);
-    const [subLoading, setSubLoading] = useState(false);
-    const [subError, setSubError] = useState<string | null>(null);
-
-    // useWorkSpaces.ts
-
-    const loadSubDisplay = useCallback(
-        async (formId: number, subOrder: number, primary?: Record<string, unknown>) => {
-            if (!formId) return;
-
-            setSubLoading(true);
-            setSubError(null);
-
-            try {
-                const params = new URLSearchParams({ sub_widget_order: String(subOrder) });
-
-                const body =
-                    primary && Object.keys(primary).length
-                        ? {
-                            primary_keys: Object.fromEntries(
-                                Object.entries(primary).map(([k, v]) => [k, v == null ? '' : String(v)])
-                            ),
-                        }
-                        : {};
-
-                const { data } = await api.post<SubDisplay>(`/display/${formId}/sub?${params}`, body);
-                setSubDisplay(data);
-            } catch (e: any) {
-                const status = e?.response?.status;
-
-                if (status === 403) {
-                    setSubError('Нет доступа к подформе');
-                } else if (status === 404) {
-                    setSubError('Подформа не найдена');
-                } else {
-                    setSubError(
-                        typeof e?.message === 'string'
-                            ? e.message
-                            : 'Ошибка загрузки подформы (subDisplay)'
-                    );
-                }
-
-                setSubDisplay(null);
-            } finally {
-                setSubLoading(false);
-            }
-        },
-        []
-    );
-
-
-    /* --- новое состояние --- */
-    const [formDisplay, setFormDisplay] = useState<FormDisplay | null>(null);
-    const [formLoading, setFormLoading] = useState(false);
-    const [formError, setFormError] = useState<string | null>(null);
-
-
-    /* --- загрузка таблицы формы --- */
-    const loadFormDisplay = useCallback(async (formId: number) => {
-        setFormLoading(true);
-        setFormError(null);
-        try {
-            const {data} = await api.post<FormDisplay>(`/display/${formId}/main`);
-            setFormDisplay(data);
-        } catch (e: any) {
-            const status = e?.response?.status;
-
-            if (status === 403) {
-                setFormError('У вас нет доступа к этой форме');
-            } else if (status === 404) {
-                setFormError('Форма не найдена');
-            } else {
-                setFormError('Не удалось загрузить данные формы');
-            }
-
-            setFormDisplay(null);
-        } finally {
-            setFormLoading(false);
-        }
-    }, []);
-
-
-    const loadFilteredFormDisplay = useCallback(
-        async (
-            formId: number,
-            filter: { table_column_id: number; value: string | number }
-        ) => {
-            try {
-                const payload = [filter]; // 👈 оборачиваем в массив
-
-                const {data} = await api.post<FormDisplay>(
-                    `/display/${formId}/main`,
-                    payload
-                );
-
-                setFormDisplay(data); // 👈 теперь данные отобразятся
-            } catch (e) {
-                console.warn('Ошибка при загрузке данных формы с фильтром:', e);
-            }
-        },
-        []
-    );
-
-
-//connections
-    const [connections, setConnections] = useState<Connection[]>([]);
-    const connectionsStatusRef = useRef<'idle' | 'loading' | 'loaded' | 'forbidden'>('idle');
-
-    const loadConnections = useCallback(
-        async (opts?: { force?: boolean }) => {
-            const force = opts?.force ?? false;
-
-            // 1) если уже грузим или запрещено/загружено — выходим ТОЛЬКО если не force
-            if (
-                !force &&
-                (connectionsStatusRef.current === 'loading' ||
-                    connectionsStatusRef.current === 'forbidden' ||
-                    connectionsStatusRef.current === 'loaded')
-            ) {
-                return;
-            }
-
-            connectionsStatusRef.current = 'loading';
-
-            setLoading(true);
-            try {
-                const { data } = await api.get<Connection[]>('/connections/');
-                setConnections(data.slice().sort((a, b) => a.id - b.id));
-                setError(null);
-                connectionsStatusRef.current = 'loaded';
-            } catch (e: any) {
-                const status = e?.response?.status;
-
-                if (status === 403) {
-                    connectionsStatusRef.current = 'forbidden';
-                    setError('У вас нет доступа к списку подключений');
-                } else {
-                    connectionsStatusRef.current = 'idle';
-                    setError('Не удалось загрузить список соединений');
-                }
-            } finally {
-                setLoading(false);
-            }
-        },
-        [],
-    );
-
-    /* ↓ рядом с loadConnections connections delete */
-    const deleteConnection = useCallback(async (id: number) => {
-        try {
-            await api.delete(`/connections/${id}`);
-            setConnections(prev => prev.filter(c => c.id !== id));  // убираем из стейта
-        } catch {
-            alert('Не удалось удалить подключение');
-        }
-    }, []);
-
-
-    // ↓ сразу после updateWidgetColumn
-    /* ↓ держим один-единственный аргумент – готовый payload */
-    const addWidgetColumn = useCallback(
-        async (payload: {
-            widget_id: number;
-            alias: string;
-            default: string;
-            placeholder: string;
-            visible: boolean;
-            type: string;
-            column_order: number;
-        }) => {
-            /* POST именно в коллекцию */
-            const {data} = await api.post<WidgetColumn>(
-                '/widgets/columns/',    // ← слэш на конце, как у всех остальных
-                payload,
-            );
-
-            /* подмешиваем сразу в стейт, чтобы не ждать доп. запроса */
-            setWidgetColumns(prev => [...prev, data].sort((a, b) => a.id - b.id));
-            return data;
-        },
-        [],
-    );
-
-
-    const deleteSubWidgetFromForm = useCallback(
-        async (formId: number, subWidgetId: number) => {
-            await api.delete(`/forms/${formId}/sub/${subWidgetId}`);
-        },
-        []
-    );
-
-    const deleteTreeFieldFromForm = useCallback(
-        async (formId: number, tableColumnId: number) => {
-            await api.delete(`/forms/${formId}/tree/${tableColumnId}`);
-        },
-        []
-    );
-
+    // ─────────────────────────────────────────────────────────────
+    // Возвращаем объединённый API (полная обратная совместимость)
+    // ─────────────────────────────────────────────────────────────
 
     return {
-        workSpaces,
-        loadWorkSpaces,
-        tablesByWs,      // <-- таблицы сгруппированы по WS
-        loadTables,
+        // ═══════════════════════════════════════════════════════════
+        // WORKSPACES
+        // ═══════════════════════════════════════════════════════════
+        workSpaces: workspacesStore.workSpaces,
+        loadWorkSpaces: workspacesStore.loadWorkSpaces,
+        deleteWorkspace: workspacesStore.deleteWorkspace,
+
+        // ═══════════════════════════════════════════════════════════
+        // TABLES
+        // ═══════════════════════════════════════════════════════════
+        tablesByWs: tablesStore.tablesByWs,
+        loadTables: tablesStore.loadTables,
+        deleteTable: tablesStore.deleteTable,
+        updateTableMeta: tablesStore.updateTableMeta,
+        publishTable: tablesStore.publishTable,
+        selectedTable: tablesStore.selectedTable,
+
+        // ═══════════════════════════════════════════════════════════
+        // COLUMNS (table)
+        // ═══════════════════════════════════════════════════════════
+        columns: tablesStore.columns,
+        loadColumns: tablesStore.loadColumns,
+        updateTableColumn: tablesStore.updateTableColumn,
+        deleteColumnTable: tablesStore.deleteColumnTable,
+
+        // ═══════════════════════════════════════════════════════════
+        // WIDGETS
+        // ═══════════════════════════════════════════════════════════
+        widgetsByTable: widgetsStore.widgetsByTable,
+        loadWidgetsForTable: widgetsStore.loadWidgetsForTable,
+        deleteWidget: widgetsStore.deleteWidget,
+        updateWidgetMeta: widgetsStore.updateWidgetMeta,
+        fetchWidgetAndTable, // Адаптированная версия
+        setWidgetsByTable: widgetsStore.setWidgetsByTable,
+
+        // ═══════════════════════════════════════════════════════════
+        // WIDGET COLUMNS
+        // ═══════════════════════════════════════════════════════════
+        widgetColumns: widgetsStore.widgetColumns,
+        wColsLoading: widgetsStore.loading,
+        wColsError: widgetsStore.error,
+        loadColumnsWidget: widgetsStore.loadColumnsWidget,
+        updateWidgetColumn: widgetsStore.updateWidgetColumn,
+        deleteColumnWidget: widgetsStore.deleteColumnWidget,
+        addWidgetColumn: widgetsStore.addWidgetColumn,
+
+        // ═══════════════════════════════════════════════════════════
+        // REFERENCES
+        // ═══════════════════════════════════════════════════════════
+        fetchReferences: widgetsStore.fetchReferences,
+        updateReference: widgetsStore.updateReference,
+        deleteReference: widgetsStore.deleteReference,
+
+        // ═══════════════════════════════════════════════════════════
+        // FORMS
+        // ═══════════════════════════════════════════════════════════
+        formsByWidget: formsStore.formsByWidget,
+        formsById: formsStore.formsById,
+        formsListByWidget: formsStore.formsListByWidget,
+        loadWidgetForms: formsStore.loadWidgetForms,
+        reloadWidgetForms: formsStore.reloadWidgetForms,
+        addForm: formsStore.addForm,
+        deleteForm: formsStore.deleteForm,
+        deleteSubWidgetFromForm: formsStore.deleteSubWidgetFromForm,
+        deleteTreeFieldFromForm: formsStore.deleteTreeFieldFromForm,
+
+        // ═══════════════════════════════════════════════════════════
+        // FORM DISPLAY
+        // ═══════════════════════════════════════════════════════════
+        formDisplay: formsStore.formDisplay,
+        formLoading: formsStore.formLoading,
+        formError: formsStore.formError,
+        loadFormDisplay: formsStore.loadFormDisplay,
+        loadFilteredFormDisplay: formsStore.loadFilteredFormDisplay,
+        setFormDisplay: formsStore.setFormDisplay,
+
+        // ═══════════════════════════════════════════════════════════
+        // SUB DISPLAY
+        // ═══════════════════════════════════════════════════════════
+        subDisplay: formsStore.subDisplay,
+        subLoading: formsStore.subLoading,
+        subError: formsStore.subError,
+        loadSubDisplay: formsStore.loadSubDisplay,
+        setSubDisplay: formsStore.setSubDisplay,
+
+        // ═══════════════════════════════════════════════════════════
+        // FORM TREE
+        // ═══════════════════════════════════════════════════════════
+        formTrees: formsStore.formTrees,
+        loadFormTree: formsStore.loadFormTree,
+
+        // ═══════════════════════════════════════════════════════════
+        // CONNECTIONS
+        // ═══════════════════════════════════════════════════════════
+        connections: connectionsStore.connections,
+        loadConnections: connectionsStore.loadConnections,
+        deleteConnection: connectionsStore.deleteConnection,
+
+        // ═══════════════════════════════════════════════════════════
+        // COMBINED STATE
+        // ═══════════════════════════════════════════════════════════
         loading,
         error,
-        columns,
-        loadColumns,
-        selectedTable,
-        loadWidgetsForTable,
-        widgetsByTable,
-        widgetsLoading,
-        widgetsError,
-        formsByWidget,
-        loadWidgetForms,
-        widgetColumns,
-        wColsLoading,
-        wColsError,
-        loadColumnsWidget,
-        loadFormDisplay,
-        formDisplay,
-        formLoading,
-        formError,
-        loadSubDisplay,
-        subDisplay,
-        subLoading,
-        subError,
-        deleteWorkspace,
-        deleteTable,
-        fetchWidgetAndTable,
-        deleteColumnTable,
-        deleteColumnWidget,
-        deleteWidget,
-        updateTableColumn,
-        updateWidgetColumn,
-        loadFormTree,
-        formTrees,
-        loadFilteredFormDisplay,
-        setFormDisplay,
-        setSubDisplay,
-        updateTableMeta,
-        connections,
-        loadConnections,
-        setWidgetsByTable,
-        fetchReferences,
-        deleteReference,
-        updateWidgetMeta,
-        addWidgetColumn,
-        publishTable,
-        deleteConnection,
-        updateReference,
-        addForm,
-        reloadWidgetForms,
-        formsListByWidget,     // ← НОВОЕ
-        deleteForm,
-        formsById,
-        deleteSubWidgetFromForm,
-        deleteTreeFieldFromForm,
-
-
-
     };
 };
