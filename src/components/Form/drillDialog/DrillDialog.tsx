@@ -604,6 +604,15 @@ export const DrillDialog: React.FC<Props> = ({
     }, [filteredRows]);
 
 
+    const [treeExpandedKeys, setTreeExpandedKeys] = useState<Set<string>>(new Set());
+    const [treeChildrenCache, setTreeChildrenCache] = useState<Record<string, FormTreeColumn[]>>({});
+
+
+    useEffect(() => {
+        setTreeExpandedKeys(new Set());
+        setTreeChildrenCache({});
+    }, [currentFormId]);
+
     return (
         <Dialog open={open} onClose={onClose} fullWidth maxWidth="xl">
             <DialogTitle style={{display: 'flex', gap: 8, alignItems: 'center'}}>
@@ -635,12 +644,29 @@ export const DrillDialog: React.FC<Props> = ({
                             {effectiveComboboxMode && hasTreeFields && (
                                 <TreeFormTable
                                     tree={liveTree}
-                                    widgetForm={currentForm}
-                                    activeExpandedKey={activeExpandedKey}
-                                    nestedTrees={nestedTrees}
-                                    handleResetFilters={handleResetFilters}
+                                    selectedFormId={currentFormId}
                                     handleNestedValueClick={handleNestedValueClick}
                                     handleTreeValueClick={handleTreeValueClick}
+                                    expandedKeys={treeExpandedKeys}
+                                    setExpandedKeys={setTreeExpandedKeys}
+                                    childrenCache={treeChildrenCache}
+                                    setChildrenCache={setTreeChildrenCache}
+                                    onFilterMain={async (filters) => {
+                                        if (!currentFormId) return;
+                                        try {
+                                            const { data } = await api.post<FormDisplay>(
+                                                `/display/${currentFormId}/main`,
+                                                filters.map((f) => ({ ...f, value: String(f.value) }))
+                                            );
+                                            setLocalDisplay(data);
+                                            setActiveFilters(filters);
+                                            setSelectedKey(null);
+                                            setLastPrimary({});
+                                            setSubDisplay(null);
+                                        } catch (e) {
+                                            console.warn('[DrillDialog] onFilterMain failed:', e);
+                                        }
+                                    }}
                                 />
                             )}
 

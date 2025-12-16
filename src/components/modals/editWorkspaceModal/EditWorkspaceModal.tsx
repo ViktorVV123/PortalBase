@@ -15,7 +15,8 @@ import {
     MenuItem,
 } from '@mui/material';
 import { dark } from '@/shared/themeUI/themeModal/ThemeModalUI';
-import type { Connection } from '@/types/typesConnection';
+import {Connection} from "@/shared/hooks/stores";
+
 
 type FormState = {
     name: string;

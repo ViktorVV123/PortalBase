@@ -14,7 +14,8 @@ import { TablesMenu } from '@/components/topComponent/tablesMenu/TablesMenu';
 import { WidgetsMenu } from '@/components/topComponent/widgetsMenu/WidgetsMenu';
 import { FormsMenu } from '@/components/topComponent/formsMenu/FormsMenu';
 import {ModalEditConnection} from "@/components/modals/modalEditConnection/ModalEditConnection";
-import {Connection} from "@/types/typesConnection";
+import {Connection} from "@/shared/hooks/stores";
+
 
 type Props = {
     workSpaces: WorkSpaceTypes[];

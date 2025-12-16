@@ -12,9 +12,10 @@ import DeleteIcon from '@/assets/image/DeleteIcon.svg';
 import EditIcon from '@/assets/image/EditIcon.svg';
 
 import {api} from '@/services/api';
-import {Connection} from '@/types/typesConnection';
+
 import * as styles from './ModalAddWorkspace.module.scss';
 import {dark} from '@/shared/themeUI/themeModal/ThemeModalUI';
+import {Connection} from "@/shared/hooks/stores";
 
 /** Если у твоего Connection уже есть эти поля — отдельный тип не нужен */
 type ConnectionItem = Connection & {

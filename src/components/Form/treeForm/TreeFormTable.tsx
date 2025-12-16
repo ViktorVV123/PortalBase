@@ -415,8 +415,7 @@ export const TreeFormTable: React.FC<TreeFormTableProps> = ({
                         {/* Заголовок */}
                         <div className={s.treeHeader}>
                             <span style={{fontWeight: 600}}>{treeColumn.name}</span>
-                            <button
-                                type="button"
+                            <div
                                 onClick={() => toggleSort(idx)}
                                 title={title}
                                 style={{
@@ -430,8 +429,8 @@ export const TreeFormTable: React.FC<TreeFormTableProps> = ({
                                     cursor: 'pointer',
                                 }}
                             >
-                                <SortIcon/>
-                            </button>
+                                <SortIcon className={s.iconTree} />
+                            </div>
                         </div>
 
                         {/* Корневые значения */}
