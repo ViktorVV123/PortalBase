@@ -16,7 +16,7 @@ import { useHeaderPlan } from '@/components/Form/formTable/hooks/useHeaderPlan';
 import { useFiltersTree } from '@/components/Form/formTable/hooks/useFiltersTree';
 import { useTreeHandlers } from '@/components/Form/treeForm/hooks/useTreeHandlers';
 import { useSubNav } from '@/components/Form/subForm/hook/useSubNav';
-import { useFormSearch } from '@/components/Form/formTable/hooks/useFormSearch';
+import { useFormSearch } from '@/components/search/hook/useFormSearch';
 import { useMainCrud } from '@/components/Form/mainTable/hook/useMainCrud';
 import { useSubCrud } from '@/components/Form/subForm/hook/useSubCrud';
 import { api } from '@/services/api';

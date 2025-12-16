@@ -52,6 +52,15 @@ export type RefRowProps = {
 const comboIdOf = (it: any, fallback: number) =>
     it?.combobox_column?.id ?? it?.combobox_column_id ?? it?.id ?? fallback;
 
+const whiteCheckboxSx = {
+    color: '#fff',
+    '&.Mui-checked': { color: '#fff' },
+    '&.MuiCheckbox-indeterminate': { color: '#fff' },
+    '&.Mui-disabled': { color: 'rgba(255,255,255,0.35)' },
+    '&:hover': { backgroundColor: 'rgba(255,255,255,0.08)' },
+} as const;
+
+
 export const RefRow: React.FC<RefRowProps> = ({
                                                   wcId,
                                                   r,
@@ -174,8 +183,16 @@ export const RefRow: React.FC<RefRowProps> = ({
             </Tooltip>
 
 
-            <td>{tblCol?.name ?? '—'}</td>
-            <td>{r.ref_alias ?? '—'}</td>
+            <td>
+                <Tooltip title={tblCol?.name ?? '—'} arrow enterDelay={350}>
+                    <span className={s.ellipsis}>{tblCol?.name ?? '—'}</span>
+                </Tooltip>
+            </td>
+            <td>
+                <Tooltip title={r.ref_alias ?? '—'} arrow enterDelay={350}>
+                    <span className={s.ellipsis}>{r.ref_alias ?? '—'}</span>
+                </Tooltip>
+            </td>
             <td>{type}</td>
 
             {/* readonly */}
@@ -188,7 +205,7 @@ export const RefRow: React.FC<RefRowProps> = ({
                 >
                     <Checkbox
                         size="small"
-                        sx={{color: 'search.white', '&.Mui-checked': {color: 'search.white'}}}
+                        sx={whiteCheckboxSx}
                         checked={!!r.readonly}
                         onChange={async (e) => {
                             const nextVal = e.target.checked;
@@ -238,7 +255,7 @@ export const RefRow: React.FC<RefRowProps> = ({
                 >
                     <Checkbox
                         size="small"
-                        sx={{color: 'search.white', '&.Mui-checked': {color: 'search.white'}}}
+                        sx={whiteCheckboxSx}
                         checked={visible}
                         onChange={async (e) => {
                             const nextVal = e.target.checked;

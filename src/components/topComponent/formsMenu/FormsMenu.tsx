@@ -6,7 +6,7 @@ import EditIcon from '@/assets/image/EditIcon.svg';
 import DeleteIcon from '@/assets/image/DeleteIcon.svg';
 import { DTable, Widget, WidgetForm } from '@/shared/hooks/useWorkSpaces';
 
-const clip = (str: string, n = 18) => (str.length > n ? str.slice(0, n) + '…' : str);
+const clip = (str: string, n = 40) => (str.length > n ? str.slice(0, n) + '…' : str);
 
 type Props = {
     table: DTable;

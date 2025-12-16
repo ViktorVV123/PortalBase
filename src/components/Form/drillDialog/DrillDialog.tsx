@@ -13,7 +13,7 @@ import {SubWormTable} from '@/components/Form/subForm/SubFormTable';
 import {useHeaderPlan} from '@/components/Form/formTable/hooks/useHeaderPlan';
 import {useFiltersTree} from '@/components/Form/formTable/hooks/useFiltersTree';
 import {useSubNav} from '@/components/Form/subForm/hook/useSubNav';
-import {useFormSearch} from '@/components/Form/formTable/hooks/useFormSearch';
+import {useFormSearch} from '@/components/search/hook/useFormSearch';
 import {useSubCrud} from '@/components/Form/subForm/hook/useSubCrud';
 import {useTreeHandlers} from '@/components/Form/treeForm/hooks/useTreeHandlers';
 import {useMainCrud} from '@/components/Form/mainTable/hook/useMainCrud';

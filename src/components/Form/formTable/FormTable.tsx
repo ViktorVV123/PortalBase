@@ -80,16 +80,43 @@ export const FormTable: React.FC<Props> = (props) => {
     }, [tree, selectedFormId]);
 
     // Загрузка дерева
+
     const loadFormTree = useCallback(async (formId: number) => {
         try {
             const { data } = await api.post<FormTreeColumn[] | FormTreeColumn>(
                 `/display/${formId}/tree`
             );
-            setLiveTree(Array.isArray(data) ? data : [data]);
-        } catch (e) {
-            console.warn('Не удалось загрузить дерево:', e);
+            const normalized = Array.isArray(data) ? data : [data];
+
+            const hasValidTree = normalized.length > 0 &&
+                normalized.some(t => t.values && t.values.length > 0);
+
+            setLiveTree(hasValidTree ? normalized : null);
+        } catch (e: any) {
+            if (e?.response?.status === 404) {
+                setLiveTree(null);
+            } else {
+                console.warn('Не удалось загрузить дерево:', e);
+            }
         }
     }, []);
+
+    useEffect(() => {
+        const handleFormMutated = async (e: CustomEvent<{ formId: number }>) => {
+            const mutatedFormId = e.detail?.formId;
+
+            if (mutatedFormId && mutatedFormId === selectedFormId) {
+                console.debug('[FormTable] Form mutated, reloading tree...', mutatedFormId);
+                await loadFormTree(mutatedFormId);
+            }
+        };
+
+        window.addEventListener('portal:form-mutated', handleFormMutated as EventListener);
+
+        return () => {
+            window.removeEventListener('portal:form-mutated', handleFormMutated as EventListener);
+        };
+    }, [selectedFormId, loadFormTree]);
 
     // Определяем currentForm для провайдера
     const currentForm = useMemo<WidgetForm | null>(() => {

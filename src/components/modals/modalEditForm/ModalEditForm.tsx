@@ -1,12 +1,16 @@
+// src/components/modals/ModalEditForm.tsx
+
 import React, {useMemo, useState, useEffect} from 'react';
 import {
     Dialog, DialogTitle, DialogContent, DialogActions,
     Tabs, Tab, Box, Stack, TextField, Button, MenuItem,
     FormControl, InputLabel, Select, createTheme, ThemeProvider,
-    IconButton, Tooltip, Autocomplete, CircularProgress, Divider, Alert, FormControlLabel, Switch, FormHelperText
+    IconButton, Tooltip, Autocomplete, CircularProgress, Divider,
+    Alert, FormControlLabel, Switch, Typography, Paper
 } from '@mui/material';
 import DeleteIcon from "@mui/icons-material/Delete";
 import AddIcon from "@mui/icons-material/Add";
+import SaveIcon from "@mui/icons-material/Save";
 import {WidgetForm, Widget, Column} from '@/shared/hooks/useWorkSpaces';
 import {api} from '@/services/api';
 
@@ -27,364 +31,97 @@ export const ModalEditForm: React.FC<Props> = ({
                                                }) => {
     const [tab, setTab] = useState<'main' | 'sub' | 'tree'>('main');
 
-    // ---------- MAIN ----------
+    // ═══════════════════════════════════════════════════════════
+    // HELPERS
+    // ═══════════════════════════════════════════════════════════
+
+    const [err, setErr] = useState<string | null>(null);
+    const [info, setInfo] = useState<string | null>(null);
+
+    const showError = (msg: string) => {
+        setErr(msg);
+        setTimeout(() => setErr(null), 5000);
+    };
+
+    const showSuccess = (msg: string = 'Сохранено') => {
+        setInfo(msg);
+        setTimeout(() => setInfo(null), 1500);
+    };
+
+    const emitFormMutated = (formId: number) => {
+        window.dispatchEvent(
+            new CustomEvent<{ formId: number }>('portal:form-mutated', {
+                detail: { formId }
+            })
+        );
+    };
+
+    // ═══════════════════════════════════════════════════════════
+    // MAIN STATE
+    // ═══════════════════════════════════════════════════════════
+
     const [mainName, setMainName] = useState(form.name);
     const [mainDesc, setMainDesc] = useState(form.description ?? '');
     const [mainPath, setMainPath] = useState<string>(form.path ?? '');
     const [mainWidgetId, setMainWidgetId] = useState<number>(form.main_widget_id);
-    const [savingMain, setSavingMain] = useState(false);
     const [mainSearchBar, setMainSearchBar] = useState<boolean>(!!form.search_bar);
+    const [savingMain, setSavingMain] = useState(false);
 
-    // Ошибки/уведомления
-    const [err, setErr] = useState<string | null>(null);
-    const [info, setInfo] = useState<string | null>(null);
+    // ═══════════════════════════════════════════════════════════
+    // LISTS STATE
+    // ═══════════════════════════════════════════════════════════
 
-    // ---------- Списки для выбора ----------
     const [availableWidgets, setAvailableWidgets] = useState<Widget[]>([]);
     const [availableColumns, setAvailableColumns] = useState<Column[]>([]);
     const [listsLoading, setListsLoading] = useState(false);
 
-    // Локальные списки связок (чтобы всё видно без перезагрузки)
-    // Локальные списки связок (чтобы всё видно без перезагрузки)
-    const initialSubList = form.sub_widgets ?? [];
-    const initialTreeList = form.tree_fields ?? [];
+    const [subList, setSubList] = useState(form.sub_widgets ?? []);
+    const [treeList, setTreeList] = useState(form.tree_fields ?? []);
 
-    const [subList, setSubList] = useState(initialSubList);
-    const [treeList, setTreeList] = useState(initialTreeList);
+    // ═══════════════════════════════════════════════════════════
+    // SUB STATE
+    // ═══════════════════════════════════════════════════════════
 
-// хелперы: следующий свободный order
-    const getNextSubOrder = (list: typeof subList | typeof initialSubList) =>
-        list.length ? Math.max(...list.map(it => it.widget_order ?? 0)) + 1 : 1;
-
-    const getNextTreeOrder = (list: typeof treeList | typeof initialTreeList) =>
-        list.length ? Math.max(...list.map(it => it.column_order ?? 0)) + 1 : 1;
-
-// защита от дублей order'ов
-    const hasSubOrderConflict = (order: number, ignoreSubWidgetId?: number) =>
-        subList.some(
-            s =>
-                (s.widget_order ?? 0) === order &&
-                (ignoreSubWidgetId == null || s.sub_widget_id !== ignoreSubWidgetId),
-        );
-
-    const hasTreeOrderConflict = (order: number, ignoreColumnId?: number) =>
-        treeList.some(
-            t =>
-                (t.column_order ?? 0) === order &&
-                (ignoreColumnId == null || t.table_column_id !== ignoreColumnId),
-        );
-
-
-    const emitFormMutated = (formId: number) =>
-        window.dispatchEvent(new CustomEvent('portal:form-mutated', {detail: {formId}}));
-
-    // Синхронизация при открытии / смене формы
-    useEffect(() => {
-        if (!open) return;
-        setErr(null);
-        setInfo(null);
-        const freshSubList = form.sub_widgets ?? [];
-        const freshTreeList = form.tree_fields ?? [];
-
-        setSubList(freshSubList);
-        setTreeList(freshTreeList);
-
-        setNewSubOrder(getNextSubOrder(freshSubList));
-        setNewTreeOrder(getNextTreeOrder(freshTreeList));
-        setMainName(form.name);
-        setMainDesc(form.description ?? '');
-        setMainPath(form.path ?? '');
-        setMainWidgetId(form.main_widget_id);
-        setMainSearchBar(!!form.search_bar);
-    }, [open, form]);
-
-    useEffect(() => {
-        if (!open) return;
-        let cancelled = false;
-        (async () => {
-            setListsLoading(true);
-            try {
-                const widgetsRes = await api.get<Widget[]>('/widgets');
-                const widgets = widgetsRes.data.sort((a, b) => a.id - b.id);
-                const mainW = widgets.find(w => w.id === form.main_widget_id);
-                const tableId = mainW?.table_id ?? widgets[0]?.table_id ?? null;
-                const colsRes = tableId
-                    ? await api.get<Column[]>(`/tables/${tableId}/columns`)
-                    : {data: [] as Column[]};
-                const cols = (colsRes as any).data.sort((a: Column, b: Column) => a.id - b.id);
-
-                if (!cancelled) {
-                    setAvailableWidgets(widgets);
-                    setAvailableColumns(cols);
-                }
-            } catch (e: any) {
-                if (!cancelled) setErr('Не удалось загрузить списки виджетов/колонок');
-            } finally {
-                if (!cancelled) setListsLoading(false);
-            }
-        })();
-        return () => {
-            cancelled = true;
-        };
-    }, [open, form.main_widget_id]);
-
-    // ---------- SUB (существующие) ----------
-    const [subId, setSubId] = useState<number>(subList[0]?.sub_widget_id ?? 0);
-    useEffect(() => {
-        // если список изменился и выбранный отсутствует — переключаемся
-        if (subList.length === 0) {
-            setSubId(0);
-        } else if (!subList.some(s => s.sub_widget_id === subId)) {
-            setSubId(subList[0].sub_widget_id);
-        }
-    }, [subList, subId]);
-
-    const currentSub = useMemo(
-        () => subList.find(s => s.sub_widget_id === subId) ?? subList[0],
-        [subId, subList]
-    );
-    const [subOrder, setSubOrder] = useState<number>(currentSub?.widget_order ?? 0);
-    const [subWhere, setSubWhere] = useState<string>(currentSub?.where_conditional ?? '');
+    const [subId, setSubId] = useState<number>(0);
+    const [subOrder, setSubOrder] = useState<number>(0);
+    const [subWhere, setSubWhere] = useState<string>('');
     const [savingSub, setSavingSub] = useState(false);
     const [deletingSub, setDeletingSub] = useState(false);
 
-    useEffect(() => {
-        if (currentSub) {
-            setSubOrder(currentSub.widget_order ?? 0);
-            setSubWhere(currentSub.where_conditional ?? '');
-        } else {
-            setSubOrder(0);
-            setSubWhere('');
-        }
-    }, [currentSub]);
-
-    const saveSub = async () => {
-        if (!subId) return;
-
-        setErr(null);
-        const order = Number(subOrder) || 0;
-
-        if (order <= 0) {
-            setErr('Порядок sub-виджета должен быть больше 0');
-            return;
-        }
-
-        if (hasSubOrderConflict(order, subId)) {
-            setErr(`Порядок ${order} уже занят другим sub-виджетом. Выбери другое значение.`);
-            return;
-        }
-
-        setSavingSub(true);
-        try {
-            const body = { widget_order: order, where_conditional: subWhere || null };
-            await api.patch(`/forms/${form.form_id}/sub/${subId}`, body);
-            setSubList(prev =>
-                prev.map(it =>
-                    it.sub_widget_id === subId
-                        ? { ...it, widget_order: body.widget_order, where_conditional: body.where_conditional }
-                        : it,
-                ),
-            );
-            emitFormMutated(form.form_id);
-            setInfo('Сохранено');
-            await reloadWidgetForms();
-        } catch (e: any) {
-            setErr('Не удалось сохранить sub');
-        } finally {
-            setSavingSub(false);
-            setTimeout(() => setInfo(null), 1200);
-        }
-    };
-
-
-    // ---------- TREE (существующие) ----------
-    const [treeColId, setTreeColId] = useState<number>(treeList[0]?.table_column_id ?? 0);
-    useEffect(() => {
-        if (treeList.length === 0) {
-            setTreeColId(0);
-        } else if (!treeList.some(t => t.table_column_id === treeColId)) {
-            setTreeColId(treeList[0].table_column_id);
-        }
-    }, [treeList, treeColId]);
-
-    const currentTree = useMemo(
-        () => treeList.find(t => t.table_column_id === treeColId) ?? treeList[0],
-        [treeColId, treeList]
-    );
-    const [treeOrder, setTreeOrder] = useState<number>(currentTree?.column_order ?? 0);
-    const [savingTree, setSavingTree] = useState(false);
-    const [deletingTree, setDeletingTree] = useState(false);
-
-    useEffect(() => {
-        if (currentTree) setTreeOrder(currentTree.column_order ?? 0);
-        else setTreeOrder(0);
-    }, [currentTree]);
-
-    const saveTree = async () => {
-        if (!treeColId) return;
-        setSavingTree(true);
-        setErr(null);
-        try {
-            const body = {column_order: Number(treeOrder)};
-            await api.patch(`/forms/${form.form_id}/tree/${treeColId}`, body);
-            setTreeList(prev => prev.map(it =>
-                it.table_column_id === treeColId ? {...it, column_order: body.column_order} : it
-            ));
-            setInfo('Сохранено');
-            emitFormMutated(form.form_id);
-            await reloadWidgetForms();
-        } catch (e: any) {
-            setErr('Не удалось сохранить tree');
-        } finally {
-            setSavingTree(false);
-            setTimeout(() => setInfo(null), 1200);
-        }
-    };
-
-    // ---------- Добавление новых ----------
-    const [newSubOrder, setNewSubOrder] = useState<number>(getNextSubOrder(initialSubList));
+    // New sub
+    const [newSubOrder, setNewSubOrder] = useState<number>(1);
     const [newSubWhere, setNewSubWhere] = useState<string>('');
     const [newSubWidget, setNewSubWidget] = useState<Widget | null>(null);
     const [addingSub, setAddingSub] = useState(false);
 
-    const [newTreeOrder, setNewTreeOrder] = useState<number>(getNextTreeOrder(initialTreeList));
+    // ═══════════════════════════════════════════════════════════
+    // TREE STATE
+    // ═══════════════════════════════════════════════════════════
+
+    const [treeColId, setTreeColId] = useState<number>(0);
+    const [treeOrder, setTreeOrder] = useState<number>(0);
+    const [savingTree, setSavingTree] = useState(false);
+    const [deletingTree, setDeletingTree] = useState(false);
+
+    // New tree
+    const [newTreeOrder, setNewTreeOrder] = useState<number>(1);
     const [newTreeColumn, setNewTreeColumn] = useState<Column | null>(null);
     const [addingTree, setAddingTree] = useState(false);
 
-    const addSub = async () => {
-        setErr(null);
-        if (!newSubWidget) return;
+    // ═══════════════════════════════════════════════════════════
+    // COMPUTED
+    // ═══════════════════════════════════════════════════════════
 
-        if (subList.some(s => s.sub_widget_id === newSubWidget.id)) {
-            setErr('Этот sub-виджет уже добавлен');
-            return;
-        }
+    const currentSub = useMemo(
+        () => subList.find(s => s.sub_widget_id === subId),
+        [subId, subList]
+    );
 
-        const order = Number(newSubOrder) || 0;
-        if (order <= 0) {
-            setErr('Порядок sub-виджета должен быть больше 0');
-            return;
-        }
-        if (hasSubOrderConflict(order)) {
-            setErr(`Порядок ${order} уже использует другой sub-виджет. Укажи свободный order.`);
-            return;
-        }
+    const currentTree = useMemo(
+        () => treeList.find(t => t.table_column_id === treeColId),
+        [treeColId, treeList]
+    );
 
-        setAddingSub(true);
-        try {
-            await api.post(`/forms/${form.form_id}/sub`, {
-                sub_widget_id: newSubWidget.id,
-                widget_order: order,
-                where_conditional: newSubWhere || null,
-            });
-
-            // важное место — тип берём из subList и НЕ теряем form_id
-            const newItem: (typeof subList)[number] = {
-                sub_widget_id: newSubWidget.id,
-                widget_order: order,
-                where_conditional: newSubWhere || null,
-                form_id: form.form_id,
-            };
-
-            setSubList(prev =>
-                [...prev, newItem].sort(
-                    (a, b) => (a.widget_order ?? 0) - (b.widget_order ?? 0),
-                ),
-            );
-
-            setSubId(newSubWidget.id);
-            emitFormMutated(form.form_id);
-            setNewSubWidget(null);
-            setNewSubWhere('');
-            setNewSubOrder(order + 1);
-
-            await reloadWidgetForms();
-        } catch (e: any) {
-            const status = e?.response?.status;
-            if (status === 409 || status === 400) {
-                setErr('Этот sub-виджет уже существует в форме');
-            } else {
-                setErr('Не удалось добавить sub-виджет');
-            }
-        } finally {
-            setAddingSub(false);
-        }
-    };
-
-
-    const addTree = async () => {
-        setErr(null);
-        if (!newTreeColumn) return;
-        if (treeList.some(t => t.table_column_id === newTreeColumn.id)) {
-            setErr('Это tree-поле уже добавлено');
-            return;
-        }
-        setAddingTree(true);
-        try {
-            await api.post(`/forms/${form.form_id}/tree`, {
-                table_column_id: newTreeColumn.id,
-                column_order: Number(newTreeOrder) || 0,
-            });
-            const newItem = {
-                table_column_id: newTreeColumn.id,
-                column_order: Number(newTreeOrder) || 0,
-            };
-            setTreeList(prev => [...prev, newItem].sort((a, b) => (a.column_order ?? 0) - (b.column_order ?? 0)));
-            setTreeColId(newTreeColumn.id);
-            setNewTreeColumn(null);
-            emitFormMutated(form.form_id);
-            setNewTreeOrder((prev) => (prev || 0) + 1);
-            await reloadWidgetForms();
-        } catch (e: any) {
-            const status = e?.response?.status;
-            if (status === 409 || status === 400) setErr('Это tree-поле уже существует в форме');
-            else setErr('Не удалось добавить tree-поле');
-        } finally {
-            setAddingTree(false);
-        }
-    };
-
-    // ---------- DELETE ----------
-    const deleteCurrentSub = async () => {
-        if (!subId) return;
-        if (!confirm('Удалить выбранный sub-виджет из формы?')) return;
-        setDeletingSub(true);
-        setErr(null);
-        try {
-            await deleteSubWidgetFromForm(form.form_id, subId);
-            // оптимистично удаляем
-            setSubList(prev => prev.filter(it => it.sub_widget_id !== subId));
-            setInfo('Удалено');
-            emitFormMutated(form.form_id);
-            await reloadWidgetForms();
-        } catch {
-            setErr('Не удалось удалить sub-виджет');
-        } finally {
-            setDeletingSub(false);
-            setTimeout(() => setInfo(null), 1200);
-        }
-    };
-
-    const deleteCurrentTree = async () => {
-        if (!treeColId) return;
-        if (!confirm('Удалить выбранное tree-поле из формы?')) return;
-        setDeletingTree(true);
-        setErr(null);
-        try {
-            await deleteTreeFieldFromForm(form.form_id, treeColId);
-            setTreeList(prev => prev.filter(it => it.table_column_id !== treeColId));
-            setInfo('Удалено');
-            emitFormMutated(form.form_id);
-            await reloadWidgetForms();
-        } catch {
-            setErr('Не удалось удалить tree-поле');
-        } finally {
-            setDeletingTree(false);
-            setTimeout(() => setInfo(null), 1200);
-        }
-    };
-
-    // удобные мапы
     const widgetById = useMemo(() => {
         const m = new Map<number, Widget>();
         availableWidgets.forEach(w => m.set(w.id, w));
@@ -397,187 +134,529 @@ export const ModalEditForm: React.FC<Props> = ({
         return m;
     }, [availableColumns]);
 
-    // ---------- MAIN PATCH ----------
+    const getNextSubOrder = () =>
+        subList.length ? Math.max(...subList.map(it => it.widget_order ?? 0)) + 1 : 1;
+
+    const getNextTreeOrder = () =>
+        treeList.length ? Math.max(...treeList.map(it => it.column_order ?? 0)) + 1 : 1;
+
+    // Проверка изменений для Sub
+    const subHasChanges = currentSub && (
+        subOrder !== (currentSub.widget_order ?? 0) ||
+        subWhere !== (currentSub.where_conditional ?? '')
+    );
+
+    // Проверка изменений для Tree
+    const treeHasChanges = currentTree && (
+        treeOrder !== (currentTree.column_order ?? 0)
+    );
+
+    // ═══════════════════════════════════════════════════════════
+    // EFFECTS
+    // ═══════════════════════════════════════════════════════════
+
+    // Синхронизация при открытии
+    useEffect(() => {
+        if (!open) return;
+
+        setErr(null);
+        setInfo(null);
+
+        const freshSubList = form.sub_widgets ?? [];
+        const freshTreeList = form.tree_fields ?? [];
+
+        setSubList(freshSubList);
+        setTreeList(freshTreeList);
+
+        setMainName(form.name);
+        setMainDesc(form.description ?? '');
+        setMainPath(form.path ?? '');
+        setMainWidgetId(form.main_widget_id);
+        setMainSearchBar(!!form.search_bar);
+
+        // Reset selections
+        setSubId(freshSubList[0]?.sub_widget_id ?? 0);
+        setTreeColId(freshTreeList[0]?.table_column_id ?? 0);
+
+        setNewSubOrder(freshSubList.length ? Math.max(...freshSubList.map(it => it.widget_order ?? 0)) + 1 : 1);
+        setNewTreeOrder(freshTreeList.length ? Math.max(...freshTreeList.map(it => it.column_order ?? 0)) + 1 : 1);
+
+        setNewSubWidget(null);
+        setNewSubWhere('');
+        setNewTreeColumn(null);
+    }, [open, form]);
+
+    // Загрузка списков
+    useEffect(() => {
+        if (!open) return;
+        let cancelled = false;
+
+        (async () => {
+            setListsLoading(true);
+            try {
+                const widgetsRes = await api.get<Widget[]>('/widgets');
+                const widgets = widgetsRes.data.sort((a, b) => a.id - b.id);
+
+                const mainW = widgets.find(w => w.id === form.main_widget_id);
+                const tableId = mainW?.table_id ?? widgets[0]?.table_id ?? null;
+
+                const colsRes = tableId
+                    ? await api.get<Column[]>(`/tables/${tableId}/columns`)
+                    : { data: [] as Column[] };
+                const cols = colsRes.data.sort((a: Column, b: Column) => a.id - b.id);
+
+                if (!cancelled) {
+                    setAvailableWidgets(widgets);
+                    setAvailableColumns(cols);
+                }
+            } catch {
+                if (!cancelled) showError('Не удалось загрузить списки');
+            } finally {
+                if (!cancelled) setListsLoading(false);
+            }
+        })();
+
+        return () => { cancelled = true; };
+    }, [open, form.main_widget_id]);
+
+    // Синхронизация выбранного sub
+    useEffect(() => {
+        if (subList.length === 0) {
+            setSubId(0);
+        } else if (!subList.some(s => s.sub_widget_id === subId)) {
+            setSubId(subList[0].sub_widget_id);
+        }
+    }, [subList, subId]);
+
+    useEffect(() => {
+        if (currentSub) {
+            setSubOrder(currentSub.widget_order ?? 0);
+            setSubWhere(currentSub.where_conditional ?? '');
+        }
+    }, [currentSub]);
+
+    // Синхронизация выбранного tree
+    useEffect(() => {
+        if (treeList.length === 0) {
+            setTreeColId(0);
+        } else if (!treeList.some(t => t.table_column_id === treeColId)) {
+            setTreeColId(treeList[0].table_column_id);
+        }
+    }, [treeList, treeColId]);
+
+    useEffect(() => {
+        if (currentTree) {
+            setTreeOrder(currentTree.column_order ?? 0);
+        }
+    }, [currentTree]);
+
+    // ═══════════════════════════════════════════════════════════
+    // HANDLERS - MAIN
+    // ═══════════════════════════════════════════════════════════
+
     const saveMain = async () => {
         setSavingMain(true);
         setErr(null);
         try {
-            const patch: any = {};
+            const patch: Record<string, unknown> = {};
+
             if (mainWidgetId !== form.main_widget_id) patch.main_widget_id = mainWidgetId;
             if (mainName !== form.name) patch.name = mainName;
             if ((mainDesc || null) !== (form.description ?? null)) patch.description = mainDesc || null;
-            if ((mainPath || null) !== (form.path ?? null)) {
-                patch.path = mainPath || null;
-            }
+            if ((mainPath || null) !== (form.path ?? null)) patch.path = mainPath || null;
             if (Boolean(form.search_bar) !== mainSearchBar) patch.search_bar = mainSearchBar;
 
             if (Object.keys(patch).length > 0) {
                 await api.patch(`/forms/${form.form_id}`, patch);
+                emitFormMutated(form.form_id);
                 await reloadWidgetForms();
+                showSuccess();
             }
-            onClose();
         } catch {
-            setErr('Не удалось сохранить основные параметры формы');
+            showError('Не удалось сохранить');
         } finally {
             setSavingMain(false);
         }
     };
 
+    // ═══════════════════════════════════════════════════════════
+    // HANDLERS - SUB
+    // ═══════════════════════════════════════════════════════════
+
+    const saveSub = async () => {
+        if (!subId || !currentSub) return;
+
+        const order = Number(subOrder) || 0;
+        if (order <= 0) {
+            showError('Порядок должен быть больше 0');
+            return;
+        }
+
+        // Проверка конфликта order
+        if (subList.some(s => s.widget_order === order && s.sub_widget_id !== subId)) {
+            showError(`Порядок ${order} уже занят`);
+            return;
+        }
+
+        setSavingSub(true);
+        try {
+            const body = { widget_order: order, where_conditional: subWhere || null };
+            await api.patch(`/forms/${form.form_id}/sub/${subId}`, body);
+
+            setSubList(prev => prev.map(it =>
+                it.sub_widget_id === subId
+                    ? { ...it, widget_order: order, where_conditional: subWhere || null }
+                    : it
+            ));
+
+            emitFormMutated(form.form_id);
+            showSuccess();
+            await reloadWidgetForms();
+        } catch {
+            showError('Не удалось сохранить');
+        } finally {
+            setSavingSub(false);
+        }
+    };
+
+    const addSub = async () => {
+        if (!newSubWidget) return;
+
+        if (subList.some(s => s.sub_widget_id === newSubWidget.id)) {
+            showError('Этот виджет уже добавлен');
+            return;
+        }
+
+        const order = Number(newSubOrder) || 0;
+        if (order <= 0) {
+            showError('Порядок должен быть больше 0');
+            return;
+        }
+
+        if (subList.some(s => s.widget_order === order)) {
+            showError(`Порядок ${order} уже занят`);
+            return;
+        }
+
+        setAddingSub(true);
+        try {
+            await api.post(`/forms/${form.form_id}/sub`, {
+                sub_widget_id: newSubWidget.id,
+                widget_order: order,
+                where_conditional: newSubWhere || null,
+            });
+
+            const newItem = {
+                sub_widget_id: newSubWidget.id,
+                widget_order: order,
+                where_conditional: newSubWhere || null,
+                form_id: form.form_id,
+            };
+
+            setSubList(prev => [...prev, newItem].sort((a, b) => (a.widget_order ?? 0) - (b.widget_order ?? 0)));
+            setSubId(newSubWidget.id);
+
+            setNewSubWidget(null);
+            setNewSubWhere('');
+            setNewSubOrder(order + 1);
+
+            emitFormMutated(form.form_id);
+            showSuccess('Добавлено');
+            await reloadWidgetForms();
+        } catch (e: any) {
+            const status = e?.response?.status;
+            showError(status === 409 || status === 400
+                ? 'Этот виджет уже существует'
+                : 'Не удалось добавить'
+            );
+        } finally {
+            setAddingSub(false);
+        }
+    };
+
+    const deleteSub = async () => {
+        if (!subId) return;
+        if (!confirm('Удалить sub-виджет?')) return;
+
+        setDeletingSub(true);
+        try {
+            await deleteSubWidgetFromForm(form.form_id, subId);
+            setSubList(prev => prev.filter(it => it.sub_widget_id !== subId));
+            emitFormMutated(form.form_id);
+            showSuccess('Удалено');
+            await reloadWidgetForms();
+        } catch {
+            showError('Не удалось удалить');
+        } finally {
+            setDeletingSub(false);
+        }
+    };
+
+    // ═══════════════════════════════════════════════════════════
+    // HANDLERS - TREE
+    // ═══════════════════════════════════════════════════════════
+
+    const saveTree = async () => {
+        if (!treeColId || !currentTree) return;
+
+        const order = Number(treeOrder) || 0;
+
+        if (treeList.some(t => t.column_order === order && t.table_column_id !== treeColId)) {
+            showError(`Порядок ${order} уже занят`);
+            return;
+        }
+
+        setSavingTree(true);
+        try {
+            await api.patch(`/forms/${form.form_id}/tree/${treeColId}`, { column_order: order });
+
+            setTreeList(prev => prev.map(it =>
+                it.table_column_id === treeColId ? { ...it, column_order: order } : it
+            ));
+
+            emitFormMutated(form.form_id);
+            showSuccess();
+            await reloadWidgetForms();
+        } catch {
+            showError('Не удалось сохранить');
+        } finally {
+            setSavingTree(false);
+        }
+    };
+
+    const addTree = async () => {
+        if (!newTreeColumn) return;
+
+        if (treeList.some(t => t.table_column_id === newTreeColumn.id)) {
+            showError('Это поле уже добавлено');
+            return;
+        }
+
+        setAddingTree(true);
+        try {
+            const order = Number(newTreeOrder) || 0;
+
+            await api.post(`/forms/${form.form_id}/tree`, {
+                table_column_id: newTreeColumn.id,
+                column_order: order,
+            });
+
+            const newItem = { table_column_id: newTreeColumn.id, column_order: order };
+
+            setTreeList(prev => [...prev, newItem].sort((a, b) => (a.column_order ?? 0) - (b.column_order ?? 0)));
+            setTreeColId(newTreeColumn.id);
+
+            setNewTreeColumn(null);
+            setNewTreeOrder(order + 1);
+
+            emitFormMutated(form.form_id);
+            showSuccess('Добавлено');
+            await reloadWidgetForms();
+        } catch (e: any) {
+            const status = e?.response?.status;
+            showError(status === 409 || status === 400
+                ? 'Это поле уже существует'
+                : 'Не удалось добавить'
+            );
+        } finally {
+            setAddingTree(false);
+        }
+    };
+
+    const deleteTree = async () => {
+        if (!treeColId) return;
+        if (!confirm('Удалить tree-поле?')) return;
+
+        setDeletingTree(true);
+        try {
+            await deleteTreeFieldFromForm(form.form_id, treeColId);
+            setTreeList(prev => prev.filter(it => it.table_column_id !== treeColId));
+            emitFormMutated(form.form_id);
+            showSuccess('Удалено');
+            await reloadWidgetForms();
+        } catch {
+            showError('Не удалось удалить');
+        } finally {
+            setDeletingTree(false);
+        }
+    };
+
+    // ═══════════════════════════════════════════════════════════
+    // RENDER
+    // ═══════════════════════════════════════════════════════════
+
+    const clearPaperSx = {
+        bgcolor: 'transparent',
+        backgroundImage: 'none', // важно для MUI dark overlay
+    } as const;
 
     return (
         <ThemeProvider theme={dark}>
             <Dialog open={open} onClose={onClose} fullWidth maxWidth="md">
-                <DialogTitle>Редактирование формы (ID: {form.form_id})</DialogTitle>
+                <DialogTitle>
+                    Редактирование формы #{form.form_id}
+                    <Typography variant="body2" color="text.secondary">
+                        {form.name}
+                    </Typography>
+                </DialogTitle>
 
                 <Tabs value={tab} onChange={(_, v) => setTab(v)} variant="fullWidth">
-                    <Tab value="main" label="Main form"/>
-                    <Tab value="sub" label="Sub forms"/>
-                    <Tab value="tree" label="Tree fields"/>
+                    <Tab value="main" label="Основное" />
+                    <Tab value="sub" label={`Sub-виджеты (${subList.length})`} />
+                    <Tab value="tree" label={`Tree-поля (${treeList.length})`} />
                 </Tabs>
 
                 <DialogContent dividers>
-                    {!!err && <Alert severity="error" sx={{mb: 2}}>{err}</Alert>}
-                    {!!info && <Alert severity="success" sx={{mb: 2}}>{info}</Alert>}
+                    {err && <Alert severity="error" sx={{ mb: 2 }}>{err}</Alert>}
+                    {info && <Alert severity="success" sx={{ mb: 2 }}>{info}</Alert>}
 
-                    {/* MAIN */}
+                    {/* ═══════════════ MAIN TAB ═══════════════ */}
                     {tab === 'main' && (
-                        <Box mt={1}>
-                            <Stack spacing={2}>
-                                <TextField
-                                    label="Main widget ID"
-                                    type="number"
-                                    value={mainWidgetId}
-                                    onChange={e => setMainWidgetId(Number(e.target.value))}
-                                />
-                                <TextField label="Name" value={mainName} onChange={e => setMainName(e.target.value)}/>
-                                <TextField label="Description" value={mainDesc}
-                                           onChange={e => setMainDesc(e.target.value)}/>
-                                <TextField label="Path" value={mainPath} onChange={e => setMainPath(e.target.value)}/>
-                                <Box
-                                    sx={{
-                                        p: 1.5,
-                                    }}
-                                >
-                                    <Stack direction="row" alignItems="center" justifyContent="space-between">
-                                        <Box>
-                                            <Box sx={{fontWeight: 600}}>Строка поиска</Box>
-                                        </Box>
-                                        <FormControlLabel
-                                            control={
-                                                <Switch
-                                                    checked={mainSearchBar}
-                                                    onChange={(e) => setMainSearchBar(e.target.checked)}
-                                                    color="primary"
-                                                />
-                                            }
-                                            label={mainSearchBar ? 'Включена' : 'Выключена'}
-                                            sx={{m: 0}}
+                        <Stack spacing={2} sx={{ mt: 1 }}>
+                            <TextField
+                                label="Main widget ID"
+                                type="number"
+                                value={mainWidgetId}
+                                onChange={e => setMainWidgetId(Number(e.target.value))}
+                            />
+                            <TextField
+                                label="Название"
+                                value={mainName}
+                                onChange={e => setMainName(e.target.value)}
+                            />
+                            <TextField
+                                label="Описание"
+                                value={mainDesc}
+                                onChange={e => setMainDesc(e.target.value)}
+                            />
+                            <TextField
+                                label="Path"
+                                value={mainPath}
+                                onChange={e => setMainPath(e.target.value)}
+                            />
+
+                            <Stack direction="row" alignItems="center" justifyContent="space-between">
+                                <Typography>Строка поиска</Typography>
+                                <FormControlLabel
+                                    control={
+                                        <Switch
+                                            checked={mainSearchBar}
+                                            onChange={e => setMainSearchBar(e.target.checked)}
                                         />
-                                    </Stack>
-                                </Box>
+                                    }
+                                    label={mainSearchBar ? 'Вкл' : 'Выкл'}
+                                />
                             </Stack>
-                        </Box>
+                        </Stack>
                     )}
 
-                    {/* SUB */}
+                    {/* ═══════════════ SUB TAB ═══════════════ */}
                     {tab === 'sub' && (
-                        <Box mt={1}>
-                            <Stack spacing={3}>
-                                {subList.length > 0 ? (
-                                    <>
-                                        {/* Редактирование существующих — автосейв по blur */}
-                                        <Stack spacing={2}>
-                                            <Stack  direction="row" alignItems="center" spacing={1}>
-                                                <FormControl fullWidth>
-                                                    <InputLabel id="sub-select-label">Выбери sub-виджет (уже
-                                                        привязан)</InputLabel>
-                                                    <Select
-                                                        labelId="sub-select-label"
-                                                        label="Выбери sub-виджет (уже привязан)"
-                                                        value={subId || ''}
-                                                        onChange={e => setSubId(Number(e.target.value))}
-                                                    >
-                                                        {subList.map(s => (
-                                                            <MenuItem key={s.sub_widget_id} value={s.sub_widget_id}>
-                                                                #{s.sub_widget_id} • order: {s.widget_order ?? 0}
-                                                                {widgetById.get(s.sub_widget_id) ? ` • ${widgetById.get(s.sub_widget_id)!.name}` : ''}
-                                                            </MenuItem>
-                                                        ))}
-                                                    </Select>
-                                                </FormControl>
+                        <Stack spacing={3} sx={{ mt: 1 }}>
+                            {/* Существующие */}
+                            {subList.length > 0 && (
+                                <Paper variant="outlined" sx={{ p: 2, ...clearPaperSx }}>
+                                    <Typography variant="subtitle2" gutterBottom>
+                                        Редактирование
+                                    </Typography>
 
-                                                <Tooltip title="Удалить sub-виджет">
-                          <span>
-                            <IconButton
-                                color="primary"
-                                onClick={deleteCurrentSub}
-                                disabled={!subId || deletingSub}
-                                size="small"
-                            >
-                              <DeleteIcon/>
-                            </IconButton>
-                          </span>
-                                                </Tooltip>
-                                            </Stack>
+                                    <Stack spacing={2}>
+                                        <Stack direction="row" spacing={1} alignItems="center">
+                                            <FormControl fullWidth size="small">
+                                                <InputLabel>Sub-виджет</InputLabel>
+                                                <Select
+                                                    label="Sub-виджет"
+                                                    value={subId || ''}
+                                                    onChange={e => setSubId(Number(e.target.value))}
+                                                >
+                                                    {subList.map(s => (
+                                                        <MenuItem key={s.sub_widget_id} value={s.sub_widget_id}>
+                                                            #{s.sub_widget_id} • order: {s.widget_order ?? 0}
+                                                            {widgetById.get(s.sub_widget_id)?.name
+                                                                ? ` • ${widgetById.get(s.sub_widget_id)!.name}`
+                                                                : ''
+                                                            }
+                                                        </MenuItem>
+                                                    ))}
+                                                </Select>
+                                            </FormControl>
 
+                                            <Tooltip title="Удалить">
+                                                <IconButton
+                                                    onClick={deleteSub}
+                                                    disabled={!subId || deletingSub}
+                                                    color="error"
+                                                    size="small"
+                                                >
+                                                    <DeleteIcon />
+                                                </IconButton>
+                                            </Tooltip>
+                                        </Stack>
+
+                                        <Stack direction="row" spacing={2}>
                                             <TextField
-                                                label="widget_order"
+                                                label="Порядок"
                                                 type="number"
+                                                size="small"
                                                 value={subOrder}
                                                 onChange={e => setSubOrder(Number(e.target.value))}
-                                                onBlur={saveSub}
-                                                disabled={savingSub}
+                                                sx={{ width: 120 }}
                                             />
                                             <TextField
                                                 label="where_conditional"
+                                                size="small"
                                                 value={subWhere}
                                                 onChange={e => setSubWhere(e.target.value)}
-                                                onBlur={saveSub}
-                                                disabled={savingSub}
+                                                sx={{ flex: 1 }}
                                             />
+                                            <Button
+                                                variant="contained"
+                                                size="small"
+                                                startIcon={<SaveIcon />}
+                                                onClick={saveSub}
+                                                disabled={savingSub || !subHasChanges}
+                                            >
+                                                {savingSub ? '...' : 'Сохранить'}
+                                            </Button>
                                         </Stack>
+                                    </Stack>
+                                </Paper>
+                            )}
 
-                                        <Divider/>
-                                    </>
-                                ) : null}
+                            {/* Добавление нового */}
+                            <Paper variant="outlined" sx={{ p: 2, ...clearPaperSx }}>
+                                <Typography variant="subtitle2" gutterBottom>
+                                    Добавить новый
+                                </Typography>
 
-                                {/* Добавление нового — показывается всегда (и единственный блок если нет ни одного) */}
-                                <Stack
-                                    direction="row"
-                                    alignItems="center"
-                                    sx={{
-                                        flexWrap: 'wrap',
-                                        rowGap: 1,
-                                        columnGap: 1, // горизонтальные отступы вместо spacing
-                                    }}
-                                >
+                                <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
                                     <TextField
-                                        label="Порядок (widget_order)"
+                                        label="Порядок"
                                         type="number"
                                         size="small"
                                         value={newSubOrder}
                                         onChange={e => setNewSubOrder(Number(e.target.value))}
-                                        sx={{ width: 210 }}
+                                        sx={{ width: 100 }}
                                     />
 
                                     <Autocomplete
-                                        sx={{ minWidth: 320, flex: '0 0 auto' }}
+                                        sx={{ minWidth: 280 }}
+                                        size="small"
                                         options={availableWidgets.filter(w => w.id !== form.main_widget_id)}
                                         loading={listsLoading}
                                         value={newSubWidget}
                                         onChange={(_, val) => setNewSubWidget(val)}
-                                        getOptionLabel={w => (w ? `${w.name}  (#${w.id}) · tbl:${w.table_id}` : '')}
+                                        getOptionLabel={w => w ? `${w.name} (#${w.id})` : ''}
                                         isOptionEqualToValue={(a, b) => a.id === b.id}
                                         renderInput={params => (
                                             <TextField
                                                 {...params}
-                                                label="Sub-widget (по имени)"
-                                                size="small"
+                                                label="Виджет"
                                                 InputProps={{
                                                     ...params.InputProps,
                                                     endAdornment: (
                                                         <>
-                                                            {listsLoading ? <CircularProgress size={16} /> : null}
+                                                            {listsLoading && <CircularProgress size={16} />}
                                                             {params.InputProps.endAdornment}
                                                         </>
                                                     ),
@@ -587,148 +666,160 @@ export const ModalEditForm: React.FC<Props> = ({
                                     />
 
                                     <TextField
-                                        label="where_conditional (SQL)"
+                                        label="where_conditional"
                                         size="small"
                                         value={newSubWhere}
                                         onChange={e => setNewSubWhere(e.target.value)}
-                                        sx={{ flex: 1, minWidth: 240 }}
+                                        sx={{ flex: 1, minWidth: 180 }}
                                     />
 
                                     <Button
-                                        startIcon={<AddIcon />}
                                         variant="outlined"
+                                        size="small"
+                                        startIcon={<AddIcon />}
                                         onClick={addSub}
                                         disabled={addingSub || !newSubWidget}
-                                        sx={{
-                                            flexBasis: { xs: '100%', sm: 'auto' },
-                                            mt: { xs: 1, sm: 0 },
-                                            justifyContent: 'flex-start',
-                                        }}
                                     >
-                                        {addingSub ? 'Добавляю…' : 'Добавить sub-виджет'}
+                                        {addingSub ? '...' : 'Добавить'}
                                     </Button>
                                 </Stack>
-
-                            </Stack>
-                        </Box>
+                            </Paper>
+                        </Stack>
                     )}
 
-                    {/* TREE */}
+                    {/* ═══════════════ TREE TAB ═══════════════ */}
                     {tab === 'tree' && (
-                        <Box mt={1}>
-                            <Stack spacing={3}>
-                                {treeList.length > 0 ? (
-                                    <>
-                                        {/* Редактирование существующих — автосейв по blur */}
-                                        <Stack spacing={2}>
-                                            <Stack direction="row" alignItems="center" spacing={1}>
-                                                <FormControl fullWidth>
-                                                    <InputLabel id="tree-select-label">Выбери tree-поле (уже
-                                                        привязано)</InputLabel>
-                                                    <Select
-                                                        labelId="tree-select-label"
-                                                        label="Выбери tree-поле (уже привязано)"
-                                                        value={treeColId || ''}
-                                                        onChange={e => setTreeColId(Number(e.target.value))}
-                                                    >
-                                                        {treeList.map(tf => (
-                                                            <MenuItem key={tf.table_column_id}
-                                                                      value={tf.table_column_id}>
-                                                                #{tf.table_column_id} • order: {tf.column_order ?? 0}
-                                                                {columnById.get(tf.table_column_id) ? ` • ${columnById.get(tf.table_column_id)!.name}` : ''}
-                                                            </MenuItem>
-                                                        ))}
-                                                    </Select>
-                                                </FormControl>
+                        <Stack spacing={3} sx={{ mt: 1 }}>
+                            {/* Существующие */}
+                            {treeList.length > 0 && (
+                                <Paper variant="outlined" sx={{ p: 2, ...clearPaperSx }}>
+                                    <Typography variant="subtitle2" gutterBottom>
+                                        Редактирование
+                                    </Typography>
 
-                                                <Tooltip title="Удалить tree-поле">
-                          <span>
-                            <IconButton
-                                color="primary"
-                                onClick={deleteCurrentTree}
-                                disabled={!treeColId || deletingTree}
-                                size="small"
-                            >
-                              <DeleteIcon/>
-                            </IconButton>
-                          </span>
-                                                </Tooltip>
-                                            </Stack>
+                                    <Stack spacing={2}>
+                                        <Stack direction="row" spacing={1} alignItems="center">
+                                            <FormControl fullWidth size="small">
+                                                <InputLabel>Tree-поле</InputLabel>
+                                                <Select
+                                                    label="Tree-поле"
+                                                    value={treeColId || ''}
+                                                    onChange={e => setTreeColId(Number(e.target.value))}
+                                                >
+                                                    {treeList.map(tf => (
+                                                        <MenuItem key={tf.table_column_id} value={tf.table_column_id}>
+                                                            #{tf.table_column_id} • order: {tf.column_order ?? 0}
+                                                            {columnById.get(tf.table_column_id)?.name
+                                                                ? ` • ${columnById.get(tf.table_column_id)!.name}`
+                                                                : ''
+                                                            }
+                                                        </MenuItem>
+                                                    ))}
+                                                </Select>
+                                            </FormControl>
 
-                                            <TextField
-                                                label="column_order"
-                                                type="number"
-                                                value={treeOrder}
-                                                onChange={e => setTreeOrder(Number(e.target.value))}
-                                                onBlur={saveTree}
-                                                disabled={savingTree}
-                                            />
+                                            <Tooltip title="Удалить">
+                                                <IconButton
+                                                    onClick={deleteTree}
+                                                    disabled={!treeColId || deletingTree}
+                                                    color="error"
+                                                    size="small"
+                                                >
+                                                    <DeleteIcon />
+                                                </IconButton>
+                                            </Tooltip>
                                         </Stack>
 
-                                        <Divider/>
-                                    </>
-                                ) : null}
-
-                                {/* Добавление нового — показывается всегда */}
-                                <Stack spacing={2}>
-                                    <strong>Добавить новое tree-поле</strong>
-                                    <Stack direction="row" spacing={1} alignItems="center"
-                                           sx={{flexWrap: 'wrap', rowGap: 1}}>
-                                        <TextField
-                                            label="Порядок (column_order)"
-                                            type="number"
-                                            size="small"
-                                            value={newTreeOrder}
-                                            onChange={e => setNewTreeOrder(Number(e.target.value))}
-                                            sx={{width: 260}}
-                                        />
-
-                                        <Autocomplete
-                                            sx={{minWidth: 320, flex: '0 0 auto'}}
-                                            options={availableColumns}
-                                            loading={listsLoading}
-                                            value={newTreeColumn}
-                                            onChange={(_, val) => setNewTreeColumn(val)}
-                                            getOptionLabel={(c) => c ? `${c.name}  (#${c.id})` : ''}
-                                            isOptionEqualToValue={(a, b) => a.id === b.id}
-                                            renderInput={(params) => (
-                                                <TextField
-                                                    {...params}
-                                                    label="Колонка (по имени)"
-                                                    size="small"
-                                                    InputProps={{
-                                                        ...params.InputProps,
-                                                        endAdornment: (
-                                                            <>
-                                                                {listsLoading ? <CircularProgress size={16}/> : null}
-                                                                {params.InputProps.endAdornment}
-                                                            </>
-                                                        ),
-                                                    }}
-                                                />
-                                            )}
-                                        />
-
-                                        <Button
-                                            startIcon={<AddIcon/>}
-                                            variant="outlined"
-                                            onClick={addTree}
-                                            disabled={addingTree || !newTreeColumn}
-                                        >
-                                            {addingTree ? 'Добавляю…' : 'Добавить tree-поле'}
-                                        </Button>
+                                        <Stack direction="row" spacing={2}>
+                                            <TextField
+                                                label="Порядок"
+                                                type="number"
+                                                size="small"
+                                                value={treeOrder}
+                                                onChange={e => setTreeOrder(Number(e.target.value))}
+                                                sx={{ width: 120 }}
+                                            />
+                                            <Button
+                                                variant="contained"
+                                                size="small"
+                                                startIcon={<SaveIcon />}
+                                                onClick={saveTree}
+                                                disabled={savingTree || !treeHasChanges}
+                                            >
+                                                {savingTree ? '...' : 'Сохранить'}
+                                            </Button>
+                                        </Stack>
                                     </Stack>
+                                </Paper>
+                            )}
+
+                            {/* Добавление нового */}
+                            <Paper variant="outlined" sx={{ p: 2, ...clearPaperSx }}>
+                                <Typography variant="subtitle2" gutterBottom>
+                                    Добавить новое
+                                </Typography>
+
+                                <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+                                    <TextField
+                                        label="Порядок"
+                                        type="number"
+                                        size="small"
+                                        value={newTreeOrder}
+                                        onChange={e => setNewTreeOrder(Number(e.target.value))}
+                                        sx={{ width: 100 }}
+                                    />
+
+                                    <Autocomplete
+                                        sx={{ minWidth: 280 }}
+                                        size="small"
+                                        options={availableColumns}
+                                        loading={listsLoading}
+                                        value={newTreeColumn}
+                                        onChange={(_, val) => setNewTreeColumn(val)}
+                                        getOptionLabel={c => c ? `${c.name} (#${c.id})` : ''}
+                                        isOptionEqualToValue={(a, b) => a.id === b.id}
+                                        renderInput={params => (
+                                            <TextField
+                                                {...params}
+                                                label="Колонка"
+                                                InputProps={{
+                                                    ...params.InputProps,
+                                                    endAdornment: (
+                                                        <>
+                                                            {listsLoading && <CircularProgress size={16} />}
+                                                            {params.InputProps.endAdornment}
+                                                        </>
+                                                    ),
+                                                }}
+                                            />
+                                        )}
+                                    />
+
+                                    <Button
+                                        variant="outlined"
+                                        size="small"
+                                        startIcon={<AddIcon />}
+                                        onClick={addTree}
+                                        disabled={addingTree || !newTreeColumn}
+                                    >
+                                        {addingTree ? '...' : 'Добавить'}
+                                    </Button>
                                 </Stack>
-                            </Stack>
-                        </Box>
+                            </Paper>
+                        </Stack>
                     )}
                 </DialogContent>
 
                 <DialogActions>
-                    <Button onClick={onClose}>Отмена</Button>
+                    <Button onClick={onClose}>Закрыть</Button>
                     {tab === 'main' && (
-                        <Button onClick={saveMain} variant="contained" disabled={savingMain}>
-                            {savingMain ? 'Сохраняю…' : 'Сохранить Main'}
+                        <Button
+                            onClick={saveMain}
+                            variant="contained"
+                            disabled={savingMain}
+                            startIcon={<SaveIcon />}
+                        >
+                            {savingMain ? 'Сохраняю...' : 'Сохранить'}
                         </Button>
                     )}
                 </DialogActions>

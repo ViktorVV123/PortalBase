@@ -31,10 +31,10 @@
 .popup {
   position: absolute;
   top: 120%;
-  right: -1300%;
+  right: -1700%;
   margin-top: 8px;
-  min-width: 450px;
-  max-width: 600px;
+  min-width: 580px;
+  max-width: 610px;
   max-height: 60vh;
   background-color: #131313;
   border-radius: 6px;
@@ -44,6 +44,19 @@
   overflow-y: auto;   // вертикальный скролл
   overflow-x: hidden; // по горизонтали скрываем
   z-index: 9999;
+
+
+  &::-webkit-scrollbar {
+    width: 9px;
+    height: 10px;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 9px;
+  }
+  &::-webkit-scrollbar-track {
+    background: #4c4c4c;
+  }
 }
 
 
@@ -157,8 +170,8 @@
 .treeLabel,
 .formName {
 
-  flex: 0 1 350px;   // базовая ширина ~220px, можно менять число
-  max-width: 350px;  // жёсткий потолок
+  flex: 0 1 550px;   // базовая ширина ~220px, можно менять число
+  max-width: 590px;  // жёсткий потолок
   min-width: 0;
   white-space: nowrap;
   overflow: hidden;

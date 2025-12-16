@@ -62,6 +62,9 @@ export const FormTableContent: React.FC<Props> = ({
     const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
     const [childrenCache, setChildrenCache] = useState<Record<string, FormTreeColumn[]>>({});
 
+
+
+
     // ═══════════════════════════════════════════════════════════
     // SUB WIDGETS
     // ═══════════════════════════════════════════════════════════
@@ -87,11 +90,46 @@ export const FormTableContent: React.FC<Props> = ({
             const { data } = await api.post<FormTreeColumn[] | FormTreeColumn>(
                 `/display/${fid}/tree`
             );
-            setLiveTree(Array.isArray(data) ? data : [data]);
-        } catch (e) {
-            console.warn('Не удалось обновить дерево:', e);
+            const normalized = Array.isArray(data) ? data : [data];
+
+            // Если пустой массив или нет values — считаем что дерева нет
+            const hasValidTree = normalized.length > 0 &&
+                normalized.some(t => t.values && t.values.length > 0);
+
+            setLiveTree(hasValidTree ? normalized : null);
+        } catch (e: any) {
+            // 404 или пустой ответ = нет дерева
+            if (e?.response?.status === 404) {
+                setLiveTree(null);
+            } else {
+                console.warn('Не удалось обновить дерево:', e);
+            }
         }
     }, [selectedFormId, currentForm, setLiveTree]);
+
+
+    // ═══════════════════════════════════════════════════════════
+    // СЛУШАЕМ МУТАЦИИ ФОРМЫ (из ModalEditForm)
+    // ═══════════════════════════════════════════════════════════
+
+    useEffect(() => {
+        const handleFormMutated = async (e: CustomEvent<{ formId: number }>) => {
+            const mutatedFormId = e.detail?.formId;
+            const currentFid = selectedFormId ?? currentForm?.form_id;
+
+            // Если мутировали текущую форму — перезагружаем дерево
+            if (mutatedFormId && mutatedFormId === currentFid) {
+                console.debug('[FormTableContent] Form mutated, reloading tree...', mutatedFormId);
+                await reloadTreeLocal();
+            }
+        };
+
+        window.addEventListener('portal:form-mutated', handleFormMutated as EventListener);
+
+        return () => {
+            window.removeEventListener('portal:form-mutated', handleFormMutated as EventListener);
+        };
+    }, [selectedFormId, currentForm?.form_id, reloadTreeLocal]);
 
 
 
