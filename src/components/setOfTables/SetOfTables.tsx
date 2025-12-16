@@ -1,6 +1,9 @@
-import React, {useState} from 'react';
+// src/components/setOfTables/SetOfTables.tsx
+
+import React, { useState } from 'react';
 import * as s from './SetOfTables.module.scss';
-import {
+
+import type {
     Column,
     DTable,
     FormDisplay,
@@ -11,46 +14,43 @@ import {
     WidgetForm,
     ReferenceItem,
 } from '@/shared/hooks/useWorkSpaces';
-import {FormTable} from '@/components/Form/formTable/FormTable';
-import {TableColumn} from '@/components/table/tableColumn/TableColumn';
+
+import { FormTable } from '@/components/Form/formTable/FormTable';
+import { TableColumn } from '@/components/table/tableColumn/TableColumn';
 import {
     WcReference,
     WidgetColumnsOfTable,
 } from '@/components/WidgetColumnsOfTable/WidgetColumnTable/WidgetColumnsOfTable';
+import { useHeaderPreviewFromWc } from '@/components/WidgetColumnsOfTable/WidgetColumnTable/hook/useHeaderPreviewFromWc';
+import { CenteredLoader } from '@/shared/ui/CenteredLoader';
 
-import {useHeaderPreviewFromWc} from "@/components/WidgetColumnsOfTable/WidgetColumnTable/hook/useHeaderPreviewFromWc";
-import {CenteredLoader} from "@/shared/ui/CenteredLoader";
+// ─────────────────────────────────────────────────────────────
+// ТИПЫ ПРОПСОВ (сгруппированы для читаемости)
+// ─────────────────────────────────────────────────────────────
 
-/** ─────────────────────── Пропсы ─────────────────────── */
-type Props = {
-    // базовые
+/** Пропсы для работы с таблицей */
+type TableProps = {
     columns: Column[];
-    tableName: string;
-    workspaceName: string;
-    loading: boolean;
-    error: string | null;
+    selectedTable: DTable | null;
+    deleteColumnTable: (id: number) => void;
+    updateTableColumn: (id: number, p: Partial<Omit<Column, 'id'>>) => void;
+    updateTableMeta: (id: number, patch: Partial<DTable>) => void;
+    publishTable: (id: number) => void;
+    loadColumns: (table: DTable) => void;
+    tablesByWs: Record<number, DTable[]>;
+};
 
-    // references
-    updateReference: (
-        widgetColumnId: number,
-        tableColumnId: number,
-        patch: Partial<Pick<ReferenceItem,
-            'ref_column_order' | 'width' | 'type' | 'ref_alias' | 'default' | 'placeholder' | 'visible' | 'readonly'
-        >>
-    ) => Promise<ReferenceItem>;
-    fetchReferences: (widgetColumnId: number) => Promise<WcReference[]>;
-    deleteReference: (widgetColumnId: number, tableColumnId: number) => Promise<void>;
-
-    // виджет
+/** Пропсы для работы с виджетом */
+type WidgetProps = {
     widgetColumns: WidgetColumn[];
-    deleteColumnWidget: (id: number) => void;
+    selectedWidget: Widget | null;
     wColsLoading: boolean;
     wColsError: string | null;
-    selectedWidget: Widget | null;
     handleClearWidget: () => void;
-    handleSelectWidget: (widget: Widget | null) => void; // оставляем для совместимости
+    handleSelectWidget: (widget: Widget | null) => void;
     setSelectedWidget: React.Dispatch<React.SetStateAction<Widget | null>>;
     setWidgetsByTable: React.Dispatch<React.SetStateAction<Record<number, Widget[]>>>;
+    deleteColumnWidget: (id: number) => void;
     updateWidgetColumn: (
         id: number,
         patch: Partial<Omit<WidgetColumn, 'id' | 'widget_id' | 'reference'>>
@@ -66,14 +66,29 @@ type Props = {
         type: string;
         column_order: number;
     }) => Promise<WidgetColumn>;
+};
 
-    // форма
+/** Пропсы для работы с references */
+type ReferenceProps = {
+    updateReference: (
+        widgetColumnId: number,
+        tableColumnId: number,
+        patch: Partial<Pick<ReferenceItem,
+            'ref_column_order' | 'width' | 'type' | 'ref_alias' | 'default' | 'placeholder' | 'visible' | 'readonly'
+        >>
+    ) => Promise<ReferenceItem>;
+    fetchReferences: (widgetColumnId: number) => Promise<WcReference[]>;
+    deleteReference: (widgetColumnId: number, tableColumnId: number) => Promise<void>;
+};
+
+/** Пропсы для работы с формой */
+type FormProps = {
     selectedFormId: number | null;
     clearFormSelection: () => void;
     formDisplay: FormDisplay | null;
     formLoading: boolean;
     formError: string | null;
-    formsByWidget: Record<number, WidgetForm>; // нужен order
+    formsByWidget: Record<number, WidgetForm>;
     formsById: Record<number, WidgetForm>;
     formTrees: Record<number, FormTreeColumn[]>;
     loadFilteredFormDisplay: (
@@ -81,8 +96,10 @@ type Props = {
         filter: { table_column_id: number; value: string | number }
     ) => Promise<void>;
     setFormDisplay: (value: FormDisplay | null) => void;
+};
 
-    // саб-виджет
+/** Пропсы для работы с sub-виджетом */
+type SubProps = {
     loadSubDisplay: (
         formId: number,
         subOrder: number,
@@ -92,126 +109,176 @@ type Props = {
     subLoading: boolean;
     subError: string | null;
     setSubDisplay: (value: SubDisplay | null) => void;
+};
 
-    // таблица
-    selectedTable: DTable | null;
-    deleteColumnTable: (id: number) => void;
-    updateTableColumn: (id: number, p: Partial<Omit<Column, 'id'>>) => void;
-    updateTableMeta: (id: number, patch: Partial<DTable>) => void;
-    publishTable: (id: number) => void;
-    loadColumns: (table: DTable) => void;
-
-    // общее
-    tablesByWs: Record<number, DTable[]>;
+/** Общие пропсы */
+type CommonProps = {
+    tableName: string;
+    workspaceName: string;
+    loading: boolean;
+    error: string | null;
     loadWidgetForms: () => Promise<void> | void;
 };
 
-/** ─────────────────────── Основной компонент ─────────────────────── */
+/** Полный тип пропсов */
+type Props = TableProps & WidgetProps & ReferenceProps & FormProps & SubProps & CommonProps;
+
+// ─────────────────────────────────────────────────────────────
+// КОМПОНЕНТ
+// ─────────────────────────────────────────────────────────────
+
 export const SetOfTables: React.FC<Props> = (props) => {
     const {
-        // базовые
-        columns, tableName, workspaceName, loading, error,
-        // виджет
-        widgetColumns, wColsLoading, wColsError, selectedWidget,
-        handleClearWidget, loadColumnsWidget, updateWidgetColumn,
-        addWidgetColumn, updateWidgetMeta, setSelectedWidget, setWidgetsByTable,
-        // форма/саб
-        selectedFormId, formDisplay, formLoading, formError, formTrees,
-        formsByWidget, formsById, loadFilteredFormDisplay,
-        loadSubDisplay, subDisplay, subLoading, subError,
-        setFormDisplay, setSubDisplay,
-        // references
-        fetchReferences, updateReference, deleteReference,
-        // таблица
-        selectedTable, deleteColumnTable, deleteColumnWidget, updateTableColumn,
-        updateTableMeta, publishTable, loadColumns,
-        // прочее
-        clearFormSelection, loadWidgetForms,
+        // Table
+        columns,
+        selectedTable,
+        deleteColumnTable,
+        updateTableColumn,
+        updateTableMeta,
+        publishTable,
+        loadColumns,
+
+        // Widget
+        widgetColumns,
+        selectedWidget,
+        wColsLoading,
+        wColsError,
+        setSelectedWidget,
+        setWidgetsByTable,
+        deleteColumnWidget,
+        updateWidgetColumn,
+        loadColumnsWidget,
+        updateWidgetMeta,
+        addWidgetColumn,
+
+        // References
+        fetchReferences,
+        updateReference,
+        deleteReference,
+
+        // Form
+        selectedFormId,
+        formDisplay,
+        formLoading,
+        formError,
+        formsByWidget,
+        formsById,
+        formTrees,
+        loadFilteredFormDisplay,
+        setFormDisplay,
+
+        // Sub
+        loadSubDisplay,
+        subDisplay,
+        subLoading,
+        subError,
+        setSubDisplay,
+
+        // Common
+        loadWidgetForms,
     } = props;
 
-    // локально — только то, что реально нужно держать здесь
+    // ═══════════════════════════════════════════════════════════
+    // LOCAL STATE (только для WidgetColumnsOfTable)
+    // ═══════════════════════════════════════════════════════════
+
     const [referencesMap, setReferencesMap] = useState<Record<number, WcReference[]>>({});
     const [liveRefsForHeader, setLiveRefsForHeader] = useState<Record<number, WcReference[]> | null>(null);
+
     const workspaceId = selectedTable?.workspace_id ?? null;
-    // группы заголовков: основная форма и саб-форма
-    const headerGroups = useHeaderPreviewFromWc(widgetColumns, referencesMap, liveRefsForHeader ?? undefined);
+
+    const headerGroups = useHeaderPreviewFromWc(
+        widgetColumns,
+        referencesMap,
+        liveRefsForHeader ?? undefined
+    );
+
+    // ═══════════════════════════════════════════════════════════
+    // RENDER
+    // ═══════════════════════════════════════════════════════════
 
     return (
         <div className={s.wrapper}>
-
-
-
-            {/* PRIORITY 1: FORM */}
-            {selectedFormId ? (
-                formLoading ? (
-                    <div className={s.loaderArea}>
-                        <CenteredLoader label="Загружаем форму…" />
-                    </div>
-                ) : formError ? (
-                    <p className={s.error}>{formError}</p>
-                ) : formDisplay ? (
-                            <FormTable
-                                formsById={formsById}
-                                headerGroups={headerGroups}
-                                setSubDisplay={setSubDisplay}
-                                formTrees={formTrees}
-                                selectedFormId={selectedFormId}
-                                subDisplay={subDisplay}
-                                subError={subError}
-                                subLoading={subLoading}
-                                selectedWidget={selectedWidget}
-                                formsByWidget={formsByWidget}
-                                loadFilteredFormDisplay={loadFilteredFormDisplay}
-                                setFormDisplay={setFormDisplay}
-                                loadSubDisplay={loadSubDisplay}
-                                formDisplay={formDisplay}
-                            />
-                        ) : null
-            ) : null}
-
-            {/* PRIORITY 2: WIDGET */}
-            {!selectedFormId && selectedWidget && (
-                wColsLoading ? (
-                    <div className={s.loaderArea}>
-                        <CenteredLoader label="Загружаем виджет…" />
-                    </div>
-                ) : wColsError ? (
-                    <p className={s.error}>{wColsError}</p>
-                ) : (
-                            <WidgetColumnsOfTable
-                                workspaceId={workspaceId}
-                                loadWidgetForms={loadWidgetForms}
-                                formsById={formsById}
-                                headerGroups={headerGroups}
-                                referencesMap={referencesMap}
-                                setLiveRefsForHeader={setLiveRefsForHeader}
-                                setReferencesMap={setReferencesMap}
-                                updateReference={updateReference}
-                                updateWidgetColumn={updateWidgetColumn}
-                                addWidgetColumn={addWidgetColumn}
-                                deleteReference={deleteReference}
-                                fetchReferences={fetchReferences}
-                                updateWidgetMeta={updateWidgetMeta}
-                                setWidgetsByTable={setWidgetsByTable}
-                                setSelectedWidget={setSelectedWidget}
-                                columns={columns}
-                                updateTableColumn={updateTableColumn}
-                                deleteColumnTable={deleteColumnTable}
-                                deleteColumnWidget={deleteColumnWidget}
-                                widgetColumns={widgetColumns}
-                                loadColumnsWidget={loadColumnsWidget}
-                                selectedWidget={selectedWidget}
-                            />
-                        )
+            {/* ════════════════════════════════════════════════════
+                PRIORITY 1: FORM
+            ════════════════════════════════════════════════════ */}
+            {selectedFormId && (
+                <>
+                    {formLoading ? (
+                        <div className={s.loaderArea}>
+                            <CenteredLoader label="Загружаем форму…" />
+                        </div>
+                    ) : formError ? (
+                        <p className={s.error}>{formError}</p>
+                    ) : formDisplay ? (
+                        <FormTable
+                            formsById={formsById}
+                            formTrees={formTrees}
+                            selectedFormId={selectedFormId}
+                            subDisplay={subDisplay}
+                            subError={subError}
+                            subLoading={subLoading}
+                            selectedWidget={selectedWidget}
+                            formsByWidget={formsByWidget}
+                            loadFilteredFormDisplay={loadFilteredFormDisplay}
+                            setFormDisplay={setFormDisplay}
+                            setSubDisplay={setSubDisplay}
+                            loadSubDisplay={loadSubDisplay}
+                            formDisplay={formDisplay}
+                        />
+                    ) : null}
+                </>
             )}
 
-            {/* PRIORITY 3: TABLE COLUMNS */}
+            {/* ════════════════════════════════════════════════════
+                PRIORITY 2: WIDGET
+            ════════════════════════════════════════════════════ */}
+            {!selectedFormId && selectedWidget && (
+                <>
+                    {wColsLoading ? (
+                        <div className={s.loaderArea}>
+                            <CenteredLoader label="Загружаем виджет…" />
+                        </div>
+                    ) : wColsError ? (
+                        <p className={s.error}>{wColsError}</p>
+                    ) : (
+                        <WidgetColumnsOfTable
+                            workspaceId={workspaceId}
+                            loadWidgetForms={loadWidgetForms}
+                            formsById={formsById}
+                            headerGroups={headerGroups}
+                            referencesMap={referencesMap}
+                            setLiveRefsForHeader={setLiveRefsForHeader}
+                            setReferencesMap={setReferencesMap}
+                            updateReference={updateReference}
+                            updateWidgetColumn={updateWidgetColumn}
+                            addWidgetColumn={addWidgetColumn}
+                            deleteReference={deleteReference}
+                            fetchReferences={fetchReferences}
+                            updateWidgetMeta={updateWidgetMeta}
+                            setWidgetsByTable={setWidgetsByTable}
+                            setSelectedWidget={setSelectedWidget}
+                            columns={columns}
+                            updateTableColumn={updateTableColumn}
+                            deleteColumnTable={deleteColumnTable}
+                            deleteColumnWidget={deleteColumnWidget}
+                            widgetColumns={widgetColumns}
+                            loadColumnsWidget={loadColumnsWidget}
+                            selectedWidget={selectedWidget}
+                        />
+                    )}
+                </>
+            )}
+
+            {/* ════════════════════════════════════════════════════
+                PRIORITY 3: TABLE COLUMNS
+            ════════════════════════════════════════════════════ */}
             {!selectedFormId && !selectedWidget && (
-                columns.length === 0 ? (
-                    <p>Выберите форму</p>
-                ) : (
-                    <div>
-                        {selectedTable && (
+                <>
+                    {columns.length === 0 ? (
+                        <p>Выберите форму</p>
+                    ) : (
+                        selectedTable && (
                             <TableColumn
                                 publishTable={publishTable}
                                 selectedTable={selectedTable}
@@ -222,9 +289,9 @@ export const SetOfTables: React.FC<Props> = (props) => {
                                 updateTableColumn={updateTableColumn}
                                 onCreated={() => selectedTable && loadColumns(selectedTable)}
                             />
-                        )}
-                    </div>
-                )
+                        )
+                    )}
+                </>
             )}
         </div>
     );

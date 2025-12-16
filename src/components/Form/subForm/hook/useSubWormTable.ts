@@ -156,6 +156,8 @@ export function useSubWormTable({
     };
 
     // ——— редактирование ———
+    // В useSubWormTable.ts, функция startEdit
+
     const startEdit = async (rowIdx: number) => {
         if (!formId || !currentWidgetId || !subDisplay) return;
         const pf = await preflightUpdate();
@@ -165,20 +167,39 @@ export function useSubWormTable({
 
         const row = subDisplay.data[rowIdx];
         const init: Record<number, string> = {};
+
         flatColumnsInRenderOrder.forEach((col) => {
+            // Определяем реальный write ID
+            let writeTcId: number | null = null;
+
+            if (col.type === 'combobox') {
+                // Для combobox используем __write_tc_id
+                writeTcId = (col as any).__write_tc_id ?? null;
+            } else {
+                writeTcId = col.table_column_id ?? null;
+            }
+
+            // Пропускаем синтетические и null
+            if (writeTcId == null || isSyntheticComboboxId(writeTcId)) return;
+
+            // Получаем текущее значение из row
             const syntheticTcId =
                 col.type === 'combobox' &&
                 col.combobox_column_id != null &&
                 col.table_column_id != null
                     ? -1_000_000 - Number(col.combobox_column_id)
                     : col.table_column_id ?? -1;
+
             const key = `${col.widget_column_id}:${syntheticTcId}`;
             const idx = valueIndexByKey.get(key);
             const val = idx != null ? row.values[idx] : '';
-            if (col.table_column_id != null && isEditableValue(val)) {
-                init[col.table_column_id] = String(val ?? '');
+
+            if (isEditableValue(val)) {
+                init[writeTcId] = String(val ?? '');
             }
         });
+
+        console.debug('[useSubWormTable] startEdit → init:', init);
 
         setEditingRowIdx(rowIdx);
         setEditDraft(init);
@@ -190,6 +211,10 @@ export function useSubWormTable({
         setEditSaving(false);
     };
 
+    const isSyntheticComboboxId = (tcId: number): boolean => {
+        return tcId < -1_000_000 + 1; // т.е. tcId <= -1_000_000
+    };
+
     const submitEdit = async () => {
         if (editingRowIdx == null || !formId || !currentWidgetId || !subDisplay) return;
         const pf = await preflightUpdate();
@@ -198,13 +223,21 @@ export function useSubWormTable({
         setEditSaving(true);
         try {
             const row = subDisplay.data[editingRowIdx];
-            const values = Object.entries(editDraft).map(([table_column_id, value]) => {
-                const s = value == null ? '' : String(value).trim();
-                return {
-                    table_column_id: Number(table_column_id),
-                    value: s === '' ? null : s, // пустое → null
-                };
-            });
+
+            // Фильтруем синтетические ID
+            const values = Object.entries(editDraft)
+                .filter(([tcIdStr]) => {
+                    const tcId = Number(tcIdStr);
+                    return !isSyntheticComboboxId(tcId);
+                })
+                .map(([tcIdStr, value]) => {
+                    const tcId = Number(tcIdStr);
+                    const s = value == null ? '' : String(value).trim();
+                    return {
+                        table_column_id: tcId,
+                        value: s === '' ? null : s,
+                    };
+                });
 
             const body = {
                 pk: {
@@ -214,6 +247,8 @@ export function useSubWormTable({
                 },
                 values,
             };
+
+            console.debug('[useSubWormTable] submitEdit → body:', body);
 
             const url = `/data/${formId}/${currentWidgetId}`;
             try {

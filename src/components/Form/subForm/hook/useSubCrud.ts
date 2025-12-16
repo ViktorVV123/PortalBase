@@ -1,20 +1,15 @@
-// src/components/Form/hooks/useSubCrud.ts
-import {useCallback, useMemo, useState} from 'react';
-import {api} from '@/services/api';
-import type {FormDisplay, SubDisplay} from '@/shared/hooks/useWorkSpaces';
+// src/components/Form/subForm/hook/useSubCrud.ts
+
+import { useCallback, useMemo, useState } from 'react';
+import { api } from '@/services/api';
+import type { SubDisplay } from '@/shared/hooks/useWorkSpaces';
 
 export type UseSubCrudDeps = {
-    /** id формы для саба (selectedFormId ?? currentForm.form_id) */
     formIdForSub: number | null;
-    /** sub_widget_id для активного саба */
     currentWidgetId?: number;
-    /** активный order вкладки саба (widget_order) */
     currentOrder: number | null;
-    /** загрузка саб-данных после добавления/переключения вкладок */
     loadSubDisplay: (formId: number, subOrder: number, primary?: Record<string, unknown>) => void;
-    /** PK выбранной строки основной таблицы (родитель) */
     lastPrimary: Record<string, unknown>;
-    /** полный subDisplay (нужен, чтобы определить редактируемые tcId) */
     subDisplay: SubDisplay | null;
 };
 
@@ -29,11 +24,27 @@ export type UseSubCrudResult = {
     cancelAddSub: () => void;
     submitAddSub: () => Promise<void>;
 
-    /** вычисленные редактируемые поля саб-таблицы (table_column_id) */
     subEditableTcIds: number[];
 };
 
-/** Выделенная логика саб-вставки (start/cancel/submit + состояния) */
+// ═══════════════════════════════════════════════════════════
+// УТИЛИТЫ
+// ═══════════════════════════════════════════════════════════
+
+/** Проверка: это синтетический ID от combobox? */
+const isSyntheticComboboxId = (tcId: number): boolean => {
+    return tcId < -1_000_000 + 1; // т.е. tcId <= -1_000_000
+};
+
+/** Получить реальный write_tc_id для колонки */
+const getWriteTcId = (col: any): number | null => {
+    // Для combobox используем __write_tc_id или ищем реальный table_column_id
+    if (col.type === 'combobox') {
+        return col.__write_tc_id ?? null;
+    }
+    return col.table_column_id ?? null;
+};
+
 export function useSubCrud({
                                formIdForSub,
                                currentWidgetId,
@@ -46,6 +57,9 @@ export function useSubCrud({
     const [draftSub, setDraftSub] = useState<Record<number, string>>({});
     const [savingSub, setSavingSub] = useState(false);
 
+    // ═══════════════════════════════════════════════════════════
+    // COMPUTED: колонки для редактирования
+    // ═══════════════════════════════════════════════════════════
 
     const subColumnsById = useMemo(() => {
         const map = new Map<number, SubDisplay['columns'][number]>();
@@ -58,24 +72,53 @@ export function useSubCrud({
         return map;
     }, [subDisplay?.columns]);
 
-
-    // Оставляем только редактируемые колонки саб-таблицы
+    // Редактируемые table_column_id (только реальные, не синтетические)
     const subEditableTcIds = useMemo(() => {
         const cols = subDisplay?.columns ?? [];
-        return cols
-            .filter(c =>
-                c.table_column_id != null &&
-                !((c as any).primary || (c as any).increment || (c as any).readonly)
-            )
-            .map(c => c.table_column_id as number);
+        const ids: number[] = [];
+        const seen = new Set<number>();
+
+        for (const c of cols) {
+            const col = c as any;
+
+            // Пропускаем primary, increment, readonly
+            if (col.primary || col.increment || col.readonly) continue;
+
+            // Определяем реальный ID для записи
+            let writeTcId: number | null = null;
+
+            if (col.type === 'combobox') {
+                // Для combobox берём __write_tc_id или реальный table_column_id
+                writeTcId = col.__write_tc_id ?? col.table_column_id ?? null;
+
+                // Если это синтетический ID — пропускаем
+                if (writeTcId != null && isSyntheticComboboxId(writeTcId)) {
+                    // Попробуем найти реальный ID
+                    writeTcId = col.__write_tc_id ?? null;
+                }
+            } else {
+                writeTcId = col.table_column_id ?? null;
+            }
+
+            // Добавляем только реальные, уникальные ID
+            if (writeTcId != null && !isSyntheticComboboxId(writeTcId) && !seen.has(writeTcId)) {
+                seen.add(writeTcId);
+                ids.push(writeTcId);
+            }
+        }
+
+        return ids;
     }, [subDisplay?.columns]);
 
-    // Проверка наличия INSERT QUERY у таблицы саб-виджета
+    // ═══════════════════════════════════════════════════════════
+    // PREFLIGHT
+    // ═══════════════════════════════════════════════════════════
+
     const preflightInsertSub = useCallback(async (): Promise<{ ok: boolean }> => {
         if (!currentWidgetId) return { ok: false };
         try {
             const { data: widget } = await api.get(`/widgets/${currentWidgetId}`);
-            const { data: table }  = await api.get(`/tables/${widget.table_id}`);
+            const { data: table } = await api.get(`/tables/${widget.table_id}`);
             if (!table?.insert_query?.trim()) {
                 alert('Для таблицы саб-виджета не настроен INSERT QUERY. Задайте его в метаданных таблицы.');
                 return { ok: false };
@@ -86,11 +129,13 @@ export function useSubCrud({
         return { ok: true };
     }, [currentWidgetId]);
 
-    // Начать добавление саб-строки
+    // ═══════════════════════════════════════════════════════════
+    // START ADD
+    // ═══════════════════════════════════════════════════════════
+
     const startAddSub = useCallback(async () => {
         if (!formIdForSub || !currentWidgetId) return;
 
-        // Нужен выбранный родитель (обычно FK)
         if (!lastPrimary || Object.keys(lastPrimary).length === 0) {
             alert('Сначала выберите строку в основной таблице, чтобы добавить связанную запись в саб-таблицу.');
             return;
@@ -99,19 +144,29 @@ export function useSubCrud({
         const pf = await preflightInsertSub();
         if (!pf.ok) return;
 
+        // Инициализируем draft только реальными ID
         const init: Record<number, string> = {};
-        subEditableTcIds.forEach(tcId => { init[tcId] = ''; });
+        subEditableTcIds.forEach((tcId) => {
+            init[tcId] = '';
+        });
+
         setDraftSub(init);
         setIsAddingSub(true);
     }, [formIdForSub, currentWidgetId, lastPrimary, preflightInsertSub, subEditableTcIds]);
 
-    // Отменить добавление
+    // ═══════════════════════════════════════════════════════════
+    // CANCEL ADD
+    // ═══════════════════════════════════════════════════════════
+
     const cancelAddSub = useCallback(() => {
         setIsAddingSub(false);
         setDraftSub({});
     }, []);
 
-    // Отправить добавление
+    // ═══════════════════════════════════════════════════════════
+    // SUBMIT ADD
+    // ═══════════════════════════════════════════════════════════
+
     const submitAddSub = useCallback(async () => {
         if (!formIdForSub || !currentWidgetId) return;
 
@@ -125,30 +180,35 @@ export function useSubCrud({
 
         setSavingSub(true);
         try {
-            const values = Object.entries(draftSub).map(([table_column_id, value]) => {
-                const tcId = Number(table_column_id);
-                const col = subColumnsById.get(tcId);
+            // Фильтруем только реальные table_column_id (не синтетические)
+            const values = Object.entries(draftSub)
+                .filter(([tcIdStr]) => {
+                    const tcId = Number(tcIdStr);
+                    // Пропускаем синтетические ID от combobox
+                    return !isSyntheticComboboxId(tcId);
+                })
+                .map(([tcIdStr, value]) => {
+                    const tcId = Number(tcIdStr);
+                    const col = subColumnsById.get(tcId);
 
-                const isCheckbox =
-                    col?.type === 'checkbox' ||
-                    col?.type === 'bool';
+                    const isCheckbox =
+                        (col as any)?.type === 'checkbox' ||
+                        (col as any)?.type === 'bool';
 
-                const s = value == null ? '' : String(value).trim();
+                    const s = value == null ? '' : String(value).trim();
 
-                let final: string | null;
-                if (isCheckbox) {
-                    // для чекбокса пустое значение считаем false
-                    final = s === '' ? 'false' : s;
-                } else {
-                    // как раньше: пустое → null
-                    final = s === '' ? null : s;
-                }
+                    let final: string | null;
+                    if (isCheckbox) {
+                        final = s === '' ? 'false' : s;
+                    } else {
+                        final = s === '' ? null : s;
+                    }
 
-                return {
-                    table_column_id: tcId,
-                    value: final,
-                };
-            });
+                    return {
+                        table_column_id: tcId,
+                        value: final,
+                    };
+                });
 
             const body = {
                 pk: {
@@ -159,17 +219,19 @@ export function useSubCrud({
                 values,
             };
 
+            console.debug('[useSubCrud] submitAddSub → body:', body);
+
             const url = `/data/${formIdForSub}/${currentWidgetId}`;
             try {
                 await api.post(url, body);
             } catch (err: any) {
                 const status = err?.response?.status;
-                const detail  = err?.response?.data?.detail ?? err?.response?.data ?? err?.message;
+                const detail = err?.response?.data?.detail ?? err?.response?.data ?? err?.message;
 
                 if (status === 403) {
-                    console.warn('[submitEdit] 403 Forbidden', { url, body, detail });
+                    console.warn('[submitAddSub] 403 Forbidden', { url, body, detail });
                     alert('У вас не хватает прав на добавление новой записи');
-                    return; // не валим дальше, не делаем reload
+                    return;
                 }
 
                 if (status === 404 && String(detail).includes('Insert query not found')) {
@@ -192,7 +254,16 @@ export function useSubCrud({
         } finally {
             setSavingSub(false);
         }
-    }, [formIdForSub, currentWidgetId, lastPrimary, draftSub, currentOrder, preflightInsertSub, loadSubDisplay]);
+    }, [
+        formIdForSub,
+        currentWidgetId,
+        lastPrimary,
+        draftSub,
+        currentOrder,
+        preflightInsertSub,
+        loadSubDisplay,
+        subColumnsById,
+    ]);
 
     return {
         isAddingSub,

@@ -1,6 +1,7 @@
-// useSubNav.ts
+// src/components/Form/subForm/hook/useSubNav.ts
+
+import { useCallback, useEffect, useState } from 'react';
 import type { FormDisplay } from '@/shared/hooks/useWorkSpaces';
-import {useCallback, useState} from "react";
 
 type RowView = { row: FormDisplay['data'][number]; idx: number };
 
@@ -15,9 +16,32 @@ export function useSubNav({ formIdForSub, availableOrders, loadSubDisplay }: Use
     const [selectedKey, setSelectedKey] = useState<string | null>(null);
     const [activeSubOrder, setActiveSubOrder] = useState<number>(availableOrders[0] ?? 0);
 
-    const pkToKey = useCallback((pk: Record<string, unknown>) =>
-            Object.keys(pk).sort().map(k => `${k}:${String(pk[k])}`).join('|'),
-        [],);
+    // ═══════════════════════════════════════════════════════════
+    // СБРОС ПРИ СМЕНЕ ФОРМЫ
+    // ═══════════════════════════════════════════════════════════
+
+    useEffect(() => {
+        // При смене формы сбрасываем выбор
+        setLastPrimary({});
+        setSelectedKey(null);
+        setActiveSubOrder(availableOrders[0] ?? 0);
+    }, [formIdForSub]); // Сброс при смене formId
+
+    // Обновляем activeSubOrder если availableOrders изменились
+    useEffect(() => {
+        if (!availableOrders.includes(activeSubOrder)) {
+            setActiveSubOrder(availableOrders[0] ?? 0);
+        }
+    }, [availableOrders, activeSubOrder]);
+
+    const pkToKey = useCallback(
+        (pk: Record<string, unknown>) =>
+            Object.keys(pk)
+                .sort()
+                .map((k) => `${k}:${String(pk[k])}`)
+                .join('|'),
+        [],
+    );
 
     const handleRowClick = useCallback(
         (view: RowView) => {
@@ -41,6 +65,8 @@ export function useSubNav({ formIdForSub, availableOrders, loadSubDisplay }: Use
         (order: number) => {
             setActiveSubOrder(order);
             const fid = formIdForSub;
+
+            // Загружаем только если есть выбранная строка
             if (fid && Object.keys(lastPrimary).length > 0) {
                 loadSubDisplay(fid, order, lastPrimary);
             }

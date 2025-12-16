@@ -1,7 +1,7 @@
 import React, {useMemo, useState} from 'react';
 import * as cls from './TableToolbar.module.scss';
 import {ButtonForm} from '@/shared/buttonForm/ButtonForm';
-import {SearchBox} from '@/components/common/SearchBox';
+import {SearchBox} from '@/components/search/SearchBox';
 import FilterOffIcon from '@/assets/image/FilterOffIcon.svg';
 import AddIcon from "@mui/icons-material/Add";
 
@@ -36,6 +36,7 @@ type Props = {
     showMainActions?: boolean;
 
 
+
 };
 
 
@@ -60,6 +61,7 @@ export const TableToolbar = ({
                                  collapsedWidth = 170,
                                  expandedWidth = 380,
                                  showMainActions = true,
+
                              }: Props) => {
     const [focused, setFocused] = useState(false);
     const expanded = focused || !!value;

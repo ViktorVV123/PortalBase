@@ -47,8 +47,6 @@ type Draft = {
     };
 };
 
-const comboKeyOf = (it: any) =>
-    it?.combobox_column?.id ?? it?.combobox_column_id ?? it?.id ?? -1;
 
 export function useComboboxCreate({
                                       localRefsRef,

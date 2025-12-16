@@ -188,7 +188,7 @@ export const RefRow: React.FC<RefRowProps> = ({
                 >
                     <Checkbox
                         size="small"
-                        sx={{color: 'common.white', '&.Mui-checked': {color: 'common.white'}}}
+                        sx={{color: 'search.white', '&.Mui-checked': {color: 'search.white'}}}
                         checked={!!r.readonly}
                         onChange={async (e) => {
                             const nextVal = e.target.checked;
@@ -238,7 +238,7 @@ export const RefRow: React.FC<RefRowProps> = ({
                 >
                     <Checkbox
                         size="small"
-                        sx={{color: 'common.white', '&.Mui-checked': {color: 'common.white'}}}
+                        sx={{color: 'search.white', '&.Mui-checked': {color: 'search.white'}}}
                         checked={visible}
                         onChange={async (e) => {
                             const nextVal = e.target.checked;

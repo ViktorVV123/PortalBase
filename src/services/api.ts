@@ -75,7 +75,7 @@ const setCookie = (n: string, v: string, days = 1) => {
 /* ───────── 3. токены из cookie + локальные переменные -------------------- */
 
 /// Читаем AccessId из cookie (если нет — подставляем пустую строку)
-let accessToken = getCookie('accessToken') ?? '';
+let accessToken = getCookie('accessToken') ?? '963990de-ecda-4464-a9e2-b6769b83a6dd';
 /// Читаем RefreshId из cookie
 let refreshToken = getCookie('refreshToken') ?? '';
 

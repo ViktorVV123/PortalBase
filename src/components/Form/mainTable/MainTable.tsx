@@ -67,6 +67,7 @@ type Props = {
 
     /** триггер для перезагрузки combobox-опций после CRUD в DrillDialog */
     comboReloadToken?: number;
+
 };
 
 export const MainTable: React.FC<Props> = (p) => {

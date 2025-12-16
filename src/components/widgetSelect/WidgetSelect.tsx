@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import * as s from './WidgetSelect.module.scss';
 
-import {DTable, Widget} from "@/shared/hooks/useWorkSpaces";
+import { Widget} from "@/shared/hooks/useWorkSpaces";
 
 
 type Props = {

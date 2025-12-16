@@ -1,14 +1,15 @@
+// src/pages/main/Main.tsx
+
 import React, { useEffect, useMemo, useState } from 'react';
 import * as styles from './Main.module.scss';
 
 import { useWorkSpaces } from '@/shared/hooks/useWorkSpaces';
-
 import { TopComponent } from '@/components/topComponent/TopComponent';
 import { SetOfTables } from '@/components/setOfTables/SetOfTables';
 import { useMainSelection } from '@/pages/main/hook/useMainSelection';
 import { useMainModals } from '@/pages/main/hook/useMainModals';
 import { ModalHost } from '@/components/modals/modalHost/ModalHost';
-import {CenteredLoader} from "@/shared/ui/CenteredLoader";
+import { CenteredLoader } from '@/shared/ui/CenteredLoader';
 
 export const Main = () => {
     const [navOpen, setNavOpen] = useState(false);
@@ -16,73 +17,95 @@ export const Main = () => {
     const [tblHover, setTblHover] = useState<number | null>(null);
 
     const {
-        // загрузки/кэш
+        // Workspaces
         loadWorkSpaces,
-        columns,
-        loadColumns,
-        selectedTable,
         workSpaces,
+        deleteWorkspace,
+
+        // Tables
         tablesByWs,
         loadTables,
-        loading,
-        error,
-        loadWidgetsForTable,
+        selectedTable,
+        deleteTable,
+        updateTableMeta,
+        publishTable,
+
+        // Columns
+        columns,
+        loadColumns,
+        updateTableColumn,
+        deleteColumnTable,
+
+        // Widgets
         widgetsByTable,
+        loadWidgetsForTable,
+        deleteWidget,
+        updateWidgetMeta,
+        setWidgetsByTable,
+
+        // Widget Columns
         widgetColumns,
         wColsLoading,
         wColsError,
         loadColumnsWidget,
+        updateWidgetColumn,
+        deleteColumnWidget,
+        addWidgetColumn,
+
+        // References
+        fetchReferences,
+        updateReference,
+        deleteReference,
+
+        // Forms
         formsByWidget,
+        formsById,
+        formsListByWidget,
         loadWidgetForms,
-        loadFormDisplay,
+        reloadWidgetForms,
+        addForm,
+        deleteForm,
+        deleteTreeFieldFromForm,
+        deleteSubWidgetFromForm,
+
+        // Form Display
         formDisplay,
-        formError,
         formLoading,
-        loadSubDisplay,
+        formError,
+        loadFormDisplay,
+        loadFilteredFormDisplay,
+        setFormDisplay,
+
+        // Sub Display
         subDisplay,
         subLoading,
         subError,
-        deleteWorkspace,
-        deleteTable,
-        fetchWidgetAndTable,
-        deleteColumnTable,
-        deleteColumnWidget,
-        deleteWidget,
-        updateTableColumn,
-        updateWidgetColumn,
-        loadFormTree,
-        formTrees,
-        loadFilteredFormDisplay,
-        setFormDisplay,
+        loadSubDisplay,
         setSubDisplay,
-        updateTableMeta,
+
+        // Form Tree
+        formTrees,
+        loadFormTree,
+
+        // Connections
         connections,
         loadConnections,
-        setWidgetsByTable,
-        fetchReferences,
-        updateWidgetMeta,
-        deleteReference,
-        addWidgetColumn,
-        publishTable,
         deleteConnection,
-        updateReference,
-        addForm,
-        reloadWidgetForms,
-        formsListByWidget,
-        deleteForm,
-        formsById,
-        deleteTreeFieldFromForm,
-        deleteSubWidgetFromForm,
+
+        // Misc
+        fetchWidgetAndTable,
+        loading,
+        error,
     } = useWorkSpaces();
 
-    // первичная загрузка (один эффект вместо трёх — меньше шумных ре-рендеров)
+    // Первичная загрузка
     useEffect(() => {
         loadWorkSpaces();
         loadWidgetForms();
         loadConnections();
     }, [loadWorkSpaces, loadWidgetForms, loadConnections]);
 
-    // выборы (вынесены)
+    // Selection
     const selection = useMainSelection({
         loadColumns,
         loadWidgetsForTable,
@@ -93,7 +116,7 @@ export const Main = () => {
         formsByWidget,
     });
 
-    // модалки (вынесены)
+    // Modals
     const modals = useMainModals({
         loadConnections,
         loadWorkSpaces,
@@ -105,7 +128,7 @@ export const Main = () => {
         openForm: selection.openForm,
     });
 
-    // выбранный workspace (для хлебных крошек/шапки)
+    // Selected workspace
     const selectedWs = useMemo(
         () =>
             selectedTable
@@ -114,7 +137,10 @@ export const Main = () => {
         [selectedTable, workSpaces]
     );
 
-    // группировка пропсов для читабельности (контракты компонент не меняю)
+    // ═══════════════════════════════════════════════════════════
+    // PROPS GROUPS
+    // ═══════════════════════════════════════════════════════════
+
     const topProps = {
         setEditFormOpen: modals.setEditFormOpen,
         setFormToEdit: modals.setFormToEdit,
@@ -154,51 +180,61 @@ export const Main = () => {
     };
 
     const setOfTablesProps = {
-        loadWidgetForms,
-        clearFormSelection: selection.clearFormSelection,
-        updateReference,
-        publishTable,
-        tablesByWs,
-        addWidgetColumn,
-        setWidgetsByTable,
-        setSelectedWidget: selection.setSelectedWidget,
+        // Table
         columns,
-        formDisplay,
-        tableName: selectedTable?.name ?? '',
-        loading,
-        workspaceName: selectedWs?.name ?? '',
-        error,
+        selectedTable,
+        deleteColumnTable,
+        updateTableColumn,
+        updateTableMeta,
+        publishTable,
+        loadColumns,
+        tablesByWs,
+
+        // Widget
         widgetColumns,
+        selectedWidget: selection.selectedWidget,
         wColsLoading,
         wColsError,
-        handleSelectWidget: selection.handleSelectWidget,
-        selectedWidget: selection.selectedWidget,
         handleClearWidget: selection.handleClearWidget,
+        handleSelectWidget: selection.handleSelectWidget,
+        setSelectedWidget: selection.setSelectedWidget,
+        setWidgetsByTable,
+        deleteColumnWidget,
+        updateWidgetColumn,
+        loadColumnsWidget,
+        updateWidgetMeta,
+        addWidgetColumn,
+
+        // References
+        fetchReferences,
+        updateReference,
+        deleteReference,
+
+        // Form
         selectedFormId: selection.selectedFormId,
+        clearFormSelection: selection.clearFormSelection,
+        formDisplay,
         formLoading,
         formError,
+        formsByWidget,
+        formsById,
+        formTrees,
+        loadFilteredFormDisplay,
+        setFormDisplay,
+
+        // Sub
         loadSubDisplay,
         subDisplay,
         subLoading,
         subError,
-        formsByWidget,
-        openForm: selection.openForm,
-        deleteColumnTable,
-        deleteColumnWidget,
-        updateTableColumn,
-        updateWidgetColumn,
-        loadColumnsWidget,
-        formTrees,
-        loadFilteredFormDisplay,
-        setFormDisplay,
         setSubDisplay,
-        selectedTable,
-        updateTableMeta,
-        fetchReferences,
-        deleteReference,
-        updateWidgetMeta,
-        formsById,
-        loadColumns,
+
+        // Common
+        tableName: selectedTable?.name ?? '',
+        workspaceName: selectedWs?.name ?? '',
+        loading,
+        error,
+        loadWidgetForms,
     };
 
     const modalHostProps = {
@@ -210,12 +246,15 @@ export const Main = () => {
         deleteSubWidgetFromForm,
     };
 
+    // ═══════════════════════════════════════════════════════════
+    // RENDER
+    // ═══════════════════════════════════════════════════════════
 
     return (
         <div className={styles.layout}>
-            {/* глобальный лоадер на стартовую загрузку */}
+            {/* Глобальный лоадер */}
             {loading && !selectedTable && !selection.selectedWidget && !selection.selectedFormId && (
-                <CenteredLoader fullScreen label="Загружаем рабочее пространство…"/>
+                <CenteredLoader fullScreen label="Загружаем рабочее пространство…" />
             )}
 
             <div className={styles.container}>

@@ -1,0 +1,189 @@
+// Добавить в src/components/setOfTables/SetOfTables.module.scss
+
+// ═══════════════════════════════════════════════════════════
+// TREE STYLES
+// ═══════════════════════════════════════════════════════════
+
+.treeContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  height: 80%;
+  overflow-y: auto;
+
+
+  &::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, .2);
+    border-radius: 5px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+
+.resetFiltersBtn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  color: rgba(255, 255, 255, 0.8);
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  align-self: flex-start;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.3);
+    color: #fff;
+  }
+
+  &:active {
+    background: rgba(255, 255, 255, 0.2);
+  }
+}
+
+.treeList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+
+}
+
+.treeHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  color: rgba(255, 255, 255, 0.9);
+
+
+
+  button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: 0;
+    padding: 2px;
+    cursor: pointer;
+    opacity: 0.6;
+    transition: opacity 0.2s;
+
+    &:hover {
+      opacity: 1;
+    }
+
+    svg {
+      width: 16px;
+      height: 16px;
+      fill: currentColor;
+    }
+  }
+}
+
+.treeUl {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+
+
+}
+
+.treeItem {
+  padding: 6px 12px;
+  margin-bottom: 4px;
+  background: #2e2e2e;
+  color: #eee;
+  border: 1px solid #605f5f;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background .15s;
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: 140px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 8px;
+  word-break: break-word;
+  white-space: normal;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+  }
+
+  span:first-child {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+}
+
+.treeItemExpanded {
+  background: rgba(100, 150, 255, 0.15);
+  color: #fff;
+
+  &:hover {
+    background: rgba(64, 65, 66, 0.2);
+  }
+
+
+}
+
+.nestedUl {
+  list-style: none;
+  margin: 4px 0 4px 12px;
+  padding: 0 0 0 12px;
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+
+}
+
+.nestedItem {
+  padding: 5px 10px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(255, 255, 255, 0.8);
+
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+
+
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// TREE PANE LAYOUT (если ещё нет)
+// ═══════════════════════════════════════════════════════════
+
+.treePane {
+  min-width: 220px;
+  max-width: 320px;
+  width: 25%;
+  height: 60%;
+  overflow-y: auto;
+
+
+
+
+}
