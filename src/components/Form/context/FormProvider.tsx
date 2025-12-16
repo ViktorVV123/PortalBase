@@ -164,7 +164,7 @@ export const FormProvider: React.FC<FormProviderProps> = ({
         flatColumnsInRenderOrder,
         valueIndexByKey,
         currentForm?.search_bar,
-        { threshold: 0.35, distance: 120, debounceMs: 250 },
+        { debounceMs: 250 },
     );
 
     // ═══════════════════════════════════════════════════════════

@@ -383,9 +383,8 @@ export const DrillDialog: React.FC<Props> = ({
         flatColumnsInRenderOrder,
         valueIndexByKey,
         currentForm?.search_bar,
-        {threshold: 0.35, distance: 120, debounceMs: 250}
+        { debounceMs: 250 }
     );
-
     /** ─── selectedWidget для CRUD — строго текущей формы ─── */
     const selectedWidgetForPreflight = useMemo(() => {
         return resolvedWidgetId ? ({id: resolvedWidgetId} as any) : null;
