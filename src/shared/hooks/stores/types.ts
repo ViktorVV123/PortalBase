@@ -222,11 +222,13 @@ export interface SubDisplay {
     data: SubFormRow[];
 }
 
-export interface FormTreeColumn {
+export type FormTreeColumn = {
     table_column_id: number;
     name: string;
+    sort: string | null;
     values: (string | number | null)[];
-}
+    display_values?: (string | number | null)[]; // ← ДОБАВИТЬ
+};
 
 // ─────────────────────────────────────────────────────────────
 // Payload типы для API
