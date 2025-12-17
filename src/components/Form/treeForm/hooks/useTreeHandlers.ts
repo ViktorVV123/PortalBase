@@ -6,7 +6,6 @@ type Filter = { table_column_id: number; value: string | number };
 
 type Deps = {
     selectedFormId: number | null;
-
     // состояние фильтров/дерева
     activeFilters: Filter[];
     setActiveFilters: React.Dispatch<React.SetStateAction<Filter[]>>;

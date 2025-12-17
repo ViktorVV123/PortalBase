@@ -1,9 +1,9 @@
-import {useEffect, useMemo, useState} from 'react';
-import {api} from '@/services/api';
-import type {SubDisplay, DTable, Widget, FormDisplay} from '@/shared/hooks/useWorkSpaces';
-import type {HeaderModelItem} from '@/components/Form/formTable/FormTable';
-import {isEditableValue} from '@/shared/utils/cellFormat';
-import {useHeaderPlan} from '@/components/Form/formTable/hooks/useHeaderPlan';
+import { useEffect, useMemo, useState } from 'react';
+import { api } from '@/services/api';
+import type { SubDisplay, DTable, Widget, FormDisplay } from '@/shared/hooks/useWorkSpaces';
+import type { HeaderModelItem } from '@/components/Form/formTable/FormTable';
+import { isEditableValue } from '@/shared/utils/cellFormat';
+import { useHeaderPlan } from '@/components/Form/formTable/hooks/useHeaderPlan';
 
 export type UseSubWormTableDeps = {
     subDisplay: SubDisplay | null;
@@ -12,8 +12,10 @@ export type UseSubWormTableDeps = {
     currentOrder: number | null;
     subHeaderGroups?: HeaderModelItem[];
     handleTabClick: (order: number) => void;
-    setSubDisplay: React.Dispatch<React.SetStateAction<SubDisplay | null>>;
-    // внешнее управление состояниями редактирования/добавления — чтобы можно было шарить между экранами
+
+    // было лишним обязательным — делаем опциональным (в хуке не используется)
+    setSubDisplay?: React.Dispatch<React.SetStateAction<SubDisplay | null>>;
+
     editingRowIdx: number | null;
     setEditingRowIdx: React.Dispatch<React.SetStateAction<number | null>>;
     editDraft: Record<number, string>;
@@ -26,6 +28,9 @@ export type UseSubWormTableDeps = {
     draftSub: Record<number, string>;
     setDraftSub: React.Dispatch<React.SetStateAction<Record<number, string>>>;
 };
+
+const SYNTHETIC_MIN = -1_000_000;
+const isSyntheticComboboxId = (tcId: number): boolean => tcId <= SYNTHETIC_MIN;
 
 export function useSubWormTable({
                                     subDisplay,
@@ -41,11 +46,11 @@ export function useSubWormTable({
                                     setEditDraft,
                                     editSaving,
                                     setEditSaving,
+
                                     isAddingSub,
                                     setIsAddingSub,
                                     draftSub,
                                     setDraftSub,
-                                    setSubDisplay,
                                 }: UseSubWormTableDeps) {
     const [deletingRowIdx, setDeletingRowIdx] = useState<number | null>(null);
     const [showSubHeaders, setShowSubHeaders] = useState(false);
@@ -58,20 +63,17 @@ export function useSubWormTable({
     useEffect(() => {
         if (subDisplay?.sub_widgets?.length) {
             setTabs(subDisplay.sub_widgets);
-            setDisplayedWidgetOrder(
-                subDisplay.displayed_widget?.widget_order ?? null,
-            );
+            setDisplayedWidgetOrder(subDisplay.displayed_widget?.widget_order ?? null);
         }
     }, [subDisplay]);
 
     // ——— подготовка колонок и шапки через useHeaderPlan ———
     const pseudoFormDisplay = useMemo(() => {
         if (!subDisplay) return null;
-        return {columns: subDisplay.columns} as unknown as FormDisplay;
+        return { columns: subDisplay.columns } as unknown as FormDisplay;
     }, [subDisplay]);
 
-    const {headerPlan: baseHeaderPlan, flatColumnsInRenderOrder: baseFlat} =
-        useHeaderPlan(pseudoFormDisplay);
+    const { headerPlan: baseHeaderPlan } = useHeaderPlan(pseudoFormDisplay);
 
     const headerPlan = useMemo(() => {
         if (!baseHeaderPlan) return [];
@@ -104,21 +106,17 @@ export function useSubWormTable({
         });
     }, [baseHeaderPlan, subHeaderGroups]);
 
-    const flatColumnsInRenderOrder = useMemo(
-        () => headerPlan.flatMap((g) => g.cols),
-        [headerPlan]
-    );
+    const flatColumnsInRenderOrder = useMemo(() => headerPlan.flatMap((g) => g.cols), [headerPlan]);
 
     // корректный valueIndexByKey для row.values
     const valueIndexByKey = useMemo(() => {
         const map = new Map<string, number>();
         (subDisplay?.columns ?? []).forEach((c, i) => {
             const syntheticTcId =
-                c.type === 'combobox' &&
-                c.combobox_column_id != null &&
-                c.table_column_id != null
+                c.type === 'combobox' && c.combobox_column_id != null && c.table_column_id != null
                     ? -1_000_000 - Number(c.combobox_column_id)
                     : c.table_column_id ?? -1;
+
             map.set(`${c.widget_column_id}:${syntheticTcId}`, i);
         });
         return map;
@@ -126,38 +124,36 @@ export function useSubWormTable({
 
     // ——— префлайты ———
     const preflightUpdate = async (): Promise<{ ok: boolean }> => {
-        if (!currentWidgetId) return {ok: false};
+        if (!currentWidgetId) return { ok: false };
         try {
-            const {data: widget} = await api.get<Widget>(`/widgets/${currentWidgetId}`);
-            const {data: table} = await api.get<DTable>(`/tables/${widget.table_id}`);
+            const { data: widget } = await api.get<Widget>(`/widgets/${currentWidgetId}`);
+            const { data: table } = await api.get<DTable>(`/tables/${widget.table_id}`);
             if (!table?.update_query?.trim()) {
                 alert('Для таблицы саб-виджета не настроен UPDATE QUERY.');
-                return {ok: false};
+                return { ok: false };
             }
         } catch (e) {
             console.warn('preflight (sub/update) failed:', e);
         }
-        return {ok: true};
+        return { ok: true };
     };
 
     const preflightDelete = async (): Promise<{ ok: boolean }> => {
-        if (!currentWidgetId) return {ok: false};
+        if (!currentWidgetId) return { ok: false };
         try {
-            const {data: widget} = await api.get<Widget>(`/widgets/${currentWidgetId}`);
-            const {data: table} = await api.get<DTable>(`/tables/${widget.table_id}`);
+            const { data: widget } = await api.get<Widget>(`/widgets/${currentWidgetId}`);
+            const { data: table } = await api.get<DTable>(`/tables/${widget.table_id}`);
             if (!table?.delete_query?.trim()) {
                 alert('Для таблицы саб-виджета не настроен DELETE QUERY.');
-                return {ok: false};
+                return { ok: false };
             }
         } catch (e) {
             console.warn('preflight (sub/delete) failed:', e);
         }
-        return {ok: true};
+        return { ok: true };
     };
 
     // ——— редактирование ———
-    // В useSubWormTable.ts, функция startEdit
-
     const startEdit = async (rowIdx: number) => {
         if (!formId || !currentWidgetId || !subDisplay) return;
         const pf = await preflightUpdate();
@@ -169,24 +165,15 @@ export function useSubWormTable({
         const init: Record<number, string> = {};
 
         flatColumnsInRenderOrder.forEach((col) => {
-            // Определяем реальный write ID
-            let writeTcId: number | null = null;
+            // реальный write ID (как в MainTable)
+            const writeTcId =
+                col.type === 'combobox' ? ((col as any).__write_tc_id ?? null) : (col.table_column_id ?? null);
 
-            if (col.type === 'combobox') {
-                // Для combobox используем __write_tc_id
-                writeTcId = (col as any).__write_tc_id ?? null;
-            } else {
-                writeTcId = col.table_column_id ?? null;
-            }
-
-            // Пропускаем синтетические и null
             if (writeTcId == null || isSyntheticComboboxId(writeTcId)) return;
 
-            // Получаем текущее значение из row
+            // значение для показа берём по synthetic ключу (чтобы совпасть с row.values)
             const syntheticTcId =
-                col.type === 'combobox' &&
-                col.combobox_column_id != null &&
-                col.table_column_id != null
+                col.type === 'combobox' && col.combobox_column_id != null && col.table_column_id != null
                     ? -1_000_000 - Number(col.combobox_column_id)
                     : col.table_column_id ?? -1;
 
@@ -211,10 +198,6 @@ export function useSubWormTable({
         setEditSaving(false);
     };
 
-    const isSyntheticComboboxId = (tcId: number): boolean => {
-        return tcId < -1_000_000 + 1; // т.е. tcId <= -1_000_000
-    };
-
     const submitEdit = async () => {
         if (editingRowIdx == null || !formId || !currentWidgetId || !subDisplay) return;
         const pf = await preflightUpdate();
@@ -224,26 +207,17 @@ export function useSubWormTable({
         try {
             const row = subDisplay.data[editingRowIdx];
 
-            // Фильтруем синтетические ID
             const values = Object.entries(editDraft)
-                .filter(([tcIdStr]) => {
-                    const tcId = Number(tcIdStr);
-                    return !isSyntheticComboboxId(tcId);
-                })
+                .filter(([tcIdStr]) => !isSyntheticComboboxId(Number(tcIdStr)))
                 .map(([tcIdStr, value]) => {
                     const tcId = Number(tcIdStr);
                     const s = value == null ? '' : String(value).trim();
-                    return {
-                        table_column_id: tcId,
-                        value: s === '' ? null : s,
-                    };
+                    return { table_column_id: tcId, value: s === '' ? null : s };
                 });
 
             const body = {
                 pk: {
-                    primary_keys: Object.fromEntries(
-                        Object.entries(row.primary_keys).map(([k, v]) => [k, String(v)])
-                    ),
+                    primary_keys: Object.fromEntries(Object.entries(row.primary_keys).map(([k, v]) => [k, String(v)])),
                 },
                 values,
             };
@@ -260,7 +234,7 @@ export function useSubWormTable({
                 if (status === 403) {
                     console.warn('[submitEdit] 403 Forbidden', { url, body, detail });
                     alert('У вас не хватает прав на редактирование записи');
-                    return; // не валим дальше, не делаем reload
+                    return;
                 }
                 if (status === 404 && String(detail).includes('Update query not found')) {
                     alert('Для саб-формы не настроен UPDATE QUERY. Задайте его и повторите.');
@@ -278,11 +252,7 @@ export function useSubWormTable({
         } catch (e: any) {
             const status = e?.response?.status;
             const msg = e?.response?.data ?? e?.message;
-            alert(
-                `Не удалось обновить строку: ${status ?? ''} ${
-                    typeof msg === 'string' ? msg : JSON.stringify(msg)
-                }`
-            );
+            alert(`Не удалось обновить строку: ${status ?? ''} ${typeof msg === 'string' ? msg : JSON.stringify(msg)}`);
         } finally {
             setEditSaving(false);
         }
@@ -295,9 +265,7 @@ export function useSubWormTable({
         if (!pf.ok) return;
 
         const row = subDisplay.data[rowIdx];
-        const pkObj = Object.fromEntries(
-            Object.entries(row.primary_keys).map(([k, v]) => [k, String(v)])
-        );
+        const pkObj = Object.fromEntries(Object.entries(row.primary_keys).map(([k, v]) => [k, String(v)]));
         const pkLabel = Object.entries(pkObj)
             .map(([k, v]) => `${k}=${v}`)
             .join(', ');
@@ -306,20 +274,21 @@ export function useSubWormTable({
 
         setDeletingRowIdx(rowIdx);
         try {
-            const body = {primary_keys: pkObj};
+            const body = { primary_keys: pkObj };
             const url = `/data/${formId}/${currentWidgetId}`;
 
             try {
-                await api.delete(url, {data: body});
+                await api.delete(url, { data: body });
             } catch (err: any) {
                 const status = err?.response?.status;
                 const detail = err?.response?.data?.detail ?? err?.response?.data ?? err?.message;
+
                 if (status === 404 && String(detail).includes('Delete query not found')) {
                     alert('Для саб-формы не настроен DELETE QUERY. Задайте его и повторите.');
                     return;
                 }
                 if (status === 404) {
-                    await api.delete(`${url}/`, {data: body});
+                    await api.delete(`${url}/`, { data: body });
                 } else {
                     throw err;
                 }
@@ -330,47 +299,36 @@ export function useSubWormTable({
         } catch (e: any) {
             const status = e?.response?.status;
             const msg = e?.response?.data ?? e?.message;
-            alert(
-                `Не удалось удалить строку: ${status ?? ''} ${
-                    typeof msg === 'string' ? msg : JSON.stringify(msg)
-                }`
-            );
+            alert(`Не удалось удалить строку: ${status ?? ''} ${typeof msg === 'string' ? msg : JSON.stringify(msg)}`);
         } finally {
             setDeletingRowIdx(null);
         }
     };
 
     return {
-        // состояние
         deletingRowIdx,
-        setDeletingRowIdx,
         showSubHeaders,
         setShowSubHeaders,
         hasTabs,
         safe,
 
-        // план шапки/колонки/индексы значений
         headerPlan,
         flatColumnsInRenderOrder,
         valueIndexByKey,
 
-
         tabs,
         displayedWidgetOrder,
 
-        // действия
         startEdit,
         cancelEdit,
         submitEdit,
         deleteRow,
 
-        // проброс для UI добавления (как и было)
         isAddingSub,
         setIsAddingSub,
         draftSub,
         setDraftSub,
 
-        // проброс редактирования
         editingRowIdx,
         setEditingRowIdx,
         editDraft,

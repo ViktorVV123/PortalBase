@@ -8,7 +8,7 @@ import EditIcon from '@/assets/image/EditIcon.svg';
 import DeleteIcon from '@/assets/image/DeleteIcon.svg';
 import type { SubDisplay } from '@/shared/hooks/useWorkSpaces';
 import type { HeaderModelItem } from '@/components/Form/formTable/FormTable';
-import { useSubWormTable, UseSubWormTableDeps } from '@/components/Form/subForm/hook/useSubWormTable';
+import { useSubWormTable } from '@/components/Form/subForm/hook/useSubWormTable';
 import { InputCell } from '@/components/Form/mainTable/InputCell';
 import { ExtCol, formatByDatatype } from '@/components/Form/formTable/parts/FormatByDatatype';
 
@@ -21,6 +21,7 @@ type SubformProps = {
     subHeaderGroups?: HeaderModelItem[];
     currentWidgetId?: number;
     comboReloadToken: number;
+
     editingRowIdx: number | null;
     setEditingRowIdx: React.Dispatch<React.SetStateAction<number | null>>;
     editDraft: Record<number, string>;
@@ -47,13 +48,24 @@ type SubformProps = {
     ) => void;
 };
 
-/** Сравнение двух саб-строк по primary_keys.
- *  Если PK один и он числовой (как phone_id) → сортируем численно.
- *  Иначе — строковое сравнение с numeric: true.
- */
+const SYNTHETIC_MIN = -1_000_000;
+const isSyntheticComboboxId = (tcId: number): boolean => tcId <= SYNTHETIC_MIN;
 
+/** Реальный table_column_id, который нужно ОТПРАВЛЯТЬ на бэк */
+const getWriteTcId = (col: ExtCol): number | null => {
+    if (col.type === 'combobox') {
+        const w = (col as any).__write_tc_id;
+        if (typeof w === 'number') return w;
 
+        // фолбэк: если table_column_id вдруг уже реальный (не синтетика)
+        const tc = col.table_column_id;
+        if (typeof tc === 'number' && !isSyntheticComboboxId(tc)) return tc;
 
+        return null;
+    }
+
+    return typeof col.table_column_id === 'number' ? col.table_column_id : null;
+};
 
 export const SubWormTable: React.FC<SubformProps> = (props) => {
     const {
@@ -79,8 +91,6 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
         comboReloadToken,
     } = props;
 
-    // ⚙️ Стабильная сортировка саб-строк по primary_keys
-
     const {
         deletingRowIdx,
         showSubHeaders,
@@ -94,27 +104,28 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
         cancelEdit,
         submitEdit,
         deleteRow,
-
         tabs,
         displayedWidgetOrder,
     } = useSubWormTable({
-        subDisplay:subDisplay,
+        subDisplay,
         formId,
         currentWidgetId,
         currentOrder,
         subHeaderGroups,
         handleTabClick,
+
         editingRowIdx,
         setEditingRowIdx,
         editDraft,
         setEditDraft,
         editSaving,
         setEditSaving,
+
         isAddingSub,
         setIsAddingSub,
         draftSub,
         setDraftSub,
-    } as UseSubWormTableDeps);
+    });
 
     const activeOrder = currentOrder ?? displayedWidgetOrder ?? null;
 
@@ -123,9 +134,7 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
             {hasTabs && tabs && (
                 <ul className={sub.tabs}>
                     {tabs.map((sw) => {
-                        const isActive =
-                            activeOrder != null ? sw.widget_order === activeOrder : false;
-
+                        const isActive = activeOrder != null ? sw.widget_order === activeOrder : false;
                         return (
                             <li key={sw.widget_order}>
                                 <button
@@ -162,11 +171,7 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                                 <button
                                     type="button"
                                     onClick={() => setShowSubHeaders((v) => !v)}
-                                    title={
-                                        showSubHeaders
-                                            ? 'Скрыть подзаголовки'
-                                            : 'Показать подзаголовки'
-                                    }
+                                    title={showSubHeaders ? 'Скрыть подзаголовки' : 'Показать подзаголовки'}
                                     className={sub.toggleBtn}
                                 >
                                     {showSubHeaders ? (
@@ -198,26 +203,32 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                         {/* строка добавления в саб */}
                         {isAddingSub && (
                             <tr>
-                                {flatColumnsInRenderOrder.map((col) => (
-                                    <td
-                                        key={`sub-add-wc${col.widget_column_id}-tc${col.table_column_id}`}
-                                    >
-                                        <InputCell
-                                            mode="add"
-                                            col={col as ExtCol}
-                                            readOnly={false}
-                                            value={draftSub[col.table_column_id!] ?? ''}
-                                            onChange={(v) =>
-                                                setDraftSub((prev) => ({
-                                                    ...prev,
-                                                    [col.table_column_id!]: v,
-                                                }))
-                                            }
-                                            placeholder={col.placeholder ?? col.column_name}
-                                            comboReloadToken={comboReloadToken}
-                                        />
-                                    </td>
-                                ))}
+                                {flatColumnsInRenderOrder.map((col) => {
+                                    const writeTcId = getWriteTcId(col as ExtCol);
+
+                                    return (
+                                        <td key={`sub-add-wc${col.widget_column_id}-tc${col.table_column_id}`}>
+                                            {writeTcId == null ? (
+                                                <span className={sub.ellipsis}>—</span>
+                                            ) : (
+                                                <InputCell
+                                                    mode="add"
+                                                    col={col as ExtCol}
+                                                    readOnly={false}
+                                                    value={draftSub[writeTcId] ?? ''}
+                                                    onChange={(v) =>
+                                                        setDraftSub((prev) => ({
+                                                            ...prev,
+                                                            [writeTcId]: v,
+                                                        }))
+                                                    }
+                                                    placeholder={col.placeholder ?? col.column_name}
+                                                    comboReloadToken={comboReloadToken}
+                                                />
+                                            )}
+                                        </td>
+                                    );
+                                })}
                                 <td className={sub.actionsCell} />
                             </tr>
                         )}
@@ -232,8 +243,7 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                                             col.type === 'combobox' &&
                                             col.combobox_column_id != null &&
                                             col.table_column_id != null
-                                                ? -1_000_000 -
-                                                Number(col.combobox_column_id)
+                                                ? -1_000_000 - Number(col.combobox_column_id)
                                                 : col.table_column_id ?? -1;
 
                                         const key = `${col.widget_column_id}:${syntheticTcId}`;
@@ -241,25 +251,30 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                                         const val = idx != null ? row.values[idx] : '';
 
                                         if (isEditingRow) {
-                                            const tcId = col.table_column_id!;
+                                            const writeTcId = getWriteTcId(col as ExtCol);
+
                                             return (
                                                 <td
                                                     key={`sub-edit-r${rowIdx}-wc${col.widget_column_id}-tc${col.table_column_id}`}
                                                 >
-                                                    <InputCell
-                                                        mode="edit"
-                                                        col={col as ExtCol}
-                                                        readOnly={false}
-                                                        value={editDraft[tcId] ?? ''}
-                                                        onChange={(v) =>
-                                                            setEditDraft((prev) => ({
-                                                                ...prev,
-                                                                [tcId]: v,
-                                                            }))
-                                                        }
-                                                        placeholder={col.placeholder ?? col.column_name}
-                                                        comboReloadToken={comboReloadToken}
-                                                    />
+                                                    {writeTcId == null ? (
+                                                        <span className={sub.ellipsis}>—</span>
+                                                    ) : (
+                                                        <InputCell
+                                                            mode="edit"
+                                                            col={col as ExtCol}
+                                                            readOnly={false}
+                                                            value={editDraft[writeTcId] ?? ''}
+                                                            onChange={(v) =>
+                                                                setEditDraft((prev) => ({
+                                                                    ...prev,
+                                                                    [writeTcId]: v,
+                                                                }))
+                                                            }
+                                                            placeholder={col.placeholder ?? col.column_name}
+                                                            comboReloadToken={comboReloadToken}
+                                                        />
+                                                    )}
                                                 </td>
                                             );
                                         }
@@ -267,30 +282,20 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                                         const raw = val == null ? '' : String(val);
                                         const display = formatByDatatype(raw, col as ExtCol);
                                         const isCheckboxCol =
-                                            (col as ExtCol).type === 'checkbox' ||
-                                            (col as ExtCol).type === 'bool';
+                                            (col as ExtCol).type === 'checkbox' || (col as ExtCol).type === 'bool';
 
                                         const toBool = (v: unknown): boolean => {
                                             if (v == null) return false;
                                             if (typeof v === 'boolean') return v;
                                             if (typeof v === 'number') return v !== 0;
                                             const s = String(v).trim().toLowerCase();
-                                            return (
-                                                s === '1' ||
-                                                s === 'true' ||
-                                                s === 't' ||
-                                                s === 'yes' ||
-                                                s === 'да'
-                                            );
+                                            return s === '1' || s === 'true' || s === 't' || s === 'yes' || s === 'да';
                                         };
 
-                                        const clickable =
-                                            !!onOpenDrill && col.form_id != null;
+                                        const clickable = !!onOpenDrill && col.form_id != null;
 
                                         return (
-                                            <td
-                                                key={`sub-r${rowIdx}-wc${col.widget_column_id}-tc${col.table_column_id}`}
-                                            >
+                                            <td key={`sub-r${rowIdx}-wc${col.widget_column_id}-tc${col.table_column_id}`}>
                                                 {isCheckboxCol ? (
                                                     <Checkbox
                                                         size="small"
@@ -299,14 +304,8 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                                                         disabled
                                                         sx={{
                                                             color: 'rgba(255, 255, 255, 0.4)',
-                                                            '&.Mui-checked': {
-                                                                color:
-                                                                    'rgba(255, 255, 255, 0.9)',
-                                                            },
-                                                            '&.Mui-disabled': {
-                                                                color:
-                                                                    'rgba(255, 255, 255, 0.7)',
-                                                            },
+                                                            '&.Mui-checked': { color: 'rgba(255, 255, 255, 0.9)' },
+                                                            '&.Mui-disabled': { color: 'rgba(255, 255, 255, 0.7)' },
                                                         }}
                                                     />
                                                 ) : clickable ? (
@@ -315,40 +314,24 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                                                         onClick={(e) => {
                                                             e.stopPropagation();
                                                             onOpenDrill?.(col.form_id!, {
-                                                                originColumnType:
-                                                                    col.type === 'combobox'
-                                                                        ? 'combobox'
-                                                                        : null,
-                                                                primary:
-                                                                    row.primary_keys as Record<
-                                                                        string,
-                                                                        unknown
-                                                                    >,
+                                                                originColumnType: col.type === 'combobox' ? 'combobox' : null,
+                                                                primary: row.primary_keys as Record<string, unknown>,
                                                                 openedFromEdit: false,
+                                                                targetWriteTcId: getWriteTcId(col as ExtCol) ?? undefined,
                                                             });
-                                                            // eslint-disable-next-line no-console
-                                                            console.debug(
-                                                                '[SubWormTable] drill click',
-                                                                {
-                                                                    formId: col.form_id,
-                                                                    widget_column_id:
-                                                                    col.widget_column_id,
-                                                                    table_column_id:
-                                                                    col.table_column_id,
-                                                                },
-                                                            );
+                                                            console.debug('[SubWormTable] drill click', {
+                                                                formId: col.form_id,
+                                                                widget_column_id: col.widget_column_id,
+                                                                table_column_id: col.table_column_id,
+                                                            });
                                                         }}
                                                         className={sub.linkButton}
                                                         title={`Открыть форму #${col.form_id}`}
                                                     >
-                                                            <span className={sub.ellipsis}>
-                                                                {display}
-                                                            </span>
+                                                        <span className={sub.ellipsis}>{display}</span>
                                                     </button>
                                                 ) : (
-                                                    <span className={sub.ellipsis}>
-                                                            {display}
-                                                        </span>
+                                                    <span className={sub.ellipsis}>{display}</span>
                                                 )}
                                             </td>
                                         );
@@ -388,15 +371,12 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                                                     type="button"
                                                     className={sub.iconBtn}
                                                     onClick={() => {
-                                                        if (deletingRowIdx == null)
-                                                            deleteRow(rowIdx);
+                                                        if (deletingRowIdx == null) deleteRow(rowIdx);
                                                     }}
                                                     disabled={deletingRowIdx === rowIdx}
                                                     title="Удалить"
                                                 >
-                                                    <DeleteIcon
-                                                        className={sub.actionIcon}
-                                                    />
+                                                    <DeleteIcon className={sub.actionIcon} />
                                                 </button>
                                             </>
                                         )}
