@@ -4,6 +4,7 @@ import type { SubDisplay, DTable, Widget, FormDisplay } from '@/shared/hooks/use
 import type { HeaderModelItem } from '@/components/Form/formTable/FormTable';
 import { isEditableValue } from '@/shared/utils/cellFormat';
 import { useHeaderPlan } from '@/components/Form/formTable/hooks/useHeaderPlan';
+import { loadComboOptionsOnce } from '@/components/Form/mainTable/InputCell';
 
 export type UseSubWormTableDeps = {
     subDisplay: SubDisplay | null;
@@ -13,7 +14,6 @@ export type UseSubWormTableDeps = {
     subHeaderGroups?: HeaderModelItem[];
     handleTabClick: (order: number) => void;
 
-    // было лишним обязательным — делаем опциональным (в хуке не используется)
     setSubDisplay?: React.Dispatch<React.SetStateAction<SubDisplay | null>>;
 
     editingRowIdx: number | null;
@@ -108,7 +108,6 @@ export function useSubWormTable({
 
     const flatColumnsInRenderOrder = useMemo(() => headerPlan.flatMap((g) => g.cols), [headerPlan]);
 
-    // корректный valueIndexByKey для row.values
     const valueIndexByKey = useMemo(() => {
         const map = new Map<string, number>();
         (subDisplay?.columns ?? []).forEach((c, i) => {
@@ -164,14 +163,22 @@ export function useSubWormTable({
         const row = subDisplay.data[rowIdx];
         const init: Record<number, string> = {};
 
+        // Собираем combobox колонки для маппинга
+        const comboGroups = new Map<string, {
+            wcId: number;
+            writeTcId: number;
+            tokens: string[];
+        }>();
+
         flatColumnsInRenderOrder.forEach((col) => {
-            // реальный write ID (как в MainTable)
             const writeTcId =
-                col.type === 'combobox' ? ((col as any).__write_tc_id ?? null) : (col.table_column_id ?? null);
+                col.type === 'combobox'
+                    ? ((col as any).__write_tc_id ?? col.table_column_id ?? null)
+                    : (col.table_column_id ?? null);
 
             if (writeTcId == null || isSyntheticComboboxId(writeTcId)) return;
 
-            // значение для показа берём по synthetic ключу (чтобы совпасть с row.values)
+            // Получаем отображаемое значение
             const syntheticTcId =
                 col.type === 'combobox' && col.combobox_column_id != null && col.table_column_id != null
                     ? -1_000_000 - Number(col.combobox_column_id)
@@ -180,11 +187,74 @@ export function useSubWormTable({
             const key = `${col.widget_column_id}:${syntheticTcId}`;
             const idx = valueIndexByKey.get(key);
             const val = idx != null ? row.values[idx] : '';
+            const shownStr = val == null ? '' : String(val).trim();
 
-            if (isEditableValue(val)) {
-                init[writeTcId] = String(val ?? '');
+            if (col.type === 'combobox') {
+                // Для combobox собираем токены для последующего маппинга
+                const gKey = `${col.widget_column_id}:${writeTcId}`;
+                const g = comboGroups.get(gKey) ?? {
+                    wcId: col.widget_column_id,
+                    writeTcId,
+                    // @ts-ignore
+                    tokens: [],
+                };
+                if (shownStr) g.tokens.push(shownStr);
+                comboGroups.set(gKey, g);
+            } else {
+                // Обычные колонки
+                if (isEditableValue(val)) {
+                    init[writeTcId] = shownStr;
+                }
             }
         });
+
+        // Маппинг combobox: загружаем опции и ищем UUID по отображаемому значению
+        const groups = Array.from(comboGroups.values());
+        for (const g of groups) {
+            try {
+                const options = await loadComboOptionsOnce(g.wcId, g.writeTcId);
+
+                const tokens = g.tokens.map((t) => t.toLowerCase());
+
+                let bestId: string | null = null;
+                let bestScore = 0;
+                let bestCount = 0;
+
+                for (const o of options) {
+                    // Проверяем совпадение по show и showHidden
+                    const hay = [...o.show, ...o.showHidden].map((x) => x.toLowerCase());
+
+                    const score = tokens.reduce(
+                        (acc, t) => acc + (hay.includes(t) ? 1 : 0),
+                        0
+                    );
+
+                    if (score > bestScore) {
+                        bestScore = score;
+                        bestCount = 1;
+                        bestId = o.id;
+                    } else if (score === bestScore && score > 0) {
+                        bestCount += 1;
+                    }
+                }
+
+                // Записываем найденный UUID (или пустую строку если не нашли)
+                init[g.writeTcId] =
+                    bestScore > 0 && bestCount === 1 && bestId ? bestId : '';
+
+                console.debug('[useSubWormTable] combobox mapping:', {
+                    wcId: g.wcId,
+                    writeTcId: g.writeTcId,
+                    tokens: g.tokens,
+                    foundId: init[g.writeTcId],
+                    bestScore,
+                    bestCount,
+                });
+            } catch (e) {
+                console.warn('[useSubWormTable] Failed to load combo options:', g, e);
+                init[g.writeTcId] = '';
+            }
+        }
 
         console.debug('[useSubWormTable] startEdit → init:', init);
 
@@ -217,7 +287,9 @@ export function useSubWormTable({
 
             const body = {
                 pk: {
-                    primary_keys: Object.fromEntries(Object.entries(row.primary_keys).map(([k, v]) => [k, String(v)])),
+                    primary_keys: Object.fromEntries(
+                        Object.entries(row.primary_keys).map(([k, v]) => [k, String(v)])
+                    ),
                 },
                 values,
             };
@@ -252,7 +324,9 @@ export function useSubWormTable({
         } catch (e: any) {
             const status = e?.response?.status;
             const msg = e?.response?.data ?? e?.message;
-            alert(`Не удалось обновить строку: ${status ?? ''} ${typeof msg === 'string' ? msg : JSON.stringify(msg)}`);
+            alert(
+                `Не удалось обновить строку: ${status ?? ''} ${typeof msg === 'string' ? msg : JSON.stringify(msg)}`
+            );
         } finally {
             setEditSaving(false);
         }
@@ -265,7 +339,9 @@ export function useSubWormTable({
         if (!pf.ok) return;
 
         const row = subDisplay.data[rowIdx];
-        const pkObj = Object.fromEntries(Object.entries(row.primary_keys).map(([k, v]) => [k, String(v)]));
+        const pkObj = Object.fromEntries(
+            Object.entries(row.primary_keys).map(([k, v]) => [k, String(v)])
+        );
         const pkLabel = Object.entries(pkObj)
             .map(([k, v]) => `${k}=${v}`)
             .join(', ');
@@ -299,7 +375,9 @@ export function useSubWormTable({
         } catch (e: any) {
             const status = e?.response?.status;
             const msg = e?.response?.data ?? e?.message;
-            alert(`Не удалось удалить строку: ${status ?? ''} ${typeof msg === 'string' ? msg : JSON.stringify(msg)}`);
+            alert(
+                `Не удалось удалить строку: ${status ?? ''} ${typeof msg === 'string' ? msg : JSON.stringify(msg)}`
+            );
         } finally {
             setDeletingRowIdx(null);
         }
