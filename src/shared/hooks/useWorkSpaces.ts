@@ -17,11 +17,11 @@
 import { useCallback } from 'react';
 import { api } from '@/services/api';
 
-import { useWorkspacesStore } from './stores/useWorkspacesStore';
-import { useTablesStore } from './stores/useTablesStore';
-import { useWidgetsStore } from './stores/useWidgetsStore';
-import { useFormsStore } from './stores/useFormsStore';
-import { useConnectionsStore } from './stores/useConnectionsStore';
+import { useWorkspacesStore } from '@/shared/hooks/stores';
+import { useTablesStore } from '@/shared/hooks/stores';
+import { useWidgetsStore } from '@/shared/hooks/stores';
+import { useFormsStore } from '@/shared/hooks/stores';
+import { useConnectionsStore } from '@/shared/hooks/stores';
 
 import type { DTable, Widget } from './stores/types';
 

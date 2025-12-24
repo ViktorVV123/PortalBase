@@ -225,7 +225,7 @@ export const TableColumn: React.FC<TableColumnProps> = ({
     return (
         <div>
             <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-                <TableListView
+                <TableListView columns={columns}
                     startAdd={startAdd}
                     isAdding={isAdding}
                     cancelAdd={cancelAdd}

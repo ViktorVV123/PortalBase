@@ -130,11 +130,15 @@ export const TopComponent: React.FC<Props> = (props) => {
         }
     };
 
+
+    const hasWorkspaces = workSpaces.length > 0;
+
     return (
         <div className={s.bar}>
             <div className={s.logo}>Портал ввода данных</div>
 
             <div className={s.menuWrapper} ref={state.menuRef}>
+                {hasWorkspaces && (
                 <button
                     className={s.trigger}
                     onClick={state.handleTriggerClick}
@@ -143,7 +147,7 @@ export const TopComponent: React.FC<Props> = (props) => {
                 >
                     Рабочие&nbsp;пространства ▾
                 </button>
-
+                )}
                 <SideNav
                     open={navOpen}
                     toggle={() => {

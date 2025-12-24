@@ -1,5 +1,5 @@
 import React, {useState} from 'react';
-import {DTable} from "@/shared/hooks/useWorkSpaces";
+import {Column, DTable} from "@/shared/hooks/useWorkSpaces";
 import {Button, Typography} from "@mui/material";
 import {ModalEditTableMeta} from "@/components/modals/modalEditTableMeta/ModalEditTableMeta";
 import Editicon from "@/assets/image/EditIcon.svg";
@@ -16,10 +16,11 @@ type Props = {
     startAdd:any
     savingNew:any
     cancelAdd:any
+    columns: Column[];
 };
 
 
-export const TableListView: React.FC<Props> = ({selectedTable, updateTableMeta,publishTable,isAdding,startAdd,savingNew,cancelAdd}) => {
+export const TableListView: React.FC<Props> = ({selectedTable, updateTableMeta,publishTable,isAdding,startAdd,savingNew,cancelAdd,columns}) => {
     const [openMetaModal, setOpenMetaModal] = useState(false);
 
     if (!selectedTable) return null;
@@ -95,6 +96,7 @@ export const TableListView: React.FC<Props> = ({selectedTable, updateTableMeta,p
                 <ModalEditTableMeta
                     open={openMetaModal}
                     table={selectedTable}
+                    columns={columns}  // ← ПЕРЕДАТЬ
                     onClose={() => setOpenMetaModal(false)}
                     onSave={handleSave}
                 />
