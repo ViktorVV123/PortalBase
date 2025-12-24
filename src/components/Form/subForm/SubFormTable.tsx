@@ -11,6 +11,8 @@ import type { HeaderModelItem } from '@/components/Form/formTable/FormTable';
 import { useSubWormTable } from '@/components/Form/subForm/hook/useSubWormTable';
 import { InputCell } from '@/components/Form/mainTable/InputCell';
 import { ExtCol, formatByDatatype } from '@/components/Form/formTable/parts/FormatByDatatype';
+import LockIcon from '@/assets/image/LockIcon.svg';
+import * as s from "@/components/setOfTables/SetOfTables.module.scss";
 
 type SubformProps = {
     subDisplay: SubDisplay | null;
@@ -66,6 +68,18 @@ const getWriteTcId = (col: ExtCol): number | null => {
 
     return typeof col.table_column_id === 'number' ? col.table_column_id : null;
 };
+
+function isRlsLockedValue(val: unknown): boolean {
+    if (val == null) return false;
+    if (typeof val === 'boolean') return val;
+    if (typeof val === 'number') return val !== 0;
+
+    const s = String(val).trim().toLowerCase();
+    return s === '1' || s === 'true' || s === 'да' || s === 'yes' || s === 't';
+}
+
+
+
 
 export const SubWormTable: React.FC<SubformProps> = (props) => {
     const {
@@ -129,6 +143,45 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
 
     const activeOrder = currentOrder ?? displayedWidgetOrder ?? null;
 
+    const rlsMeta = React.useMemo(() => {
+        const col = flatColumnsInRenderOrder.find((c) => (c as ExtCol).type === 'rls');
+        if (!col) return null;
+
+        const syntheticTcId =
+            col.type === 'combobox' && col.combobox_column_id != null && col.table_column_id != null
+                ? -1_000_000 - Number(col.combobox_column_id)
+                : col.table_column_id ?? -1;
+
+        const key = `${col.widget_column_id}:${syntheticTcId}`;
+        const idx = valueIndexByKey.get(key);
+        if (idx == null) return null;
+
+        return { col: col as ExtCol, idx };
+    }, [flatColumnsInRenderOrder, valueIndexByKey]);
+
+    // ✅ колонки, которые реально показываем
+    const renderCols = React.useMemo(
+        () => flatColumnsInRenderOrder.filter((c) => (c as ExtCol).type !== 'rls'),
+        [flatColumnsInRenderOrder],
+    );
+
+    // ✅ headerPlan без rls (иначе шапка покажет check)
+    const renderHeaderPlan = React.useMemo(() => {
+        return (headerPlan ?? [])
+            .map((g) => {
+                const nextCols = (g.cols ?? []).filter((c) => (c as ExtCol).type !== 'rls');
+                if (!nextCols.length) return null;
+
+                const nextLabels =
+                    Array.isArray(g.labels) && g.labels.length === (g.cols?.length ?? 0)
+                        ? g.labels.filter((_, i) => (g.cols[i] as ExtCol | undefined)?.type !== 'rls')
+                        : g.labels;
+
+                return { ...g, cols: nextCols, labels: nextLabels };
+            })
+            .filter(Boolean) as typeof headerPlan;
+    }, [headerPlan]);
+
     return (
         <div className={sub.root}>
             {hasTabs && tabs && (
@@ -162,7 +215,7 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                     <table className={sub.tbl}>
                         <thead>
                         <tr>
-                            {headerPlan.map((g) => (
+                            {renderHeaderPlan.map((g) => (
                                 <th key={`sub-g-top-${g.id}`} colSpan={g.cols.length || 1}>
                                     <span className={sub.ellipsis}>{g.title}</span>
                                 </th>
@@ -185,16 +238,34 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
 
                         {showSubHeaders && (
                             <tr>
-                                {headerPlan.map((g) => {
-                                    const span = g.cols.length || 1;
-                                    const label = safe(g.labels?.[0] ?? '—');
-                                    return (
-                                        <th key={`sub-g-sub-${g.id}`} colSpan={span}>
-                                            <span className={sub.ellipsis}>{label}</span>
-                                        </th>
-                                    );
+                                {renderHeaderPlan.flatMap((g) => {
+                                    const labels = (g.labels ?? []).slice(0, g.cols.length);
+                                    // если labels меньше, добьём "—"
+                                    while (labels.length < g.cols.length) labels.push('—');
+
+                                    const nodes: React.ReactNode[] = [];
+
+                                    let i = 0;
+                                    while (i < g.cols.length) {
+                                        const label = labels[i] ?? '—';
+
+                                        let span = 1;
+                                        while (i + span < g.cols.length && (labels[i + span] ?? '—') === label) {
+                                            span += 1;
+                                        }
+
+                                        nodes.push(
+                                            <th key={`g-sub-${g.id}-${i}`} colSpan={span}>
+                                                <span className={s.ellipsis}>{label}</span>
+                                            </th>
+                                        );
+
+                                        i += span;
+                                    }
+
+                                    return nodes;
                                 })}
-                                <th className={sub.actionsHeadCell} />
+                                <th className={s.actionsCell} />
                             </tr>
                         )}
                         </thead>
@@ -203,7 +274,7 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                         {/* строка добавления в саб */}
                         {isAddingSub && (
                             <tr>
-                                {flatColumnsInRenderOrder.map((col) => {
+                                {renderCols.map((col) => {
                                     const writeTcId = getWriteTcId(col as ExtCol);
 
                                     return (
@@ -236,9 +307,14 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                         {subDisplay.data.map((row, rowIdx) => {
                             const isEditingRow = editingRowIdx === rowIdx;
 
+                            // ✅ RLS-lock для строки
+                            const rlsVal = rlsMeta ? row.values[rlsMeta.idx] : null;
+                            const isRowLocked = rlsMeta ? isRlsLockedValue(rlsVal) : false;
+
                             return (
                                 <tr key={rowIdx}>
-                                    {flatColumnsInRenderOrder.map((col) => {
+                                    {/* ✅ было flatColumnsInRenderOrder -> стало renderCols */}
+                                    {renderCols.map((col) => {
                                         const syntheticTcId =
                                             col.type === 'combobox' &&
                                             col.combobox_column_id != null &&
@@ -254,9 +330,7 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                                             const writeTcId = getWriteTcId(col as ExtCol);
 
                                             return (
-                                                <td
-                                                    key={`sub-edit-r${rowIdx}-wc${col.widget_column_id}-tc${col.table_column_id}`}
-                                                >
+                                                <td key={`sub-edit-r${rowIdx}-wc${col.widget_column_id}-tc${col.table_column_id}`}>
                                                     {writeTcId == null ? (
                                                         <span className={sub.ellipsis}>—</span>
                                                     ) : (
@@ -279,20 +353,15 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                                             );
                                         }
 
-                                        const raw = val == null ? '' : String(val);
-                                        const display = formatByDatatype(raw, col as ExtCol);
                                         const isCheckboxCol =
                                             (col as ExtCol).type === 'checkbox' || (col as ExtCol).type === 'bool';
 
-                                        const toBool = (v: unknown): boolean => {
-                                            if (v == null) return false;
-                                            if (typeof v === 'boolean') return v;
-                                            if (typeof v === 'number') return v !== 0;
-                                            const s = String(v).trim().toLowerCase();
-                                            return s === '1' || s === 'true' || s === 't' || s === 'yes' || s === 'да';
-                                        };
+                                        const toBool = (v: unknown): boolean => isRlsLockedValue(v);
 
                                         const clickable = !!onOpenDrill && col.form_id != null;
+
+                                        const raw = val == null ? '' : String(val);
+                                        const display = formatByDatatype(raw, col as ExtCol);
 
                                         return (
                                             <td key={`sub-r${rowIdx}-wc${col.widget_column_id}-tc${col.table_column_id}`}>
@@ -319,11 +388,6 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                                                                 openedFromEdit: false,
                                                                 targetWriteTcId: getWriteTcId(col as ExtCol) ?? undefined,
                                                             });
-                                                            console.debug('[SubWormTable] drill click', {
-                                                                formId: col.form_id,
-                                                                widget_column_id: col.widget_column_id,
-                                                                table_column_id: col.table_column_id,
-                                                            });
                                                         }}
                                                         className={sub.linkButton}
                                                         title={`Открыть форму #${col.form_id}`}
@@ -337,17 +401,21 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                                         );
                                     })}
 
+                                    {/* ✅ actions */}
                                     <td className={sub.actionsCell}>
                                         {isEditingRow ? (
                                             <>
-                                                <button
-                                                    className={sub.okBtn}
-                                                    onClick={submitEdit}
-                                                    disabled={editSaving}
-                                                    title="Сохранить"
-                                                >
-                                                    {editSaving ? '…' : '✓'}
-                                                </button>
+                                                {/* если строка вдруг залочена — не даём сохранить */}
+                                                {!isRowLocked && (
+                                                    <button
+                                                        className={sub.okBtn}
+                                                        onClick={submitEdit}
+                                                        disabled={editSaving}
+                                                        title="Сохранить"
+                                                    >
+                                                        {editSaving ? '…' : '✓'}
+                                                    </button>
+                                                )}
                                                 <button
                                                     className={sub.cancelBtn}
                                                     onClick={cancelEdit}
@@ -356,28 +424,48 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                                                 >
                                                     ×
                                                 </button>
+                                                {isRowLocked && (
+                                                    <span title="Строка защищена политикой RLS">
+                              <LockIcon className={sub.actionIcon} />
+                            </span>
+                                                )}
                                             </>
                                         ) : (
                                             <>
                                                 <button
                                                     type="button"
                                                     className={sub.iconBtn}
-                                                    onClick={() => startEdit(rowIdx)}
-                                                    title="Редактировать"
+                                                    onClick={() => {
+                                                        if (isRowLocked) return;
+                                                        startEdit(rowIdx);
+                                                    }}
+                                                    style={{ pointerEvents: isRowLocked ? 'none' : 'auto' }}
+                                                    disabled={isRowLocked}
+                                                    title={isRowLocked ? 'Редактирование запрещено (RLS)' : 'Редактировать'}
                                                 >
                                                     <EditIcon className={sub.actionIcon} />
                                                 </button>
+
                                                 <button
                                                     type="button"
                                                     className={sub.iconBtn}
+                                                    style={{ pointerEvents: isRowLocked ? 'none' : 'auto' }}
                                                     onClick={() => {
+                                                        if (isRowLocked) return;
                                                         if (deletingRowIdx == null) deleteRow(rowIdx);
                                                     }}
-                                                    disabled={deletingRowIdx === rowIdx}
-                                                    title="Удалить"
+                                                    disabled={isRowLocked || deletingRowIdx === rowIdx}
+                                                    title={isRowLocked ? 'Удаление запрещено (RLS)' : 'Удалить'}
                                                 >
                                                     <DeleteIcon className={sub.actionIcon} />
                                                 </button>
+
+                                                {isRowLocked && (
+                                                    <span  className={sub.lockSlot}
+                                                           title="Строка защищена политикой RLS">
+                              <LockIcon className={sub.actionIcon} />
+                            </span>
+                                                )}
                                             </>
                                         )}
                                     </td>

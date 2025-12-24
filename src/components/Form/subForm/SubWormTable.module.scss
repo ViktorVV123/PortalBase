@@ -233,8 +233,16 @@ $error: #d33;
 }
 
 .actionIcon {
-  width: 1.2em;
-  height: 1.2em;
+  width: 1.1em;
+  height: 1.1em;
+  color: #d1d0d0;
+}
+.lockSlot {
+  width: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
 }
 
 /* кнопки ✓ / × и иконки */

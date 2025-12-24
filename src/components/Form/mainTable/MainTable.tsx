@@ -77,16 +77,42 @@ export const MainTable: React.FC<Props> = (p) => {
         [p.filteredRows],
     );
 
+    // ✅ RLS нужен ТОЛЬКО для блокировки, не для отображения
     const rlsMeta = React.useMemo(() => {
         const col = p.flatColumnsInRenderOrder.find(c => c.type === 'rls');
         if (!col) return null;
 
         const key = `${col.widget_column_id}:${col.table_column_id ?? -1}`;
         const idx = p.valueIndexByKey.get(key);
-
         if (idx == null) return null;
+
         return { col, idx };
     }, [p.flatColumnsInRenderOrder, p.valueIndexByKey]);
+
+    // ✅ колонки, которые рисуем
+    const renderCols = React.useMemo(
+        () => p.flatColumnsInRenderOrder.filter(c => c.type !== 'rls'),
+        [p.flatColumnsInRenderOrder],
+    );
+
+    // ✅ headerPlan без rls (иначе thead покажет check)
+    const renderHeaderPlan = React.useMemo(() => {
+        return (p.headerPlan ?? [])
+            .map(g => {
+                const nextCols = (g.cols ?? []).filter(c => c.type !== 'rls');
+                if (!nextCols.length) return null;
+
+                // labels часто 1:1 с cols — фильтруем аккуратно
+                const nextLabels =
+                    Array.isArray(g.labels) && g.labels.length === (g.cols?.length ?? 0)
+                        ? g.labels.filter((_, i) => g.cols[i]?.type !== 'rls')
+                        : g.labels;
+
+                return { ...g, cols: nextCols, labels: nextLabels };
+            })
+            .filter(Boolean) as typeof p.headerPlan;
+    }, [p.headerPlan]);
+
 
     const colWidths = React.useMemo(() => {
         return p.flatColumnsInRenderOrder.map((col) => {
@@ -102,7 +128,7 @@ export const MainTable: React.FC<Props> = (p) => {
             // интерпретируем как проценты от ширины таблицы
             return `${w}%`;
         });
-    }, [p.flatColumnsInRenderOrder]);
+    }, [renderCols]);
 
     const drillDisabled = p.disableDrillWhileEditing && p.editingRowIdx != null;
 
@@ -128,7 +154,7 @@ export const MainTable: React.FC<Props> = (p) => {
 
                 <thead>
                 <tr>
-                    {p.headerPlan.map(g => (
+                    {renderHeaderPlan.map(g => (
                         <th key={`g-top-${g.id}`} colSpan={g.cols.length || 1}>
                             <span className={s.ellipsis}>{g.title}</span>
                         </th>
@@ -146,14 +172,32 @@ export const MainTable: React.FC<Props> = (p) => {
                 </tr>
                 {p.showSubHeaders && (
                     <tr>
-                        {p.headerPlan.map(g => {
-                            const span = g.cols.length || 1;
-                            const label = (g.labels?.[0] ?? '—');
-                            return (
-                                <th key={`g-sub-${g.id}`} colSpan={span}>
-                                    <span className={s.ellipsis}>{label}</span>
-                                </th>
-                            );
+                        {renderHeaderPlan.flatMap((g) => {
+                            const labels = (g.labels ?? []).slice(0, g.cols.length);
+                            // если labels меньше, добьём "—"
+                            while (labels.length < g.cols.length) labels.push('—');
+
+                            const nodes: React.ReactNode[] = [];
+
+                            let i = 0;
+                            while (i < g.cols.length) {
+                                const label = labels[i] ?? '—';
+
+                                let span = 1;
+                                while (i + span < g.cols.length && (labels[i + span] ?? '—') === label) {
+                                    span += 1;
+                                }
+
+                                nodes.push(
+                                    <th key={`g-sub-${g.id}-${i}`} colSpan={span}>
+                                        <span className={s.ellipsis}>{label}</span>
+                                    </th>
+                                );
+
+                                i += span;
+                            }
+
+                            return nodes;
                         })}
                         <th className={s.actionsCell} />
                     </tr>
@@ -164,7 +208,7 @@ export const MainTable: React.FC<Props> = (p) => {
                 {/* ───────── Добавление ───────── */}
                 {p.isAdding && (
                     <MainTableAddRow
-                        flatColumnsInRenderOrder={p.flatColumnsInRenderOrder}
+                        flatColumnsInRenderOrder={renderCols}
                         draft={p.draft}
                         onDraftChange={p.onDraftChange}
                         placeholderFor={p.placeholderFor}
@@ -175,9 +219,10 @@ export const MainTable: React.FC<Props> = (p) => {
                 {/* ───────── Основные строки ───────── */}
                 {safeRows.map((rowView) => (
                     <MainTableRow
+
                         key={p.pkToKey(rowView.row.primary_keys)}
                         rowView={rowView}
-                        flatColumnsInRenderOrder={p.flatColumnsInRenderOrder}
+                        flatColumnsInRenderOrder={renderCols}
                         valueIndexByKey={p.valueIndexByKey}
                         isColReadOnly={p.isColReadOnly}
                         placeholderFor={p.placeholderFor}
