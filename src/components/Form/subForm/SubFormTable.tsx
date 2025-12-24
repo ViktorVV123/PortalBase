@@ -13,6 +13,8 @@ import { InputCell } from '@/components/Form/mainTable/InputCell';
 import { ExtCol, formatByDatatype } from '@/components/Form/formTable/parts/FormatByDatatype';
 import LockIcon from '@/assets/image/LockIcon.svg';
 import * as s from "@/components/setOfTables/SetOfTables.module.scss";
+import * as cls from "@/components/table/tableToolbar/TableToolbar.module.scss";
+import {ButtonForm} from "@/shared/buttonForm/ButtonForm";
 
 type SubformProps = {
     subDisplay: SubDisplay | null;
@@ -48,6 +50,15 @@ type SubformProps = {
             targetWriteTcId?: number;
         },
     ) => void;
+
+
+    submitAdd: any;
+    saving: any;
+    selectedWidget: any;
+    buttonClassName: any;
+    selectFormId:any
+    startAdd:any
+    cancelAdd:any
 };
 
 const SYNTHETIC_MIN = -1_000_000;
@@ -103,6 +114,13 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
         setDraftSub,
         onOpenDrill,
         comboReloadToken,
+        submitAdd,
+        saving,
+        selectedWidget,
+        buttonClassName,
+        selectFormId,
+        startAdd,
+        cancelAdd,
     } = props;
 
     const {
@@ -184,23 +202,45 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
 
     return (
         <div className={sub.root}>
-            {hasTabs && tabs && (
-                <ul className={sub.tabs}>
-                    {tabs.map((sw) => {
-                        const isActive = activeOrder != null ? sw.widget_order === activeOrder : false;
-                        return (
-                            <li key={sw.widget_order}>
-                                <button
-                                    className={isActive ? sub.tabActive : sub.tab}
-                                    onClick={() => handleTabClick(sw.widget_order)}
-                                >
-                                    {sw.name}
-                                </button>
-                            </li>
-                        );
-                    })}
-                </ul>
-            )}
+            <div style={{display:'flex'}}>
+
+                {hasTabs && tabs && (
+                    <ul className={sub.tabs}>
+                        {tabs.map((sw) => {
+                            const isActive = activeOrder != null ? sw.widget_order === activeOrder : false;
+                            return (
+                                <li key={sw.widget_order}>
+                                    <button
+                                        className={isActive ? sub.tabActive : sub.tab}
+                                        onClick={() => {
+                                            // ✅ закрываем режимы редактирования/добавления при смене вкладки
+                                            if (editingRowIdx != null) cancelEdit();
+                                            if (isAddingSub) cancelAdd?.(); // если у тебя cancelAdd есть и реально сбрасывает
+                                            setShowSubHeaders(false); // опционально, если хочешь тоже сбрасывать шапку
+
+                                            handleTabClick(sw.widget_order);
+                                        }}
+                                    >
+                                        {sw.name}
+                                    </button>
+                                </li>
+                            );
+                        })}
+                        <ButtonForm
+                            cancelAdd={cancelAdd}
+                            startAdd={startAdd}
+                            isAdding={!!isAddingSub}
+                            submitAdd={submitAdd}
+                            saving={saving}
+                            selectedWidget={selectedWidget}
+                            selectedFormId={selectFormId}
+                            buttonClassName={cls.iconBtn}
+                        />
+                    </ul>
+                )}
+
+            </div>
+
 
             {subLoading ? (
                 <p>Загрузка sub-виджета…</p>
@@ -212,6 +252,7 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                 </p>
             ) : !subDisplay ? null : (
                 <div className={sub.tableScroll}>
+
                     <table className={sub.tbl}>
                         <thead>
                         <tr>

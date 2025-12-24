@@ -1,18 +1,28 @@
 // src/components/Form/subForm/SubFormWithContext.tsx
 
-import React, { useCallback, useEffect, useMemo, useRef } from 'react';
-import { useFormContext } from '@/components/Form/context';
-import { SubWormTable } from './SubFormTable';
-import type { DrillOpenMeta } from '@/components/Form/context';
+import React, {useCallback, useEffect, useMemo, useRef} from 'react';
+import {useFormContext} from '@/components/Form/context';
+import {SubWormTable} from './SubFormTable';
+import type {DrillOpenMeta} from '@/components/Form/context';
+import * as cls from "@/components/table/tableToolbar/TableToolbar.module.scss";
 
 type Props = {
     onOpenDrill?: (fid?: number | null, meta?: DrillOpenMeta) => void;
     comboReloadToken?: number;
+    cancelAdd: any;
+    startAdd: any;
+
+    submitAdd: any;
+    saving: any;
+    selectedWidget: any;
+    buttonClassName: any;
 };
 
 export const SubFormWithContext: React.FC<Props> = ({
                                                         onOpenDrill,
                                                         comboReloadToken = 0,
+                                                        submitAdd,saving,selectedWidget,buttonClassName,startAdd,cancelAdd
+
                                                     }) => {
     const ctx = useFormContext();
 
@@ -32,10 +42,10 @@ export const SubFormWithContext: React.FC<Props> = ({
         loadSubDisplay,
     } = ctx;
 
-    const { selectedFormId, currentForm } = config;
-    const { subDisplay } = data;
-    const { subLoading, subError } = loading;
-    const { activeSubOrder, lastPrimary } = selection;
+    const {selectedFormId, currentForm} = config;
+    const {subDisplay} = data;
+    const {subLoading, subError} = loading;
+    const {activeSubOrder, lastPrimary} = selection;
 
     // Трекаем предыдущий formId для сброса
     const prevFormIdRef = useRef<number | null>(selectedFormId);
@@ -115,6 +125,15 @@ export const SubFormWithContext: React.FC<Props> = ({
 
     return (
         <SubWormTable
+            selectFormId={selectedFormId}
+            submitAdd={submitAdd}
+            saving={saving}
+            selectedWidget={selectedWidget}
+            buttonClassName={buttonClassName}
+            startAdd={startAdd}
+            cancelAdd={cancelAdd}
+
+
             subDisplay={subDisplay}
             handleTabClick={handleTabClick}
             subLoading={subLoading}
@@ -129,10 +148,12 @@ export const SubFormWithContext: React.FC<Props> = ({
             editDraft={subEditing.editDraft}
             setEditDraft={setSubEditDraft}
             editSaving={subEditing.editSaving}
-            setEditSaving={() => {}} // TODO: добавить в контекст если нужно
+            setEditSaving={() => {
+            }} // TODO: добавить в контекст если нужно
             // Adding
             isAddingSub={subAdding.isAddingSub}
-            setIsAddingSub={() => {}} // Управляется через контекст
+            setIsAddingSub={() => {
+            }} // Управляется через контекст
             draftSub={subAdding.draftSub}
             setDraftSub={setDraftSub}
             // Drill

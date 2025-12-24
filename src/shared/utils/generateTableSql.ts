@@ -49,7 +49,7 @@ export function generateTableSql(tableName: string, columns: Column[]): Generate
     const pkColumns = columns.filter(c => c.primary);
     const nonPkColumns = columns.filter(c => !c.primary);
 
-    const insertColumns = columns.filter(c => !(c.primary && c.increment));
+    const insertColumns = columns.filter(c => !c.primary);
     const allColNames = columns.map(c => c.name);
 
     const select_query = `SELECT ${allColNames.join(', ')} FROM ${tableName}`;

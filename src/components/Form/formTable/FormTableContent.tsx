@@ -12,6 +12,8 @@ import { TreeFormTable } from '@/components/Form/treeForm/TreeFormTable';
 import { MainTableWithContext } from '@/components/Form/mainTable/MainTableWithContext';
 import { SubFormWithContext } from '@/components/Form/subForm/SubFormWithContext';
 import { DrillDialogWithContext } from '@/components/Form/drillDialog/DrillDialogWithContext';
+import * as cls from "@/components/table/tableToolbar/TableToolbar.module.scss";
+import {ButtonForm} from "@/shared/buttonForm/ButtonForm";
 
 type Props = {
     liveTree: FormTreeColumn[] | null;
@@ -274,6 +276,7 @@ export const FormTableContent: React.FC<Props> = ({
                         />
                     </div>
 
+
                     {/* MAIN TABLE */}
                     <div className={s.mainPane}>
                         <div className={s.mainTableScroll}>
@@ -290,6 +293,12 @@ export const FormTableContent: React.FC<Props> = ({
                             <SubFormWithContext
                                 onOpenDrill={handleOpenDrill}
                                 comboReloadToken={comboReloadToken}
+                                cancelAdd={cancelAddSub!}
+                                startAdd={startAddSub!}
+                                submitAdd={submitAddSub!}
+                                saving={subAdding.savingSub}
+                                selectedWidget={selectedWidget}
+                                buttonClassName={cls.iconBtn}
                             />
                         </div>
                     )}
