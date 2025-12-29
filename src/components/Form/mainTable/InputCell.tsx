@@ -298,16 +298,44 @@ export const InputCell: React.FC<InputCellProps> = ({
         };
     }
 
+    const isMultiline =
+        mode === 'edit' &&
+        !isDateLike &&
+        !isCheckbox &&
+        !isComboPrimary;
+
     return (
         <TextField
             size="small"
             fullWidth
-            type={inputType}
+            type={isMultiline ? undefined : inputType}
             value={inputValue}
             onChange={handleChange}
             placeholder={placeholder}
-            inputProps={inputType === 'time' ? { step: 1 } : undefined}
+            inputProps={
+                !isMultiline && inputType === 'time'
+                    ? { step: 1 }
+                    : undefined
+            }
+            multiline={isMultiline}
+            minRows={isMultiline ? 1 : undefined}
+            maxRows={isMultiline ? 6 : undefined}
             className={`${s.inpInCell} ${isDateLike ? s.dateTimeInput : ''}`}
+            sx={{
+                // чтобы textarea не была "в одну строку" визуально
+                '& .MuiInputBase-root': {
+                    alignItems: 'stretch',
+                },
+                '& .MuiInputBase-inputMultiline': {
+                    padding: '4px 6px',
+                    lineHeight: 1.3,
+                },
+                '& textarea': {
+                    whiteSpace: 'pre-wrap',
+                    overflowWrap: 'anywhere',
+                    wordBreak: 'break-word',
+                },
+            }}
         />
     );
 };

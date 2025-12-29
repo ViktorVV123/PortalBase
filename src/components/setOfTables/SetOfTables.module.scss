@@ -332,7 +332,21 @@ h2 {
   text-align: center;
   white-space: nowrap;
   width: 1%; /* колонка старается занимать минимум ширины */
+
 }
+//для того чтобы текст в Main на несколько строчек был а не с троеточием
+.wrap {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+
+  /* чтобы длинные слова/uuid не ломали верстку */
+  overflow-wrap: anywhere;
+  word-break: break-word;
+
+  display: block; /* чтобы перенос работал предсказуемо в кнопке/спане */
+}
+
 
 .actionsRow {
   display: inline-flex;

@@ -52,13 +52,13 @@ type SubformProps = {
     ) => void;
 
 
-    submitAdd: any;
-    saving: any;
-    selectedWidget: any;
-    buttonClassName: any;
-    selectFormId:any
-    startAdd:any
-    cancelAdd:any
+    submitAdd?: any;
+    saving?: any;
+    selectedWidget?: any;
+    buttonClassName?: any;
+    selectFormId?:any
+    startAdd?:any
+    cancelAdd?:any
 };
 
 const SYNTHETIC_MIN = -1_000_000;

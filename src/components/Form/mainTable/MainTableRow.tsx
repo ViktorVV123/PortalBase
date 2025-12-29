@@ -277,7 +277,7 @@ export const MainTableRow: React.FC<MainTableRowProps> = (p) => {
                                             <span className={s.ellipsis}>{content}</span>
                                         </button>
                                     ) : (
-                                        <span className={s.ellipsis}>{content}</span>
+                                        <span className={s.wrap}>{content}</span>
                                     )}
                                 </td>
                             );
