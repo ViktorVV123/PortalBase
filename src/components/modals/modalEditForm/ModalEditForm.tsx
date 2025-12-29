@@ -63,6 +63,7 @@ export const ModalEditForm: React.FC<Props> = ({
     const [mainName, setMainName] = useState(form.name);
     const [mainDesc, setMainDesc] = useState(form.description ?? '');
     const [mainPath, setMainPath] = useState<string>(form.path ?? '');
+    const [mainGroup, setMainGroup] = useState<string>(form.group ?? '');
     const [mainWidgetId, setMainWidgetId] = useState<number>(form.main_widget_id);
     const [mainSearchBar, setMainSearchBar] = useState<boolean>(!!form.search_bar);
     const [savingMain, setSavingMain] = useState(false);
@@ -87,12 +88,14 @@ export const ModalEditForm: React.FC<Props> = ({
     const [subWhere, setSubWhere] = useState<string>('');
     const [savingSub, setSavingSub] = useState(false);
     const [deletingSub, setDeletingSub] = useState(false);
+    const [subQueryDelete, setSubQueryDelete] = useState('');
 
     // New sub
     const [newSubOrder, setNewSubOrder] = useState<number>(1);
     const [newSubWhere, setNewSubWhere] = useState<string>('');
     const [newSubWidget, setNewSubWidget] = useState<Widget | null>(null);
     const [addingSub, setAddingSub] = useState(false);
+    const [newSubDeleteQuery, setNewSubDeleteQuery] = useState('');
 
     // ═══════════════════════════════════════════════════════════
     // TREE STATE
@@ -141,10 +144,13 @@ export const ModalEditForm: React.FC<Props> = ({
         treeList.length ? Math.max(...treeList.map(it => it.column_order ?? 0)) + 1 : 1;
 
     // Проверка изменений для Sub
-    const subHasChanges = currentSub && (
-        subOrder !== (currentSub.widget_order ?? 0) ||
-        subWhere !== (currentSub.where_conditional ?? '')
-    );
+    const subHasChanges =
+        !!currentSub &&
+        (
+            subOrder !== (currentSub.widget_order ?? 0) ||
+            subWhere !== (currentSub.where_conditional ?? '') ||
+            subQueryDelete !== (currentSub.delete_sub_query ?? '')
+        );
 
     // Проверка изменений для Tree
     const treeHasChanges = currentTree && (
@@ -171,6 +177,7 @@ export const ModalEditForm: React.FC<Props> = ({
         setMainName(form.name);
         setMainDesc(form.description ?? '');
         setMainPath(form.path ?? '');
+        setMainGroup(form.group ?? '');
         setMainWidgetId(form.main_widget_id);
         setMainSearchBar(!!form.search_bar);
 
@@ -183,6 +190,7 @@ export const ModalEditForm: React.FC<Props> = ({
 
         setNewSubWidget(null);
         setNewSubWhere('');
+        setSubQueryDelete('');
         setNewTreeColumn(null);
     }, [open, form]);
 
@@ -232,6 +240,7 @@ export const ModalEditForm: React.FC<Props> = ({
         if (currentSub) {
             setSubOrder(currentSub.widget_order ?? 0);
             setSubWhere(currentSub.where_conditional ?? '');
+            setSubQueryDelete((currentSub as any).delete_sub_query ?? '');
         }
     }, [currentSub]);
 
@@ -262,6 +271,7 @@ export const ModalEditForm: React.FC<Props> = ({
 
             if (mainWidgetId !== form.main_widget_id) patch.main_widget_id = mainWidgetId;
             if (mainName !== form.name) patch.name = mainName;
+            if (mainGroup !== form.group) patch.group = mainGroup;
             if ((mainDesc || null) !== (form.description ?? null)) patch.description = mainDesc || null;
             if ((mainPath || null) !== (form.path ?? null)) patch.path = mainPath || null;
             if (Boolean(form.search_bar) !== mainSearchBar) patch.search_bar = mainSearchBar;
@@ -300,12 +310,12 @@ export const ModalEditForm: React.FC<Props> = ({
 
         setSavingSub(true);
         try {
-            const body = { widget_order: order, where_conditional: subWhere || null };
+            const body = { widget_order: order, where_conditional: subWhere || null, delete_sub_query: subQueryDelete || null, };
             await api.patch(`/forms/${form.form_id}/sub/${subId}`, body);
 
             setSubList(prev => prev.map(it =>
                 it.sub_widget_id === subId
-                    ? { ...it, widget_order: order, where_conditional: subWhere || null }
+                    ? { ...it, widget_order: order, where_conditional: subWhere || null,delete_sub_query: subQueryDelete || null, }
                     : it
             ));
 
@@ -344,6 +354,7 @@ export const ModalEditForm: React.FC<Props> = ({
                 sub_widget_id: newSubWidget.id,
                 widget_order: order,
                 where_conditional: newSubWhere || null,
+                delete_sub_query: newSubDeleteQuery || null,
             });
 
             const newItem = {
@@ -351,6 +362,7 @@ export const ModalEditForm: React.FC<Props> = ({
                 widget_order: order,
                 where_conditional: newSubWhere || null,
                 form_id: form.form_id,
+                delete_sub_query: newSubDeleteQuery || null,
             };
 
             setSubList(prev => [...prev, newItem].sort((a, b) => (a.widget_order ?? 0) - (b.widget_order ?? 0)));
@@ -358,6 +370,7 @@ export const ModalEditForm: React.FC<Props> = ({
 
             setNewSubWidget(null);
             setNewSubWhere('');
+            setNewSubDeleteQuery('');
             setNewSubOrder(order + 1);
 
             emitFormMutated(form.form_id);
@@ -513,12 +526,13 @@ export const ModalEditForm: React.FC<Props> = ({
                     {/* ═══════════════ MAIN TAB ═══════════════ */}
                     {tab === 'main' && (
                         <Stack spacing={2} sx={{ mt: 1 }}>
-                            <TextField
+                           {/* <TextField
                                 label="Main widget ID"
                                 type="number"
                                 value={mainWidgetId}
                                 onChange={e => setMainWidgetId(Number(e.target.value))}
-                            />
+                            />*/}
+
                             <TextField
                                 label="Название"
                                 value={mainName}
@@ -530,9 +544,14 @@ export const ModalEditForm: React.FC<Props> = ({
                                 onChange={e => setMainDesc(e.target.value)}
                             />
                             <TextField
-                                label="Path"
+                                label="Путь"
                                 value={mainPath}
                                 onChange={e => setMainPath(e.target.value)}
+                            />
+                            <TextField
+                                label="Группа"
+                                value={mainGroup}
+                                onChange={e => setMainGroup(e.target.value)}
                             />
 
                             <Stack direction="row" alignItems="center" justifyContent="space-between">
@@ -559,6 +578,7 @@ export const ModalEditForm: React.FC<Props> = ({
                                     <Typography variant="subtitle2" gutterBottom>
                                         Редактирование
                                     </Typography>
+
 
                                     <Stack spacing={2}>
                                         <Stack direction="row" spacing={1} alignItems="center">
@@ -593,7 +613,7 @@ export const ModalEditForm: React.FC<Props> = ({
                                             </Tooltip>
                                         </Stack>
 
-                                        <Stack direction="row" spacing={2}>
+                                        <Stack direction="row" spacing={3}>
                                             <TextField
                                                 label="Порядок"
                                                 type="number"
@@ -609,6 +629,14 @@ export const ModalEditForm: React.FC<Props> = ({
                                                 onChange={e => setSubWhere(e.target.value)}
                                                 sx={{ flex: 1 }}
                                             />
+                                            <TextField
+                                                label="delete_sub_query"
+                                                size="small"
+                                                value={subQueryDelete}
+                                                onChange={e => setSubQueryDelete(e.target.value)}
+                                                sx={{ flex: 1 }}
+                                            />
+
                                             <Button
                                                 variant="contained"
                                                 size="small"
@@ -672,6 +700,13 @@ export const ModalEditForm: React.FC<Props> = ({
                                         onChange={e => setNewSubWhere(e.target.value)}
                                         sx={{ flex: 1, minWidth: 180 }}
                                     />
+                                    <TextField
+                                        label="delete_sub_query"
+                                        size="small"
+                                        value={newSubDeleteQuery}
+                                        onChange={e => setNewSubDeleteQuery(e.target.value)}
+                                        sx={{ flex: 1, minWidth: 180 }}
+                                    />
 
                                     <Button
                                         variant="outlined"
@@ -697,7 +732,7 @@ export const ModalEditForm: React.FC<Props> = ({
                                         Редактирование
                                     </Typography>
 
-                                    <Stack spacing={2}>
+                                    <Stack spacing={3}>
                                         <Stack direction="row" spacing={1} alignItems="center">
                                             <FormControl fullWidth size="small">
                                                 <InputLabel>Tree-поле</InputLabel>
@@ -716,6 +751,7 @@ export const ModalEditForm: React.FC<Props> = ({
                                                         </MenuItem>
                                                     ))}
                                                 </Select>
+
                                             </FormControl>
 
                                             <Tooltip title="Удалить">

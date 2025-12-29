@@ -81,6 +81,7 @@ export interface WidgetForm {
     main_widget_id: number;
     name: string;
     search_bar: boolean;
+    group:string;
     description: string | null;
     path?: string | null;
     form_id: number;
@@ -89,6 +90,7 @@ export interface WidgetForm {
         sub_widget_id: number;
         form_id: number;
         where_conditional: string | null;
+        delete_sub_query:string
     }[];
     tree_fields: {
         column_order: number;
