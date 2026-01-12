@@ -67,7 +67,13 @@ type Props = {
 
     /** триггер для перезагрузки combobox-опций после CRUD в DrillDialog */
     comboReloadToken?: number;
+    stylesColumnMeta?: {
+        exists: boolean;
+        valueIndex: number | null;
+    } | null;
 
+    editStylesDraft?:any
+    onEditStyleChange?:any
 };
 
 export const MainTable: React.FC<Props> = (p) => {
@@ -153,7 +159,7 @@ export const MainTable: React.FC<Props> = (p) => {
                 </colgroup>
 
                 <thead>
-                <tr>
+                <tr >
                     {renderHeaderPlan.map(g => (
                         <th key={`g-top-${g.id}`} colSpan={g.cols.length || 1}>
                             <span className={s.ellipsis}>{g.title}</span>
@@ -242,6 +248,9 @@ export const MainTable: React.FC<Props> = (p) => {
                         disableDrillWhileEditing={drillDisabled}
                         comboReloadToken={p.comboReloadToken}
                         rlsMeta={rlsMeta}
+                        stylesColumnMeta={p.stylesColumnMeta}
+                        editStylesDraft={p.editStylesDraft}
+                        onEditStyleChange={p.onEditStyleChange}
                     />
                 ))}
                 </tbody>

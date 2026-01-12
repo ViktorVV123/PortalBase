@@ -1,30 +1,33 @@
 // useHeaderPlan.ts
 import { useMemo } from 'react';
 import type { FormDisplay } from '@/shared/hooks/useWorkSpaces';
-import {ExtCol} from "@/components/Form/formTable/parts/FormatByDatatype";
-
-
+import { ExtCol } from "@/components/Form/formTable/parts/FormatByDatatype";
 
 export type HeaderPlanGroup = {
     id: number;
     title: string;
     labels: string[];
-    cols: ExtCol[]; // ← расширили тип
+    cols: ExtCol[];
+};
+
+export type StylesColumnMeta = {
+    exists: boolean;
+    valueIndex: number | null;
+    columnNameToIndex: Map<string, number>;
 };
 
 export type HeaderPlanResult = {
     headerPlan: HeaderPlanGroup[];
-    flatColumnsInRenderOrder: ExtCol[];        // ← расширили тип
+    flatColumnsInRenderOrder: ExtCol[];
     valueIndexByKey: Map<string, number>;
-    isColReadOnly: (c: ExtCol) => boolean;     // ← расширили тип
+    isColReadOnly: (c: ExtCol) => boolean;
+    stylesColumnMeta: StylesColumnMeta | null;
 };
 
 export function useHeaderPlan(formDisplay: FormDisplay | null): HeaderPlanResult {
     const columns = (formDisplay?.columns ?? []) as ExtCol[];
 
-
-
-    // 1) сортировка (как было)
+    // 1) сортировка
     const ordered = useMemo(() => {
         return [...columns].sort((a, b) => {
             const colA = a.column_order ?? 0;
@@ -39,7 +42,7 @@ export function useHeaderPlan(formDisplay: FormDisplay | null): HeaderPlanResult
         });
     }, [columns]);
 
-    // 2) нормализация combobox (как было)
+    // 2) нормализация combobox
     const normalized = useMemo<ExtCol[]>(() => {
         return ordered.map((c) => {
             if (c.type === 'combobox' && c.combobox_column_id != null && c.table_column_id != null) {
@@ -54,7 +57,7 @@ export function useHeaderPlan(formDisplay: FormDisplay | null): HeaderPlanResult
         });
     }, [ordered]);
 
-    // 3) помечаем primary для combobox (как было)
+    // 3) помечаем primary для combobox
     const normalizedWithPrimary = useMemo<ExtCol[]>(() => {
         const map: Record<number, ExtCol[]> = {};
         for (const c of normalized) {
@@ -68,7 +71,7 @@ export function useHeaderPlan(formDisplay: FormDisplay | null): HeaderPlanResult
             const byWc: Record<number, ExtCol[]> = {};
             for (const c of arr) (byWc[c.widget_column_id] ??= []).push(c);
             Object.entries(byWc).forEach(([wcIdStr, list]) => {
-                const primary = [...list].sort((a,b)=>(a.combobox_column_order ?? 0)-(b.combobox_column_order ?? 0))[0];
+                const primary = [...list].sort((a, b) => (a.combobox_column_order ?? 0) - (b.combobox_column_order ?? 0))[0];
                 if (primary) primaryKeys.add(`${wcIdStr}:${writeTcIdStr}`);
             });
         });
@@ -82,32 +85,13 @@ export function useHeaderPlan(formDisplay: FormDisplay | null): HeaderPlanResult
         });
     }, [normalized]);
 
-    // 4) подписи: ИГНОРИРУЕМ combobox_alias, всегда берём ref-название
+    // 4) подписи
     const getLabel = (c: ExtCol) => {
-        const ref = (c.ref_column_name ?? '').trim(); // либо c.ref_alias, если есть в payload
+        const ref = (c.ref_column_name ?? '').trim();
         return ref || '—';
     };
 
-    // 5) группировка по widget_column_id (как было)
-    const headerPlan = useMemo<HeaderPlanGroup[]>(() => {
-        const byWc: Record<number, { title: string; cols: ExtCol[]; labels: string[]; order: number }> = {};
-        for (const c of normalizedWithPrimary) {
-            const wcId = c.widget_column_id;
-            if (!byWc[wcId]) {
-                byWc[wcId] = { title: c.column_name ?? '', cols: [], labels: [], order: c.column_order ?? 0 };
-            }
-            byWc[wcId].cols.push(c);
-            // подзаголовок теперь всегда от референса, без combobox-подписей
-            byWc[wcId].labels.push(getLabel(c));
-        }
-        return Object.entries(byWc)
-            .map(([id, g]) => ({ id: Number(id), title: g.title, labels: g.labels, cols: g.cols }))
-            .sort((a, b) => (byWc[a.id].order ?? 0) - (byWc[b.id].order ?? 0));
-    }, [normalizedWithPrimary]);
-
-    const flatColumnsInRenderOrder = normalizedWithPrimary;
-
-    // 6) индекс для values (как было)
+    // 5) индекс для values (нужен ДО stylesColumnMeta)
     const valueIndexByKey = useMemo(() => {
         const map = new Map<string, number>();
         for (let i = 0; i < columns.length; i++) {
@@ -121,7 +105,50 @@ export function useHeaderPlan(formDisplay: FormDisplay | null): HeaderPlanResult
         return map;
     }, [columns]);
 
-    // 7) readonly-логика (как было)
+    // 6) NEW: мета для колонки стилей
+    const stylesColumnMeta = useMemo<StylesColumnMeta | null>(() => {
+        const stylesCol = columns.find(c => c.type === 'styles');
+        if (!stylesCol) return null;
+
+        const key = `${stylesCol.widget_column_id}:${stylesCol.table_column_id ?? -1}`;
+        const valueIndex = valueIndexByKey.get(key) ?? null;
+
+        const columnNameToIndex = new Map<string, number>();
+        columns.forEach((c, idx) => {
+            if (c.column_name) {
+                columnNameToIndex.set(c.column_name, idx);
+            }
+        });
+
+        return {
+            exists: true,
+            valueIndex,
+            columnNameToIndex,
+        };
+    }, [columns, valueIndexByKey]);
+
+    // 7) NEW: фильтруем styles из рендера
+    const normalizedWithoutStyles = useMemo(() => {
+        return normalizedWithPrimary.filter(c => c.type !== 'styles');
+    }, [normalizedWithPrimary]);
+
+    // 8) группировка по widget_column_id (БЕЗ styles)
+    const headerPlan = useMemo<HeaderPlanGroup[]>(() => {
+        const byWc: Record<number, { title: string; cols: ExtCol[]; labels: string[]; order: number }> = {};
+        for (const c of normalizedWithoutStyles) {
+            const wcId = c.widget_column_id;
+            if (!byWc[wcId]) {
+                byWc[wcId] = { title: c.column_name ?? '', cols: [], labels: [], order: c.column_order ?? 0 };
+            }
+            byWc[wcId].cols.push(c);
+            byWc[wcId].labels.push(getLabel(c));
+        }
+        return Object.entries(byWc)
+            .map(([id, g]) => ({ id: Number(id), title: g.title, labels: g.labels, cols: g.cols }))
+            .sort((a, b) => (byWc[a.id].order ?? 0) - (byWc[b.id].order ?? 0));
+    }, [normalizedWithoutStyles]);
+
+    // 9) readonly-логика
     const isColReadOnly = (c: ExtCol) => {
         if (c.visible === false) return true;
         if (c.type === 'combobox') return !c.__is_primary_combo_input;
@@ -129,5 +156,12 @@ export function useHeaderPlan(formDisplay: FormDisplay | null): HeaderPlanResult
         return !!c.readonly;
     };
 
-    return { headerPlan, flatColumnsInRenderOrder, valueIndexByKey, isColReadOnly };
+    // 10) RETURN — теперь включает stylesColumnMeta и использует normalizedWithoutStyles
+    return {
+        headerPlan,
+        flatColumnsInRenderOrder: normalizedWithoutStyles,
+        valueIndexByKey,
+        isColReadOnly,
+        stylesColumnMeta,
+    };
 }

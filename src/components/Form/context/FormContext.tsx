@@ -1,6 +1,6 @@
 // src/components/Form/context/FormContext.tsx
 
-import React, { createContext, useContext, useMemo, useState, useCallback } from 'react';
+import React, { createContext, useContext } from 'react';
 import type {
     FormDisplay,
     SubDisplay,
@@ -10,6 +10,7 @@ import type {
     Column,
 } from '@/shared/hooks/useWorkSpaces';
 import type { ExtCol } from '@/components/Form/formTable/parts/FormatByDatatype';
+import type { CellStyles } from '@/components/Form/mainTable/CellStylePopover'; // ← NEW
 
 // ─────────────────────────────────────────────────────────────
 // ТИПЫ
@@ -35,6 +36,7 @@ export type EditingState = {
     editingRowIdx: number | null;
     editDraft: Record<number, string>;
     editSaving: boolean;
+    editStylesDraft?: Record<string, CellStyles | null>; // ← NEW
 };
 
 /** Состояние добавления */
@@ -90,6 +92,11 @@ export type HeaderPlanData = {
     flatColumnsInRenderOrder: ExtCol[];
     valueIndexByKey: Map<string, number>;
     isColReadOnly: (c: ExtCol) => boolean;
+    stylesColumnMeta: {
+        exists: boolean;
+        valueIndex: number | null;
+        columnNameToIndex: Map<string, number>;
+    } | null;
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -132,6 +139,7 @@ export type FormContextValue = {
     deleteRow: (rowIdx: number) => Promise<void>;
     setDraft: React.Dispatch<React.SetStateAction<Record<number, string>>>;
     setEditDraft: React.Dispatch<React.SetStateAction<Record<number, string>>>;
+    setEditStylesDraft: React.Dispatch<React.SetStateAction<Record<string, CellStyles | null>>>; // ← NEW
 
     // === Sub CRUD ===
     subAdding: {
@@ -226,6 +234,7 @@ export function useMainCrudContext() {
         deleteRow: ctx.deleteRow,
         setDraft: ctx.setDraft,
         setEditDraft: ctx.setEditDraft,
+        setEditStylesDraft: ctx.setEditStylesDraft, // ← NEW
     };
 }
 

@@ -1,5 +1,5 @@
 // components/Form/mainTable/MainTableRow.tsx
-import React from 'react';
+import React, { useMemo } from 'react';
 import * as s from '@/components/setOfTables/SetOfTables.module.scss';
 import EditIcon from '@/assets/image/EditIcon.svg';
 import DeleteIcon from '@/assets/image/DeleteIcon.svg';
@@ -17,6 +17,9 @@ import {
     isSameComboGroup,
     pickPrimaryCombo,
 } from './MainTableCombo';
+import { extractRowStyles, getCellStyle } from '@/shared/utils/rowStyles';
+import { CellStyleButton } from './CellStyleButton';
+import type { CellStyles } from './CellStylePopover';
 
 type RowView = { row: FormDisplay['data'][number]; idx: number };
 
@@ -56,8 +59,19 @@ type MainTableRowProps = {
 
     disableDrillWhileEditing?: boolean;
     comboReloadToken?: number;
-
     rlsMeta: RlsMeta;
+
+    /** Мета для колонки стилей */
+    stylesColumnMeta?: {
+        exists: boolean;
+        valueIndex: number | null;
+    } | null;
+
+    /** Локальные изменения стилей во время редактирования */
+    editStylesDraft?: Record<string, CellStyles | null>;
+
+    /** Колбэк изменения стиля ячейки */
+    onEditStyleChange?: (columnName: string, style: CellStyles | null) => void;
 };
 
 /** Правило "строка под RLS?" и как рисовать чекбоксы/булевые */
@@ -66,8 +80,8 @@ function isRlsLockedValue(val: unknown): boolean {
     if (typeof val === 'boolean') return val;
     if (typeof val === 'number') return val !== 0;
 
-    const s = String(val).trim().toLowerCase();
-    return s === '1' || s === 'true' || s === 'да' || s === 'yes';
+    const str = String(val).trim().toLowerCase();
+    return str === '1' || str === 'true' || str === 'да' || str === 'yes';
 }
 
 export const MainTableRow: React.FC<MainTableRowProps> = (p) => {
@@ -77,10 +91,37 @@ export const MainTableRow: React.FC<MainTableRowProps> = (p) => {
     const rowKey = p.pkToKey(row.primary_keys);
 
     const rlsVal = p.rlsMeta ? row.values[p.rlsMeta.idx] : null;
-    const isRowLocked =
-        p.rlsMeta != null ? isRlsLockedValue(rlsVal) : false;
+    const isRowLocked = p.rlsMeta != null ? isRlsLockedValue(rlsVal) : false;
 
     const drillDisabled = p.disableDrillWhileEditing && p.editingRowIdx != null;
+
+    // Проверяем, поддерживаются ли стили
+    const stylesEnabled = !!p.stylesColumnMeta?.exists && p.stylesColumnMeta.valueIndex != null;
+
+    // Стили из данных строки
+    const rowStylesFromData = useMemo(() => {
+        if (!p.stylesColumnMeta?.exists || p.stylesColumnMeta.valueIndex == null) {
+            return {};
+        }
+        return extractRowStyles(row.values, p.stylesColumnMeta.valueIndex);
+    }, [row.values, p.stylesColumnMeta]);
+
+    // Мержим стили из данных + локальные изменения (draft) при редактировании
+    const mergedRowStyles = useMemo(() => {
+        if (!isEditing || !p.editStylesDraft) return rowStylesFromData;
+
+        const merged = { ...rowStylesFromData };
+
+        Object.entries(p.editStylesDraft).forEach(([colName, style]) => {
+            if (style === null) {
+                delete merged[colName];
+            } else if (style) {
+                merged[colName] = style;
+            }
+        });
+
+        return merged;
+    }, [rowStylesFromData, p.editStylesDraft, isEditing]);
 
     return (
         <tr
@@ -101,7 +142,7 @@ export const MainTableRow: React.FC<MainTableRowProps> = (p) => {
                 while (i < cols.length) {
                     const col = cols[i];
 
-                    // ───── Combobox-группа → одна TD с colSpan
+                    // ───── Combobox-группа → одна TD с colSpan ─────
                     if (col.type === 'combobox') {
                         let j = i + 1;
                         while (j < cols.length && isSameComboGroup(col, cols[j])) j += 1;
@@ -133,7 +174,7 @@ export const MainTableRow: React.FC<MainTableRowProps> = (p) => {
                         } else {
                             // просмотр
                             const shownParts = group
-                                .map(gcol => getShown(p.valueIndexByKey, row.values, gcol))
+                                .map((gcol) => getShown(p.valueIndexByKey, row.values, gcol))
                                 .filter(Boolean);
                             const display = shownParts.length
                                 ? shownParts.map(formatCellValue).join(' · ')
@@ -155,7 +196,6 @@ export const MainTableRow: React.FC<MainTableRowProps> = (p) => {
                                                     primary: row.primary_keys,
                                                     openedFromEdit: false,
                                                 });
-                                                // eslint-disable-next-line no-console
                                                 console.debug('[MainTable] drill click (combobox)', {
                                                     formId: primary.form_id,
                                                     originColumnType: 'combobox',
@@ -186,7 +226,7 @@ export const MainTableRow: React.FC<MainTableRowProps> = (p) => {
                         continue;
                     }
 
-                    // ───── Обычная колонка
+                    // ───── Обычная колонка ─────
                     const visKey = `${col.widget_column_id}:${col.table_column_id ?? -1}`;
                     const idxVal = p.valueIndexByKey.get(visKey);
                     const rawVal = idxVal != null ? row.values[idxVal] : null;
@@ -194,9 +234,15 @@ export const MainTableRow: React.FC<MainTableRowProps> = (p) => {
                     const ro = p.isColReadOnly(col) || col.visible === false;
                     const writeTcId = (col.__write_tc_id ?? col.table_column_id) ?? null;
 
+                    // Получаем стиль для ячейки (используем merged при редактировании)
+                    const cellStyle = getCellStyle(
+                        isEditing ? mergedRowStyles : rowStylesFromData,
+                        col.column_name
+                    );
+
                     if (isEditing) {
                         cells.push(
-                            <td key={`edit-${visKey}`} className={s.editCell}>
+                            <td key={`edit-${visKey}`} className={s.editCell} style={cellStyle}>
                                 <div className={s.cellEditor}>
                                     <InputCell
                                         mode="edit"
@@ -209,6 +255,17 @@ export const MainTableRow: React.FC<MainTableRowProps> = (p) => {
                                         placeholder={p.placeholderFor(col)}
                                         comboReloadToken={p.comboReloadToken}
                                     />
+
+                                    {/* 🎨 Кнопка стилизации */}
+                                    {stylesEnabled && col.column_name && (
+                                        <CellStyleButton
+                                            columnName={col.column_name}
+                                            currentStyle={cellStyle as CellStyles | undefined}
+                                            onStyleChange={(colName, style) => {
+                                                p.onEditStyleChange?.(colName, style);
+                                            }}
+                                        />
+                                    )}
                                 </div>
                             </td>
                         );
@@ -217,15 +274,12 @@ export const MainTableRow: React.FC<MainTableRowProps> = (p) => {
                         const pretty = formatByDatatype(shownVal, col as ExtCol);
 
                         const isCheckboxCol =
-                            col.type === 'checkbox' ||
-                            (col as ExtCol).type === 'bool';
+                            col.type === 'checkbox' || (col as ExtCol).type === 'bool';
 
                         if (isCheckboxCol) {
                             const checked = isRlsLockedValue(rawVal);
                             cells.push(
-                                <td
-                                    key={`cell-${visKey}`}
-                                >
+                                <td key={`cell-${visKey}`}>
                                     <Checkbox
                                         size="small"
                                         checked={checked}
@@ -245,7 +299,7 @@ export const MainTableRow: React.FC<MainTableRowProps> = (p) => {
                         } else {
                             const content = pretty || '—';
                             cells.push(
-                                <td key={`cell-${visKey}`}>
+                                <td key={`cell-${visKey}`} style={cellStyle}>
                                     {clickable ? (
                                         <button
                                             type="button"
@@ -256,7 +310,6 @@ export const MainTableRow: React.FC<MainTableRowProps> = (p) => {
                                                     primary: row.primary_keys,
                                                     openedFromEdit: false,
                                                 });
-                                                // eslint-disable-next-line no-console
                                                 console.debug('[MainTable] drill click (regular)', {
                                                     formId: col.form_id,
                                                     originColumnType: col.type ?? null,
@@ -297,7 +350,7 @@ export const MainTableRow: React.FC<MainTableRowProps> = (p) => {
                         const hasEditable =
                             !isRowLocked &&
                             p.flatColumnsInRenderOrder.some(
-                                c => c.visible !== false && !p.isColReadOnly(c),
+                                (c) => c.visible !== false && !p.isColReadOnly(c)
                             );
 
                         return (

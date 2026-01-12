@@ -4,6 +4,7 @@ import React, { useCallback } from 'react';
 import { useFormContext } from '@/components/Form/context';
 import { MainTable } from './MainTable';
 import type { DrillOpenMeta } from '@/components/Form/context';
+import type { CellStyles } from './CellStylePopover';
 
 type Props = {
     onOpenDrill?: (fid?: number | null, meta?: DrillOpenMeta) => void;
@@ -26,7 +27,7 @@ export const MainTableWithContext: React.FC<Props> = ({
         mainAdding,
         mainEditing,
         deletingRowIdx,
-        pkToKey, // ← Берём отсюда, не из selection
+        pkToKey,
         // Actions
         startEdit,
         cancelEdit,
@@ -34,13 +35,14 @@ export const MainTableWithContext: React.FC<Props> = ({
         deleteRow,
         setDraft,
         setEditDraft,
+        setEditStylesDraft, // ← NEW
         setLastPrimary,
         setSelectedKey,
         loadSubDisplay,
         config,
     } = ctx;
 
-    const { headerPlan, flatColumnsInRenderOrder, valueIndexByKey, isColReadOnly } = hp;
+    const { headerPlan, flatColumnsInRenderOrder, valueIndexByKey, isColReadOnly, stylesColumnMeta } = hp;
     const { filteredRows } = search;
     const { selectedKey, activeSubOrder } = selection;
 
@@ -54,25 +56,42 @@ export const MainTableWithContext: React.FC<Props> = ({
     // ROW CLICK HANDLER
     // ═══════════════════════════════════════════════════════════
 
-    const handleRowClick = useCallback((view: { row: any; idx: number }) => {
-        const primary = view.row.primary_keys as Record<string, unknown>;
-        if (!primary) return;
+    const handleRowClick = useCallback(
+        (view: { row: any; idx: number }) => {
+            const primary = view.row.primary_keys as Record<string, unknown>;
+            if (!primary) return;
 
-        setLastPrimary(primary);
-        setSelectedKey(pkToKey(primary));
+            setLastPrimary(primary);
+            setSelectedKey(pkToKey(primary));
 
-        const fid = config.selectedFormId;
+            const fid = config.selectedFormId;
 
-        if (fid && activeSubOrder != null) {
-            loadSubDisplay(fid, activeSubOrder, primary);
-        }
-    }, [pkToKey, setLastPrimary, setSelectedKey, config.selectedFormId, activeSubOrder, loadSubDisplay]);
+            if (fid && activeSubOrder != null) {
+                loadSubDisplay(fid, activeSubOrder, primary);
+            }
+        },
+        [pkToKey, setLastPrimary, setSelectedKey, config.selectedFormId, activeSubOrder, loadSubDisplay]
+    );
 
     // ═══════════════════════════════════════════════════════════
     // PLACEHOLDER
     // ═══════════════════════════════════════════════════════════
 
     const placeholderFor = useCallback((c: any) => c.placeholder ?? c.column_name, []);
+
+    // ═══════════════════════════════════════════════════════════
+    // STYLE CHANGE HANDLER
+    // ═══════════════════════════════════════════════════════════
+
+    const handleEditStyleChange = useCallback(
+        (columnName: string, style: CellStyles | null) => {
+            setEditStylesDraft((prev) => ({
+                ...prev,
+                [columnName]: style,
+            }));
+        },
+        [setEditStylesDraft]
+    );
 
     return (
         <MainTable
@@ -102,6 +121,9 @@ export const MainTableWithContext: React.FC<Props> = ({
             deletingRowIdx={deletingRowIdx}
             disableDrillWhileEditing={disableDrillWhileEditing}
             comboReloadToken={comboReloadToken}
+            stylesColumnMeta={stylesColumnMeta}
+            editStylesDraft={mainEditing.editStylesDraft} // ← NEW
+            onEditStyleChange={handleEditStyleChange} // ← NEW
         />
     );
 };

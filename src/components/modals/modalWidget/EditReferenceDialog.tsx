@@ -85,6 +85,7 @@ export const EditReferenceDialog: React.FC<Props> = ({ value, onChange, onClose,
                         <MenuItem value="timestamp">Календарь со временем</MenuItem>
                         <MenuItem value="timewtz">Время с тайм зоной</MenuItem>
                         <MenuItem value="time">Время</MenuItem>
+                        <MenuItem value="styles">Стиль</MenuItem>
                     </Select>
                 </FormControl>
 

@@ -3,22 +3,26 @@ import { useCallback, useState } from 'react';
 import { api } from '@/services/api';
 import type { DTable, FormDisplay, Widget, WidgetForm } from '@/shared/hooks/useWorkSpaces';
 import type { ExtCol } from '@/components/Form/formTable/parts/FormatByDatatype';
-import {loadComboOptionsOnce, normalizeValueForColumn} from "@/components/Form/mainTable/InputCell";
+import { loadComboOptionsOnce, normalizeValueForColumn } from '@/components/Form/mainTable/InputCell';
+import type { CellStyles } from '@/components/Form/mainTable/CellStylePopover';
 
 const DEBUG_MAINCRUD = true;
 const log = (label: string, payload?: unknown) => {
     if (!DEBUG_MAINCRUD) return;
-    // eslint-disable-next-line no-console
     console.groupCollapsed(`[CRUD] ${label}`);
     if (payload !== undefined) {
-        // eslint-disable-next-line no-console
         console.log(payload);
     }
-    // eslint-disable-next-line no-console
     console.groupEnd();
 };
 
 type EnsureQueryKind = 'insert' | 'update' | 'delete';
+
+export type StylesColumnMeta = {
+    exists: boolean;
+    valueIndex: number | null;
+    columnNameToIndex: Map<string, number>;
+} | null;
 
 export type UseMainCrudDeps = {
     formDisplay: FormDisplay;
@@ -38,6 +42,8 @@ export type UseMainCrudDeps = {
     setLastPrimary: (v: Record<string, unknown>) => void;
     setSelectedKey: React.Dispatch<React.SetStateAction<string | null>>;
     preflightTableId?: number | null;
+    /** Мета для колонки стилей */
+    stylesColumnMeta?: StylesColumnMeta;
 };
 
 export function useMainCrud({
@@ -58,6 +64,7 @@ export function useMainCrud({
                                 formsById,
                                 setSelectedKey,
                                 preflightTableId,
+                                stylesColumnMeta,
                             }: UseMainCrudDeps) {
     const [isAdding, setIsAdding] = useState(false);
     const [draft, setDraft] = useState<Record<number, string>>({});
@@ -69,6 +76,9 @@ export function useMainCrud({
 
     const [deletingRowIdx, setDeletingRowIdx] = useState<number | null>(null);
 
+    // ← NEW: draft для стилей ячеек
+    const [editStylesDraft, setEditStylesDraft] = useState<Record<string, CellStyles | null>>({});
+
     const getEffectiveFormId = useCallback((): number | null => {
         if (selectedFormId != null) return selectedFormId;
         if (!selectedWidget) return null;
@@ -76,17 +86,14 @@ export function useMainCrud({
     }, [selectedFormId, selectedWidget, formsByWidget]);
 
     const getEffectiveWidgetId = useCallback((): number | null => {
-        // 1) Если сверху уже явно выбран виджет — используем его
         if (selectedWidget?.id) return selectedWidget.id;
 
-        // 2) Если выбрана форма — пробуем найти виджет по formsById
         if (selectedFormId != null) {
             const form = formsById[selectedFormId];
             if (form && typeof (form as any).widget_id === 'number') {
                 return (form as any).widget_id as number;
             }
 
-            // 3) Fallback: formsByWidget (старый маппер виджет → базовая форма)
             for (const [widStr, f] of Object.entries(formsByWidget)) {
                 if (f?.form_id === selectedFormId) {
                     const wid = Number(widStr);
@@ -116,7 +123,7 @@ export function useMainCrud({
 
                 if (!tableId && widgetId) {
                     const { data: widgetMeta } = await api.get<{ id: number; table_id: number }>(
-                        `/widgets/${widgetId}`,
+                        `/widgets/${widgetId}`
                     );
                     tableId = widgetMeta?.table_id ?? null;
                 }
@@ -145,12 +152,12 @@ export function useMainCrud({
                     return { ok: false };
                 }
             } catch {
-                // префлайт не критичен — не валим CRUD, просто молча
+                // префлайт не критичен
             }
 
             return { ok: true, formId };
         },
-        [selectedWidget, preflightTableId, getEffectiveFormId, getEffectiveWidgetId],
+        [selectedWidget, preflightTableId, getEffectiveFormId, getEffectiveWidgetId]
     );
 
     const preflightInsert = useCallback(() => ensureQuery('insert'), [ensureQuery]);
@@ -172,7 +179,7 @@ export function useMainCrud({
     }
 
     function getWriteTcIdForComboGroupCRUD(group: ExtCol[]): number | null {
-        const primary = group.find(c => c.__is_primary_combo_input) ?? group[0];
+        const primary = group.find((c) => c.__is_primary_combo_input) ?? group[0];
         if (primary?.__write_tc_id != null) return primary.__write_tc_id;
         for (const g of group) {
             if (g.__write_tc_id != null) return g.__write_tc_id;
@@ -181,8 +188,6 @@ export function useMainCrud({
         return null;
     }
 
-
-
     // ───────── Добавление ─────────
     const startAdd = useCallback(async () => {
         const pf = await preflightInsert();
@@ -190,6 +195,7 @@ export function useMainCrud({
 
         setIsAdding(true);
         setEditingRowIdx(null);
+        setEditStylesDraft({}); // ← сбрасываем стили
 
         const init: Record<number, string> = {};
         const seen = new Set<number>();
@@ -199,7 +205,10 @@ export function useMainCrud({
 
             if (c.type === 'combobox') {
                 let j = i + 1;
-                while (j < flatColumnsInRenderOrder.length && isSameComboGroupCRUD(c, flatColumnsInRenderOrder[j])) {
+                while (
+                    j < flatColumnsInRenderOrder.length &&
+                    isSameComboGroupCRUD(c, flatColumnsInRenderOrder[j])
+                    ) {
                     j += 1;
                 }
                 const group = flatColumnsInRenderOrder.slice(i, j);
@@ -227,6 +236,7 @@ export function useMainCrud({
     const cancelAdd = useCallback(() => {
         setIsAdding(false);
         setDraft({});
+        setEditStylesDraft({}); // ← сбрасываем стили
     }, []);
 
     const submitAdd = useCallback(async () => {
@@ -241,7 +251,7 @@ export function useMainCrud({
             const allWriteIds: number[] = [];
             const seen = new Set<number>();
 
-            flatColumnsInRenderOrder.forEach(c => {
+            flatColumnsInRenderOrder.forEach((c) => {
                 const w = (c.__write_tc_id ?? c.table_column_id) ?? null;
                 if (w != null && !seen.has(w)) {
                     seen.add(w);
@@ -253,24 +263,19 @@ export function useMainCrud({
                 const raw = draft[tcId];
                 const s = raw == null ? '' : String(raw);
 
-                // ищем колонку, которая пишет в этот write_tc_id
                 const colForTc = flatColumnsInRenderOrder.find((c) => {
                     const w = (c.__write_tc_id ?? c.table_column_id) ?? null;
                     return w === tcId;
                 });
 
-                const isCheckboxCol =
-                    colForTc?.type === 'checkbox' ||
-                    colForTc?.type === 'bool';
+                const isCheckboxCol = colForTc?.type === 'checkbox' || colForTc?.type === 'bool';
 
                 let value: string | null;
 
                 if (isCheckboxCol) {
-                    // если чекбокс вообще не трогали → считаем его false по умолчанию
                     const normalized = s.trim();
                     value = normalized === '' ? 'false' : normalized;
                 } else {
-                    // 👇 вот тут запятые → точки ТОЛЬКО для числовых колонок
                     const normalized = normalizeValueForColumn(tcId, s, flatColumnsInRenderOrder);
                     value = normalized === '' ? null : normalized;
                 }
@@ -307,14 +312,10 @@ export function useMainCrud({
                 if (status === 404) {
                     await api.post(`${url}/`, body);
                 } else if (status === 422) {
-                    console.error('[submitAdd] 422 от бэка', {
-                        detail,
-                        body,
-                    });
-
+                    console.error('[submitAdd] 422 от бэка', { detail, body });
                     alert(
                         `Не удалось добавить строку (422).\n` +
-                        `detail: ${typeof detail === 'string' ? detail : JSON.stringify(detail)}`,
+                        `detail: ${typeof detail === 'string' ? detail : JSON.stringify(detail)}`
                     );
                     return;
                 } else {
@@ -328,18 +329,27 @@ export function useMainCrud({
 
             setIsAdding(false);
             setDraft({});
+            setEditStylesDraft({}); // ← сбрасываем стили
         } catch (e: any) {
             const status = e?.response?.status;
             const msg = e?.response?.data ?? e?.message;
             alert(
                 `Не удалось добавить строку: ${status ?? ''} ${
                     typeof msg === 'string' ? msg : JSON.stringify(msg)
-                }`,
+                }`
             );
         } finally {
             setSaving(false);
         }
-    }, [getEffectiveWidgetId, preflightInsert, draft, activeFilters, setFormDisplay, reloadTree, flatColumnsInRenderOrder]);
+    }, [
+        getEffectiveWidgetId,
+        preflightInsert,
+        draft,
+        activeFilters,
+        setFormDisplay,
+        reloadTree,
+        flatColumnsInRenderOrder,
+    ]);
 
     // ───────── Редактирование ─────────
     const startEdit = useCallback(
@@ -347,13 +357,14 @@ export function useMainCrud({
             const pf = await preflightUpdate();
             if (!pf.ok) return;
             setIsAdding(false);
+            setEditStylesDraft({}); // ← сбрасываем стили при начале редактирования
 
             const row = formDisplay.data[rowIdx];
 
             const init: Record<number, string> = {};
             const comboGroups = new Map<string, { wcId: number; writeTcId: number; tokens: string[] }>();
 
-            flatColumnsInRenderOrder.forEach(col => {
+            flatColumnsInRenderOrder.forEach((col) => {
                 const writeTcId = (col.__write_tc_id ?? col.table_column_id) ?? null;
                 if (writeTcId == null) return;
 
@@ -393,7 +404,7 @@ export function useMainCrud({
                         const hay: string[] = o.showHidden.map((x: string) => x.toLowerCase());
                         const score = tokens.reduce(
                             (acc: number, t: string) => acc + (hay.includes(t) ? 1 : 0),
-                            0,
+                            0
                         );
                         if (score > bestScore) {
                             bestScore = score;
@@ -415,13 +426,14 @@ export function useMainCrud({
             setEditingRowIdx(rowIdx);
             setEditDraft(init);
         },
-        [preflightUpdate, formDisplay.data, flatColumnsInRenderOrder, valueIndexByKey],
+        [preflightUpdate, formDisplay.data, flatColumnsInRenderOrder, valueIndexByKey]
     );
 
     const cancelEdit = useCallback(() => {
         setEditingRowIdx(null);
         setEditDraft({});
         setEditSaving(false);
+        setEditStylesDraft({}); // ← сбрасываем стили
     }, []);
 
     const submitEdit = useCallback(async () => {
@@ -438,12 +450,12 @@ export function useMainCrud({
             const row = formDisplay.data[editingRowIdx];
 
             const pkObj = Object.fromEntries(
-                Object.entries(row.primary_keys).map(([k, v]) => [k, String(v)]),
+                Object.entries(row.primary_keys).map(([k, v]) => [k, String(v)])
             );
             const pkToString = (pk: Record<string, unknown>) =>
                 Object.keys(pk)
                     .sort()
-                    .map(k => `${k}:${String(pk[k])}`)
+                    .map((k) => `${k}:${String(pk[k])}`)
                     .join('|');
 
             const getSendingValue = (raw: unknown): string | null => {
@@ -453,13 +465,67 @@ export function useMainCrud({
 
             const entries = Object.entries(editDraft);
 
-            const values = entries.map(([tcIdStr, v]) => {
-                const tcId = Number(tcIdStr);
-                return {
-                    table_column_id: tcId,
-                    value: getSendingValue(v),
-                };
-            });
+            const values: Array<{ table_column_id: number; value: string | null }> = entries.map(
+                ([tcIdStr, v]) => {
+                    const tcId = Number(tcIdStr);
+                    return {
+                        table_column_id: tcId,
+                        value: getSendingValue(v),
+                    };
+                }
+            );
+
+            // ═══════════════════════════════════════════════════════════
+            // NEW: Добавляем стили в values, если есть изменения
+            // ═══════════════════════════════════════════════════════════
+            if (
+                stylesColumnMeta?.exists &&
+                stylesColumnMeta.valueIndex != null &&
+                Object.keys(editStylesDraft).length > 0
+            ) {
+                const stylesValueIndex = stylesColumnMeta.valueIndex;
+
+                // Находим колонку стилей для получения table_column_id
+                const stylesColumn = formDisplay.columns.find((c) => c.type === 'styles');
+                const stylesTcId = stylesColumn?.table_column_id;
+
+                if (stylesTcId) {
+                    // Текущие стили из строки
+                    const currentStylesJson = row.values[stylesValueIndex];
+                    const currentStyles: Record<string, CellStyles> =
+                        currentStylesJson &&
+                        typeof currentStylesJson === 'object' &&
+                        !Array.isArray(currentStylesJson)
+                            ? { ...(currentStylesJson as Record<string, CellStyles>) }
+                            : {};
+
+                    // Мержим с draft
+                    Object.entries(editStylesDraft).forEach(([colName, style]) => {
+                        if (style === null) {
+                            delete currentStyles[colName];
+                        } else {
+                            currentStyles[colName] = style;
+                        }
+                    });
+
+                    // Добавляем в values
+                    const stylesValue =
+                        Object.keys(currentStyles).length > 0 ? JSON.stringify(currentStyles) : null;
+
+                    log('submitEdit → styles update', {
+                        stylesTcId,
+                        editStylesDraft,
+                        currentStyles,
+                        stylesValue,
+                    });
+
+                    values.push({
+                        table_column_id: stylesTcId,
+                        value: stylesValue,
+                    });
+                }
+            }
+            // ═══════════════════════════════════════════════════════════
 
             const body = {
                 pk: { primary_keys: pkObj as Record<string, string> },
@@ -471,14 +537,14 @@ export function useMainCrud({
                 widget_column_id: number;
                 write_tc_id: number;
                 shown_before: string;
-                sending_value?: string;
+                sending_value?: string | null;
             };
 
             const beforeAfter: BeforeAfter[] = [];
             for (const [tcIdStr] of entries) {
                 const writeTcId = Number(tcIdStr);
 
-                const related = flatColumnsInRenderOrder.filter(c => {
+                const related = flatColumnsInRenderOrder.filter((c) => {
                     const w = (c.__write_tc_id ?? c.table_column_id) ?? null;
                     return w === writeTcId;
                 });
@@ -507,6 +573,7 @@ export function useMainCrud({
             console.groupCollapsed('[CRUD][submitEdit]');
             console.log('PK:', pkObj, 'pkKey:', pkToString(pkObj));
             console.log('editDraft (raw):', editDraft);
+            console.log('editStylesDraft:', editStylesDraft);
             console.log('entries (to send):', entries);
             console.log('values[] (will be sent):', values);
             console.log('request:', { url, body });
@@ -528,7 +595,9 @@ export function useMainCrud({
                 }
 
                 if (status === 404 && String(detail).includes('Update query not found')) {
-                    alert('Для этой таблицы не настроен UPDATE QUERY. Задайте его в метаданных таблицы.');
+                    alert(
+                        'Для этой таблицы не настроен UPDATE QUERY. Задайте его в метаданных таблицы.'
+                    );
                     return;
                 }
                 if (status === 404) {
@@ -545,14 +614,14 @@ export function useMainCrud({
 
             const { data: newDisplay } = await api.post<FormDisplay>(
                 `/display/${pf.formId}/main`,
-                activeFilters,
+                activeFilters
             );
 
             const findRowByPk = (fd: FormDisplay, pk: Record<string, unknown>) => {
                 const key = (obj: Record<string, unknown>) =>
                     Object.keys(obj)
                         .sort()
-                        .map(k => `${k}:${String(obj[k])}`)
+                        .map((k) => `${k}:${String(obj[k])}`)
                         .join('|');
                 const target = key(pk);
                 for (let i = 0; i < fd.data.length; i += 1) {
@@ -566,8 +635,8 @@ export function useMainCrud({
 
             const after: Array<BeforeAfter & { shown_after: string }> = [];
             if (updatedRow) {
-                beforeAfter.forEach(ba => {
-                    const related = flatColumnsInRenderOrder.filter(c => {
+                beforeAfter.forEach((ba) => {
+                    const related = flatColumnsInRenderOrder.filter((c) => {
                         const w = (c.__write_tc_id ?? c.table_column_id) ?? null;
                         return w === ba.write_tc_id;
                     });
@@ -599,6 +668,7 @@ export function useMainCrud({
 
             setIsAdding(false);
             setDraft({});
+            setEditStylesDraft({}); // ← сбрасываем стили после сохранения
             cancelEdit();
         } finally {
             setEditSaving(false);
@@ -608,7 +678,10 @@ export function useMainCrud({
         getEffectiveWidgetId,
         preflightUpdate,
         formDisplay.data,
+        formDisplay.columns,
         editDraft,
+        editStylesDraft,
+        stylesColumnMeta,
         activeFilters,
         setFormDisplay,
         reloadTree,
@@ -628,10 +701,10 @@ export function useMainCrud({
 
             const row = formDisplay.data[rowIdx];
             const rowKey = pkToKey(row.primary_keys);
-            setSelectedKey(prev => (prev === rowKey ? null : prev));
+            setSelectedKey((prev) => (prev === rowKey ? null : prev));
 
             const pkObj = Object.fromEntries(
-                Object.entries(row.primary_keys).map(([k, v]) => [k, String(v)]),
+                Object.entries(row.primary_keys).map(([k, v]) => [k, String(v)])
             );
 
             setDeletingRowIdx(rowIdx);
@@ -646,7 +719,9 @@ export function useMainCrud({
                     const detail = err?.response?.data?.detail ?? err?.response?.data ?? err?.message;
 
                     if (status === 404 && String(detail).includes('Delete query not found')) {
-                        alert('Для этой таблицы не настроен DELETE QUERY. Задайте его в метаданных таблицы.');
+                        alert(
+                            'Для этой таблицы не настроен DELETE QUERY. Задайте его в метаданных таблицы.'
+                        );
                         return;
                     }
                     if (status === 404) {
@@ -656,7 +731,10 @@ export function useMainCrud({
                     }
                 }
 
-                const { data } = await api.post<FormDisplay>(`/display/${pf.formId}/main`, activeFilters);
+                const { data } = await api.post<FormDisplay>(
+                    `/display/${pf.formId}/main`,
+                    activeFilters
+                );
                 setFormDisplay(data);
 
                 try {
@@ -683,7 +761,7 @@ export function useMainCrud({
             setSelectedKey,
             reloadTree,
             setLastPrimary,
-        ],
+        ]
     );
 
     return {
@@ -703,5 +781,8 @@ export function useMainCrud({
         deleteRow,
         setDraft,
         setEditDraft,
+        // ← NEW: экспортируем стили
+        editStylesDraft,
+        setEditStylesDraft,
     };
 }
