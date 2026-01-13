@@ -1,63 +1,40 @@
+// src/components/Form/subForm/SubWormTable.module.scss
 @use '@/assets/styles/fluid-type' as *;
 
 $border: #e5e5e5;
 $error: #d33;
 
-/* высота 1-й строки шапки — как в основной таблице */
 :root {
   --head-row-1: 40px;
 }
 
-/* корень компонента */
+// ═══════════════════════════════════════════════════════════
+// ROOT - занимает всё пространство subPane
+// ═══════════════════════════════════════════════════════════
+
 .root {
-  position: relative;
   display: flex;
   flex-direction: column;
   min-height: 0;
-
-}
-.scrollArea {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow: auto;
-  overscroll-behavior: contain;
-
-  /* прокидываем из JSX: 0px / 44px */
-  --tabsH: 0px;
-  --head-row-1: 40px;
-
-  border-radius: 4px;
-
-  &::-webkit-scrollbar {
-    height: 5px;
-    width: 8px;
-  }
-  &::-webkit-scrollbar-thumb {
-    background: #888;
-    border-radius: 4px;
-  }
-  &::-webkit-scrollbar-track {
-    background: #3a3a3a;
-  }
+  height: 100%; // Занимаем всю высоту subPane
+  overflow: hidden;
 }
 
+// ═══════════════════════════════════════════════════════════
+// TABS - фиксированная высота сверху
+// ═══════════════════════════════════════════════════════════
 
-/* ───── вкладки ───── */
 .tabs {
-  display: inline-flex;      /* важно: не растягивать на всю ширину */
-  width: max-content;        /* как у таблицы */
-  min-width: 100%;           /* но не уже контейнера */
-  box-sizing: border-box;
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
 
   list-style: none;
-  padding: 4px 0 0;
+  padding: 4px 0;
   margin: 0 0 4px 0;
-  gap: 10px;
 
-  position: sticky;
-  top: 0;
-  z-index: 6;
-
+  flex-shrink: 0; // Не сжимается
 }
 
 .tab,
@@ -68,7 +45,7 @@ $error: #d33;
   border-radius: 6px 6px 0 0;
   background: #3a3a3a;
   color: #eee;
-  font-size: 16px;
+  font-size: 14px;
   cursor: pointer;
   white-space: nowrap;
   transition: background 0.15s;
@@ -85,40 +62,38 @@ $error: #d33;
   z-index: 1;
 }
 
-/* сообщения */
-.error {
-  color: $error;
-  padding: 16px 0;
-}
+// ═══════════════════════════════════════════════════════════
+// TABLE SCROLL - адаптивная высота
+// ═══════════════════════════════════════════════════════════
 
-/* ───── скролл-обёртка: как у MainTable, но ниже по высоте ───── */
 .tableScroll {
-  flex: 1 1 auto;
+  flex: 1 1 auto; // Занимает оставшееся место
   min-height: 0;
-  max-height: 23vh;
-  overflow-y: auto;
-  overflow-x: auto;
-  border-radius: 4px;
+  overflow: auto;
+  overscroll-behavior: contain;
 
   &::-webkit-scrollbar {
-    height: 10px;
-    width: 8px;
+    height: 8px;
+    width: 6px;
   }
 
   &::-webkit-scrollbar-thumb {
     background: rgba(255, 255, 255, 0.3);
     border-radius: 6px;
   }
+
   &::-webkit-scrollbar-track {
-    background: #4c4c4c;
+    background: #3a3a3a;
   }
 }
 
-/* ───── таблица: те же принципы, что и в MainTable ───── */
-.tbl {
-  width: max-content; /* ширина по содержимому */
+// ═══════════════════════════════════════════════════════════
+// TABLE
+// ═══════════════════════════════════════════════════════════
 
-  min-width: 100%;    /* но не уже контейнера */
+.tbl {
+  width: max-content;
+  min-width: 100%;
   table-layout: fixed;
   border-collapse: separate;
   border-spacing: 0;
@@ -126,7 +101,6 @@ $error: #d33;
   @include fluid-type(13, 16);
 }
 
-/* базовые ячейки */
 .tbl th,
 .tbl td {
   font-size: 14px;
@@ -135,18 +109,18 @@ $error: #d33;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 320px; /* чтобы огромные тексты не раздували ячейку по высоте */
+  max-width: 320px;
 }
 
 .tbl thead th {
   background: var(--header-color);
   color: #eee;
   font-weight: 600;
-  @include fluid-type(16, 20);
+  @include fluid-type(14, 16);
   z-index: 2;
 }
 
-/* липкая шапка — ниже вкладок */
+// Липкая шапка
 .tbl thead tr:nth-child(1) th {
   position: sticky;
   top: 0;
@@ -154,38 +128,37 @@ $error: #d33;
   height: var(--head-row-1);
 }
 
-/* 2-я строка шапки (подписи) */
 .tbl thead tr:nth-child(2) th {
   position: sticky;
   top: var(--head-row-1);
   z-index: 3;
 }
 
-/* тело */
 .tbl td {
   color: #ddd;
   background: transparent;
 }
 
-/* hover строк тела */
 .tbl tbody tr:hover {
   background: var(--hover-color);
 }
 
-/* курсор-рука только по телу */
 .tbl tbody td {
   cursor: pointer;
 }
 
-/* выбранная строка (если будешь использовать) */
 .selectedRow {
   background: var(--hover-color);
-}
-.selectedRow td {
-  font-weight: 600;
+
+  td {
+    font-weight: 600;
+  }
 }
 
-/* ───── текст с обрезкой / переносом ───── */
+// ═══════════════════════════════════════════════════════════
+// TEXT HELPERS
+// ═══════════════════════════════════════════════════════════
+
 .ellipsis {
   display: block;
   max-width: 100%;
@@ -194,22 +167,22 @@ $error: #d33;
   white-space: nowrap;
 }
 
-/* во 2-й строке шапки разрешаем перенос,
-   чтобы длинные подписи НЕ растягивали таблицу по ширине */
 .tbl thead tr:nth-child(2) .ellipsis {
   white-space: normal;
   word-break: break-word;
   text-overflow: clip;
 }
 
-/* ───── заголовок actions-колонки ───── */
+// ═══════════════════════════════════════════════════════════
+// ACTIONS
+// ═══════════════════════════════════════════════════════════
+
 .actionsHeadCell {
   text-align: center;
   vertical-align: middle;
   width: 1%;
 }
 
-/* кнопка-тогглер подзаголовков */
 .toggleBtn {
   background: none;
   border: 0;
@@ -221,14 +194,13 @@ $error: #d33;
   color: #fff;
 }
 
-/* ───── actions-колонка в теле ───── */
 .actionsCell {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 4px;
   padding: 0;
-  height: 40px;
+  height: 36px;
   min-width: 64px;
 }
 
@@ -237,6 +209,7 @@ $error: #d33;
   height: 1.1em;
   color: #d1d0d0;
 }
+
 .lockSlot {
   width: 18px;
   display: inline-flex;
@@ -245,7 +218,6 @@ $error: #d33;
   pointer-events: none;
 }
 
-/* кнопки ✓ / × и иконки */
 .okBtn,
 .cancelBtn {
   background: none;
@@ -262,6 +234,11 @@ $error: #d33;
   fill: #ccc;
   cursor: pointer;
   transition: color 0.15s, fill 0.15s;
+
+  &:hover {
+    color: #fff;
+    fill: #fff;
+  }
 }
 
 .iconBtn {
@@ -274,18 +251,22 @@ $error: #d33;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: #EEEEEE;
+  color: #eeeeee;
+
+  &:hover {
+    color: #fff;
+  }
 }
 
-.actionIcon:hover,
-.okBtn:hover,
-.cancelBtn:hover,
-.iconBtn:hover .actionIcon {
+.actionIcon:hover {
   color: #fff;
   fill: #fff;
 }
 
-/* инпуты в ячейках (для add/edit) */
+// ═══════════════════════════════════════════════════════════
+// INPUTS
+// ═══════════════════════════════════════════════════════════
+
 .inp,
 .inpN {
   width: 100%;
@@ -301,7 +282,10 @@ $error: #d33;
   text-align: right;
 }
 
-/* ссылка-кнопка для drill */
+// ═══════════════════════════════════════════════════════════
+// LINK BUTTON (для drill)
+// ═══════════════════════════════════════════════════════════
+
 .linkButton {
   padding: 0;
   border: none;
@@ -311,3 +295,11 @@ $error: #d33;
   color: var(--link, #66b0ff);
 }
 
+// ═══════════════════════════════════════════════════════════
+// MESSAGES
+// ═══════════════════════════════════════════════════════════
+
+.error {
+  color: $error;
+  padding: 16px 0;
+}

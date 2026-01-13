@@ -21,7 +21,10 @@ type EnsureQueryKind = 'insert' | 'update' | 'delete';
 export type StylesColumnMeta = {
     exists: boolean;
     valueIndex: number | null;
-    columnNameToIndex: Map<string, number>;
+    /** Маппинг table_column_name → column_name (для чтения стилей) */
+    tableColumnNameMap: Map<string, string>;
+    /** Маппинг column_name → table_column_name (для записи стилей) */
+    columnNameToTableColumnName: Map<string, string>;
 } | null;
 
 export type UseMainCrudDeps = {
@@ -76,7 +79,7 @@ export function useMainCrud({
 
     const [deletingRowIdx, setDeletingRowIdx] = useState<number | null>(null);
 
-    // ← NEW: draft для стилей ячеек
+    // ← NEW: draft для стилей ячеек (ключи — column_name)
     const [editStylesDraft, setEditStylesDraft] = useState<Record<string, CellStyles | null>>({});
 
     const getEffectiveFormId = useCallback((): number | null => {
@@ -195,7 +198,7 @@ export function useMainCrud({
 
         setIsAdding(true);
         setEditingRowIdx(null);
-        setEditStylesDraft({}); // ← сбрасываем стили
+        setEditStylesDraft({});
 
         const init: Record<number, string> = {};
         const seen = new Set<number>();
@@ -236,7 +239,7 @@ export function useMainCrud({
     const cancelAdd = useCallback(() => {
         setIsAdding(false);
         setDraft({});
-        setEditStylesDraft({}); // ← сбрасываем стили
+        setEditStylesDraft({});
     }, []);
 
     const submitAdd = useCallback(async () => {
@@ -329,7 +332,7 @@ export function useMainCrud({
 
             setIsAdding(false);
             setDraft({});
-            setEditStylesDraft({}); // ← сбрасываем стили
+            setEditStylesDraft({});
         } catch (e: any) {
             const status = e?.response?.status;
             const msg = e?.response?.data ?? e?.message;
@@ -357,7 +360,7 @@ export function useMainCrud({
             const pf = await preflightUpdate();
             if (!pf.ok) return;
             setIsAdding(false);
-            setEditStylesDraft({}); // ← сбрасываем стили при начале редактирования
+            setEditStylesDraft({});
 
             const row = formDisplay.data[rowIdx];
 
@@ -433,7 +436,7 @@ export function useMainCrud({
         setEditingRowIdx(null);
         setEditDraft({});
         setEditSaving(false);
-        setEditStylesDraft({}); // ← сбрасываем стили
+        setEditStylesDraft({});
     }, []);
 
     const submitEdit = useCallback(async () => {
@@ -490,7 +493,7 @@ export function useMainCrud({
                 const stylesTcId = stylesColumn?.table_column_id;
 
                 if (stylesTcId) {
-                    // Текущие стили из строки
+                    // Текущие стили из строки (ключи — table_column_name)
                     const currentStylesJson = row.values[stylesValueIndex];
                     const currentStyles: Record<string, CellStyles> =
                         currentStylesJson &&
@@ -499,12 +502,17 @@ export function useMainCrud({
                             ? { ...(currentStylesJson as Record<string, CellStyles>) }
                             : {};
 
-                    // Мержим с draft
-                    Object.entries(editStylesDraft).forEach(([colName, style]) => {
+                    // Мержим с draft, конвертируя column_name → table_column_name
+                    const columnNameToTableColumnName = stylesColumnMeta.columnNameToTableColumnName;
+
+                    Object.entries(editStylesDraft).forEach(([columnName, style]) => {
+                        // Конвертируем column_name ("Комментарий") → table_column_name ("description")
+                        const tableColumnName = columnNameToTableColumnName?.get(columnName) ?? columnName;
+
                         if (style === null) {
-                            delete currentStyles[colName];
+                            delete currentStyles[tableColumnName];
                         } else {
-                            currentStyles[colName] = style;
+                            currentStyles[tableColumnName] = style;
                         }
                     });
 
@@ -515,6 +523,7 @@ export function useMainCrud({
                     log('submitEdit → styles update', {
                         stylesTcId,
                         editStylesDraft,
+                        columnNameToTableColumnName: columnNameToTableColumnName ? Object.fromEntries(columnNameToTableColumnName) : null,
                         currentStyles,
                         stylesValue,
                     });
@@ -668,7 +677,7 @@ export function useMainCrud({
 
             setIsAdding(false);
             setDraft({});
-            setEditStylesDraft({}); // ← сбрасываем стили после сохранения
+            setEditStylesDraft({});
             cancelEdit();
         } finally {
             setEditSaving(false);

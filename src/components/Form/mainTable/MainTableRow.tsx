@@ -1,6 +1,6 @@
-// components/Form/mainTable/MainTableRow.tsx
+// src/components/Form/mainTable/MainTableRow.tsx
 import React, { useMemo } from 'react';
-import * as s from '@/components/setOfTables/SetOfTables.module.scss';
+import * as s from './MainTable.module.scss';
 import EditIcon from '@/assets/image/EditIcon.svg';
 import DeleteIcon from '@/assets/image/DeleteIcon.svg';
 import LockIcon from '@/assets/image/LockIcon.svg';
@@ -61,20 +61,17 @@ type MainTableRowProps = {
     comboReloadToken?: number;
     rlsMeta: RlsMeta;
 
-    /** Мета для колонки стилей */
     stylesColumnMeta?: {
         exists: boolean;
         valueIndex: number | null;
+        tableColumnNameMap?: Map<string, string>;
+        readonly?: boolean;
     } | null;
 
-    /** Локальные изменения стилей во время редактирования */
     editStylesDraft?: Record<string, CellStyles | null>;
-
-    /** Колбэк изменения стиля ячейки */
     onEditStyleChange?: (columnName: string, style: CellStyles | null) => void;
 };
 
-/** Правило "строка под RLS?" и как рисовать чекбоксы/булевые */
 function isRlsLockedValue(val: unknown): boolean {
     if (val == null) return false;
     if (typeof val === 'boolean') return val;
@@ -95,18 +92,25 @@ export const MainTableRow: React.FC<MainTableRowProps> = (p) => {
 
     const drillDisabled = p.disableDrillWhileEditing && p.editingRowIdx != null;
 
-    // Проверяем, поддерживаются ли стили
-    const stylesEnabled = !!p.stylesColumnMeta?.exists && p.stylesColumnMeta.valueIndex != null;
+    // Стили включены только если колонка существует, есть valueIndex и НЕ readonly
+    const stylesEnabled =
+        !!p.stylesColumnMeta?.exists &&
+        p.stylesColumnMeta.valueIndex != null &&
+        !p.stylesColumnMeta.readonly;
 
-    // Стили из данных строки
+    // Стили из данных строки (для отображения — работает даже при readonly)
     const rowStylesFromData = useMemo(() => {
         if (!p.stylesColumnMeta?.exists || p.stylesColumnMeta.valueIndex == null) {
             return {};
         }
-        return extractRowStyles(row.values, p.stylesColumnMeta.valueIndex);
+        return extractRowStyles(
+            row.values,
+            p.stylesColumnMeta.valueIndex,
+            p.stylesColumnMeta.tableColumnNameMap
+        );
     }, [row.values, p.stylesColumnMeta]);
 
-    // Мержим стили из данных + локальные изменения (draft) при редактировании
+    // Мержим стили с draft при редактировании
     const mergedRowStyles = useMemo(() => {
         if (!isEditing || !p.editStylesDraft) return rowStylesFromData;
 
@@ -125,8 +129,6 @@ export const MainTableRow: React.FC<MainTableRowProps> = (p) => {
 
     return (
         <tr
-            key={rowKey}
-            style={{ textAlign: 'center' }}
             className={p.selectedKey === rowKey ? s.selectedRow : undefined}
             aria-selected={p.selectedKey === rowKey || undefined}
             onClick={() => {
@@ -142,7 +144,7 @@ export const MainTableRow: React.FC<MainTableRowProps> = (p) => {
                 while (i < cols.length) {
                     const col = cols[i];
 
-                    // ───── Combobox-группа → одна TD с colSpan ─────
+                    // ───── Combobox-группа ─────
                     if (col.type === 'combobox') {
                         let j = i + 1;
                         while (j < cols.length && isSameComboGroup(col, cols[j])) j += 1;
@@ -172,7 +174,6 @@ export const MainTableRow: React.FC<MainTableRowProps> = (p) => {
                                 </td>
                             );
                         } else {
-                            // просмотр
                             const shownParts = group
                                 .map((gcol) => getShown(p.valueIndexByKey, row.values, gcol))
                                 .filter(Boolean);
@@ -196,21 +197,8 @@ export const MainTableRow: React.FC<MainTableRowProps> = (p) => {
                                                     primary: row.primary_keys,
                                                     openedFromEdit: false,
                                                 });
-                                                console.debug('[MainTable] drill click (combobox)', {
-                                                    formId: primary.form_id,
-                                                    originColumnType: 'combobox',
-                                                    widget_column_id: primary.widget_column_id,
-                                                    table_column_id: primary.table_column_id,
-                                                });
                                             }}
-                                            style={{
-                                                padding: 0,
-                                                border: 'none',
-                                                background: 'none',
-                                                cursor: 'pointer',
-                                                textDecoration: 'underline',
-                                                color: 'var(--link,#66b0ff)',
-                                            }}
+                                            className={s.linkButton}
                                             title={`Открыть форму #${primary.form_id}`}
                                         >
                                             {display}
@@ -234,7 +222,6 @@ export const MainTableRow: React.FC<MainTableRowProps> = (p) => {
                     const ro = p.isColReadOnly(col) || col.visible === false;
                     const writeTcId = (col.__write_tc_id ?? col.table_column_id) ?? null;
 
-                    // Получаем стиль для ячейки (используем merged при редактировании)
                     const cellStyle = getCellStyle(
                         isEditing ? mergedRowStyles : rowStylesFromData,
                         col.column_name
@@ -256,7 +243,7 @@ export const MainTableRow: React.FC<MainTableRowProps> = (p) => {
                                         comboReloadToken={p.comboReloadToken}
                                     />
 
-                                    {/* 🎨 Кнопка стилизации */}
+                                    {/* Кнопка стилей — только если НЕ readonly */}
                                     {stylesEnabled && col.column_name && (
                                         <CellStyleButton
                                             columnName={col.column_name}
@@ -279,7 +266,7 @@ export const MainTableRow: React.FC<MainTableRowProps> = (p) => {
                         if (isCheckboxCol) {
                             const checked = isRlsLockedValue(rawVal);
                             cells.push(
-                                <td key={`cell-${visKey}`}>
+                                <td key={`cell-${visKey}`} className={s.checkboxCell}>
                                     <Checkbox
                                         size="small"
                                         checked={checked}
@@ -310,21 +297,8 @@ export const MainTableRow: React.FC<MainTableRowProps> = (p) => {
                                                     primary: row.primary_keys,
                                                     openedFromEdit: false,
                                                 });
-                                                console.debug('[MainTable] drill click (regular)', {
-                                                    formId: col.form_id,
-                                                    originColumnType: col.type ?? null,
-                                                    widget_column_id: col.widget_column_id,
-                                                    table_column_id: col.table_column_id,
-                                                });
                                             }}
-                                            style={{
-                                                padding: 0,
-                                                border: 'none',
-                                                background: 'none',
-                                                cursor: 'pointer',
-                                                textDecoration: 'underline',
-                                                color: 'var(--link,#66b0ff)',
-                                            }}
+                                            className={s.linkButton}
                                             title={`Открыть форму #${col.form_id}`}
                                         >
                                             <span className={s.ellipsis}>{content}</span>
@@ -343,7 +317,7 @@ export const MainTableRow: React.FC<MainTableRowProps> = (p) => {
                 return cells;
             })()}
 
-            {/* ───── actions-ячейка ───── */}
+            {/* ───── Actions ───── */}
             <td className={s.actionsCell}>
                 {isEditing ? (
                     (() => {
@@ -354,7 +328,7 @@ export const MainTableRow: React.FC<MainTableRowProps> = (p) => {
                             );
 
                         return (
-                            <>
+                            <div className={s.actionsRow}>
                                 {hasEditable && (
                                     <button
                                         className={s.okBtn}
@@ -363,6 +337,7 @@ export const MainTableRow: React.FC<MainTableRowProps> = (p) => {
                                             p.onSubmitEdit();
                                         }}
                                         disabled={p.editSaving}
+                                        title="Сохранить"
                                     >
                                         {p.editSaving ? '…' : '✓'}
                                     </button>
@@ -374,15 +349,15 @@ export const MainTableRow: React.FC<MainTableRowProps> = (p) => {
                                         p.onCancelEdit();
                                     }}
                                     disabled={p.editSaving}
+                                    title="Отменить"
                                 >
                                     ×
                                 </button>
-                            </>
+                            </div>
                         );
                     })()
                 ) : (
                     <div className={s.actionsRow}>
-                        {/* EDIT */}
                         <button
                             type="button"
                             className={`${s.actionsBtn} ${isRowLocked ? s.actionsBtnDisabled : ''}`}
@@ -393,13 +368,9 @@ export const MainTableRow: React.FC<MainTableRowProps> = (p) => {
                             }}
                             title={isRowLocked ? 'Редактирование запрещено (RLS)' : 'Редактировать'}
                         >
-                            <EditIcon
-                                style={{ pointerEvents: isRowLocked ? 'none' : 'auto' }}
-                                className={s.actionIcon}
-                            />
+                            <EditIcon className={s.actionIcon} />
                         </button>
 
-                        {/* DELETE */}
                         <button
                             type="button"
                             className={`${s.actionsBtn} ${
@@ -412,13 +383,9 @@ export const MainTableRow: React.FC<MainTableRowProps> = (p) => {
                             }}
                             title={isRowLocked ? 'Удаление запрещено (RLS)' : 'Удалить'}
                         >
-                            <DeleteIcon
-                                style={{ pointerEvents: isRowLocked ? 'none' : 'auto' }}
-                                className={s.actionIcon}
-                            />
+                            <DeleteIcon className={s.actionIcon} />
                         </button>
 
-                        {/* LOCK */}
                         <span
                             className={s.lockSlot}
                             title={isRowLocked ? 'Строка защищена политикой RLS' : undefined}

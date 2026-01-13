@@ -1,0 +1,233 @@
+// src/components/Form/formTable/FormTable.module.scss
+// Стили для FormTableContent и связанных компонентов
+
+// ═══════════════════════════════════════════════════════════
+// FORM LAYOUT FULL WIDTH (с TreeDrawer вместо боковой панели)
+// ═══════════════════════════════════════════════════════════
+
+.formLayoutFullWidth {
+  height: calc(100dvh - var(--appHeaderH, 80px));
+  min-height: 0;
+
+  display: flex;
+  flex-direction: column;
+
+  overflow: hidden;
+  padding: 10px;
+  padding-left: 70px; // Отступ для кнопки открытия TreeDrawer
+
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 6px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+@media (max-width: 480px) {
+  .formLayoutFullWidth {
+    padding-left: 10px;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// RIGHT PANE (Toolbar + Main + Sub)
+// ═══════════════════════════════════════════════════════════
+
+.rightPane {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+  gap: 8px;
+}
+
+// ═══════════════════════════════════════════════════════════
+// TOOLBAR PANE
+// ═══════════════════════════════════════════════════════════
+
+.toolbarPane {
+  flex: 0 0 auto; // Фиксированная высота
+}
+
+// ═══════════════════════════════════════════════════════════
+// MAIN PANE - адаптивная высота
+// ═══════════════════════════════════════════════════════════
+
+.mainPane {
+  flex: 1 1 auto; // Растягивается
+  min-height: 150px; // Минимум для таблицы
+  max-height: calc(100% - 50px); // Оставляем место для subPane если он есть
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+
+  // Когда subPane отсутствует - занимаем всё
+  &:only-child,
+  &:last-child {
+    max-height: 100%;
+  }
+}
+
+.mainTableScroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+
+  &::-webkit-scrollbar {
+    width: 6px;
+    height: 8px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 6px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: #3a3a3a;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// SUB PANE - адаптивная высота, прибит к низу
+// ═══════════════════════════════════════════════════════════
+
+.subPane {
+  flex: 0 1 auto; // Может сжиматься, но не растягивается бесконечно
+  min-height: 120px;
+  max-height: 40vh; // Максимум 40% viewport
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+
+  // Разделитель сверху
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  padding-top: 8px;
+  margin-top: 4px;
+}
+
+// ═══════════════════════════════════════════════════════════
+// АДАПТИВНОЕ РАСПРЕДЕЛЕНИЕ ВЫСОТЫ
+// ═══════════════════════════════════════════════════════════
+
+// Когда есть и main и sub - делим пространство
+.rightPane {
+  // Main занимает ~60%, Sub ~40% (с учётом min/max)
+  .mainPane {
+    flex: 3 1 0; // flex-grow: 3
+  }
+
+  .subPane {
+    flex: 2 1 0; // flex-grow: 2
+  }
+}
+
+// На маленьких экранах - больше места для main
+@media (max-height: 700px) {
+  .rightPane {
+    .mainPane {
+      min-height: 120px;
+      flex: 2 1 0;
+    }
+
+    .subPane {
+      min-height: 100px;
+      max-height: 30vh;
+      flex: 1 1 0;
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// FILTER INDICATOR (для toolbar)
+// ═══════════════════════════════════════════════════════════
+
+.filterIndicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  margin-left: 8px;
+
+  background: rgba(100, 150, 255, 0.15);
+  border: 1px solid rgba(100, 150, 255, 0.3);
+  border-radius: 16px;
+
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.9);
+
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  &:hover {
+    background: rgba(100, 150, 255, 0.25);
+    border-color: rgba(100, 150, 255, 0.5);
+  }
+
+  svg {
+    width: 14px;
+    height: 14px;
+  }
+}
+
+.filterIndicatorDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #6496ff;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(0.8);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// FLOAT ACTIONS (для модальных действий)
+// ═══════════════════════════════════════════════════════════
+
+.floatActions {
+  position: absolute;
+  top: -2%;
+  right: -1%;
+  bottom: 20px;
+  z-index: 50;
+}
+
+// ═══════════════════════════════════════════════════════════
+// ICON BUTTON (для SubForm)
+// ═══════════════════════════════════════════════════════════
+
+.iconBtn {
+  background: none;
+  border: 0;
+  padding: 0;
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #eeeeee;
+
+  &:hover {
+    color: #fff;
+  }
+}

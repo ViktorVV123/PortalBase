@@ -13,7 +13,12 @@ export type HeaderPlanGroup = {
 export type StylesColumnMeta = {
     exists: boolean;
     valueIndex: number | null;
-    columnNameToIndex: Map<string, number>;
+    /** Маппинг table_column_name → column_name (для чтения стилей) */
+    tableColumnNameMap: Map<string, string>;
+    /** Маппинг column_name → table_column_name (для записи стилей) */
+    columnNameToTableColumnName: Map<string, string>;
+    /** Если true — редактирование стилей запрещено (кнопка не показывается) */
+    readonly: boolean;
 };
 
 export type HeaderPlanResult = {
@@ -105,29 +110,44 @@ export function useHeaderPlan(formDisplay: FormDisplay | null): HeaderPlanResult
         return map;
     }, [columns]);
 
-    // 6) NEW: мета для колонки стилей
+    // 6) мета для колонки стилей
     const stylesColumnMeta = useMemo<StylesColumnMeta | null>(() => {
+        // Находим колонку styles в ОРИГИНАЛЬНОМ массиве columns
         const stylesCol = columns.find(c => c.type === 'styles');
-        if (!stylesCol) return null;
 
-        const key = `${stylesCol.widget_column_id}:${stylesCol.table_column_id ?? -1}`;
-        const valueIndex = valueIndexByKey.get(key) ?? null;
+        if (!stylesCol) {
+            return null;
+        }
 
-        const columnNameToIndex = new Map<string, number>();
-        columns.forEach((c, idx) => {
-            if (c.column_name) {
-                columnNameToIndex.set(c.column_name, idx);
+        const stylesColIndex = columns.indexOf(stylesCol);
+
+        // Маппинг table_column_name → column_name (для чтения)
+        // Стили в JSON хранятся по table_column_name (например "description")
+        // А нам нужно применить к колонке с column_name (например "Комментарий")
+        const tableColumnNameMap = new Map<string, string>();
+
+        // Маппинг column_name → table_column_name (для записи)
+        // При сохранении нужно конвертировать обратно
+        const columnNameToTableColumnName = new Map<string, string>();
+
+        columns.forEach((c) => {
+            const tableColName = (c as any).table_column_name;
+            if (tableColName && c.column_name) {
+                tableColumnNameMap.set(tableColName, c.column_name);
+                columnNameToTableColumnName.set(c.column_name, tableColName);
             }
         });
 
         return {
             exists: true,
-            valueIndex,
-            columnNameToIndex,
+            valueIndex: stylesColIndex,
+            tableColumnNameMap,
+            columnNameToTableColumnName,
+            readonly: !!stylesCol.readonly,
         };
-    }, [columns, valueIndexByKey]);
+    }, [columns]);
 
-    // 7) NEW: фильтруем styles из рендера
+    // 7) фильтруем styles из рендера
     const normalizedWithoutStyles = useMemo(() => {
         return normalizedWithPrimary.filter(c => c.type !== 'styles');
     }, [normalizedWithPrimary]);
@@ -156,7 +176,7 @@ export function useHeaderPlan(formDisplay: FormDisplay | null): HeaderPlanResult
         return !!c.readonly;
     };
 
-    // 10) RETURN — теперь включает stylesColumnMeta и использует normalizedWithoutStyles
+    // 10) RETURN
     return {
         headerPlan,
         flatColumnsInRenderOrder: normalizedWithoutStyles,
