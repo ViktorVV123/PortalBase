@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useState} from 'react';
+import React, { useCallback, useEffect, useState, useMemo } from 'react';
 import * as s from '@/components/setOfTables/SetOfTables.module.scss';
 import {
     Column,
@@ -6,31 +6,27 @@ import {
     WidgetColumn,
     WidgetForm,
 } from '@/shared/hooks/useWorkSpaces';
-import {TableColumn} from '@/components/table/tableColumn/TableColumn';
+import { TableColumn } from '@/components/table/tableColumn/TableColumn';
 import {
     Box,
     createTheme,
     Modal,
     Typography,
 } from '@mui/material';
-import {WidgetColumnsMainTable} from '@/components/WidgetColumnsOfTable/WidgetColumnsMainTable';
+import { WidgetColumnsMainTable } from '@/components/WidgetColumnsOfTable/WidgetColumnsMainTable';
 import EditIcon from '@/assets/image/EditIcon.svg';
-import {WidgetMetaDialog} from "@/components/modals/modalWidget/WidgetMetaDialog";
-import {AddWidgetColumnDialog} from "@/components/modals/modalWidget/AddWidgetColumnDialog";
-import {HeaderModelItem} from "@/components/Form/formTable/FormTable";
+import { WidgetMetaDialog } from '@/components/modals/modalWidget/WidgetMetaDialog';
+import { AddWidgetColumnDialog } from '@/components/modals/modalWidget/AddWidgetColumnDialog';
+import { HeaderModelItem } from '@/components/Form/formTable/FormTable';
 
 export type WcReference = WidgetColumn['reference'][number];
 
 interface Props {
     deleteColumnWidget: (id: number) => void;
-
     widgetColumns: WidgetColumn[];
     selectedWidget: Widget | null;
     columns: Column[];
-
     loadColumnsWidget: (widgetId: number) => void;
-
-    /** ВАЖНО: полная сигнатура patch + form_id, чтобы совпадать с WidgetColumnsMainTable */
     updateReference: (
         widgetColumnId: number,
         tableColumnId: number,
@@ -48,7 +44,6 @@ interface Props {
             >
         > & { form_id?: number | null }
     ) => Promise<WcReference>;
-
     fetchReferences: (widgetColumnId: number) => Promise<WcReference[]>;
     deleteReference: (widgetColumnId: number, tableColumnId: number) => Promise<void>;
     updateWidgetMeta: (id: number, patch: Partial<Widget>) => Promise<Widget>;
@@ -56,13 +51,10 @@ interface Props {
         id: number,
         patch: Partial<Omit<WidgetColumn, 'id' | 'widget_id' | 'reference'>>
     ) => Promise<void> | void;
-
     updateTableColumn: (id: number, p: Partial<Omit<Column, 'id'>>) => void;
     deleteColumnTable: (id: number) => void;
     setSelectedWidget: React.Dispatch<React.SetStateAction<Widget | null>>;
     setWidgetsByTable: React.Dispatch<React.SetStateAction<Record<number, Widget[]>>>;
-
-    /** Совместимо и с коротким, и с расширенным payload (поля optional) */
     addWidgetColumn: (payload: {
         widget_id: number;
         alias: string;
@@ -72,12 +64,9 @@ interface Props {
         visible?: boolean;
         type?: string;
     }) => Promise<WidgetColumn>;
-
-    /** ВАЖНО: тут допускаем null (как в SetOfTables) */
     setLiveRefsForHeader: React.Dispatch<
         React.SetStateAction<Record<number, WcReference[]> | null>
     >;
-
     setReferencesMap: React.Dispatch<React.SetStateAction<Record<number, WcReference[]>>>;
     referencesMap: Record<number, WcReference[]>;
     headerGroups: HeaderModelItem[];
@@ -102,17 +91,17 @@ const modalStyle = {
 };
 
 const dark = createTheme({
-    palette: {mode: 'dark', primary: {main: '#ffffff'}},
+    palette: { mode: 'dark', primary: { main: '#ffffff' } },
     components: {
         MuiOutlinedInput: {
             styleOverrides: {
                 root: {
-                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {borderColor: '#ffffff'},
+                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#ffffff' },
                 },
             },
         },
-        MuiInputLabel: {styleOverrides: {root: {'&.Mui-focused': {color: '#ffffff'}}}},
-        MuiSelect: {styleOverrides: {icon: {color: '#ffffff'}}},
+        MuiInputLabel: { styleOverrides: { root: { '&.Mui-focused': { color: '#ffffff' } } } },
+        MuiSelect: { styleOverrides: { icon: { color: '#ffffff' } } },
     },
 });
 
@@ -141,31 +130,71 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                                                           loadWidgetForms,
                                                       }) => {
     const [addOpen, setAddOpen] = useState(false);
+    const [loadingRefs, setLoadingRefs] = useState(false);
 
-    // загрузка reference для всех wc
+    // ─────────────────────────────────────────────────────────────────────────
+    // ИСПРАВЛЕНО: Загрузка references ПОСЛЕДОВАТЕЛЬНО (избегаем race condition при 401)
+    // ─────────────────────────────────────────────────────────────────────────
     useEffect(() => {
         if (!widgetColumns.length) return;
-        (async () => {
+
+        let cancelled = false;
+
+        const loadAllRefs = async () => {
+            setLoadingRefs(true);
+
             const map: Record<number, WcReference[]> = {};
-            await Promise.all(
-                widgetColumns.map(async (wc) => {
-                    try {
-                        map[wc.id] = await fetchReferences(wc.id);
-                    } catch (e) {
-                        console.warn(`reference load error (wc ${wc.id})`, e);
-                        map[wc.id] = [];
+
+            // ПОСЛЕДОВАТЕЛЬНАЯ загрузка — если первый запрос получит 401,
+            // api.ts сделает refresh, и следующие запросы уже пойдут с новым токеном
+            for (const wc of widgetColumns) {
+                if (cancelled) break;
+
+                try {
+                    const refs = await fetchReferences(wc.id);
+                    map[wc.id] = refs;
+                } catch (e: any) {
+                    const status = e?.response?.status;
+                    console.warn(`[WidgetColumnsOfTable] fetchReferences(${wc.id}) failed:`, status, e?.message);
+
+                    // FALLBACK: используем wc.reference если API упал
+                    map[wc.id] = wc.reference ?? [];
+
+                    // Если 401 — возможно токен ещё обновляется, подождём немного
+                    if (status === 401) {
+                        console.log(`[WidgetColumnsOfTable] Got 401, waiting for token refresh...`);
+                        await new Promise(r => setTimeout(r, 500));
                     }
-                })
-            );
+                }
+            }
+
+            if (cancelled) return;
+
+            // Проверяем что все группы имеют данные
+            for (const wc of widgetColumns) {
+                if (!map[wc.id]) {
+                    console.warn(`[WidgetColumnsOfTable] No refs for wc ${wc.id}, using wc.reference`);
+                    map[wc.id] = wc.reference ?? [];
+                }
+            }
+
             setReferencesMap(map);
-        })();
+            setLoadingRefs(false);
+        };
+
+        loadAllRefs();
+
+        return () => {
+            cancelled = true;
+        };
     }, [widgetColumns, fetchReferences, setReferencesMap]);
 
-    // ───────── Метаданные виджета ─────────
+    // ─────────────────────────────────────────────────────────────────────────
+    // Метаданные виджета
+    // ─────────────────────────────────────────────────────────────────────────
     const [modalOpen, setModalOpen] = useState(false);
     const [widgetModalOpen, setWidgetModalOpen] = useState(false);
 
-    // форма метаданных (инициализируем при открытии диалога/смене виджета)
     const [widgetMeta, setWidgetMeta] = useState<Partial<Widget>>({
         name: selectedWidget?.name ?? '',
         description: selectedWidget?.description ?? '',
@@ -183,27 +212,84 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
         });
     }, [selectedWidget, widgetModalOpen]);
 
-    // ───────── Удаление reference ─────────
-    const handleDeleteReference = async (wcId: number, tblColId: number) => {
-        if (!selectedWidget) return;
-        if (!confirm('Удалить связь столбца?')) return;
-        try {
-            await deleteReference(wcId, tblColId);
-            setReferencesMap(prev => ({
-                ...prev,
-                [wcId]: (prev[wcId] ?? []).filter(r => r.table_column?.id !== tblColId),
-            }));
-            await loadColumnsWidget(selectedWidget.id);
-        } catch (e) {
-            console.warn('❌ не удалось удалить reference', e);
-            alert('Ошибка при удалении');
+    // ─────────────────────────────────────────────────────────────────────────
+    // Удаление reference
+    // ─────────────────────────────────────────────────────────────────────────
+    const handleDeleteReference = useCallback(
+        async (wcId: number, tblColId: number) => {
+            if (!selectedWidget) return;
+            if (!confirm('Удалить связь столбца?')) return;
+
+            try {
+                await deleteReference(wcId, tblColId);
+
+                setReferencesMap((prev) => ({
+                    ...prev,
+                    [wcId]: (prev[wcId] ?? []).filter((r) => r.table_column?.id !== tblColId),
+                }));
+
+                await loadColumnsWidget(selectedWidget.id);
+            } catch (e) {
+                console.warn('❌ не удалось удалить reference', e);
+                alert('Ошибка при удалении');
+            }
+        },
+        [selectedWidget, deleteReference, setReferencesMap, loadColumnsWidget]
+    );
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // ИСПРАВЛЕНО: refreshReferences с fallback
+    // ─────────────────────────────────────────────────────────────────────────
+    const refreshReferences = useCallback(
+        async (wcId: number) => {
+            try {
+                const fresh = await fetchReferences(wcId);
+                setReferencesMap((prev) => ({ ...prev, [wcId]: fresh ?? [] }));
+            } catch (e) {
+                console.warn(`[refreshReferences] Failed for wc ${wcId}:`, e);
+                // Не трогаем referencesMap при ошибке — оставляем старые данные
+            }
+
+            // Перезагружаем колонки виджета
+            if (selectedWidget) {
+                try {
+                    await loadColumnsWidget(selectedWidget.id);
+                } catch (e) {
+                    console.warn('[refreshReferences] loadColumnsWidget failed:', e);
+                }
+            }
+        },
+        [fetchReferences, setReferencesMap, selectedWidget, loadColumnsWidget]
+    );
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Мержим referencesMap с wc.reference для гарантии данных
+    // ─────────────────────────────────────────────────────────────────────────
+    const mergedReferencesMap = useMemo(() => {
+        const merged: Record<number, WcReference[]> = {};
+
+        for (const wc of widgetColumns) {
+            // Приоритет: referencesMap > wc.reference
+            const fromMap = referencesMap[wc.id];
+            const fromWc = wc.reference ?? [];
+
+            if (fromMap && fromMap.length > 0) {
+                merged[wc.id] = fromMap;
+            } else if (fromWc.length > 0) {
+                merged[wc.id] = fromWc;
+                console.log(`[mergedReferencesMap] Using wc.reference for wc ${wc.id}`);
+            } else {
+                merged[wc.id] = [];
+            }
         }
-    };
+
+        return merged;
+    }, [widgetColumns, referencesMap]);
 
     return (
         <div>
             {/* Верхние ссылки */}
-            <div style={{display: 'flex', gap: 24}}>
+            <div style={{ display: 'flex', gap: 24 }}>
                 <Typography
                     variant="h6"
                     onClick={() => setModalOpen(true)}
@@ -214,11 +300,11 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                         color: '#8ac7ff',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: 1
+                        gap: 1,
                     }}
                 >
                     Посмотреть таблицу
-                    <EditIcon/>
+                    <EditIcon />
                 </Typography>
 
                 <Typography
@@ -231,11 +317,11 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                         color: '#8ac7ff',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: 1
+                        gap: 1,
                     }}
                 >
                     Метаданные widget
-                    <EditIcon/>
+                    <EditIcon />
                 </Typography>
 
                 <Typography
@@ -248,27 +334,30 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                         color: '#8ac7ff',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: 1
+                        gap: 1,
                     }}
                 >
                     Добавить столбец
-                    <EditIcon/>
+                    <EditIcon />
                 </Typography>
             </div>
 
-            <div style={{margin: '12px 0 20px'}}>
-                <div style={{opacity: 0.8, fontSize: 12, marginBottom: 6}}>Шапка формы (превью)</div>
+            {/* Шапка формы (превью) */}
+            <div style={{ margin: '12px 0 20px' }}>
+                <div style={{ opacity: 0.8, fontSize: 12, marginBottom: 6 }}>
+                    Шапка формы (превью)
+                </div>
                 <table className={s.tbl}>
                     <thead>
                     <tr>
-                        {headerGroups.map(g => (
+                        {headerGroups.map((g) => (
                             <th key={`g-top-${g.id}`} colSpan={g.span}>
                                 {g.title}
                             </th>
                         ))}
                     </tr>
                     <tr>
-                        {headerGroups.map(g =>
+                        {headerGroups.map((g) =>
                             g.labels.map((label, idx) => (
                                 <th key={`g-sub-${g.id}-${idx}`}>{label}</th>
                             ))
@@ -279,29 +368,31 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
             </div>
 
             {/* Основная таблица */}
-            <WidgetColumnsMainTable
-                workspaceId={workspaceId}
-                formsById={formsById}
-                loadWidgetForms={loadWidgetForms}
-                onRefsChange={setLiveRefsForHeader}
-                deleteColumnWidget={deleteColumnWidget}
-                updateReference={updateReference}
-                refreshReferences={async (wcId) => {
-                    const fresh = await fetchReferences(wcId);
-                    setReferencesMap(prev => ({...prev, [wcId]: fresh ?? []}));
-                    if (selectedWidget) await loadColumnsWidget(selectedWidget.id);
-                }}
-                updateWidgetColumn={updateWidgetColumn}
-                widgetColumns={widgetColumns}
-                handleDeleteReference={handleDeleteReference}
-                referencesMap={referencesMap}
-                allColumns={columns}
-            />
+            {loadingRefs ? (
+                <div style={{ padding: 20, textAlign: 'center', opacity: 0.6 }}>
+                    Загрузка связей...
+                </div>
+            ) : (
+                <WidgetColumnsMainTable
+                    workspaceId={workspaceId}
+                    formsById={formsById}
+                    loadWidgetForms={loadWidgetForms}
+                    onRefsChange={setLiveRefsForHeader}
+                    deleteColumnWidget={deleteColumnWidget}
+                    updateReference={updateReference}
+                    refreshReferences={refreshReferences}
+                    updateWidgetColumn={updateWidgetColumn}
+                    widgetColumns={widgetColumns}
+                    handleDeleteReference={handleDeleteReference}
+                    referencesMap={mergedReferencesMap}  // ← Используем merged!
+                    allColumns={columns}
+                />
+            )}
 
             {/* Modal «Посмотреть таблицу» */}
             <Modal open={modalOpen} onClose={() => setModalOpen(false)}>
                 <Box sx={modalStyle}>
-                    <h3 style={{marginBottom: 15}}>Таблица</h3>
+                    <h3 style={{ marginBottom: 15 }}>Таблица</h3>
                     {columns.length ? (
                         <TableColumn
                             columns={columns}
@@ -325,7 +416,7 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                 setWidgetsByTable={setWidgetsByTable}
             />
 
-            {/* Dialog «Добавить столбец» — вынесен */}
+            {/* Dialog «Добавить столбец» */}
             <AddWidgetColumnDialog
                 open={addOpen}
                 onClose={() => setAddOpen(false)}
@@ -334,7 +425,6 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                 addWidgetColumn={addWidgetColumn}
                 loadColumnsWidget={loadColumnsWidget}
             />
-
         </div>
     );
 };

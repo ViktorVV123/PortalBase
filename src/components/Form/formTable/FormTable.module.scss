@@ -1,8 +1,28 @@
 // src/components/Form/formTable/FormTable.module.scss
-// Стили для FormTableContent и связанных компонентов
+// Стили для FormTableContent
 
 // ═══════════════════════════════════════════════════════════
-// FORM LAYOUT FULL WIDTH (с TreeDrawer вместо боковой панели)
+// SCROLLBAR MIXIN
+// ═══════════════════════════════════════════════════════════
+
+@mixin custom-scrollbar($width: 6px, $height: 8px) {
+  &::-webkit-scrollbar {
+    width: $width;
+    height: $height;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 6px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: #3a3a3a;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// FORM LAYOUT FULL WIDTH
 // ═══════════════════════════════════════════════════════════
 
 .formLayoutFullWidth {
@@ -12,22 +32,9 @@
   display: flex;
   flex-direction: column;
 
-  overflow: hidden;
+  overflow: hidden; // НЕ скроллится — скроллы внутри children
   padding: 10px;
-  padding-left: 70px; // Отступ для кнопки открытия TreeDrawer
-
-  &::-webkit-scrollbar {
-    width: 6px;
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.2);
-    border-radius: 6px;
-  }
-
-  &::-webkit-scrollbar-track {
-    background: transparent;
-  }
+  padding-left: 70px; // Отступ для TreeDrawer
 }
 
 @media (max-width: 480px) {
@@ -45,110 +52,80 @@
   flex-direction: column;
   min-height: 0;
   height: 100%;
-  overflow: hidden;
+  overflow: hidden; // НЕ скроллится
   gap: 8px;
 }
 
 // ═══════════════════════════════════════════════════════════
-// TOOLBAR PANE
+// TOOLBAR PANE — фиксированная высота
 // ═══════════════════════════════════════════════════════════
 
 .toolbarPane {
-  flex: 0 0 auto; // Фиксированная высота
+  flex: 0 0 auto;
 }
 
 // ═══════════════════════════════════════════════════════════
-// MAIN PANE - адаптивная высота
+// MAIN PANE — растягивается
 // ═══════════════════════════════════════════════════════════
 
 .mainPane {
-  flex: 1 1 auto; // Растягивается
-  min-height: 150px; // Минимум для таблицы
-  max-height: calc(100% - 50px); // Оставляем место для subPane если он есть
-  overflow: hidden;
+  flex: 1 1 60%;
+  min-height: 150px;
+  overflow: hidden; // Скролл внутри mainTableScroll
   display: flex;
   flex-direction: column;
-
-  // Когда subPane отсутствует - занимаем всё
-  &:only-child,
-  &:last-child {
-    max-height: 100%;
-  }
 }
 
+// Скролл ТОЛЬКО здесь для MainTable
 .mainTableScroll {
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
   overscroll-behavior: contain;
 
-  &::-webkit-scrollbar {
-    width: 6px;
-    height: 8px;
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.3);
-    border-radius: 6px;
-  }
-
-  &::-webkit-scrollbar-track {
-    background: #3a3a3a;
-  }
+  @include custom-scrollbar(6px, 8px);
 }
 
 // ═══════════════════════════════════════════════════════════
-// SUB PANE - адаптивная высота, прибит к низу
+// SUB PANE — независимый контейнер
+// Скролл ВНУТРИ SubWormTable.tableScroll
 // ═══════════════════════════════════════════════════════════
 
 .subPane {
-  flex: 0 1 auto; // Может сжиматься, но не растягивается бесконечно
+  flex: 0 1 40%;
   min-height: 120px;
-  max-height: 40vh; // Максимум 40% viewport
+  max-height: 45vh;
+
+  // ВАЖНО: overflow: hidden — скролл внутри SubWormTable
   overflow: hidden;
   display: flex;
   flex-direction: column;
 
-  // Разделитель сверху
+  // Визуальный разделитель
   border-top: 1px solid rgba(255, 255, 255, 0.15);
   padding-top: 8px;
   margin-top: 4px;
 }
 
 // ═══════════════════════════════════════════════════════════
-// АДАПТИВНОЕ РАСПРЕДЕЛЕНИЕ ВЫСОТЫ
+// АДАПТИВНОСТЬ
 // ═══════════════════════════════════════════════════════════
 
-// Когда есть и main и sub - делим пространство
-.rightPane {
-  // Main занимает ~60%, Sub ~40% (с учётом min/max)
+@media (max-height: 700px) {
   .mainPane {
-    flex: 3 1 0; // flex-grow: 3
+    min-height: 120px;
+    flex: 2 1 0;
   }
 
   .subPane {
-    flex: 2 1 0; // flex-grow: 2
-  }
-}
-
-// На маленьких экранах - больше места для main
-@media (max-height: 700px) {
-  .rightPane {
-    .mainPane {
-      min-height: 120px;
-      flex: 2 1 0;
-    }
-
-    .subPane {
-      min-height: 100px;
-      max-height: 30vh;
-      flex: 1 1 0;
-    }
+    min-height: 100px;
+    max-height: 35vh;
+    flex: 1 1 0;
   }
 }
 
 // ═══════════════════════════════════════════════════════════
-// FILTER INDICATOR (для toolbar)
+// FILTER INDICATOR
 // ═══════════════════════════════════════════════════════════
 
 .filterIndicator {
@@ -200,7 +177,7 @@
 }
 
 // ═══════════════════════════════════════════════════════════
-// FLOAT ACTIONS (для модальных действий)
+// FLOAT ACTIONS
 // ═══════════════════════════════════════════════════════════
 
 .floatActions {

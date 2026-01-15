@@ -4,7 +4,7 @@ import * as s from '@/components/setOfTables/SetOfTables.module.scss';
 import { api } from '@/services/api';
 import { ExtCol, getCanonicalType } from '@/components/Form/formTable/parts/FormatByDatatype';
 import { fromInputValue, toInputValue } from '@/components/Form/formTable/parts/ToInputValue';
-import { MenuItem, Select, TextField, Checkbox } from '@mui/material';
+import { MenuItem, Select, TextField, Checkbox, CircularProgress } from '@mui/material';
 
 /** combobox-мета с бэка (если понадобится) */
 type ComboColumnMeta = { ref_column_order: number; width: number; combobox_alias: string | null };
@@ -85,6 +85,17 @@ export async function loadComboOptionsOnce(
     return opts;
 }
 
+/** Очистка кеша для конкретного combobox (вызывать после CRUD) */
+export function clearComboCache(widgetColumnId?: number, writeTcId?: number) {
+    if (widgetColumnId != null && writeTcId != null) {
+        const key = makeComboKey(widgetColumnId, writeTcId);
+        comboCache.delete(key);
+    } else {
+        // Очищаем весь кеш
+        comboCache.clear();
+    }
+}
+
 /** Собираем красивую подпись из show + show_hidden (как у тебя было) */
 export function buildOptionLabel(opt: ComboOption): string {
     const base = opt.show ?? [];
@@ -102,11 +113,16 @@ export function useComboOptions(
     const [loading, setLoading] = React.useState(false);
     const [options, setOptions] = React.useState<ComboOption[]>([]);
     const [error, setError] = React.useState<string | null>(null);
+    const [ready, setReady] = React.useState(false);
 
     React.useEffect(() => {
-        if (!widgetColumnId || !writeTcId) return;
+        if (!widgetColumnId || !writeTcId) {
+            setReady(true); // Не combobox — сразу ready
+            return;
+        }
 
         let cancelled = false;
+        setReady(false);
 
         const load = async () => {
             setLoading(true);
@@ -120,6 +136,7 @@ export function useComboOptions(
                     const cached = comboCache.get(key);
                     if (cached) {
                         setOptions(cached.options);
+                        setReady(true);
                         return;
                     }
                 } else {
@@ -130,10 +147,12 @@ export function useComboOptions(
                 const opts = await loadComboOptionsOnce(widgetColumnId, writeTcId);
                 if (!cancelled) {
                     setOptions(opts);
+                    setReady(true);
                 }
             } catch (e: any) {
                 if (!cancelled) {
                     setError(String(e?.message ?? 'Ошибка загрузки combobox'));
+                    setReady(true); // Даже при ошибке ставим ready чтобы не висеть
                 }
             } finally {
                 if (!cancelled) {
@@ -149,7 +168,7 @@ export function useComboOptions(
         };
     }, [widgetColumnId, writeTcId, reloadToken]);
 
-    return { loading, options, error };
+    return { loading, options, error, ready };
 }
 
 export type InputCellProps = {
@@ -185,7 +204,7 @@ export const InputCell: React.FC<InputCellProps> = ({
 
     const isComboPrimary = col.type === 'combobox' && col.__is_primary_combo_input;
 
-    const { options } = useComboOptions(
+    const { options, loading, ready } = useComboOptions(
         col.widget_column_id,
         isComboPrimary ? writeTcId : null,
         comboReloadToken,
@@ -193,11 +212,46 @@ export const InputCell: React.FC<InputCellProps> = ({
 
     // ───── combobox primary ─────
     if (isComboPrimary) {
+        // Пока опции не загружены — показываем loading
+        if (loading || !ready) {
+            return (
+                <div
+                    className={s.inpInCell}
+                    style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        minHeight: 32,
+                        gap: 8,
+                        color: 'rgba(255,255,255,0.6)',
+                        fontSize: 12,
+                    }}
+                >
+                    <CircularProgress size={16} color="inherit" />
+                    <span>Загрузка...</span>
+                </div>
+            );
+        }
+
+        // Проверяем: если value есть, но его нет в options —
+        // показываем его как "неизвестное значение" + добавляем в список
+        const currentValue = value ?? '';
+        const hasValueInOptions = !currentValue || options.some(o => o.id === currentValue);
+
+        // Если значение не найдено в опциях — добавляем его как "временный" пункт
+        // чтобы MUI Select не ругался
+        const effectiveOptions = hasValueInOptions
+            ? options
+            : [
+                { id: currentValue, show: [`#${currentValue}`], showHidden: ['Значение не найдено'] },
+                ...options
+            ];
+
         return (
             <Select
                 size="small"
                 fullWidth
-                value={value ?? ''}
+                value={currentValue}
                 displayEmpty
                 onChange={(e) => onChange(String(e.target.value ?? ''))}
                 className={s.inpInCell}
@@ -216,11 +270,17 @@ export const InputCell: React.FC<InputCellProps> = ({
                 <MenuItem value="">
                     <em>—</em>
                 </MenuItem>
-                {options.map((o) => (
+                {effectiveOptions.map((o) => (
                     <MenuItem
                         key={o.id}
                         value={o.id}
                         title={o.showHidden.join(' / ')}
+                        sx={
+                            // Подсвечиваем "неизвестное значение" другим цветом
+                            !hasValueInOptions && o.id === currentValue
+                                ? { color: 'warning.main', fontStyle: 'italic' }
+                                : undefined
+                        }
                     >
                         {buildOptionLabel(o)}
                     </MenuItem>
@@ -266,12 +326,6 @@ export const InputCell: React.FC<InputCellProps> = ({
         inputType === 'time' ||
         inputType === 'datetime-local';
 
-    // числовые типы — сюда тащим переложение запятая → точка
-
-
-
-
-
     let inputValue: string;
     let handleChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
 
@@ -290,7 +344,7 @@ export const InputCell: React.FC<InputCellProps> = ({
             let raw = e.target.value;
 
             // 👇 если это числовая колонка — заменяем запятые на точки
-            if (isNumericLike && raw.includes(',')) {
+            if (isNumericLike(dt) && raw.includes(',')) {
                 raw = raw.replace(/,/g, '.');
             }
 
@@ -322,7 +376,6 @@ export const InputCell: React.FC<InputCellProps> = ({
             maxRows={isMultiline ? 6 : undefined}
             className={`${s.inpInCell} ${isDateLike ? s.dateTimeInput : ''}`}
             sx={{
-                // чтобы textarea не была "в одну строку" визуально
                 '& .MuiInputBase-root': {
                     alignItems: 'stretch',
                 },

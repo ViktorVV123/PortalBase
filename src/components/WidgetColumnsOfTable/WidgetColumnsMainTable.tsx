@@ -1,43 +1,44 @@
-import React, {useCallback, useMemo} from 'react';
-import {WidgetColumn} from '@/shared/hooks/useWorkSpaces';
-import {createTheme, ThemeProvider} from '@mui/material';
+import React, { useCallback, useMemo } from 'react';
+import { WidgetColumn } from '@/shared/hooks/useWorkSpaces';
+import { createTheme, ThemeProvider } from '@mui/material';
 
-import {EditReferenceDialog} from '@/components/modals/modalWidget/EditReferenceDialog';
-import {AliasDialog} from '@/components/modals/modalWidget/AliasDialog';
-import {FormPickerDialog} from '@/components/modals/modalWidget/FormPickerDialog';
-import {AddReferenceDialog} from '@/components/modals/modalWidget/AddReferenceDialog';
+import { EditReferenceDialog } from '@/components/modals/modalWidget/EditReferenceDialog';
+import { AliasDialog } from '@/components/modals/modalWidget/AliasDialog';
+import { FormPickerDialog } from '@/components/modals/modalWidget/FormPickerDialog';
+import { AddReferenceDialog } from '@/components/modals/modalWidget/AddReferenceDialog';
 
-import {logApi, createReference} from './ref-helpers';
-import type {RefPatch, Props} from './types';
+import { logApi, createReference } from './ref-helpers';
+import type { RefPatch, Props } from './types';
 
-import {WidgetGroup} from '@/components/WidgetColumnsOfTable/parts/WidgetGroups';
-import {useAliasDialog} from '@/components/WidgetColumnsOfTable/WidgetColumnTable/hook/useAliasDialog';
-import {useFormPicker} from '@/components/WidgetColumnsOfTable/WidgetColumnTable/hook/useFormPicker';
-import {useLocalRefs} from '@/components/WidgetColumnsOfTable/WidgetColumnTable/hook/useLocalRefs';
-import {useEditReference} from '@/components/WidgetColumnsOfTable/WidgetColumnTable/hook/useEditReference';
-import {useAddReference} from '@/components/WidgetColumnsOfTable/WidgetColumnTable/hook/useAddReference';
-import {ComboboxItemDialog} from '@/components/modals/modalCombobox/ComboboxItemDialog';
-import {useComboboxEditor} from '@/components/WidgetColumnsOfTable/WidgetColumnTable/hook/useComboboxEditor';
-
-// РЕКОМЕНДОВАННЫЙ путь, если модалка лежит в modals:
-
-// Если у тебя файл реально лежит в hook/, оставь твой путь:
-// import { ComboboxAddDialog } from '@/components/WidgetColumnsOfTable/WidgetColumnTable/hook/ComboboxAddDialog';
-
+import { WidgetGroup } from '@/components/WidgetColumnsOfTable/parts/WidgetGroups';
+import { useAliasDialog } from '@/components/WidgetColumnsOfTable/WidgetColumnTable/hook/useAliasDialog';
+import { useFormPicker } from '@/components/WidgetColumnsOfTable/WidgetColumnTable/hook/useFormPicker';
+import { useLocalRefs } from '@/components/WidgetColumnsOfTable/WidgetColumnTable/hook/useLocalRefs';
+import { useEditReference } from '@/components/WidgetColumnsOfTable/WidgetColumnTable/hook/useEditReference';
+import { useAddReference } from '@/components/WidgetColumnsOfTable/WidgetColumnTable/hook/useAddReference';
+import { ComboboxItemDialog } from '@/components/modals/modalCombobox/ComboboxItemDialog';
+import { useComboboxEditor } from '@/components/WidgetColumnsOfTable/WidgetColumnTable/hook/useComboboxEditor';
 import {
     OpenComboResult,
     useComboboxCreate
 } from '@/components/WidgetColumnsOfTable/WidgetColumnTable/hook/useComboboxCreate';
-import {useRefsDnd} from "@/components/WidgetColumnsOfTable/ hooks/useRefsDnd";
-import {ComboboxAddDialog} from "@/components/modals/modalCombobox/ComboboxAddDialog";
 
-/** ——— UI theme (для твоих модалок) ——— */
+import { ComboboxAddDialog } from "@/components/modals/modalCombobox/ComboboxAddDialog";
+import {useRefsDnd} from "@/components/WidgetColumnsOfTable/ hooks/useRefsDnd";
+
+/** ——— UI theme (для модалок) ——— */
 const dark = createTheme({
-    palette: {mode: 'dark', primary: {main: '#ffffff'}},
+    palette: { mode: 'dark', primary: { main: '#ffffff' } },
     components: {
-        MuiOutlinedInput: {styleOverrides: {root: {'&.Mui-focused .MuiOutlinedInput-notchedOutline': {borderColor: '#ffffff'}}}},
-        MuiInputLabel: {styleOverrides: {root: {'&.Mui-focused': {color: '#ffffff'}}}},
-        MuiSelect: {styleOverrides: {icon: {color: '#ffffff'}}},
+        MuiOutlinedInput: {
+            styleOverrides: {
+                root: {
+                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#ffffff' }
+                }
+            }
+        },
+        MuiInputLabel: { styleOverrides: { root: { '&.Mui-focused': { color: '#ffffff' } } } },
+        MuiSelect: { styleOverrides: { icon: { color: '#ffffff' } } },
     },
 });
 
@@ -52,13 +53,14 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
                                                             formsById,
                                                             loadWidgetForms,
                                                             allColumns,
-                                                            deleteColumnWidget, workspaceId,
+                                                            deleteColumnWidget,
+                                                            workspaceId,
                                                         }) => {
     /** ——— API wrappers ——— */
     const callUpdateReference = useCallback(async (wcId: number, tblColId: number, patch: RefPatch) => {
-        logApi('PATCH updateReference:REQ', {wcId, tableColumnId: tblColId, patch});
+        logApi('PATCH updateReference:REQ', { wcId, tableColumnId: tblColId, patch });
         const res = await updateReference(wcId, tblColId, patch);
-        logApi('PATCH updateReference:OK', {wcId, tableColumnId: tblColId});
+        logApi('PATCH updateReference:OK', { wcId, tableColumnId: tblColId });
         return res;
     }, [updateReference]);
 
@@ -66,9 +68,9 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
         id: number,
         patch: Partial<Omit<WidgetColumn, 'id' | 'widget_id' | 'reference'>>
     ) => {
-        logApi('PATCH updateWidgetColumn:REQ', {widget_column_id: id, patch});
+        logApi('PATCH updateWidgetColumn:REQ', { widget_column_id: id, patch });
         const res = await updateWidgetColumn(id, patch);
-        logApi('PATCH updateWidgetColumn:OK', {widget_column_id: id});
+        logApi('PATCH updateWidgetColumn:OK', { widget_column_id: id });
         return res;
     }, [updateWidgetColumn]);
 
@@ -100,9 +102,9 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
         saveAlias,
     } = useAliasDialog(callUpdateWidgetColumn);
 
-    /** ——— DnD (без DELETE: бэк чистит исходную группу сам) ——— */
-    const {onDragStart, onDragEnd, onDragOver, onDropRow, onDropTbodyEnd, queueSyncRef} =
-        useRefsDnd({setLocalRefs, localRefsRef, getIdxById, snapshotRef, callUpdateReference, createReference});
+    /** ——— DnD ——— */
+    const { onDragStart, onDragEnd, onDragOver, onDropRow, onDropTbodyEnd, queueSyncRef } =
+        useRefsDnd({ setLocalRefs, localRefsRef, getIdxById, snapshotRef, callUpdateReference, createReference });
 
     const {
         edit, setEdit,
@@ -126,19 +128,51 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
         refreshReferences,
     });
 
-    /** ——— Перемещение групп ——— */
-    const moveGroup = async (wcId: number, dir: 'up' | 'down') => {
-        const list = orderedWc;
-        const i = list.findIndex((w) => w.id === wcId);
-        if (i < 0) return;
-        const j = dir === 'up' ? i - 1 : i + 1;
-        if (j < 0 || j >= list.length) return;
-        const A = list[i], B = list[j];
-        await Promise.all([
-            callUpdateWidgetColumn(A.id, {column_order: B.column_order ?? 0}),
-            callUpdateWidgetColumn(B.id, {column_order: A.column_order ?? 0}),
-        ]);
-    };
+    // ═══════════════════════════════════════════════════════════════════════════
+    // ИСПРАВЛЕНО: Перемещение групп с переиндексацией
+    // ═══════════════════════════════════════════════════════════════════════════
+    const moveGroup = useCallback(async (wcId: number, dir: 'up' | 'down') => {
+        const list = [...orderedWc]; // копия отсортированного списка
+        const currentIdx = list.findIndex((w) => w.id === wcId);
+
+        if (currentIdx < 0) return;
+
+        const targetIdx = dir === 'up' ? currentIdx - 1 : currentIdx + 1;
+
+        if (targetIdx < 0 || targetIdx >= list.length) return;
+
+        // Меняем местами в массиве
+        const temp = list[currentIdx];
+        list[currentIdx] = list[targetIdx];
+        list[targetIdx] = temp;
+
+        // КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: Переиндексируем ВСЕ группы последовательно (0, 1, 2, 3...)
+        // Это гарантирует что не будет дубликатов column_order
+        const updates: Promise<any>[] = [];
+
+        for (let i = 0; i < list.length; i++) {
+            const wc = list[i];
+            const newOrder = i; // Новый порядок = индекс в массиве
+
+            // Обновляем только если порядок изменился
+            if (wc.column_order !== newOrder) {
+                logApi('moveGroup:reindex', { wcId: wc.id, oldOrder: wc.column_order, newOrder });
+                updates.push(callUpdateWidgetColumn(wc.id, { column_order: newOrder }));
+            }
+        }
+
+        if (updates.length > 0) {
+            try {
+                // Выполняем последовательно чтобы избежать race condition
+                for (const update of updates) {
+                    await update;
+                }
+                logApi('moveGroup:complete', { movedWcId: wcId, direction: dir });
+            } catch (e) {
+                console.error('[moveGroup] Error updating column_order:', e);
+            }
+        }
+    }, [orderedWc, callUpdateWidgetColumn]);
 
     const {
         formOptions,
@@ -149,7 +183,7 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
         closeFormDialog,
         saveFormDialog,
     } = useFormPicker({
-        workspaceId,             // 👈 сюда прокинули ws
+        workspaceId,
         formsById,
         loadWidgetForms,
         callUpdateReference: (wcId, tblColId, patch) =>
@@ -157,20 +191,14 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
         setLocalRefs,
     });
 
-
-    const {dlg, open: openComboEditor, close: closeComboEditor, onChange: changeComboEditor, save: saveComboEditor} =
+    const { dlg, open: openComboEditor, close: closeComboEditor, onChange: changeComboEditor, save: saveComboEditor } =
         useComboboxEditor({
             localRefsRef,
             setLocalRefs,
-            // после любых изменений в combobox — свежие references для группы
             refreshReferences: async (wcId) => {
                 await refreshReferences(wcId);
             },
         });
-
-
-// Обёртка, чтобы подсказать причину (можешь заменить на snackbar)
-
 
     const {
         dlg: dlgCreate,
@@ -182,10 +210,8 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
         localRefsRef,
         setLocalRefs,
         refreshReferences: async (wcId) => { await refreshReferences(wcId); },
-        formsById, // ← ОБЯЗАТЕЛЬНО!
+        formsById,
     });
-
-// guard с корректным сужением типа
 
     const onOpenComboCreateGuarded = async (wcId: number, tblColId: number, preset?: any) => {
         const res: OpenComboResult = await openComboCreate(wcId, tblColId, preset);
@@ -194,20 +220,19 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
             if (res.reason === 'NO_FORM' || res.reason === 'NO_TYPE') {
                 alert(
                     'Для этой строки не выбрана форма или тип поля. ' +
-                     'Сначала выбери форму и укажи тип "combobox" — тогда станет доступно создание combobox.'
+                    'Сначала выбери форму и укажи тип "combobox" — тогда станет доступно создание combobox.'
                 );
             } else if (res.reason === 'NO_TABLE') {
                 alert('У выбранной формы не определена таблица. Свяжи форму с таблицей и повтори.');
             }
-            return; // модалку не открываем
+            return;
         }
-        // ok:true — модалка уже открыта хуком (setDlg({ open:true, ... }))
     };
 
     /** ——— Render ——— */
     return (
-        <div style={{padding: 5}}>
-            <h3 style={{margin: '24px 0 8px',textAlign:'center'}}>Настройка формы</h3>
+        <div style={{ padding: 5 }}>
+            <h3 style={{ margin: '24px 0 8px', textAlign: 'center' }}>Настройка формы</h3>
 
             {orderedWc.map((wc, idx) => {
                 const refs = localRefs[wc.id] ?? [];
@@ -215,28 +240,28 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
 
                 return (
                     <WidgetGroup
-                                 key={wc.id}
-                                 wcId={wc.id}
-                                 onOpenComboCreate={(wcId, tblColId, preset) => onOpenComboCreateGuarded(wcId, tblColId, preset)}
-                                 title={displayAlias ?? `Колонка #${wc.id}`}
-                                 order={wc.column_order ?? 0}
-                                 refs={refs}
-                                 isFirst={idx === 0}
-                                 isLast={idx === orderedWc.length - 1}
-                                 moveGroup={moveGroup}
-                                 onOpenAlias={() => openAliasDialog(wc)}
-                                 onDeleteGroup={() => deleteColumnWidget(wc.id)}
-                                 onAddField={() => openAddDialog(wc.id)}
-                                 formNameById={formNameById}
-                                 rowProps={{
-                                     setLocalRefs, localRefsRef, callUpdateReference,
-                                     onOpenEdit: openEditById,
-                                     onDelete: handleDeleteReference,
-                                     onOpenForm: openFormDialog,
-                                     onOpenComboItem: (wcId, tblColId, item) => openComboEditor(wcId, tblColId, item),
-                                     onOpenComboCreate: onOpenComboCreateGuarded,
-                                     getIdxById, onDragStart, onDragEnd, onDragOver, onDropRow, onDropTbodyEnd,
-                                 }}
+                        key={wc.id}
+                        wcId={wc.id}
+                        onOpenComboCreate={(wcId, tblColId, preset) => onOpenComboCreateGuarded(wcId, tblColId, preset)}
+                        title={displayAlias ?? `Колонка #${wc.id}`}
+                        order={wc.column_order ?? 0}
+                        refs={refs}
+                        isFirst={idx === 0}
+                        isLast={idx === orderedWc.length - 1}
+                        moveGroup={moveGroup}
+                        onOpenAlias={() => openAliasDialog(wc)}
+                        onDeleteGroup={() => deleteColumnWidget(wc.id)}
+                        onAddField={() => openAddDialog(wc.id)}
+                        formNameById={formNameById}
+                        rowProps={{
+                            setLocalRefs, localRefsRef, callUpdateReference,
+                            onOpenEdit: openEditById,
+                            onDelete: handleDeleteReference,
+                            onOpenForm: openFormDialog,
+                            onOpenComboItem: (wcId, tblColId, item) => openComboEditor(wcId, tblColId, item),
+                            onOpenComboCreate: onOpenComboCreateGuarded,
+                            getIdxById, onDragStart, onDragEnd, onDragOver, onDropRow, onDropTbodyEnd,
+                        }}
                     />
                 );
             })}
@@ -253,7 +278,7 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
 
                 <EditReferenceDialog
                     value={edit}
-                    onChange={(patch) => setEdit(prev => ({...prev, ...patch}))}
+                    onChange={(patch) => setEdit(prev => ({ ...prev, ...patch }))}
                     onClose={closeEdit}
                     onSave={saveEdit}
                 />
@@ -261,7 +286,7 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
                 <AliasDialog
                     open={aliasDlg.open}
                     value={aliasDlg.value}
-                    onChange={(v) => setAliasDlg(p => ({...p, value: v}))}
+                    onChange={(v) => setAliasDlg(p => ({ ...p, value: v }))}
                     onClose={closeAliasDialog}
                     onSave={saveAlias}
                 />
@@ -273,8 +298,8 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
                     onOpen={() => {
                         if (!formOptions.length) loadWidgetForms?.();
                     }}
-                    onChange={(v) => setFormDlg(p => ({...p, value: v}))}
-                    onClear={() => setFormDlg(p => ({...p, value: null}))}
+                    onChange={(v) => setFormDlg(p => ({ ...p, value: v }))}
+                    onClear={() => setFormDlg(p => ({ ...p, value: null }))}
                     onClose={closeFormDialog}
                     onSave={saveFormDialog}
                 />
@@ -287,7 +312,7 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
                     onOpenForms={() => {
                         if (!formOptions.length) loadWidgetForms?.();
                     }}
-                    onChange={(patch) => setAddDlg(prev => ({...prev, ...patch}))}
+                    onChange={(patch) => setAddDlg(prev => ({ ...prev, ...patch }))}
                     onClose={closeAddDialog}
                     onSave={saveAddDialog}
                 />

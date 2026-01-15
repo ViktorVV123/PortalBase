@@ -7,7 +7,7 @@
 // VARIABLES
 // ═══════════════════════════════════════════════════════════
 
-$border-color: rgba(255, 255, 255, 0.74); // Светлее (было 0.15)
+$border-color: rgba(255, 255, 255, 0.74);
 $header-bg: var(--header-color, #3a3a3a);
 $hover-bg: var(--hover-color, rgba(255, 255, 255, 0.08));
 $link-color: var(--link, #66b0ff);
@@ -19,21 +19,27 @@ $text-muted: #888;
 }
 
 // ═══════════════════════════════════════════════════════════
-// TABLE WRAPPER
+// TABLE WRAPPER — контейнер без своего скролла
 // ═══════════════════════════════════════════════════════════
 
 .tableWrapper {
   width: 100%;
-  padding-bottom: 16px;
+  min-width: 0;
 }
 
 // ═══════════════════════════════════════════════════════════
-// TABLE BASE
+// TABLE BASE — КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ
 // ═══════════════════════════════════════════════════════════
 
 .tbl {
-  width: 100%; // Занимает всю ширину контейнера
-  table-layout: fixed; // Фиксированные ширины через colgroup
+  // Ширина по контенту, но не меньше контейнера
+  width: max-content;
+  min-width: 100%;
+
+  // table-layout: auto позволяет колонкам расширяться под контент
+  // colgroup задаёт минимальные ширины
+  table-layout: auto;
+
   border-collapse: separate;
   border-spacing: 0;
   @include fluid-type(13, 15);
@@ -49,7 +55,8 @@ $text-muted: #888;
   padding: 6px 8px;
   text-align: center;
   vertical-align: middle;
-  // Разрешаем переносы в ячейках
+
+  // Показываем весь текст с переносами
   white-space: normal;
   word-wrap: break-word;
   overflow-wrap: break-word;
@@ -66,7 +73,7 @@ $text-muted: #888;
   font-size: 13px;
   line-height: 1.2;
   z-index: 2;
-  // Компактный заголовок с переносом
+
   white-space: normal;
   word-break: break-word;
   hyphens: auto;
@@ -79,6 +86,8 @@ $text-muted: #888;
   top: 0;
   z-index: 4;
   min-height: 36px;
+  white-space: normal;
+  line-height: 1.3;
 }
 
 // Вторая строка шапки (подписи) — липкая под первой
@@ -88,6 +97,13 @@ $text-muted: #888;
   z-index: 3;
   font-weight: 500;
   font-size: 12px;
+  white-space: normal;
+
+  .ellipsis {
+    white-space: normal;
+    word-break: break-word;
+    text-overflow: clip;
+  }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -118,7 +134,7 @@ $text-muted: #888;
 // TEXT HELPERS
 // ═══════════════════════════════════════════════════════════
 
-// Однострочный текст с троеточием (для коротких значений)
+// Однострочный текст с троеточием
 .ellipsis {
   display: block;
   max-width: 100%;
@@ -127,36 +143,17 @@ $text-muted: #888;
   white-space: nowrap;
 }
 
-// Многострочный текст с переносом (для длинного контента)
+// Многострочный текст с переносом (основной для данных)
 .wrap {
   display: block;
   white-space: normal;
-  overflow: visible;
-  text-overflow: clip;
   overflow-wrap: anywhere;
   word-break: break-word;
-  line-height: 1.5;
-  text-align: center; // По центру
+  line-height: 1.4;
+  text-align: center;
 }
 
-// Во второй строке шапки — разрешаем перенос
-.tbl thead tr:nth-child(2) th {
-  white-space: normal;
-
-  .ellipsis {
-    white-space: normal;
-    word-break: break-word;
-    text-overflow: clip;
-  }
-}
-
-// В первой строке шапки — тоже можно переносить если длинный заголовок
-.tbl thead tr:nth-child(1) th {
-  white-space: normal;
-  line-height: 1.3;
-}
-
-// Ограничение по строкам (clamp) - если нужно ограничить высоту
+// Ограничение по строкам (clamp)
 .clamp {
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -295,6 +292,10 @@ $text-muted: #888;
   color: $link-color;
   font: inherit;
 
+  // Текст внутри кнопки тоже ограничиваем
+  max-width: 100%;
+  display: block;
+
   &:hover {
     text-decoration: none;
   }
@@ -426,7 +427,7 @@ $text-muted: #888;
 }
 
 .okBtn {
-  color: #4ade80; // Зелёный
+  color: #4ade80;
 
   &:hover {
     color: #22c55e;
@@ -434,7 +435,7 @@ $text-muted: #888;
 }
 
 .cancelBtn {
-  color: #f87171; // Красный
+  color: #f87171;
 
   &:hover {
     color: #ef4444;
@@ -461,7 +462,7 @@ $text-muted: #888;
 }
 
 // ═══════════════════════════════════════════════════════════
-// CHECKBOX STYLES (MUI overrides)
+// CHECKBOX STYLES
 // ═══════════════════════════════════════════════════════════
 
 .checkboxCell {

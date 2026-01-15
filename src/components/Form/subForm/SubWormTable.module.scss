@@ -1,27 +1,58 @@
 // src/components/Form/subForm/SubWormTable.module.scss
+// Стили для SubWormTable — унифицированы с MainTable
+
 @use '@/assets/styles/fluid-type' as *;
 
-$border: #e5e5e5;
-$error: #d33;
+// ═══════════════════════════════════════════════════════════
+// VARIABLES
+// ═══════════════════════════════════════════════════════════
+
+$border-color: rgba(255, 255, 255, 0.74);
+$header-bg: var(--header-color, #3a3a3a);
+$hover-bg: var(--hover-color, rgba(255, 255, 255, 0.08));
+$link-color: var(--link, #66b0ff);
+$text-color: #ddd;
+$text-muted: #888;
+$error-color: #d33;
 
 :root {
-  --head-row-1: 40px;
+  --sub-head-row-1: 40px;
 }
 
 // ═══════════════════════════════════════════════════════════
-// ROOT - занимает всё пространство subPane
+// SCROLLBAR MIXIN
+// ═══════════════════════════════════════════════════════════
+
+@mixin custom-scrollbar($width: 6px, $height: 8px) {
+  &::-webkit-scrollbar {
+    width: $width;
+    height: $height;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 6px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: #3a3a3a;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// ROOT — занимает всё пространство subPane, БЕЗ своего скролла
 // ═══════════════════════════════════════════════════════════
 
 .root {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  height: 100%; // Занимаем всю высоту subPane
-  overflow: hidden;
+  height: 100%;
+  overflow: hidden; // Скролл только внутри tableScroll
 }
 
 // ═══════════════════════════════════════════════════════════
-// TABS - фиксированная высота сверху
+// TABS — фиксированная высота сверху
 // ═══════════════════════════════════════════════════════════
 
 .tabs {
@@ -63,96 +94,116 @@ $error: #d33;
 }
 
 // ═══════════════════════════════════════════════════════════
-// TABLE SCROLL - адаптивная высота
+// TABLE SCROLL — ЕДИНСТВЕННЫЙ скролл для SubWormTable
 // ═══════════════════════════════════════════════════════════
 
 .tableScroll {
-  flex: 1 1 auto; // Занимает оставшееся место
+  flex: 1 1 auto;
   min-height: 0;
-  overflow: auto;
+  overflow: auto; // ← Скролл ТОЛЬКО здесь
   overscroll-behavior: contain;
 
-  &::-webkit-scrollbar {
-    height: 8px;
-    width: 6px;
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.3);
-    border-radius: 6px;
-  }
-
-  &::-webkit-scrollbar-track {
-    background: #3a3a3a;
-  }
+  @include custom-scrollbar(6px, 8px);
 }
 
 // ═══════════════════════════════════════════════════════════
-// TABLE
+// TABLE BASE
 // ═══════════════════════════════════════════════════════════
 
 .tbl {
+  // Ширина по контенту, но не меньше контейнера
   width: max-content;
   min-width: 100%;
-  table-layout: fixed;
+
+  table-layout: auto;
   border-collapse: separate;
   border-spacing: 0;
-  text-align: center;
-  @include fluid-type(13, 16);
+  @include fluid-type(13, 15);
 }
+
+// ═══════════════════════════════════════════════════════════
+// CELLS BASE
+// ═══════════════════════════════════════════════════════════
 
 .tbl th,
 .tbl td {
-  font-size: 14px;
-  border: 1px solid $border;
-  padding: 4px 6px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 320px;
+  border: 1px solid $border-color;
+  padding: 6px 8px;
+  text-align: center;
+  vertical-align: middle;
+
+  // Показываем весь текст с переносами
+  white-space: normal;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
+
+// ═══════════════════════════════════════════════════════════
+// HEADER (THEAD)
+// ═══════════════════════════════════════════════════════════
 
 .tbl thead th {
-  background: var(--header-color);
+  background: $header-bg;
   color: #eee;
   font-weight: 600;
-  @include fluid-type(14, 16);
+  font-size: 13px;
+  line-height: 1.2;
   z-index: 2;
+
+  white-space: normal;
+  word-break: break-word;
+  hyphens: auto;
+  padding: 6px 4px;
 }
 
-// Липкая шапка
+// Первая строка шапки — липкая
 .tbl thead tr:nth-child(1) th {
   position: sticky;
   top: 0;
-  z-index: 3;
-  height: var(--head-row-1);
+  z-index: 4;
+  min-height: 36px;
+  white-space: normal;
+  line-height: 1.3;
 }
 
+// Вторая строка шапки — липкая под первой
 .tbl thead tr:nth-child(2) th {
   position: sticky;
-  top: var(--head-row-1);
+  top: var(--sub-head-row-1);
   z-index: 3;
+  font-weight: 500;
+  font-size: 12px;
+  white-space: normal;
+
+  .ellipsis {
+    white-space: normal;
+    word-break: break-word;
+    text-overflow: clip;
+  }
 }
 
-.tbl td {
-  color: #ddd;
-  background: transparent;
-}
-
-.tbl tbody tr:hover {
-  background: var(--hover-color);
-}
+// ═══════════════════════════════════════════════════════════
+// BODY (TBODY)
+// ═══════════════════════════════════════════════════════════
 
 .tbl tbody td {
+  color: $text-color;
+  background: transparent;
   cursor: pointer;
+  transition: background 0.1s ease;
 }
 
-.selectedRow {
-  background: var(--hover-color);
+.tbl tbody tr:hover td {
+  background: $hover-bg;
+}
 
-  td {
-    font-weight: 600;
-  }
+// ═══════════════════════════════════════════════════════════
+// SELECTED ROW
+// ═══════════════════════════════════════════════════════════
+
+.selectedRow td {
+  background: $hover-bg;
+  font-weight: 600;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -167,47 +218,254 @@ $error: #d33;
   white-space: nowrap;
 }
 
-.tbl thead tr:nth-child(2) .ellipsis {
+.wrap {
+  display: block;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.clamp {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: var(--lines, 3);
+  overflow: hidden;
   white-space: normal;
   word-break: break-word;
-  text-overflow: clip;
+  line-height: 1.4;
 }
 
 // ═══════════════════════════════════════════════════════════
-// ACTIONS
+// EDIT CELL
 // ═══════════════════════════════════════════════════════════
 
-.actionsHeadCell {
-  text-align: center;
-  vertical-align: middle;
-  width: 1%;
+.editCell {
+  padding: 2px 4px !important;
+  background: rgba(255, 255, 255, 0.03);
 }
 
-.toggleBtn {
-  background: none;
-  border: 0;
-  cursor: pointer;
-  padding: 0;
-}
-
-.toggleIcon {
-  color: #fff;
-}
-
-.actionsCell {
+.cellEditor {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 4px;
+  width: 100%;
+  min-width: 0;
+}
+
+// ═══════════════════════════════════════════════════════════
+// INPUT IN CELL
+// ═══════════════════════════════════════════════════════════
+
+.inpInCell {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+
+  :global(.MuiInputBase-root) {
+    width: 100%;
+    min-width: 0;
+  }
+
+  :global(.MuiInputBase-input) {
+    padding: 4px 6px;
+    font-size: 13px;
+    text-align: center;
+  }
+
+  :global(.MuiSelect-select) {
+    padding: 4px 6px;
+    text-align: center;
+  }
+}
+
+.inp,
+.inpN {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 4px 6px;
+  font: inherit;
+  font-size: 13px;
+  color: inherit;
+  background: #1e1e1e;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  text-align: center;
+
+  &:focus {
+    outline: none;
+    border-color: rgba(100, 150, 255, 0.5);
+  }
+}
+
+.inpN {
+  text-align: right;
+}
+
+// ═══════════════════════════════════════════════════════════
+// COMBOBOX EDIT
+// ═══════════════════════════════════════════════════════════
+
+.comboEditWrapper {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+}
+
+.comboSelect {
+  flex: 1;
+  min-width: 0;
+}
+
+.comboEditInner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.comboText {
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.comboClearBtn {
+  border: none;
+  background: none;
+  cursor: pointer;
+  opacity: 0.7;
+  font-size: 16px;
+  color: #fff;
   padding: 0;
-  height: 36px;
-  min-width: 64px;
+  flex-shrink: 0;
+
+  &:hover {
+    opacity: 1;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// LINK BUTTON
+// ═══════════════════════════════════════════════════════════
+
+.linkButton {
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-decoration: underline;
+  color: $link-color;
+  font: inherit;
+  max-width: 100%;
+  display: block;
+
+  &:hover {
+    text-decoration: none;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// READ-ONLY CELLS
+// ═══════════════════════════════════════════════════════════
+
+.cellReadonly {
+  cursor: default;
+}
+
+.readonlyValue {
+  user-select: text;
+  pointer-events: none;
+  opacity: 0.85;
+}
+
+// ═══════════════════════════════════════════════════════════
+// DATE/TIME INPUT
+// ═══════════════════════════════════════════════════════════
+
+.dateTimeInput {
+  input {
+    color: #fff;
+
+    &::-webkit-calendar-picker-indicator {
+      filter: invert(1);
+      opacity: 1;
+    }
+
+    &::-webkit-inner-spin-button {
+      filter: invert(1);
+    }
+
+    &::-webkit-clear-button {
+      filter: invert(1);
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// ACTIONS COLUMN
+// ═══════════════════════════════════════════════════════════
+
+.actionsHeadCell {
+  padding: 0 4px !important;
+  text-align: center;
+  white-space: nowrap;
+  width: 80px;
+  min-width: 56px;
+  max-width: 100px;
+}
+
+.actionsCell {
+  padding: 0 4px !important;
+  text-align: center;
+  white-space: nowrap;
+  width: 80px;
+  min-width: 56px;
+  max-width: 100px;
+}
+
+.actionsRow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.actionsBtn {
+  background: none;
+  border: 0;
+  padding: 0;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #ccc;
+  transition: color 0.15s;
+
+  &:hover {
+    color: #fff;
+  }
+}
+
+.actionsBtnDisabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+  pointer-events: none;
 }
 
 .actionIcon {
   width: 1.1em;
   height: 1.1em;
-  color: #d1d0d0;
+  color: inherit;
 }
 
 .lockSlot {
@@ -218,81 +476,109 @@ $error: #d33;
   pointer-events: none;
 }
 
-.okBtn,
-.cancelBtn {
-  background: none;
-  border: 0;
-  width: 18px;
-  height: 18px;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 16px;
-  line-height: 1;
-  color: #ccc;
-  fill: #ccc;
-  cursor: pointer;
-  transition: color 0.15s, fill 0.15s;
-
-  &:hover {
-    color: #fff;
-    fill: #fff;
-  }
-}
+// ═══════════════════════════════════════════════════════════
+// ICON BUTTON
+// ═══════════════════════════════════════════════════════════
 
 .iconBtn {
   background: none;
   border: 0;
   padding: 0;
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: #eeeeee;
+  color: #ccc;
+  transition: color 0.15s;
 
   &:hover {
     color: #fff;
   }
-}
 
-.actionIcon:hover {
-  color: #fff;
-  fill: #fff;
-}
-
-// ═══════════════════════════════════════════════════════════
-// INPUTS
-// ═══════════════════════════════════════════════════════════
-
-.inp,
-.inpN {
-  width: 100%;
-  box-sizing: border-box;
-  padding: 2px 4px;
-  font: inherit;
-  color: inherit;
-  background: #1e1e1e;
-  border-radius: 3px;
-}
-
-.inpN {
-  text-align: right;
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
 }
 
 // ═══════════════════════════════════════════════════════════
-// LINK BUTTON (для drill)
+// OK / CANCEL BUTTONS
 // ═══════════════════════════════════════════════════════════
 
-.linkButton {
-  padding: 0;
-  border: none;
+.okBtn,
+.cancelBtn {
   background: none;
+  border: 0;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  line-height: 1;
+  color: #ccc;
   cursor: pointer;
-  text-decoration: underline;
-  color: var(--link, #66b0ff);
+  transition: color 0.15s;
+
+  &:hover {
+    color: #fff;
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.okBtn {
+  color: #4ade80;
+
+  &:hover {
+    color: #22c55e;
+  }
+}
+
+.cancelBtn {
+  color: #f87171;
+
+  &:hover {
+    color: #ef4444;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// TOGGLE SUBHEADERS BUTTON
+// ═══════════════════════════════════════════════════════════
+
+.toggleBtn {
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  &:hover {
+    opacity: 0.8;
+  }
+}
+
+.toggleIcon {
+  color: #fff;
+}
+
+// ═══════════════════════════════════════════════════════════
+// CHECKBOX STYLES
+// ═══════════════════════════════════════════════════════════
+
+.checkboxCell {
+  padding: 2px !important;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -300,6 +586,6 @@ $error: #d33;
 // ═══════════════════════════════════════════════════════════
 
 .error {
-  color: $error;
+  color: $error-color;
   padding: 16px 0;
 }
