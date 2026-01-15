@@ -21,6 +21,21 @@ import { extractRowStyles, getCellStyle } from '@/shared/utils/rowStyles';
 import { CellStyleButton } from './CellStyleButton';
 import type { CellStyles } from './CellStylePopover';
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// DEBUG: Включить/выключить логирование
+// ═══════════════════════════════════════════════════════════════════════════════
+const DEBUG = true;
+
+function logRow(action: string, data: Record<string, any>) {
+    if (!DEBUG) return;
+    console.log(
+        `%c[MainTableRow] %c${action}`,
+        'color: #FF9800; font-weight: bold',
+        'color: #2196F3',
+        data
+    );
+}
+
 type RowView = { row: FormDisplay['data'][number]; idx: number };
 
 type RlsMeta = { col: ExtCol; idx: number } | null;
@@ -127,14 +142,179 @@ export const MainTableRow: React.FC<MainTableRowProps> = (p) => {
         return merged;
     }, [rowStylesFromData, p.editStylesDraft, isEditing]);
 
+    // ═══════════════════════════════════════════════════════════════════════════
+    // DEBUG: Логируем при рендере
+    // ═══════════════════════════════════════════════════════════════════════════
+    if (DEBUG && rowIdx === 0) {
+        // Логируем только для первой строки чтобы не спамить
+        console.log(
+            `%c[MainTableRow] %cRENDER row[0]`,
+            'color: #FF9800; font-weight: bold',
+            'color: #9E9E9E',
+            {
+                rowIdx,
+                isEditing,
+                isRowLocked,
+                editingRowIdx: p.editingRowIdx,
+                deletingRowIdx: p.deletingRowIdx,
+                // Проверяем что функции переданы
+                hasOnStartEdit: typeof p.onStartEdit === 'function',
+                hasOnDeleteRow: typeof p.onDeleteRow === 'function',
+                hasOnSubmitEdit: typeof p.onSubmitEdit === 'function',
+                hasOnCancelEdit: typeof p.onCancelEdit === 'function',
+                hasOnRowClick: typeof p.onRowClick === 'function',
+            }
+        );
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Обёртки с логированием
+    // ═══════════════════════════════════════════════════════════════════════════
+    const handleEditClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
+
+        logRow('CLICK: Edit button', {
+            rowIdx,
+            isRowLocked,
+            isEditing,
+            editingRowIdx: p.editingRowIdx,
+            isFunction: typeof p.onStartEdit === 'function',
+        });
+
+        if (isRowLocked) {
+            logRow('BLOCKED: Edit - row is locked (RLS)', { rowIdx });
+            return;
+        }
+
+        if (typeof p.onStartEdit !== 'function') {
+            console.error('[MainTableRow] onStartEdit is not a function!', p.onStartEdit);
+            return;
+        }
+
+        logRow('CALLING: onStartEdit()', { rowIdx });
+        try {
+            p.onStartEdit(rowIdx);
+            logRow('SUCCESS: onStartEdit() called', { rowIdx });
+        } catch (err) {
+            console.error('[MainTableRow] onStartEdit() threw error:', err);
+        }
+    };
+
+    const handleDeleteClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
+
+        logRow('CLICK: Delete button', {
+            rowIdx,
+            isRowLocked,
+            deletingRowIdx: p.deletingRowIdx,
+            isFunction: typeof p.onDeleteRow === 'function',
+        });
+
+        if (isRowLocked) {
+            logRow('BLOCKED: Delete - row is locked (RLS)', { rowIdx });
+            return;
+        }
+
+        if (p.deletingRowIdx != null) {
+            logRow('BLOCKED: Delete - another delete in progress', { deletingRowIdx: p.deletingRowIdx });
+            return;
+        }
+
+        if (typeof p.onDeleteRow !== 'function') {
+            console.error('[MainTableRow] onDeleteRow is not a function!', p.onDeleteRow);
+            return;
+        }
+
+        logRow('CALLING: onDeleteRow()', { rowIdx });
+        try {
+            p.onDeleteRow(rowIdx);
+            logRow('SUCCESS: onDeleteRow() called', { rowIdx });
+        } catch (err) {
+            console.error('[MainTableRow] onDeleteRow() threw error:', err);
+        }
+    };
+
+    const handleSubmitEdit = (e: React.MouseEvent) => {
+        e.stopPropagation();
+
+        logRow('CLICK: Submit edit (✓)', {
+            rowIdx,
+            editSaving: p.editSaving,
+            isFunction: typeof p.onSubmitEdit === 'function',
+        });
+
+        if (p.editSaving) {
+            logRow('BLOCKED: Submit - saving in progress', {});
+            return;
+        }
+
+        if (typeof p.onSubmitEdit !== 'function') {
+            console.error('[MainTableRow] onSubmitEdit is not a function!', p.onSubmitEdit);
+            return;
+        }
+
+        logRow('CALLING: onSubmitEdit()', {});
+        try {
+            p.onSubmitEdit();
+            logRow('SUCCESS: onSubmitEdit() called', {});
+        } catch (err) {
+            console.error('[MainTableRow] onSubmitEdit() threw error:', err);
+        }
+    };
+
+    const handleCancelEdit = (e: React.MouseEvent) => {
+        e.stopPropagation();
+
+        logRow('CLICK: Cancel edit (×)', {
+            rowIdx,
+            editSaving: p.editSaving,
+            isFunction: typeof p.onCancelEdit === 'function',
+        });
+
+        if (p.editSaving) {
+            logRow('BLOCKED: Cancel - saving in progress', {});
+            return;
+        }
+
+        if (typeof p.onCancelEdit !== 'function') {
+            console.error('[MainTableRow] onCancelEdit is not a function!', p.onCancelEdit);
+            return;
+        }
+
+        logRow('CALLING: onCancelEdit()', {});
+        try {
+            p.onCancelEdit();
+            logRow('SUCCESS: onCancelEdit() called', {});
+        } catch (err) {
+            console.error('[MainTableRow] onCancelEdit() threw error:', err);
+        }
+    };
+
+    const handleRowClick = () => {
+        logRow('CLICK: Row', {
+            rowIdx,
+            isEditing,
+            willProcess: !isEditing,
+        });
+
+        if (isEditing) {
+            logRow('BLOCKED: Row click - currently editing', { rowIdx });
+            return;
+        }
+
+        if (typeof p.onRowClick !== 'function') {
+            console.error('[MainTableRow] onRowClick is not a function!', p.onRowClick);
+            return;
+        }
+
+        p.onRowClick({ row, idx: rowIdx });
+    };
+
     return (
         <tr
             className={p.selectedKey === rowKey ? s.selectedRow : undefined}
             aria-selected={p.selectedKey === rowKey || undefined}
-            onClick={() => {
-                if (isEditing) return;
-                p.onRowClick({ row, idx: rowIdx });
-            }}
+            onClick={handleRowClick}
         >
             {(() => {
                 const cells: React.ReactNode[] = [];
@@ -332,10 +512,7 @@ export const MainTableRow: React.FC<MainTableRowProps> = (p) => {
                                 {hasEditable && (
                                     <button
                                         className={s.okBtn}
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            p.onSubmitEdit();
-                                        }}
+                                        onClick={handleSubmitEdit}
                                         disabled={p.editSaving}
                                         title="Сохранить"
                                     >
@@ -344,10 +521,7 @@ export const MainTableRow: React.FC<MainTableRowProps> = (p) => {
                                 )}
                                 <button
                                     className={s.cancelBtn}
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        p.onCancelEdit();
-                                    }}
+                                    onClick={handleCancelEdit}
                                     disabled={p.editSaving}
                                     title="Отменить"
                                 >
@@ -361,11 +535,7 @@ export const MainTableRow: React.FC<MainTableRowProps> = (p) => {
                         <button
                             type="button"
                             className={`${s.actionsBtn} ${isRowLocked ? s.actionsBtnDisabled : ''}`}
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                if (isRowLocked) return;
-                                p.onStartEdit(rowIdx);
-                            }}
+                            onClick={handleEditClick}
                             title={isRowLocked ? 'Редактирование запрещено (RLS)' : 'Редактировать'}
                         >
                             <EditIcon className={s.actionIcon} />
@@ -376,11 +546,7 @@ export const MainTableRow: React.FC<MainTableRowProps> = (p) => {
                             className={`${s.actionsBtn} ${
                                 isRowLocked || p.deletingRowIdx === rowIdx ? s.actionsBtnDisabled : ''
                             }`}
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                if (isRowLocked) return;
-                                if (p.deletingRowIdx == null) p.onDeleteRow(rowIdx);
-                            }}
+                            onClick={handleDeleteClick}
                             title={isRowLocked ? 'Удаление запрещено (RLS)' : 'Удалить'}
                         >
                             <DeleteIcon className={s.actionIcon} />

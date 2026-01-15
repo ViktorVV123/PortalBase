@@ -6,6 +6,21 @@ import { ExtCol, getCanonicalType } from '@/components/Form/formTable/parts/Form
 import { fromInputValue, toInputValue } from '@/components/Form/formTable/parts/ToInputValue';
 import { MenuItem, Select, TextField, Checkbox, CircularProgress } from '@mui/material';
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// DEBUG
+// ═══════════════════════════════════════════════════════════════════════════════
+const DEBUG_COMBO = true;
+
+function logCombo(action: string, data: Record<string, any>) {
+    if (!DEBUG_COMBO) return;
+    console.log(
+        `%c[InputCell:Combo] %c${action}`,
+        'color: #E91E63; font-weight: bold',
+        'color: #2196F3',
+        data
+    );
+}
+
 /** combobox-мета с бэка (если понадобится) */
 type ComboColumnMeta = { ref_column_order: number; width: number; combobox_alias: string | null };
 type ComboResp = {
@@ -42,7 +57,6 @@ export const normalizeValueForColumn = (
     const trimmed = raw.trim();
     if (!trimmed.includes(',')) return trimmed;
 
-    // находим колонку по write_tc_id
     const col = cols.find(c => {
         const w = (c.__write_tc_id ?? c.table_column_id) ?? null;
         return w === writeTcId;
@@ -57,11 +71,9 @@ export const normalizeValueForColumn = (
         isNumericLike(rawDt);
 
     if (!isNumeric) {
-        // текстовые поля с запятыми не трогаем
         return trimmed;
     }
 
-    // для числовых меняем ВСЕ запятые на точки
     return trimmed.replace(/,/g, '.');
 };
 
@@ -71,10 +83,25 @@ export async function loadComboOptionsOnce(
     writeTcId: number,
 ): Promise<ComboOption[]> {
     const key = makeComboKey(widgetColumnId, writeTcId);
+
+    logCombo('loadComboOptionsOnce', { widgetColumnId, writeTcId, key, hasCached: comboCache.has(key) });
+
     const cached = comboCache.get(key);
-    if (cached) return cached.options;
+    if (cached) {
+        logCombo('loadComboOptionsOnce → from cache', { key, count: cached.options.length });
+        return cached.options;
+    }
+
+    logCombo('loadComboOptionsOnce → fetching from API', { url: `/display/combobox/${widgetColumnId}/${writeTcId}` });
 
     const { data } = await api.get<ComboResp>(`/display/combobox/${widgetColumnId}/${writeTcId}`);
+
+    logCombo('loadComboOptionsOnce → API response', {
+        columnsCount: data.columns?.length,
+        dataCount: data.data?.length,
+        firstItem: data.data?.[0],
+    });
+
     const opts: ComboOption[] = data.data.map((row) => ({
         id: String(row.primary?.[0] ?? ''),
         show: (row.show ?? []).map(String),
@@ -82,6 +109,9 @@ export async function loadComboOptionsOnce(
     }));
 
     comboCache.set(key, { options: opts, columns: data.columns });
+
+    logCombo('loadComboOptionsOnce → cached', { key, count: opts.length });
+
     return opts;
 }
 
@@ -90,9 +120,10 @@ export function clearComboCache(widgetColumnId?: number, writeTcId?: number) {
     if (widgetColumnId != null && writeTcId != null) {
         const key = makeComboKey(widgetColumnId, writeTcId);
         comboCache.delete(key);
+        logCombo('clearComboCache → specific', { key });
     } else {
-        // Очищаем весь кеш
         comboCache.clear();
+        logCombo('clearComboCache → ALL', {});
     }
 }
 
@@ -116,8 +147,11 @@ export function useComboOptions(
     const [ready, setReady] = React.useState(false);
 
     React.useEffect(() => {
+        logCombo('useComboOptions:effect', { widgetColumnId, writeTcId, reloadToken });
+
         if (!widgetColumnId || !writeTcId) {
-            setReady(true); // Не combobox — сразу ready
+            logCombo('useComboOptions:skip', { reason: 'no widgetColumnId or writeTcId' });
+            setReady(true);
             return;
         }
 
@@ -132,27 +166,30 @@ export function useComboOptions(
                 const key = makeComboKey(widgetColumnId, writeTcId);
 
                 if (reloadToken === 0) {
-                    // пробуем взять из кеша
                     const cached = comboCache.get(key);
                     if (cached) {
+                        logCombo('useComboOptions:fromCache', { key, count: cached.options.length });
                         setOptions(cached.options);
                         setReady(true);
                         return;
                     }
                 } else {
-                    // после CRUD в DrillDialog принудительно сбрасываем кеш
                     comboCache.delete(key);
+                    logCombo('useComboOptions:cacheCleared', { key, reloadToken });
                 }
 
                 const opts = await loadComboOptionsOnce(widgetColumnId, writeTcId);
                 if (!cancelled) {
+                    logCombo('useComboOptions:loaded', { count: opts.length });
                     setOptions(opts);
                     setReady(true);
                 }
             } catch (e: any) {
                 if (!cancelled) {
-                    setError(String(e?.message ?? 'Ошибка загрузки combobox'));
-                    setReady(true); // Даже при ошибке ставим ready чтобы не висеть
+                    const errMsg = String(e?.message ?? 'Ошибка загрузки combobox');
+                    logCombo('useComboOptions:ERROR', { error: errMsg, e });
+                    setError(errMsg);
+                    setReady(true);
                 }
             } finally {
                 if (!cancelled) {
@@ -178,7 +215,6 @@ export type InputCellProps = {
     onChange: (v: string) => void;
     readOnly: boolean;
     placeholder: string;
-    /** если нужно явно перезагрузить combobox после CRUD (MainTable edit) */
     comboReloadToken?: number;
 };
 
@@ -194,7 +230,29 @@ export const InputCell: React.FC<InputCellProps> = ({
                                                     }) => {
     const writeTcId = (col.__write_tc_id ?? col.table_column_id) ?? null;
 
+    // ═══════════════════════════════════════════════════════════════════════════
+    // DEBUG: Логируем при рендере combobox колонки
+    // ═══════════════════════════════════════════════════════════════════════════
+    const isComboType = col.type === 'combobox';
+
+    if (DEBUG_COMBO && isComboType) {
+        logCombo('RENDER', {
+            columnName: col.column_name ?? col.ref_column_name,
+            type: col.type,
+            widget_column_id: col.widget_column_id,
+            table_column_id: col.table_column_id,
+            writeTcId,
+            __is_primary_combo_input: col.__is_primary_combo_input,
+            __write_tc_id: col.__write_tc_id,
+            readOnly,
+            value,
+        });
+    }
+
     if (readOnly || writeTcId == null) {
+        if (DEBUG_COMBO && isComboType) {
+            logCombo('RENDER → readonly/no writeTcId', { readOnly, writeTcId });
+        }
         return (
             <span className={s.readonlyValue} title="Только для чтения">
                 {value || '—'}
@@ -202,16 +260,41 @@ export const InputCell: React.FC<InputCellProps> = ({
         );
     }
 
+    // ═══════════════════════════════════════════════════════════════════════════
+    // ИСПРАВЛЕНО: Проверяем type === 'combobox' даже если __is_primary_combo_input не установлен
+    // ═══════════════════════════════════════════════════════════════════════════
     const isComboPrimary = col.type === 'combobox' && col.__is_primary_combo_input;
+
+    // НОВОЕ: Если type === 'combobox' но __is_primary_combo_input не установлен,
+    // всё равно пытаемся показать как combobox
+    const shouldRenderAsCombo = col.type === 'combobox';
+
+    if (DEBUG_COMBO && isComboType) {
+        logCombo('COMBO CHECK', {
+            isComboPrimary,
+            shouldRenderAsCombo,
+            willLoadOptions: shouldRenderAsCombo,
+        });
+    }
 
     const { options, loading, ready } = useComboOptions(
         col.widget_column_id,
-        isComboPrimary ? writeTcId : null,
+        // ИСПРАВЛЕНО: загружаем опции если это combobox (не только если primary)
+        shouldRenderAsCombo ? writeTcId : null,
         comboReloadToken,
     );
 
-    // ───── combobox primary ─────
-    if (isComboPrimary) {
+    // ───── combobox ─────
+    if (shouldRenderAsCombo) {
+        if (DEBUG_COMBO) {
+            logCombo('COMBO RENDER', {
+                loading,
+                ready,
+                optionsCount: options.length,
+                currentValue: value,
+            });
+        }
+
         // Пока опции не загружены — показываем loading
         if (loading || !ready) {
             return (
@@ -233,13 +316,11 @@ export const InputCell: React.FC<InputCellProps> = ({
             );
         }
 
-        // Проверяем: если value есть, но его нет в options —
-        // показываем его как "неизвестное значение" + добавляем в список
+        // Проверяем: если value есть, но его нет в options
         const currentValue = value ?? '';
         const hasValueInOptions = !currentValue || options.some(o => o.id === currentValue);
 
         // Если значение не найдено в опциях — добавляем его как "временный" пункт
-        // чтобы MUI Select не ругался
         const effectiveOptions = hasValueInOptions
             ? options
             : [
@@ -247,13 +328,26 @@ export const InputCell: React.FC<InputCellProps> = ({
                 ...options
             ];
 
+        if (DEBUG_COMBO) {
+            logCombo('COMBO SELECT', {
+                currentValue,
+                hasValueInOptions,
+                effectiveOptionsCount: effectiveOptions.length,
+                firstOptions: effectiveOptions.slice(0, 3).map(o => ({ id: o.id, label: buildOptionLabel(o) })),
+            });
+        }
+
         return (
             <Select
                 size="small"
                 fullWidth
                 value={currentValue}
                 displayEmpty
-                onChange={(e) => onChange(String(e.target.value ?? ''))}
+                onChange={(e) => {
+                    const newVal = String(e.target.value ?? '');
+                    logCombo('COMBO onChange', { oldValue: currentValue, newValue: newVal });
+                    onChange(newVal);
+                }}
                 className={s.inpInCell}
                 sx={{
                     '& .MuiSelect-select': {
@@ -268,7 +362,7 @@ export const InputCell: React.FC<InputCellProps> = ({
                 }}
             >
                 <MenuItem value="">
-                    <em>—</em>
+                    <em>— не выбрано —</em>
                 </MenuItem>
                 {effectiveOptions.map((o) => (
                     <MenuItem
@@ -276,7 +370,6 @@ export const InputCell: React.FC<InputCellProps> = ({
                         value={o.id}
                         title={o.showHidden.join(' / ')}
                         sx={
-                            // Подсвечиваем "неизвестное значение" другим цветом
                             !hasValueInOptions && o.id === currentValue
                                 ? { color: 'warning.main', fontStyle: 'italic' }
                                 : undefined
@@ -330,7 +423,6 @@ export const InputCell: React.FC<InputCellProps> = ({
     let handleChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
 
     if (isDateLike) {
-        // даты/время обрабатываем как раньше
         inputValue = toInputValue(value ?? '', dt);
         handleChange = (e) => {
             const raw = e.target.value;
@@ -338,12 +430,10 @@ export const InputCell: React.FC<InputCellProps> = ({
             onChange(backend);
         };
     } else {
-        // обычный текст/число
         inputValue = value ?? '';
         handleChange = (e) => {
             let raw = e.target.value;
 
-            // 👇 если это числовая колонка — заменяем запятые на точки
             if (isNumericLike(dt) && raw.includes(',')) {
                 raw = raw.replace(/,/g, '.');
             }
@@ -355,8 +445,7 @@ export const InputCell: React.FC<InputCellProps> = ({
     const isMultiline =
         mode === 'edit' &&
         !isDateLike &&
-        !isCheckbox &&
-        !isComboPrimary;
+        !isCheckbox;
 
     return (
         <TextField
