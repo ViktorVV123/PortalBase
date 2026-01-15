@@ -1,6 +1,6 @@
 // src/components/Form/formTable/FormTableContent.tsx
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo } from 'react';
 import * as s from '@/components/Form/formTable/FormTable.module.scss';
 import { api } from '@/services/api';
 
@@ -8,13 +8,10 @@ import type { FormDisplay, FormTreeColumn, WidgetForm } from '@/shared/hooks/use
 
 import { useFormContext } from '@/components/Form/context';
 import { TableToolbar } from '@/components/table/tableToolbar/TableToolbar';
-import { TreeFormTable } from '@/components/Form/treeForm/TreeFormTable';
 import { MainTableWithContext } from '@/components/Form/mainTable/MainTableWithContext';
 import { SubFormWithContext } from '@/components/Form/subForm/SubFormWithContext';
 import { DrillDialogWithContext } from '@/components/Form/drillDialog/DrillDialogWithContext';
-
-import {ButtonForm} from "@/shared/buttonForm/ButtonForm";
-import {TreeDrawer} from "@/components/Form/treeForm/TreeDrawer";
+import { TreeDrawer } from '@/components/Form/treeForm/TreeDrawer';
 
 type Props = {
     liveTree: FormTreeColumn[] | null;
@@ -39,6 +36,7 @@ export const FormTableContent: React.FC<Props> = ({
         drill,
         filters,
         search,
+        treeDrawer,
         // Actions
         startAdd,
         cancelAdd,
@@ -51,6 +49,12 @@ export const FormTableContent: React.FC<Props> = ({
         setFormDisplay,
         comboReloadToken,
         triggerComboReload,
+        // Tree Drawer
+        toggleTreeDrawer,
+        closeTreeDrawer,
+        resetTreeDrawer,
+        setExpandedKeys,
+        setChildrenCache,
         // Sub
         startAddSub,
         cancelAddSub,
@@ -61,23 +65,7 @@ export const FormTableContent: React.FC<Props> = ({
     const { formDisplay, subDisplay } = data;
     const { subLoading, subError } = loading;
     const { lastPrimary, activeSubOrder } = selection;
-
-    const [isTreeOpen, setIsTreeOpen] = useState(false);
-    const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
-    const [childrenCache, setChildrenCache] = useState<Record<string, FormTreeColumn[]>>({});
-
-    // Закрываем drawer при смене формы
-    useEffect(() => {
-        setIsTreeOpen(false);
-    }, [selectedFormId]);
-
-    const handleToggleTree = useCallback(() => {
-        setIsTreeOpen((prev) => !prev);
-    }, []);
-
-    const handleCloseTree = useCallback(() => {
-        setIsTreeOpen(false);
-    }, []);
+    const { isOpen: isTreeOpen, expandedKeys, childrenCache } = treeDrawer;
 
     // ═══════════════════════════════════════════════════════════
     // SUB WIDGETS
@@ -94,8 +82,6 @@ export const FormTableContent: React.FC<Props> = ({
     // ═══════════════════════════════════════════════════════════
     // TREE
     // ═══════════════════════════════════════════════════════════
-
-    const hasTree = !!(liveTree && liveTree.length);
 
     const reloadTreeLocal = useCallback(async () => {
         const fid = selectedFormId ?? currentForm?.form_id ?? null;
@@ -148,8 +134,7 @@ export const FormTableContent: React.FC<Props> = ({
     const handleResetFilters = useCallback(async () => {
         await resetFilters();
         await reloadTreeLocal();
-        setExpandedKeys(new Set());
-        setChildrenCache({});
+        // resetTreeDrawer вызывается внутри resetFilters в контексте
     }, [resetFilters, reloadTreeLocal]);
 
     // ═══════════════════════════════════════════════════════════
@@ -225,9 +210,6 @@ export const FormTableContent: React.FC<Props> = ({
                 ctx.setSelectedKey(null);
                 ctx.setLastPrimary({});
                 ctx.setSubDisplay(null);
-
-                // Опционально: закрываем drawer после выбора фильтра
-                // setIsTreeOpen(false);
             } catch (e) {
                 console.warn('[FormTableContent] handleFilterMain failed:', e);
             }
@@ -237,11 +219,10 @@ export const FormTableContent: React.FC<Props> = ({
 
     return (
         <>
-
             <TreeDrawer
                 isOpen={isTreeOpen}
-                onToggle={handleToggleTree}
-                onClose={handleCloseTree}
+                onToggle={toggleTreeDrawer}
+                onClose={closeTreeDrawer}
                 tree={liveTree}
                 selectedFormId={selectedFormId}
                 handleTreeValueClick={handleTreeValueClick}
@@ -254,71 +235,67 @@ export const FormTableContent: React.FC<Props> = ({
                 onResetFilters={handleResetFilters}
             />
 
+            {/* RIGHT: TOOLBAR + MAIN + SUB */}
+            <div className={s.formLayoutFullWidth}>
+                <section className={s.rightPane}>
+                    <div className={s.toolbarPane}>
+                        <TableToolbar
+                            showSubActions={!!subDisplay && Object.keys(lastPrimary).length > 0}
+                            cancelAddSub={cancelAddSub}
+                            startAddSub={startAddSub}
+                            isAddingSub={subAdding.isAddingSub}
+                            submitAddSub={submitAddSub}
+                            savingSub={subAdding.savingSub}
+                            isAdding={mainAdding.isAdding}
+                            selectedFormId={selectedFormId}
+                            selectedWidget={selectedWidget}
+                            saving={mainAdding.saving}
+                            startAdd={startAdd}
+                            submitAdd={submitAdd}
+                            cancelAdd={cancelAdd}
+                            showSearch={search.showSearch}
+                            value={search.q}
+                            onChange={search.setQ}
+                            onResetFilters={handleResetFilters}
+                            collapsedWidth={160}
+                            expandedWidth={420}
+                        />
+                    </div>
 
-
-                {/* RIGHT: TOOLBAR + MAIN + SUB */}
-
-                <div className={s.formLayoutFullWidth}>
-                    <section className={s.rightPane}>
-                        <div className={s.toolbarPane}>
-                            <TableToolbar
-
-                                showSubActions={!!subDisplay && Object.keys(lastPrimary).length > 0}
-                                cancelAddSub={cancelAddSub}
-                                startAddSub={startAddSub}
-                                isAddingSub={subAdding.isAddingSub}
-                                submitAddSub={submitAddSub}
-                                savingSub={subAdding.savingSub}
-                                isAdding={mainAdding.isAdding}
-                                selectedFormId={selectedFormId}
-                                selectedWidget={selectedWidget}
-                                saving={mainAdding.saving}
-                                startAdd={startAdd}
-                                submitAdd={submitAdd}
-                                cancelAdd={cancelAdd}
-                                showSearch={search.showSearch}
-                                value={search.q}
-                                onChange={search.setQ}
-                                onResetFilters={handleResetFilters}
-                                collapsedWidth={160}
-                                expandedWidth={420}
+                    {/* MAIN TABLE */}
+                    <div className={s.mainPane}>
+                        <div className={s.mainTableScroll}>
+                            <MainTableWithContext
+                                onOpenDrill={handleOpenDrill}
+                                comboReloadToken={comboReloadToken}
                             />
                         </div>
+                    </div>
 
-
-                        {/* MAIN TABLE */}
-                        <div className={s.mainPane}>
-                            <div className={s.mainTableScroll}>
-                                <MainTableWithContext
-                                    onOpenDrill={handleOpenDrill}
-                                    comboReloadToken={comboReloadToken}
-                                />
-                            </div>
+                    {/* SUB TABLE */}
+                    {shouldShowSubSection && (
+                        <div className={s.subPane}>
+                            <SubFormWithContext
+                                onOpenDrill={handleOpenDrill}
+                                comboReloadToken={comboReloadToken}
+                                cancelAdd={cancelAddSub!}
+                                startAdd={startAddSub!}
+                                submitAdd={submitAddSub!}
+                                saving={subAdding.savingSub}
+                                selectedWidget={selectedWidget}
+                                buttonClassName={s.iconBtn}
+                            />
                         </div>
+                    )}
+                </section>
+            </div>
 
-                        {/* SUB TABLE */}
-                        {shouldShowSubSection && (
-                            <div className={s.subPane}>
-                                <SubFormWithContext
-                                    onOpenDrill={handleOpenDrill}
-                                    comboReloadToken={comboReloadToken}
-                                    cancelAdd={cancelAddSub!}
-                                    startAdd={startAddSub!}
-                                    submitAdd={submitAddSub!}
-                                    saving={subAdding.savingSub}
-                                    selectedWidget={selectedWidget}
-                                    buttonClassName={s.iconBtn}
-                                />
-                            </div>
-                        )}
-                    </section>
-                </div>
-                {/* DRILL DIALOG */}
-                <DrillDialogWithContext
-                    onSyncParentMain={handleSyncParentMain}
-                    onPickFromDrill={drill.disableNestedDrill ? handlePickFromDrill : undefined}
-                    onComboboxChanged={triggerComboReload}
-                />
-            </>
-            );
-            };
+            {/* DRILL DIALOG */}
+            <DrillDialogWithContext
+                onSyncParentMain={handleSyncParentMain}
+                onPickFromDrill={drill.disableNestedDrill ? handlePickFromDrill : undefined}
+                onComboboxChanged={triggerComboReload}
+            />
+        </>
+    );
+};

@@ -1,7 +1,7 @@
 // src/components/Form/context/FormProvider.tsx
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { FormContext, FormContextValue, DrillState, DrillOpenMeta } from './FormContext';
+import { FormContext, FormContextValue, DrillState, DrillOpenMeta, TreeDrawerState } from './FormContext';
 
 import type {
     FormDisplay,
@@ -99,6 +99,37 @@ export const FormProvider: React.FC<FormProviderProps> = ({
         isColReadOnly,
         stylesColumnMeta,
     } = useHeaderPlan(formDisplay);
+
+    // ═══════════════════════════════════════════════════════════
+    // TREE DRAWER STATE
+    // ═══════════════════════════════════════════════════════════
+
+    const [isTreeOpen, setIsTreeOpen] = useState(false);
+    const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
+    const [childrenCache, setChildrenCache] = useState<Record<string, FormTreeColumn[]>>({});
+
+    const openTreeDrawer = useCallback(() => {
+        setIsTreeOpen(true);
+    }, []);
+
+    const closeTreeDrawer = useCallback(() => {
+        setIsTreeOpen(false);
+    }, []);
+
+    const toggleTreeDrawer = useCallback(() => {
+        setIsTreeOpen((prev) => !prev);
+    }, []);
+
+    const resetTreeDrawer = useCallback(() => {
+        setIsTreeOpen(false);
+        setExpandedKeys(new Set());
+        setChildrenCache({});
+    }, []);
+
+    // Закрываем drawer при смене формы
+    useEffect(() => {
+        resetTreeDrawer();
+    }, [selectedFormId, resetTreeDrawer]);
 
     // ═══════════════════════════════════════════════════════════
     // FILTERS / TREE
@@ -199,7 +230,13 @@ export const FormProvider: React.FC<FormProviderProps> = ({
         lastPrimary,
         setLastPrimary,
         setSelectedKey,
-        stylesColumnMeta, // ← NEW: добавляем stylesColumnMeta
+        stylesColumnMeta,
+        resetFilters: async () => {
+            await resetFiltersHard();
+            await reloadTree();
+        },
+        setActiveFilters,
+        onResetTreeDrawer: resetTreeDrawer, // ← NEW: передаём callback для сброса drawer
     });
 
     // ═══════════════════════════════════════════════════════════
@@ -284,6 +321,7 @@ export const FormProvider: React.FC<FormProviderProps> = ({
         try {
             await resetFiltersHard();
             await reloadTree();
+            resetTreeDrawer(); // ← NEW: сбрасываем drawer при сбросе фильтров
         } catch (e) {
             console.warn('Ошибка при сбросе фильтров:', e);
         }
@@ -293,10 +331,21 @@ export const FormProvider: React.FC<FormProviderProps> = ({
         setSubDisplay,
         resetFiltersHard,
         reloadTree,
+        resetTreeDrawer,
         setSelectedKey,
         setLastPrimary,
         setActiveSubOrder,
     ]);
+
+    // ═══════════════════════════════════════════════════════════
+    // TREE DRAWER STATE OBJECT
+    // ═══════════════════════════════════════════════════════════
+
+    const treeDrawerState = useMemo<TreeDrawerState>(() => ({
+        isOpen: isTreeOpen,
+        expandedKeys,
+        childrenCache,
+    }), [isTreeOpen, expandedKeys, childrenCache]);
 
     // ═══════════════════════════════════════════════════════════
     // CONTEXT VALUE
@@ -361,7 +410,7 @@ export const FormProvider: React.FC<FormProviderProps> = ({
                 editingRowIdx: mainCrud.editingRowIdx,
                 editDraft: mainCrud.editDraft,
                 editSaving: mainCrud.editSaving,
-                editStylesDraft: mainCrud.editStylesDraft, // ← NEW
+                editStylesDraft: mainCrud.editStylesDraft,
             },
             deletingRowIdx: mainCrud.deletingRowIdx,
             startAdd: mainCrud.startAdd,
@@ -373,7 +422,7 @@ export const FormProvider: React.FC<FormProviderProps> = ({
             deleteRow: mainCrud.deleteRow,
             setDraft: mainCrud.setDraft,
             setEditDraft: mainCrud.setEditDraft,
-            setEditStylesDraft: mainCrud.setEditStylesDraft, // ← NEW
+            setEditStylesDraft: mainCrud.setEditStylesDraft,
 
             // Sub CRUD
             subAdding: {
@@ -397,6 +446,15 @@ export const FormProvider: React.FC<FormProviderProps> = ({
             drill,
             openDrill,
             closeDrill,
+
+            // Tree Drawer
+            treeDrawer: treeDrawerState,
+            openTreeDrawer,
+            closeTreeDrawer,
+            toggleTreeDrawer,
+            resetTreeDrawer,
+            setExpandedKeys,
+            setChildrenCache,
 
             // Filters
             filters: {
@@ -429,7 +487,6 @@ export const FormProvider: React.FC<FormProviderProps> = ({
             triggerComboReload,
         }),
         [
-            // Перечисляем все зависимости
             selectedFormId,
             selectedWidget,
             currentForm,
@@ -465,6 +522,13 @@ export const FormProvider: React.FC<FormProviderProps> = ({
             drill,
             openDrill,
             closeDrill,
+            treeDrawerState,
+            openTreeDrawer,
+            closeTreeDrawer,
+            toggleTreeDrawer,
+            resetTreeDrawer,
+            setExpandedKeys,
+            setChildrenCache,
             activeFilters,
             nestedTrees,
             activeExpandedKey,

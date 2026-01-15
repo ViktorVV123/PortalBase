@@ -238,6 +238,19 @@ $text-muted: #888;
 // COMBOBOX EDIT
 // ═══════════════════════════════════════════════════════════
 
+.comboEditWrapper {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+}
+
+.comboSelect {
+  flex: 1;
+  min-width: 0;
+}
+
 .comboEditInner {
   display: flex;
   align-items: center;

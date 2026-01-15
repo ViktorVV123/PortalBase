@@ -1,15 +1,16 @@
 // src/components/Form/mainTable/MainTableCombo.tsx
 import React from 'react';
-import * as s from '@/components/setOfTables/SetOfTables.module.scss';
+import * as s from './MainTable.module.scss';
 import type { FormDisplay } from '@/shared/hooks/useWorkSpaces';
 import { formatCellValue } from '@/shared/utils/cellFormat';
 import type { ExtCol } from '@/components/Form/formTable/parts/FormatByDatatype';
+import { MenuItem, Select, IconButton, Tooltip } from '@mui/material';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 
 // ⬇️ Берём общие вещи из InputCell, не дублируем
 import {
     buildOptionLabel,
     useComboOptions,
-
 } from '@/components/Form/mainTable/InputCell';
 
 /** Хелпер: одинаковая ли группа combobox (для объединения в одну TD) */
@@ -65,12 +66,11 @@ export function getWriteTcIdForComboGroup(group: ExtCol[]): number | null {
         if (g.__write_tc_id != null) return g.__write_tc_id;
     }
 
-    // eslint-disable-next-line no-console
     console.warn('[MainTable][add] combobox group has no __write_tc_id', group);
     return null;
 }
 
-/** Отображение combobox в режиме редактирования с учётом editDraft */
+/** Отображение combobox в режиме редактирования с Select + кнопка drill */
 type ComboEditDisplayProps = {
     group: ExtCol[];
     row: FormDisplay['data'][number];
@@ -102,127 +102,110 @@ export const ComboEditDisplay: React.FC<ComboEditDisplayProps> = ({
     const primary = pickPrimaryCombo(group);
     const writeTcId = (primary.__write_tc_id ?? primary.table_column_id) ?? null;
 
-    const { options } = useComboOptions(
+    const { options, loading } = useComboOptions(
         primary.widget_column_id,
         writeTcId ?? null,
         comboReloadToken ?? 0,
     );
 
-    // есть ли вообще ключ в draft для этого writeTcId
-    const hasDraftKey =
-        writeTcId != null &&
-        Object.prototype.hasOwnProperty.call(editDraft, writeTcId);
+    // Текущее значение из draft
+    const currentValue = writeTcId != null ? (editDraft[writeTcId] ?? '') : '';
 
-    const draftId = writeTcId != null ? editDraft[writeTcId] : '';
-
-    let display: string;
-
-    if (hasDraftKey) {
-        // 👇 пользователь уже вносил изменения (или мы их проставили в startEdit)
-
-        if (!draftId) {
-            // явное пустое значение → показываем пусто
-            display = '—';
-        } else {
-            // есть draftId → пробуем красиво отрисовать по options
-            if (options.length) {
-                const opt = options.find(o => o.id === draftId);
-                display = opt ? buildOptionLabel(opt) : draftId;
-            } else {
-                display = draftId;
-            }
-        }
-    } else {
-        // 👇 fallback: ещё ни разу не трогали draft, берём текущий текст из row.values
-        const viewParts = group
-            .map(gcol => getShown(valueIndexByKey, row.values, gcol))
-            .filter(Boolean);
-        const viewLabel = viewParts.length
-            ? viewParts.map(formatCellValue).join(' · ')
-            : '';
-
-        if (options.length && viewLabel) {
-            const normalizedView = viewLabel.trim();
-            let matched: { id: string } | undefined;
-
-            for (const opt of options) {
-                const full = buildOptionLabel(opt).trim();
-                const hidden = (opt.showHidden ?? []).join(' · ').trim();
-
-                if (!full && !hidden) continue;
-
-                if (
-                    full === normalizedView ||
-                    hidden === normalizedView ||
-                    full.endsWith(` · ${normalizedView}`) ||
-                    normalizedView.endsWith(` · ${hidden}`)
-                ) {
-                    matched = opt;
-                    break;
-                }
-            }
-
-            display = matched ? buildOptionLabel(matched as any) : (viewLabel || '—');
-        } else {
-            display = viewLabel || '—';
-        }
-    }
-
-    const clickable = primary.form_id != null && !!onOpenDrill;
+    // Есть ли drill (form_id)
+    const hasDrill = primary.form_id != null && !!onOpenDrill;
 
     return (
-        <div className={s.comboEditInner}>
-            {clickable ? (
-                <button
-                    type="button"
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        onOpenDrill?.(primary.form_id!, {
-                            originColumnType: 'combobox',
-                            primary: row.primary_keys,
-                            openedFromEdit: true,
-                            targetWriteTcId: writeTcId ?? undefined,
-                        });
-                        // eslint-disable-next-line no-console
-                        console.debug('[MainTable] drill click (combobox, edit mode)', {
-                            formId: primary.form_id,
-                            widget_column_id: primary.widget_column_id,
-                            table_column_id: primary.table_column_id,
-                            targetWriteTcId: writeTcId,
-                        });
-                    }}
-                    className={s.comboText}
-                    title={display}
-                    style={{
-                        padding: 0,
-                        border: 'none',
-                        background: 'none',
-                        cursor: 'pointer',
-                        textDecoration: 'underline',
-                        color: 'var(--link,#66b0ff)',
-                    }}
-                >
-                    {display}
-                </button>
-            ) : (
-                <span className={s.comboText} title={display}>
-                    {display}
-                </span>
-            )}
+        <div className={s.comboEditWrapper}>
+            {/* Select для быстрого выбора */}
+            <Select
+                size="small"
+                fullWidth
+                value={currentValue}
+                displayEmpty
+                onChange={(e) => {
+                    if (writeTcId != null) {
+                        onChangeDraft(writeTcId, String(e.target.value ?? ''));
+                    }
+                }}
+                disabled={loading}
+                className={s.comboSelect}
+                sx={{
+                    flex: 1,
+                    minWidth: 0,
+                    '& .MuiSelect-select': {
+                        padding: '4px 8px',
+                        paddingRight: '28px !important',
+                        minHeight: '28px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        overflow: 'hidden',
+                        whiteSpace: 'nowrap',
+                        textOverflow: 'ellipsis',
+                        fontSize: '13px',
+                    },
+                    '& .MuiOutlinedInput-notchedOutline': {
+                        borderColor: 'rgba(255,255,255,0.3)',
+                    },
+                    '&:hover .MuiOutlinedInput-notchedOutline': {
+                        borderColor: 'rgba(255,255,255,0.5)',
+                    },
+                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                        borderColor: 'var(--link, #66b0ff)',
+                    },
+                }}
+                MenuProps={{
+                    PaperProps: {
+                        sx: {
+                            maxHeight: 300,
+                            backgroundColor: '#2a2a2a',
+                            '& .MuiMenuItem-root': {
+                                fontSize: '13px',
+                                padding: '6px 12px',
+                            },
+                        },
+                    },
+                }}
+            >
+                <MenuItem value="">
+                    <em style={{ opacity: 0.6 }}>— не выбрано —</em>
+                </MenuItem>
+                {options.map((o) => (
+                    <MenuItem
+                        key={o.id}
+                        value={o.id}
+                        title={o.showHidden.join(' / ')}
+                    >
+                        {buildOptionLabel(o)}
+                    </MenuItem>
+                ))}
+            </Select>
 
-            {writeTcId != null && (
-                <button
-                    type="button"
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        // явное очищение: кладём пустую строку в draft
-                        onChangeDraft(writeTcId, '');
-                    }}
-                    title="Очистить значение"
-                    className={s.comboClearBtn}
-                >
-                    ×
-                </button>
+            {/* Кнопка drill — открыть форму для редактирования справочника */}
+            {hasDrill && (
+                <Tooltip title="Открыть справочник" arrow>
+                    <IconButton
+                        size="small"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onOpenDrill?.(primary.form_id!, {
+                                originColumnType: 'combobox',
+                                primary: row.primary_keys,
+                                openedFromEdit: true,
+                                targetWriteTcId: writeTcId ?? undefined,
+                            });
+                        }}
+                        sx={{
+                            ml: 0.5,
+                            p: 0.5,
+                            color: 'var(--link, #66b0ff)',
+                            '&:hover': {
+                                backgroundColor: 'rgba(102, 176, 255, 0.1)',
+                            },
+                        }}
+                    >
+                        <OpenInNewIcon sx={{ fontSize: 18 }} />
+                    </IconButton>
+                </Tooltip>
             )}
         </div>
     );

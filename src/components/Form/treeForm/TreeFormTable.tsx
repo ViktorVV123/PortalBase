@@ -1,4 +1,4 @@
-// src/components/Form/treeForm/TreeFormTable.tsx
+// src/components/Form/treeForm/TreeFormTable.tsx — ИСПРАВЛЕННАЯ ВЕРСИЯ
 
 import React, {useState, useCallback, useEffect} from 'react';
 import * as s from './TreeFormTable.module.scss';
@@ -6,16 +6,11 @@ import SortIcon from '@/assets/image/SortIcon.svg';
 import {FormTreeColumn} from '@/shared/hooks/useWorkSpaces';
 import {api} from '@/services/api';
 
-// ─────────────────────────────────────────────────────────────
-// ТИПЫ
-// ─────────────────────────────────────────────────────────────
-
 type TreeFormTableProps = {
     tree: FormTreeColumn[] | null;
     selectedFormId: number | null;
     handleTreeValueClick: (table_column_id: number, value: string | number) => void;
     handleNestedValueClick: (table_column_id: number, value: string | number) => void;
-
     onFilterMain?: (filters: Array<{ table_column_id: number; value: string | number }>) => Promise<void>;
     expandedKeys: Set<string>;
     setExpandedKeys: React.Dispatch<React.SetStateAction<Set<string>>>;
@@ -25,17 +20,8 @@ type TreeFormTableProps = {
 };
 
 type SortMode = 'asc' | 'desc';
-
 type Filter = { table_column_id: number; value: string | number };
-
-type ValuePair = {
-    value: string | number;
-    displayValue: string | number;
-};
-
-// ─────────────────────────────────────────────────────────────
-// УТИЛИТЫ
-// ─────────────────────────────────────────────────────────────
+type ValuePair = { value: string | number; displayValue: string | number };
 
 const collator = new Intl.Collator(undefined, {numeric: true, sensitivity: 'base'});
 
@@ -49,19 +35,16 @@ function sortValuePairs(pairs: ValuePair[], mode: SortMode): ValuePair[] {
 function getValuePairs(treeColumn: FormTreeColumn): ValuePair[] {
     const values = treeColumn.values ?? [];
     const displayValues = (treeColumn as any).display_values ?? values;
-
     const pairs: ValuePair[] = [];
 
     for (let i = 0; i < values.length; i++) {
         const val = values[i];
         if (val == null) continue;
-
         pairs.push({
             value: val as string | number,
             displayValue: (displayValues[i] ?? val) as string | number,
         });
     }
-
     return pairs;
 }
 
@@ -82,24 +65,13 @@ function shouldAutoExpand(treeColumn: FormTreeColumn): boolean {
     return isGuidLike(val) && val === displayVal;
 }
 
-/**
- * Ключ кэша = полный путь фильтров
- */
 function makeCacheKey(filters: Filter[]): string {
     return filters.map(f => `${f.table_column_id}:${f.value}`).join('|');
 }
 
-/**
- * Ключ раскрытия = ТОЖЕ полный путь!
- * Это гарантирует что 2021→Marine и 2022→Marine — разные ключи
- */
 function makeExpandKey(filters: Filter[]): string {
     return filters.map(f => `${f.table_column_id}:${f.value}`).join('|');
 }
-
-// ─────────────────────────────────────────────────────────────
-// ОСНОВНОЙ КОМПОНЕНТ
-// ─────────────────────────────────────────────────────────────
 
 export const TreeFormTable: React.FC<TreeFormTableProps> = ({
                                                                 tree,
@@ -121,7 +93,7 @@ export const TreeFormTable: React.FC<TreeFormTableProps> = ({
         setChildrenCache({});
         setSortModes({});
         setLoadingKeys(new Set());
-    }, [selectedFormId]);
+    }, [selectedFormId, setExpandedKeys, setChildrenCache]);
 
     const toggleSort = useCallback((idx: number) => {
         setSortModes((prev) => ({
@@ -129,10 +101,6 @@ export const TreeFormTable: React.FC<TreeFormTableProps> = ({
             [idx]: (prev[idx] ?? 'asc') === 'asc' ? 'desc' : 'asc',
         }));
     }, []);
-
-    // ═══════════════════════════════════════════════════════════
-    // РЕКУРСИВНАЯ ЗАГРУЗКА
-    // ═══════════════════════════════════════════════════════════
 
     const loadAndExpandRecursively = useCallback(async (
         table_column_id: number,
@@ -150,7 +118,7 @@ export const TreeFormTable: React.FC<TreeFormTableProps> = ({
 
         const filters = [...parentFilters, {table_column_id, value}];
         const cacheKey = makeCacheKey(filters);
-        const expandKey = makeExpandKey(filters);  // ← Полный путь!
+        const expandKey = makeExpandKey(filters);
         const keysToExpand: string[] = [expandKey];
         let newCache = {...currentCache};
 
@@ -185,7 +153,6 @@ export const TreeFormTable: React.FC<TreeFormTableProps> = ({
                         filters,
                         newCache
                     );
-
                     keysToExpand.push(...result.keysToExpand);
                     newCache = result.newCache;
                     finalFilters = result.finalFilters;
@@ -196,10 +163,6 @@ export const TreeFormTable: React.FC<TreeFormTableProps> = ({
         return {keysToExpand, newCache, finalFilters};
     }, [selectedFormId]);
 
-    // ═══════════════════════════════════════════════════════════
-    // КЛИК ПО УЗЛУ
-    // ═══════════════════════════════════════════════════════════
-
     const handleNodeClick = useCallback(async (
         table_column_id: number,
         value: string | number,
@@ -207,20 +170,16 @@ export const TreeFormTable: React.FC<TreeFormTableProps> = ({
     ) => {
         const filters = [...parentFilters, {table_column_id, value}];
         const expandKey = makeExpandKey(filters);
-        const cacheKey = makeCacheKey(filters);
 
         // ═══════════════════════════════════════════════════════════
         // ЕСЛИ УЖЕ РАСКРЫТ — СВОРАЧИВАЕМ
         // ═══════════════════════════════════════════════════════════
-
         if (expandedKeys.has(expandKey)) {
-            // Удаляем этот ключ и все дочерние (по префиксу)
             const prefix = expandKey + '|';
 
             setExpandedKeys((prev) => {
                 const next = new Set<string>();
                 prev.forEach((k) => {
-                    // Оставляем только те, которые НЕ начинаются с нашего пути
                     if (k !== expandKey && !k.startsWith(prefix)) {
                         next.add(k);
                     }
@@ -228,7 +187,6 @@ export const TreeFormTable: React.FC<TreeFormTableProps> = ({
                 return next;
             });
 
-            // Применяем фильтры родительского уровня
             if (parentFilters.length === 0) {
                 if (onResetFilters) {
                     await onResetFilters();
@@ -248,13 +206,8 @@ export const TreeFormTable: React.FC<TreeFormTableProps> = ({
         }
 
         // ═══════════════════════════════════════════════════════════
-        // РАСКРЫВАЕМ НОВЫЙ УЗЕЛ
+        // РАСКРЫВАЕМ НОВЫЙ УЗЕЛ — УПРОЩЁННАЯ ЛОГИКА
         // ═══════════════════════════════════════════════════════════
-
-        // Находим "братьев" — узлы с тем же родителем но другим значением на этом уровне
-        const parentPrefix = parentFilters.length > 0
-            ? makeExpandKey(parentFilters) + '|' + table_column_id + ':'
-            : table_column_id + ':';
 
         setLoadingKeys((prev) => {
             const next = new Set(prev);
@@ -272,43 +225,28 @@ export const TreeFormTable: React.FC<TreeFormTableProps> = ({
 
             setChildrenCache(newCache);
 
+            // ← ИСПРАВЛЕННАЯ ЛОГИКА: Простое сохранение только родительских узлов
             setExpandedKeys((prev) => {
                 const next = new Set<string>();
 
-                // Проходим по всем текущим ключам
+                // Путь к родителю
+                const parentPath = parentFilters.map(f => `${f.table_column_id}:${f.value}`).join('|');
+
+                // Сохраняем только те ключи, которые являются предками текущего узла
                 prev.forEach((k) => {
-                    // Проверяем, является ли это "братом" (тот же уровень, другое значение)
-                    // Братья начинаются с того же parentPrefix
-                    if (k.startsWith(parentPrefix) && !k.startsWith(expandKey)) {
-                        // Это брат или его потомок — не добавляем
+                    // Если наш родительский путь пустой (корневой уровень) — ничего не сохраняем
+                    if (parentPath === '') {
+                        // Не сохраняем других корневых узлов
                         return;
                     }
-                    // Проверяем, является ли это потомком брата
-                    // Потомки братьев тоже не добавляем
-                    const kParts = k.split('|');
-                    const parentParts = parentFilters.map(f => `${f.table_column_id}:${f.value}`);
 
-                    // Если путь совпадает до родителя, но расходится на текущем уровне
-                    if (parentParts.length < kParts.length) {
-                        const kParentPath = kParts.slice(0, parentParts.length).join('|');
-                        const ourParentPath = parentParts.join('|');
-
-                        if (kParentPath === ourParentPath) {
-                            // Это на том же уровне или ниже
-                            const levelKey = kParts[parentParts.length];
-                            const ourLevelKey = `${table_column_id}:${value}`;
-
-                            if (levelKey !== ourLevelKey) {
-                                // Это брат или потомок брата — не добавляем
-                                return;
-                            }
-                        }
+                    // Если наш путь начинается с этого ключа — это предок, сохраняем
+                    if (parentPath.startsWith(k) || parentPath === k) {
+                        next.add(k);
                     }
-
-                    next.add(k);
                 });
 
-                // Добавляем новые ключи
+                // Добавляем новые раскрытые ключи
                 keysToExpand.forEach((k) => next.add(k));
 
                 return next;
@@ -342,10 +280,6 @@ export const TreeFormTable: React.FC<TreeFormTableProps> = ({
         setExpandedKeys,
         setChildrenCache,
     ]);
-
-    // ═══════════════════════════════════════════════════════════
-    // РЕНДЕР УЗЛА
-    // ═══════════════════════════════════════════════════════════
 
     const renderNode = useCallback((
         treeColumn: FormTreeColumn,
@@ -437,10 +371,6 @@ export const TreeFormTable: React.FC<TreeFormTableProps> = ({
             </div>
         );
     }, [expandedKeys, loadingKeys, childrenCache, handleNodeClick]);
-
-    // ═══════════════════════════════════════════════════════════
-    // RENDER
-    // ═══════════════════════════════════════════════════════════
 
     if (!tree || tree.length === 0) return null;
     if (!selectedFormId) return null;

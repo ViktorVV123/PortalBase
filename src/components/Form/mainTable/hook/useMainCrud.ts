@@ -1,4 +1,4 @@
-// useMainCrud.ts
+// useMainCrud.ts — ФИНАЛЬНОЕ ИСПРАВЛЕНИЕ
 import { useCallback, useState } from 'react';
 import { api } from '@/services/api';
 import type { DTable, FormDisplay, Widget, WidgetForm } from '@/shared/hooks/useWorkSpaces';
@@ -21,9 +21,7 @@ type EnsureQueryKind = 'insert' | 'update' | 'delete';
 export type StylesColumnMeta = {
     exists: boolean;
     valueIndex: number | null;
-    /** Маппинг table_column_name → column_name (для чтения стилей) */
     tableColumnNameMap: Map<string, string>;
-    /** Маппинг column_name → table_column_name (для записи стилей) */
     columnNameToTableColumnName: Map<string, string>;
 } | null;
 
@@ -45,8 +43,11 @@ export type UseMainCrudDeps = {
     setLastPrimary: (v: Record<string, unknown>) => void;
     setSelectedKey: React.Dispatch<React.SetStateAction<string | null>>;
     preflightTableId?: number | null;
-    /** Мета для колонки стилей */
     stylesColumnMeta?: StylesColumnMeta;
+    resetFilters?: () => Promise<void>;
+    setActiveFilters?: React.Dispatch<React.SetStateAction<Array<{ table_column_id: number; value: string | number }>>>;
+    /** Callback для сброса TreeDrawer при сбросе фильтров */
+    onResetTreeDrawer?: () => void;
 };
 
 export function useMainCrud({
@@ -68,6 +69,9 @@ export function useMainCrud({
                                 setSelectedKey,
                                 preflightTableId,
                                 stylesColumnMeta,
+                                resetFilters,
+                                setActiveFilters,
+                                onResetTreeDrawer,
                             }: UseMainCrudDeps) {
     const [isAdding, setIsAdding] = useState(false);
     const [draft, setDraft] = useState<Record<number, string>>({});
@@ -78,8 +82,6 @@ export function useMainCrud({
     const [editSaving, setEditSaving] = useState(false);
 
     const [deletingRowIdx, setDeletingRowIdx] = useState<number | null>(null);
-
-    // ← NEW: draft для стилей ячеек (ключи — column_name)
     const [editStylesDraft, setEditStylesDraft] = useState<Record<string, CellStyles | null>>({});
 
     const getEffectiveFormId = useCallback((): number | null => {
@@ -107,6 +109,41 @@ export function useMainCrud({
 
         return null;
     }, [selectedWidget, selectedFormId, formsById, formsByWidget]);
+
+    // ═══════════════════════════════════════════════════════════
+    // HELPER: Reload display with proper filter conversion
+    // ═══════════════════════════════════════════════════════════
+    const reloadDisplay = useCallback(async (formId: number, useFilters: boolean = false) => {
+        try {
+            const filters = useFilters ? activeFilters : [];
+
+            const normalizedFilters = filters.map(f => ({
+                table_column_id: f.table_column_id,
+                value: String(f.value),
+            }));
+
+            log('reloadDisplay', {
+                formId,
+                useFilters,
+                rawFilters: filters,
+                normalizedFilters
+            });
+
+            const { data } = await api.post<FormDisplay>(
+                `/display/${formId}/main`,
+                normalizedFilters
+            );
+            setFormDisplay(data);
+
+            if (!useFilters && setActiveFilters) {
+                setActiveFilters([]);
+            }
+        } catch (e: any) {
+            console.error('[reloadDisplay] Failed:', e);
+            const detail = e?.response?.data?.detail ?? e?.message;
+            console.error('[reloadDisplay] Detail:', detail);
+        }
+    }, [activeFilters, setFormDisplay, setActiveFilters]);
 
     const ensureQuery = useCallback(
         async (kind: EnsureQueryKind): Promise<{ ok: boolean; formId?: number }> => {
@@ -146,22 +183,74 @@ export function useMainCrud({
 
                 if (!q || !q.trim()) {
                     if (kind === 'insert') {
-                        alert('Для этой таблицы не настроен INSERT QUERY. Задайте его в метаданных таблицы.');
+                        alert('❌ Для этой таблицы не настроен INSERT QUERY.\n\nЗадайте его в метаданных таблицы.');
                     } else if (kind === 'update') {
-                        alert('Для этой таблицы не настроен UPDATE QUERY. Задайте его в метаданных таблицы.');
+                        alert('❌ Для этой таблицы не настроен UPDATE QUERY.\n\nЗадайте его в метаданных таблицы.');
                     } else {
-                        alert('Для этой таблицы не настроен DELETE QUERY. Задайте его в метаданных таблицы.');
+                        alert('❌ Для этой таблицы не настроен DELETE QUERY.\n\nЗадайте его в метаданных таблицы.');
                     }
                     return { ok: false };
                 }
-            } catch {
-                // префлайт не критичен
+            } catch (e) {
+                console.warn('[ensureQuery] Preflight check failed (non-critical):', e);
             }
 
             return { ok: true, formId };
         },
         [selectedWidget, preflightTableId, getEffectiveFormId, getEffectiveWidgetId]
     );
+
+    // ═══════════════════════════════════════════════════════════
+    // HELPER: Can new record match current filters?
+    // ═══════════════════════════════════════════════════════════
+    const canMatchFilters = useCallback((
+        draft: Record<number, string>,
+        filters: Array<{ table_column_id: number; value: string | number }>
+    ): boolean => {
+        if (filters.length === 0) return true;
+
+        for (const filter of filters) {
+            const draftValue = draft[filter.table_column_id];
+
+            if (draftValue != null && draftValue !== '') {
+                const filterValue = String(filter.value).toLowerCase().trim();
+                const draftValueNormalized = String(draftValue).toLowerCase().trim();
+
+                if (draftValueNormalized !== filterValue) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }, []);
+
+    // ═══════════════════════════════════════════════════════════
+    // HELPER: Build new filters from draft
+    // ═══════════════════════════════════════════════════════════
+    const buildFiltersFromDraft = useCallback((
+        draft: Record<number, string>,
+        currentFilters: Array<{ table_column_id: number; value: string | number }>
+    ): Array<{ table_column_id: number; value: string | number }> | null => {
+        if (currentFilters.length === 0) return null;
+
+        const newFilters: Array<{ table_column_id: number; value: string | number }> = [];
+
+        for (const filter of currentFilters) {
+            const draftValue = draft[filter.table_column_id];
+
+            if (draftValue != null && draftValue !== '') {
+                newFilters.push({
+                    table_column_id: filter.table_column_id,
+                    value: draftValue,
+                });
+            } else {
+                return null;
+            }
+        }
+
+        return newFilters.length > 0 ? newFilters : null;
+    }, []);
 
     const preflightInsert = useCallback(() => ensureQuery('insert'), [ensureQuery]);
     const preflightUpdate = useCallback(() => ensureQuery('update'), [ensureQuery]);
@@ -191,7 +280,9 @@ export function useMainCrud({
         return null;
     }
 
-    // ───────── Добавление ─────────
+    // ═══════════════════════════════════════════════════════════
+    // ДОБАВЛЕНИЕ
+    // ═══════════════════════════════════════════════════════════
     const startAdd = useCallback(async () => {
         const pf = await preflightInsert();
         if (!pf.ok) return;
@@ -289,35 +380,34 @@ export function useMainCrud({
                 };
             });
 
-            log('submitAdd → allWriteIds', allWriteIds);
-            log('submitAdd → values[] (with null for empty combobox)', values);
+            log('submitAdd → values[]', values);
 
             const body = { pk: { primary_keys: {} as Record<string, string> }, values };
             const url = `/data/${pf.formId}/${wid}`;
-            log('submitAdd → request', { url, body });
 
             try {
                 await api.post(url, body);
+                log('✅ submitAdd → POST success');
             } catch (err: any) {
                 const status = err?.response?.status;
                 const detail = err?.response?.data?.detail ?? err?.response?.data ?? err?.message;
 
                 if (status === 403) {
-                    console.warn('[submitEdit] 403 Forbidden', { url, body, detail });
-                    alert('У вас не хватает прав на добавление новой записи');
+                    alert('❌ У вас не хватает прав на добавление новой записи');
                     return;
                 }
 
                 if (status === 404 && String(detail).includes('Insert query not found')) {
-                    alert('Для этой таблицы не настроен INSERT QUERY. Задайте его в метаданных таблицы.');
+                    alert('❌ Для этой таблицы не настроен INSERT QUERY.\n\nЗадайте его в метаданных таблицы.');
                     return;
                 }
                 if (status === 404) {
                     await api.post(`${url}/`, body);
+                    log('✅ submitAdd → POST with trailing slash success');
                 } else if (status === 422) {
                     console.error('[submitAdd] 422 от бэка', { detail, body });
                     alert(
-                        `Не удалось добавить строку (422).\n` +
+                        `❌ Не удалось добавить строку (422).\n\n` +
                         `detail: ${typeof detail === 'string' ? detail : JSON.stringify(detail)}`
                     );
                     return;
@@ -326,18 +416,75 @@ export function useMainCrud({
                 }
             }
 
-            const { data } = await api.post<FormDisplay>(`/display/${pf.formId}/main`, activeFilters);
-            setFormDisplay(data);
+            // ═══════════════════════════════════════════════════════════
+            // УМНАЯ ЛОГИКА ФИЛЬТРОВ
+            // ═══════════════════════════════════════════════════════════
+
+            const hasFilters = activeFilters.length > 0;
+            let shouldResetTreeDrawer = false;
+
+            if (!hasFilters) {
+                await reloadDisplay(pf.formId, false);
+                log('✅ submitAdd → no filters, full reload');
+            } else {
+                const matches = canMatchFilters(draft, activeFilters);
+
+                if (matches) {
+                    await reloadDisplay(pf.formId, true);
+                    log('✅ submitAdd → filters kept (new record matches)');
+                } else {
+                    const newFilters = buildFiltersFromDraft(draft, activeFilters);
+
+                    if (newFilters && setActiveFilters) {
+                        setActiveFilters(newFilters);
+
+                        const normalizedFilters = newFilters.map(f => ({
+                            table_column_id: f.table_column_id,
+                            value: String(f.value),
+                        }));
+
+                        const { data } = await api.post<FormDisplay>(
+                            `/display/${pf.formId}/main`,
+                            normalizedFilters
+                        );
+                        setFormDisplay(data);
+
+                        log('✅ submitAdd → auto-updated filters', {
+                            oldFilters: activeFilters,
+                            newFilters
+                        });
+                    } else {
+                        await reloadDisplay(pf.formId, false);
+
+                        if (resetFilters) {
+                            await resetFilters();
+                        }
+
+                        shouldResetTreeDrawer = true;
+
+                        log('✅ submitAdd → filters reset (cannot auto-update)');
+                    }
+                }
+            }
+
             await reloadTree();
+
+            // ← Сбрасываем TreeDrawer только если фильтры были сброшены
+            if (shouldResetTreeDrawer && onResetTreeDrawer) {
+                onResetTreeDrawer();
+                log('✅ submitAdd → TreeDrawer reset');
+            }
 
             setIsAdding(false);
             setDraft({});
             setEditStylesDraft({});
+
+            log('✅ submitAdd COMPLETE');
         } catch (e: any) {
             const status = e?.response?.status;
             const msg = e?.response?.data ?? e?.message;
             alert(
-                `Не удалось добавить строку: ${status ?? ''} ${
+                `❌ Не удалось добавить строку: ${status ?? ''}\n\n${
                     typeof msg === 'string' ? msg : JSON.stringify(msg)
                 }`
             );
@@ -348,17 +495,26 @@ export function useMainCrud({
         getEffectiveWidgetId,
         preflightInsert,
         draft,
-        activeFilters,
-        setFormDisplay,
-        reloadTree,
         flatColumnsInRenderOrder,
+        activeFilters,
+        reloadDisplay,
+        reloadTree,
+        resetFilters,
+        setActiveFilters,
+        setFormDisplay,
+        canMatchFilters,
+        buildFiltersFromDraft,
+        onResetTreeDrawer,
     ]);
 
-    // ───────── Редактирование ─────────
+    // ═══════════════════════════════════════════════════════════
+    // РЕДАКТИРОВАНИЕ
+    // ═══════════════════════════════════════════════════════════
     const startEdit = useCallback(
         async (rowIdx: number) => {
             const pf = await preflightUpdate();
             if (!pf.ok) return;
+
             setIsAdding(false);
             setEditStylesDraft({});
 
@@ -391,24 +547,18 @@ export function useMainCrud({
             });
 
             const groups = Array.from(comboGroups.values());
-            for (let i = 0; i < groups.length; i += 1) {
-                const g = groups[i];
+            for (const g of groups) {
                 try {
                     const options = await loadComboOptionsOnce(g.wcId, g.writeTcId);
-
-                    const tokens: string[] = g.tokens.map((t: string) => t.toLowerCase());
+                    const tokens = g.tokens.map((t) => t.toLowerCase());
 
                     let bestId: string | null = null;
                     let bestScore = 0;
                     let bestCount = 0;
 
-                    for (let j = 0; j < options.length; j += 1) {
-                        const o = options[j];
-                        const hay: string[] = o.showHidden.map((x: string) => x.toLowerCase());
-                        const score = tokens.reduce(
-                            (acc: number, t: string) => acc + (hay.includes(t) ? 1 : 0),
-                            0
-                        );
+                    for (const o of options) {
+                        const hay = o.showHidden.map((x) => x.toLowerCase());
+                        const score = tokens.reduce((acc, t) => acc + (hay.includes(t) ? 1 : 0), 0);
                         if (score > bestScore) {
                             bestScore = score;
                             bestCount = 1;
@@ -425,7 +575,7 @@ export function useMainCrud({
                 }
             }
 
-            log('startEdit → init editDraft (с авто-map combobox)', { rowIdx, init });
+            log('startEdit → init editDraft', { rowIdx, init });
             setEditingRowIdx(rowIdx);
             setEditDraft(init);
         },
@@ -455,11 +605,6 @@ export function useMainCrud({
             const pkObj = Object.fromEntries(
                 Object.entries(row.primary_keys).map(([k, v]) => [k, String(v)])
             );
-            const pkToString = (pk: Record<string, unknown>) =>
-                Object.keys(pk)
-                    .sort()
-                    .map((k) => `${k}:${String(pk[k])}`)
-                    .join('|');
 
             const getSendingValue = (raw: unknown): string | null => {
                 const s = raw == null ? '' : String(raw).trim();
@@ -469,44 +614,30 @@ export function useMainCrud({
             const entries = Object.entries(editDraft);
 
             const values: Array<{ table_column_id: number; value: string | null }> = entries.map(
-                ([tcIdStr, v]) => {
-                    const tcId = Number(tcIdStr);
-                    return {
-                        table_column_id: tcId,
-                        value: getSendingValue(v),
-                    };
-                }
+                ([tcIdStr, v]) => ({
+                    table_column_id: Number(tcIdStr),
+                    value: getSendingValue(v),
+                })
             );
 
-            // ═══════════════════════════════════════════════════════════
-            // NEW: Добавляем стили в values, если есть изменения
-            // ═══════════════════════════════════════════════════════════
             if (
                 stylesColumnMeta?.exists &&
                 stylesColumnMeta.valueIndex != null &&
                 Object.keys(editStylesDraft).length > 0
             ) {
-                const stylesValueIndex = stylesColumnMeta.valueIndex;
-
-                // Находим колонку стилей для получения table_column_id
                 const stylesColumn = formDisplay.columns.find((c) => c.type === 'styles');
                 const stylesTcId = stylesColumn?.table_column_id;
 
                 if (stylesTcId) {
-                    // Текущие стили из строки (ключи — table_column_name)
-                    const currentStylesJson = row.values[stylesValueIndex];
+                    const currentStylesJson = row.values[stylesColumnMeta.valueIndex];
                     const currentStyles: Record<string, CellStyles> =
-                        currentStylesJson &&
-                        typeof currentStylesJson === 'object' &&
-                        !Array.isArray(currentStylesJson)
+                        currentStylesJson && typeof currentStylesJson === 'object'
                             ? { ...(currentStylesJson as Record<string, CellStyles>) }
                             : {};
 
-                    // Мержим с draft, конвертируя column_name → table_column_name
                     const columnNameToTableColumnName = stylesColumnMeta.columnNameToTableColumnName;
 
                     Object.entries(editStylesDraft).forEach(([columnName, style]) => {
-                        // Конвертируем column_name ("Комментарий") → table_column_name ("description")
                         const tableColumnName = columnNameToTableColumnName?.get(columnName) ?? columnName;
 
                         if (style === null) {
@@ -516,17 +647,8 @@ export function useMainCrud({
                         }
                     });
 
-                    // Добавляем в values
                     const stylesValue =
                         Object.keys(currentStyles).length > 0 ? JSON.stringify(currentStyles) : null;
-
-                    log('submitEdit → styles update', {
-                        stylesTcId,
-                        editStylesDraft,
-                        columnNameToTableColumnName: columnNameToTableColumnName ? Object.fromEntries(columnNameToTableColumnName) : null,
-                        currentStyles,
-                        stylesValue,
-                    });
 
                     values.push({
                         table_column_id: stylesTcId,
@@ -534,151 +656,48 @@ export function useMainCrud({
                     });
                 }
             }
-            // ═══════════════════════════════════════════════════════════
 
             const body = {
-                pk: { primary_keys: pkObj as Record<string, string> },
+                pk: { primary_keys: pkObj },
                 values,
             };
             const url = `/data/${pf.formId}/${wid}`;
 
-            type BeforeAfter = {
-                widget_column_id: number;
-                write_tc_id: number;
-                shown_before: string;
-                sending_value?: string | null;
-            };
+            log('submitEdit → request', { url, body });
 
-            const beforeAfter: BeforeAfter[] = [];
-            for (const [tcIdStr] of entries) {
-                const writeTcId = Number(tcIdStr);
-
-                const related = flatColumnsInRenderOrder.filter((c) => {
-                    const w = (c.__write_tc_id ?? c.table_column_id) ?? null;
-                    return w === writeTcId;
-                });
-
-                const col = related[0];
-                if (col) {
-                    const visKey = `${col.widget_column_id}:${col.table_column_id ?? -1}`;
-                    const idx = valueIndexByKey.get(visKey);
-                    const shownVal = (idx != null ? row.values[idx] : '') as string | number | null;
-                    beforeAfter.push({
-                        widget_column_id: col.widget_column_id,
-                        write_tc_id: writeTcId,
-                        shown_before: shownVal == null ? '' : String(shownVal),
-                        sending_value: getSendingValue(editDraft[writeTcId]),
-                    });
-                } else {
-                    beforeAfter.push({
-                        widget_column_id: -1,
-                        write_tc_id: writeTcId,
-                        shown_before: '',
-                        sending_value: String(editDraft[writeTcId] ?? ''),
-                    });
-                }
-            }
-
-            console.groupCollapsed('[CRUD][submitEdit]');
-            console.log('PK:', pkObj, 'pkKey:', pkToString(pkObj));
-            console.log('editDraft (raw):', editDraft);
-            console.log('editStylesDraft:', editStylesDraft);
-            console.log('entries (to send):', entries);
-            console.log('values[] (will be sent):', values);
-            console.log('request:', { url, body });
-            console.log('BEFORE (shown) & SENDING values by write_tc_id:', beforeAfter);
-            console.groupEnd();
-
-            let patchRespData: unknown = null;
             try {
-                const resp = await api.patch(url, body);
-                patchRespData = resp?.data ?? null;
+                await api.patch(url, body);
+                log('✅ submitEdit → PATCH success');
             } catch (err: any) {
                 const status = err?.response?.status;
                 const detail = err?.response?.data?.detail ?? err?.response?.data ?? err?.message;
 
                 if (status === 403) {
-                    console.warn('[submitEdit] 403 Forbidden', { url, body, detail });
-                    alert('У вас не хватает прав на редактирование этой записи');
+                    alert('❌ У вас не хватает прав на редактирование этой записи');
                     return;
                 }
 
                 if (status === 404 && String(detail).includes('Update query not found')) {
-                    alert(
-                        'Для этой таблицы не настроен UPDATE QUERY. Задайте его в метаданных таблицы.'
-                    );
+                    alert('❌ Для этой таблицы не настроен UPDATE QUERY.\n\nЗадайте его в метаданных таблицы.');
                     return;
                 }
                 if (status === 404) {
-                    const resp = await api.patch(`${url}/`, body);
-                    patchRespData = resp?.data ?? null;
+                    await api.patch(`${url}/`, body);
+                    log('✅ submitEdit → PATCH with trailing slash success');
                 } else {
                     throw err;
                 }
             }
 
-            console.groupCollapsed('[CRUD][submitEdit] PATCH response');
-            console.log(patchRespData);
-            console.groupEnd();
-
-            const { data: newDisplay } = await api.post<FormDisplay>(
-                `/display/${pf.formId}/main`,
-                activeFilters
-            );
-
-            const findRowByPk = (fd: FormDisplay, pk: Record<string, unknown>) => {
-                const key = (obj: Record<string, unknown>) =>
-                    Object.keys(obj)
-                        .sort()
-                        .map((k) => `${k}:${String(obj[k])}`)
-                        .join('|');
-                const target = key(pk);
-                for (let i = 0; i < fd.data.length; i += 1) {
-                    const k = key(fd.data[i].primary_keys as Record<string, unknown>);
-                    if (k === target) return fd.data[i];
-                }
-                return null;
-            };
-
-            const updatedRow = findRowByPk(newDisplay, pkObj);
-
-            const after: Array<BeforeAfter & { shown_after: string }> = [];
-            if (updatedRow) {
-                beforeAfter.forEach((ba) => {
-                    const related = flatColumnsInRenderOrder.filter((c) => {
-                        const w = (c.__write_tc_id ?? c.table_column_id) ?? null;
-                        return w === ba.write_tc_id;
-                    });
-                    const col = related[0];
-                    if (col) {
-                        const visKey = `${col.widget_column_id}:${col.table_column_id ?? -1}`;
-                        const idx = valueIndexByKey.get(visKey);
-                        const shownVal = (idx != null ? updatedRow.values[idx] : '') as
-                            | string
-                            | number
-                            | null;
-                        after.push({
-                            ...ba,
-                            shown_after: shownVal == null ? '' : String(shownVal),
-                        });
-                    } else {
-                        after.push({ ...ba, shown_after: '(col not found)' });
-                    }
-                });
-            }
-
-            console.groupCollapsed('[CRUD][submitEdit] AFTER reload');
-            console.log('new display row:', updatedRow);
-            console.table(after);
-            console.groupEnd();
-
-            setFormDisplay(newDisplay);
+            await reloadDisplay(pf.formId, true);
             await reloadTree();
 
             setIsAdding(false);
             setDraft({});
             setEditStylesDraft({});
             cancelEdit();
+
+            log('✅ submitEdit COMPLETE');
         } finally {
             setEditSaving(false);
         }
@@ -691,15 +710,14 @@ export function useMainCrud({
         editDraft,
         editStylesDraft,
         stylesColumnMeta,
-        activeFilters,
-        setFormDisplay,
+        reloadDisplay,
         reloadTree,
         cancelEdit,
-        flatColumnsInRenderOrder,
-        valueIndexByKey,
     ]);
 
-    // ───────── Удаление ─────────
+    // ═══════════════════════════════════════════════════════════
+    // УДАЛЕНИЕ
+    // ═══════════════════════════════════════════════════════════
     const deleteRow = useCallback(
         async (rowIdx: number) => {
             const wid = getEffectiveWidgetId();
@@ -723,28 +741,24 @@ export function useMainCrud({
 
                 try {
                     await api.delete(url, { data: body });
+                    log('✅ deleteRow → DELETE success');
                 } catch (err: any) {
                     const status = err?.response?.status;
                     const detail = err?.response?.data?.detail ?? err?.response?.data ?? err?.message;
 
                     if (status === 404 && String(detail).includes('Delete query not found')) {
-                        alert(
-                            'Для этой таблицы не настроен DELETE QUERY. Задайте его в метаданных таблицы.'
-                        );
+                        alert('❌ Для этой таблицы не настроен DELETE QUERY.\n\nЗадайте его в метаданных таблицы.');
                         return;
                     }
                     if (status === 404) {
                         await api.delete(`${url}/`, { data: body });
+                        log('✅ deleteRow → DELETE with trailing slash success');
                     } else {
                         throw err;
                     }
                 }
 
-                const { data } = await api.post<FormDisplay>(
-                    `/display/${pf.formId}/main`,
-                    activeFilters
-                );
-                setFormDisplay(data);
+                await reloadDisplay(pf.formId, true);
 
                 try {
                     await reloadTree();
@@ -754,6 +768,8 @@ export function useMainCrud({
                     setLastPrimary({});
                     setSubDisplay(null);
                 }
+
+                log('✅ deleteRow COMPLETE');
             } finally {
                 setDeletingRowIdx(null);
             }
@@ -763,8 +779,7 @@ export function useMainCrud({
             preflightDelete,
             formDisplay.data,
             pkToKey,
-            activeFilters,
-            setFormDisplay,
+            reloadDisplay,
             lastPrimary,
             setSubDisplay,
             setSelectedKey,
@@ -790,7 +805,6 @@ export function useMainCrud({
         deleteRow,
         setDraft,
         setEditDraft,
-        // ← NEW: экспортируем стили
         editStylesDraft,
         setEditStylesDraft,
     };

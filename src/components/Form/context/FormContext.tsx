@@ -57,6 +57,13 @@ export type DrillState = {
     targetWriteTcId?: number | null;
 };
 
+/** Состояние TreeDrawer */
+export type TreeDrawerState = {
+    isOpen: boolean;
+    expandedKeys: Set<string>;
+    childrenCache: Record<string, FormTreeColumn[]>;
+};
+
 /** Конфигурация формы (то, что редко меняется) */
 export type FormConfig = {
     selectedFormId: number | null;
@@ -158,6 +165,15 @@ export type FormContextValue = {
     openDrill: (formId: number | null, meta?: DrillOpenMeta) => void;
     closeDrill: () => void;
 
+    // === Tree Drawer ===
+    treeDrawer: TreeDrawerState;
+    openTreeDrawer: () => void;
+    closeTreeDrawer: () => void;
+    toggleTreeDrawer: () => void;
+    resetTreeDrawer: () => void;
+    setExpandedKeys: React.Dispatch<React.SetStateAction<Set<string>>>;
+    setChildrenCache: React.Dispatch<React.SetStateAction<Record<string, FormTreeColumn[]>>>;
+
     // === Фильтры / Дерево ===
     filters: {
         activeFilters: Array<{ table_column_id: number; value: string | number }>;
@@ -254,6 +270,20 @@ export function useSubCrudContext() {
 export function useDrillContext() {
     const { drill, openDrill, closeDrill } = useFormContext();
     return { drill, openDrill, closeDrill };
+}
+
+/** Хук для доступа к tree drawer */
+export function useTreeDrawerContext() {
+    const ctx = useFormContext();
+    return {
+        treeDrawer: ctx.treeDrawer,
+        openTreeDrawer: ctx.openTreeDrawer,
+        closeTreeDrawer: ctx.closeTreeDrawer,
+        toggleTreeDrawer: ctx.toggleTreeDrawer,
+        resetTreeDrawer: ctx.resetTreeDrawer,
+        setExpandedKeys: ctx.setExpandedKeys,
+        setChildrenCache: ctx.setChildrenCache,
+    };
 }
 
 /** Хук для доступа к selection */
