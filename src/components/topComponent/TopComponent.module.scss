@@ -221,15 +221,25 @@
   flex: 0 0 auto;
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   ИСПРАВЛЕНО: Стрелка через CSS border вместо символа ›
+   Это гарантирует корректное отображение во всех шрифтах
+   ═══════════════════════════════════════════════════════════════════════════ */
 .itemBtn.hasSub::after {
-  content: '›';
-  display: block;           /* ← без этого grid-column может не сработать */
-  grid-column: 3;           /* стрелка всегда перед actions */
+  content: '';
+  display: block;
+  grid-column: 3;
   grid-row: 1;
   justify-self: center;
   align-self: center;
-  line-height: 1;
-  color: var(--menu-muted);
+
+  /* Стрелка через border */
+  width: 6px;
+  height: 6px;
+  border: solid var(--menu-muted);
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(-45deg);
+
   pointer-events: none;
 }
 
@@ -290,14 +300,23 @@
   filter: saturate(1.1);
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   ИСПРАВЛЕНО: Общий стиль .hasSub::after тоже через CSS border
+   ═══════════════════════════════════════════════════════════════════════════ */
 .hasSub::after {
-  content: '›';
-  @include fluid-type(20, 20);
-  color: var(--menu-muted);
+  content: '';
+  display: block;
   grid-column: 3;
   justify-self: center;
   align-self: center;
-  line-height: 1;
+
+  /* Стрелка через border */
+  width: 6px;
+  height: 6px;
+  border: solid var(--menu-muted);
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(-45deg);
+
   pointer-events: none;
 }
 
@@ -311,4 +330,8 @@
     max-width: none;
     width: auto;
   }
+}
+
+.nonText{
+  color: solid var(--menu-muted);
 }

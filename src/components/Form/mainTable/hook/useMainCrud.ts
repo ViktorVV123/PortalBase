@@ -90,43 +90,57 @@ export function useMainCrud({
     }, [selectedFormId, selectedWidget, formsByWidget]);
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // ИСПРАВЛЕНО: getEffectiveWidgetId теперь ищет main_widget_id
+    // ИСПРАВЛЕНО: getEffectiveWidgetId — приоритет formDisplay (текущие данные)
     // ═══════════════════════════════════════════════════════════════════════════
     const getEffectiveWidgetId = useCallback((): number | null => {
-        // 1. Прямой selectedWidget
+        const formId = getEffectiveFormId();
+
+        // 1. Прямой selectedWidget — высший приоритет
         if (selectedWidget?.id) {
             log('getEffectiveWidgetId → from selectedWidget', { widgetId: selectedWidget.id });
             return selectedWidget.id;
         }
 
-        // 2. Ищем через formsById
-        if (selectedFormId != null) {
-            const form = formsById[selectedFormId];
+        // 2. НОВОЕ: Из formDisplay (текущие актуальные данные формы)
+        // formDisplay.main_widget_id — это widget_id именно для ТЕКУЩЕЙ загруженной формы
+        if ((formDisplay as any)?.main_widget_id != null) {
+            const wid = (formDisplay as any).main_widget_id as number;
+            log('getEffectiveWidgetId → from formDisplay.main_widget_id', { widgetId: wid, formId });
+            return wid;
+        }
+
+        if ((formDisplay as any)?.widget_id != null) {
+            const wid = (formDisplay as any).widget_id as number;
+            log('getEffectiveWidgetId → from formDisplay.widget_id', { widgetId: wid, formId });
+            return wid;
+        }
+
+        // 3. Из formsById (может быть устаревшим при быстром переключении)
+        if (formId != null) {
+            const form = formsById[formId];
 
             log('getEffectiveWidgetId → checking formsById', {
-                selectedFormId,
+                formId,
                 form,
                 hasWidgetId: form && 'widget_id' in form,
                 hasMainWidgetId: form && 'main_widget_id' in form,
             });
 
             if (form) {
-                // Проверяем widget_id
                 if (typeof (form as any).widget_id === 'number') {
                     log('getEffectiveWidgetId → from form.widget_id', { widgetId: (form as any).widget_id });
                     return (form as any).widget_id as number;
                 }
 
-                // НОВОЕ: Проверяем main_widget_id
                 if (typeof (form as any).main_widget_id === 'number') {
                     log('getEffectiveWidgetId → from form.main_widget_id', { widgetId: (form as any).main_widget_id });
                     return (form as any).main_widget_id as number;
                 }
             }
 
-            // 3. Ищем через formsByWidget
+            // 4. Ищем через formsByWidget
             for (const [widStr, f] of Object.entries(formsByWidget)) {
-                if (f?.form_id === selectedFormId) {
+                if (f?.form_id === formId) {
                     const wid = Number(widStr);
                     if (!Number.isNaN(wid)) {
                         log('getEffectiveWidgetId → from formsByWidget', { widgetId: wid });
@@ -136,9 +150,9 @@ export function useMainCrud({
             }
         }
 
-        log('getEffectiveWidgetId → NOT FOUND', { selectedFormId, selectedWidget });
+        log('getEffectiveWidgetId → NOT FOUND', { formId, selectedFormId, selectedWidget });
         return null;
-    }, [selectedWidget, selectedFormId, formsById, formsByWidget]);
+    }, [selectedWidget, selectedFormId, formsById, formsByWidget, formDisplay, getEffectiveFormId]);
 
     // ═══════════════════════════════════════════════════════════
     // HELPER: Reload display with proper filter conversion
@@ -655,6 +669,7 @@ export function useMainCrud({
                 try {
                     const options = await loadComboOptionsOnce(g.wcId, g.writeTcId);
                     const tokens = g.tokens.map((t) => t.toLowerCase());
+                    const tokensOriginal = g.tokens; // Сохраняем оригинальные токены для точного сравнения
 
                     log('startEdit → combobox mapping', {
                         wcId: g.wcId,
@@ -668,44 +683,82 @@ export function useMainCrud({
                         })),
                     });
 
-                    let bestId: string | null = null;
-                    let bestScore = 0;
-                    const candidates: Array<{ id: string; score: number }> = [];
+                    let foundId = '';
 
+                    // ═══════════════════════════════════════════════════════════
+                    // СТРАТЕГИЯ 1: Точное совпадение по ID
+                    // Если один из токенов — это ID опции, это точное совпадение
+                    // ═══════════════════════════════════════════════════════════
                     for (const o of options) {
-                        // Ищем и в show, и в showHidden
-                        const hay = [...o.show, ...o.showHidden].map((x) => x.toLowerCase());
-                        const score = tokens.reduce((acc, t) => acc + (hay.includes(t) ? 1 : 0), 0);
-
-                        if (score > 0) {
-                            candidates.push({ id: o.id, score });
+                        // Проверяем есть ли ID опции среди токенов (как строка)
+                        if (tokensOriginal.includes(o.id) || tokensOriginal.includes(String(o.id))) {
+                            foundId = o.id;
+                            log('startEdit → combobox: exact match by ID in tokens', {
+                                optionId: o.id,
+                                tokens: tokensOriginal
+                            });
+                            break;
                         }
 
-                        if (score > bestScore) {
-                            bestScore = score;
-                            bestId = o.id;
+                        // Проверяем есть ли ID в show массиве и совпадает с токеном
+                        if (o.show.includes(o.id) && tokensOriginal.some(t => t === o.id)) {
+                            foundId = o.id;
+                            log('startEdit → combobox: exact match by ID in show', {
+                                optionId: o.id,
+                                show: o.show
+                            });
+                            break;
                         }
                     }
 
-                    // Сортируем кандидатов по score (убывание)
-                    candidates.sort((a, b) => b.score - a.score);
+                    // ═══════════════════════════════════════════════════════════
+                    // СТРАТЕГИЯ 2: Если не нашли по ID — ищем по максимальному score
+                    // ═══════════════════════════════════════════════════════════
+                    if (!foundId) {
+                        let bestScore = 0;
+                        const candidates: Array<{ id: string; score: number; exactMatch: boolean }> = [];
 
-                    // ИСПРАВЛЕНО: Если несколько кандидатов с одинаковым лучшим score,
-                    // берём первого (вместо того чтобы сбрасывать в пустую строку)
-                    const topCandidates = candidates.filter(c => c.score === bestScore);
+                        for (const o of options) {
+                            const hay = [...o.show, ...o.showHidden].map((x) => x.toLowerCase());
+                            const score = tokens.reduce((acc, t) => acc + (hay.includes(t) ? 1 : 0), 0);
 
-                    let foundId = '';
-                    if (topCandidates.length === 1) {
-                        // Единственный лучший кандидат
-                        foundId = topCandidates[0].id;
-                    } else if (topCandidates.length > 1) {
-                        // Несколько кандидатов с одинаковым score — берём первого
-                        // (можно доработать: искать по точному совпадению строки)
-                        foundId = topCandidates[0].id;
-                        log('startEdit → combobox: multiple matches, picking first', {
-                            topCandidates,
-                            picked: foundId,
+                            // Проверяем точное совпадение всей строки
+                            const hayJoined = hay.join(' ');
+                            const tokensJoined = tokens.join(' ');
+                            const exactMatch = hayJoined.includes(tokensJoined) ||
+                                tokens.every(t => hay.includes(t));
+
+                            if (score > 0) {
+                                candidates.push({ id: o.id, score, exactMatch });
+                            }
+
+                            if (score > bestScore) {
+                                bestScore = score;
+                            }
+                        }
+
+                        // Сортируем: сначала по exactMatch, потом по score
+                        candidates.sort((a, b) => {
+                            if (a.exactMatch !== b.exactMatch) {
+                                return a.exactMatch ? -1 : 1;
+                            }
+                            return b.score - a.score;
                         });
+
+                        const topCandidates = candidates.filter(c => c.score === bestScore);
+
+                        if (candidates.length > 0) {
+                            // Берём лучшего кандидата (с exactMatch или первого по score)
+                            foundId = candidates[0].id;
+
+                            if (topCandidates.length > 1) {
+                                log('startEdit → combobox: multiple matches, picked best', {
+                                    picked: foundId,
+                                    topCandidates,
+                                    allCandidates: candidates,
+                                });
+                            }
+                        }
                     }
 
                     init[g.writeTcId] = foundId || init[g.writeTcId] || '';
@@ -713,9 +766,6 @@ export function useMainCrud({
                     log('startEdit → combobox result', {
                         writeTcId: g.writeTcId,
                         tokens: g.tokens,
-                        bestScore,
-                        candidatesCount: candidates.length,
-                        topCandidatesCount: topCandidates.length,
                         foundId,
                         finalValue: init[g.writeTcId],
                     });

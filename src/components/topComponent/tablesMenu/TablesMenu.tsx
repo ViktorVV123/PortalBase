@@ -5,12 +5,15 @@ import TableIcon from '@/assets/image/TableIcon.svg';
 import DeleteIcon from '@/assets/image/DeleteIcon.svg';
 import { DTable } from '@/shared/hooks/useWorkSpaces';
 import { WorkSpaceTypes } from '@/types/typesWorkSpaces';
+import {MenuLoader} from "@/components/topComponent/menuLoader/Menuloader";
+
 
 type Props = {
     ws: WorkSpaceTypes;
     tables: DTable[];
     isDesktop: boolean;
     tblOpenId: number | null;
+    loading?: boolean;  // ← НОВОЕ: флаг загрузки
     onCreateTable: (ws: WorkSpaceTypes) => void;
     onOpenTable: (t: DTable, anchor: HTMLElement | null) => void;
     onSelectTable: (t: DTable) => void;
@@ -22,6 +25,7 @@ export const TablesMenu = memo(function TablesMenu({
                                                        tables,
                                                        isDesktop,
                                                        tblOpenId,
+                                                       loading = false,  // ← по умолчанию false
                                                        onCreateTable,
                                                        onOpenTable,
                                                        onSelectTable,
@@ -47,49 +51,68 @@ export const TablesMenu = memo(function TablesMenu({
             </ul>
 
             <div className={s.sectionTitle}>Таблицы</div>
-            <ul className={s.list} role="none">
-                {(tables ?? []).map((t) => (
-                    <li
-                        key={t.id}
-                        className={s.item}
-                        role="none"
-                        onMouseEnter={
-                            isDesktop ? (e) => onOpenTable(t, e.currentTarget as unknown as HTMLElement) : undefined
-                        }
-                    >
-                        <button
-                            className={`${s.itemBtn} ${s.hasSub}`}
-                            role="menuitem"
-                            aria-haspopup="menu"
-                            aria-expanded={tblOpenId === t.id}
-                            onClick={async (e) => {
-                                if (!isDesktop) {
-                                    if (tblOpenId === t.id) {
-                                        onOpenTable({ ...t, id: null as unknown as number }, null);
-                                    } else {
-                                        await onOpenTable(t, e.currentTarget as unknown as HTMLElement);
-                                    }
-                                    return;
+
+            {/* ═══════════════════════════════════════════════════════════
+                НОВОЕ: Показываем лоадер пока грузятся таблицы
+            ═══════════════════════════════════════════════════════════ */}
+            {loading ? (
+                <MenuLoader text="Загрузка таблиц..." />
+            ) : (
+                <ul className={s.list} role="none">
+                    {tables.length === 0 ? (
+                        <li className={s.item} data-disabled="true" role="none">
+                            <div className={s.itemBtn} style={{ cursor: 'default' }}>
+                                <TableIcon className={s.icon} />
+                                <span className={s.label}>Нет таблиц</span>
+                            </div>
+                        </li>
+                    ) : (
+                        tables.map((t) => (
+                            <li
+                                key={t.id}
+                                className={s.item}
+                                role="none"
+                                onMouseEnter={
+                                    isDesktop
+                                        ? (e) => onOpenTable(t, e.currentTarget as unknown as HTMLElement)
+                                        : undefined
                                 }
-                                onSelectTable(t);
-                            }}
-                            title={t.description || t.name}
-                        >
-                            <TableIcon className={s.icon} />
-                            <span className={s.label}>{t.name}</span>
-                            <span className={s.actions}>
-                <DeleteIcon
-                    className={`${s.actionIcon} ${s.actionDanger}`}
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        onDeleteTable(t);
-                    }}
-                />
-              </span>
-                        </button>
-                    </li>
-                ))}
-            </ul>
+                            >
+                                <button
+                                    className={`${s.itemBtn} ${s.hasSub}`}
+                                    role="menuitem"
+                                    aria-haspopup="menu"
+                                    aria-expanded={tblOpenId === t.id}
+                                    onClick={async (e) => {
+                                        if (!isDesktop) {
+                                            if (tblOpenId === t.id) {
+                                                onOpenTable({ ...t, id: null as unknown as number }, null);
+                                            } else {
+                                                await onOpenTable(t, e.currentTarget as unknown as HTMLElement);
+                                            }
+                                            return;
+                                        }
+                                        onSelectTable(t);
+                                    }}
+                                    title={t.description || t.name}
+                                >
+                                    <TableIcon className={s.icon} />
+                                    <span className={s.label}>{t.name}</span>
+                                    <span className={s.actions}>
+                                        <DeleteIcon
+                                            className={`${s.actionIcon} ${s.actionDanger}`}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                onDeleteTable(t);
+                                            }}
+                                        />
+                                    </span>
+                                </button>
+                            </li>
+                        ))
+                    )}
+                </ul>
+            )}
         </>
     );
 });

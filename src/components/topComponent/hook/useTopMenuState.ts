@@ -50,6 +50,12 @@ export function useTopMenuState(deps: {
     const [tblOpen, setTblOpen] = useState<OpenState>({ id: null, anchor: null, side: 'right' });
     const [wOpen, setWOpen] = useState<OpenState>({ id: null, anchor: null, side: 'right' });
 
+    // ═══════════════════════════════════════════════════════════════════════════
+    // НОВОЕ: Состояния загрузки для каждого уровня меню
+    // ═══════════════════════════════════════════════════════════════════════════
+    const [tablesLoading, setTablesLoading] = useState(false);
+    const [widgetsLoading, setWidgetsLoading] = useState(false);
+
     const [wsNode, setWsNode] = useState<HTMLDivElement | null>(null);
     const [tblNode, setTblNode] = useState<HTMLDivElement | null>(null);
     const [wNode, setWNode] = useState<HTMLDivElement | null>(null);
@@ -64,6 +70,9 @@ export function useTopMenuState(deps: {
         setWsOpen({ id: null, anchor: null, side: 'right' });
         setTblOpen({ id: null, anchor: null, side: 'right' });
         setWOpen({ id: null, anchor: null, side: 'right' });
+        // Сбрасываем loading при закрытии
+        setTablesLoading(false);
+        setWidgetsLoading(false);
     }, []);
 
     const closeAll = useCallback(() => {
@@ -113,15 +122,27 @@ export function useTopMenuState(deps: {
         return () => document.removeEventListener('keydown', onKey);
     }, [open, closeAll]);
 
-    // открыватели уровней
+    // ═══════════════════════════════════════════════════════════════════════════
+    // ОБНОВЛЕНО: openWs с индикатором загрузки
+    // ═══════════════════════════════════════════════════════════════════════════
     const openWs = useCallback(
         async (ws: WorkSpaceTypes, anchor: HTMLElement | null) => {
             if (ws?.id) {
                 setWsHover(ws.id);
-                await loadTables(ws.id);
+
+                // Сразу открываем подменю и показываем лоадер
                 setWsOpen({ id: ws.id, anchor, side: computeSide(anchor) });
                 setTblOpen({ id: null, anchor: null, side: 'right' });
                 setWOpen({ id: null, anchor: null, side: 'right' });
+
+                // Включаем лоадер
+                setTablesLoading(true);
+
+                try {
+                    await loadTables(ws.id);
+                } finally {
+                    setTablesLoading(false);
+                }
             } else {
                 setWsOpen({ id: null, anchor: null, side: 'right' });
                 setTblOpen({ id: null, anchor: null, side: 'right' });
@@ -131,13 +152,27 @@ export function useTopMenuState(deps: {
         [loadTables, setWsHover]
     );
 
+    // ═══════════════════════════════════════════════════════════════════════════
+    // ОБНОВЛЕНО: openTbl с индикатором загрузки
+    // ═══════════════════════════════════════════════════════════════════════════
     const openTbl = useCallback(
         async (t: DTable, anchor: HTMLElement | null, widgetsByTable: Record<number, Widget[]>) => {
             if (t?.id) {
                 setTblHover(t.id);
-                if (!widgetsByTable[t.id]) await loadWidgetsForTable(t.id);
+
+                // Сразу открываем подменю
                 setTblOpen({ id: t.id, anchor, side: computeSide(anchor) });
                 setWOpen({ id: null, anchor: null, side: 'right' });
+
+                // Если виджеты ещё не загружены — показываем лоадер
+                if (!widgetsByTable[t.id]) {
+                    setWidgetsLoading(true);
+                    try {
+                        await loadWidgetsForTable(t.id);
+                    } finally {
+                        setWidgetsLoading(false);
+                    }
+                }
             } else {
                 setTblOpen({ id: null, anchor: null, side: 'right' });
                 setWOpen({ id: null, anchor: null, side: 'right' });
@@ -204,6 +239,12 @@ export function useTopMenuState(deps: {
         rootFocus,
         menuRef,
         rootItemRefs,
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // НОВОЕ: экспортируем состояния загрузки
+        // ═══════════════════════════════════════════════════════════════════════
+        tablesLoading,
+        widgetsLoading,
 
         // nodes for click-outside
         wsNode,

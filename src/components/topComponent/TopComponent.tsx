@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import * as s from './TopComponent.module.scss';
 
 import { WorkSpaceTypes } from '@/types/typesWorkSpaces';
@@ -13,8 +13,8 @@ import { Floating } from '@/components/topComponent/floating/Floating';
 import { TablesMenu } from '@/components/topComponent/tablesMenu/TablesMenu';
 import { WidgetsMenu } from '@/components/topComponent/widgetsMenu/WidgetsMenu';
 import { FormsMenu } from '@/components/topComponent/formsMenu/FormsMenu';
-import {ModalEditConnection} from "@/components/modals/modalEditConnection/ModalEditConnection";
-import {Connection} from "@/shared/hooks/stores";
+import { ModalEditConnection } from "@/components/modals/modalEditConnection/ModalEditConnection";
+import { Connection } from "@/shared/hooks/stores";
 
 
 type Props = {
@@ -56,6 +56,11 @@ type Props = {
     setEditFormOpen: (v: boolean) => void;
     loadConnections: (opts?: { force?: boolean }) => void;
     connections: Connection[];
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // НОВОЕ: Callback для уведомления родителя об открытии/закрытии меню
+    // ═══════════════════════════════════════════════════════════════════════════
+    onMenuOpenChange?: (isOpen: boolean) => void;
 };
 
 export const TopComponent: React.FC<Props> = (props) => {
@@ -91,6 +96,7 @@ export const TopComponent: React.FC<Props> = (props) => {
         setWsHover,
         setTblHover,
         loadConnections,
+        onMenuOpenChange,
     } = props;
 
     const [editModalOpen, setEditModalOpen] = useState(false);
@@ -110,9 +116,14 @@ export const TopComponent: React.FC<Props> = (props) => {
         setTblHover,
     });
 
+    // ═══════════════════════════════════════════════════════════════════════════
+    // НОВОЕ: Уведомляем родителя когда меню открывается/закрывается
+    // ═══════════════════════════════════════════════════════════════════════════
+    useEffect(() => {
+        onMenuOpenChange?.(state.open);
+    }, [state.open, onMenuOpenChange]);
 
-
-// вариант "без двойной загрузки": просто открываем форму и дерево
+    // вариант "без двойной загрузки": просто открываем форму и дерево
     const openFormWithPreload = async (_widgetId: number, formId: number) => {
         // 1) Сразу открываем форму — это дернёт POST /display/{formId}/main
         handleSelectForm(formId);
@@ -130,7 +141,6 @@ export const TopComponent: React.FC<Props> = (props) => {
         }
     };
 
-
     const hasWorkspaces = workSpaces.length > 0;
 
     return (
@@ -139,14 +149,14 @@ export const TopComponent: React.FC<Props> = (props) => {
 
             <div className={s.menuWrapper} ref={state.menuRef}>
                 {hasWorkspaces && (
-                <button
-                    className={s.trigger}
-                    onClick={state.handleTriggerClick}
-                    aria-haspopup="menu"
-                    aria-expanded={state.open}
-                >
-                    Рабочие&nbsp;пространства ▾
-                </button>
+                    <button
+                        className={s.trigger}
+                        onClick={state.handleTriggerClick}
+                        aria-haspopup="menu"
+                        aria-expanded={state.open}
+                    >
+                        Рабочие&nbsp;пространства ▾
+                    </button>
                 )}
                 <SideNav
                     open={navOpen}
@@ -189,6 +199,7 @@ export const TopComponent: React.FC<Props> = (props) => {
                             tables={tablesByWs[state.wsOpen.id] ?? []}
                             isDesktop={state.isDesktop}
                             tblOpenId={state.tblOpen.id}
+                            loading={state.tablesLoading}
                             onCreateTable={(ws) => {
                                 setCreateTblWs(ws);
                                 setShowCreateTable(true);
@@ -219,6 +230,7 @@ export const TopComponent: React.FC<Props> = (props) => {
                             widgets={widgetsByTable[state.tblOpen.id] ?? []}
                             isDesktop={state.isDesktop}
                             wOpenId={state.wOpen.id}
+                            loading={state.widgetsLoading}
                             onCreateWidget={(t) => {
                                 setCreateWidgetTable(t);
                                 setShowCreateWidget(true);
@@ -314,7 +326,7 @@ export const TopComponent: React.FC<Props> = (props) => {
                             connectionId={connToEditId}
                             onSuccess={async () => {
                                 await loadConnections({ force: true });
-                                await loadWorkSpaces({ force: true }); // ✅
+                                await loadWorkSpaces({ force: true });
                                 setEditConnOpen(false);
                             }}
                             onCancel={() => setEditConnOpen(false)}
@@ -322,8 +334,6 @@ export const TopComponent: React.FC<Props> = (props) => {
                     )}
                 </>
             )}
-
-
         </div>
     );
 };

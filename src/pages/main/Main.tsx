@@ -16,6 +16,11 @@ export const Main = () => {
     const [wsHover, setWsHover] = useState<number | null>(null);
     const [tblHover, setTblHover] = useState<number | null>(null);
 
+    // ═══════════════════════════════════════════════════════════════════════════
+    // НОВОЕ: Флаг что верхнее меню открыто (чтобы не показывать глобальный лоадер)
+    // ═══════════════════════════════════════════════════════════════════════════
+    const [topMenuOpen, setTopMenuOpen] = useState(false);
+
     const {
         // Workspaces
         loadWorkSpaces,
@@ -177,6 +182,10 @@ export const Main = () => {
         formsListByWidget,
         loadConnections,
         connections,
+        // ═══════════════════════════════════════════════════════════════════════════
+        // НОВОЕ: Передаём callback для отслеживания состояния меню
+        // ═══════════════════════════════════════════════════════════════════════════
+        onMenuOpenChange: setTopMenuOpen,
     };
 
     const setOfTablesProps = {
@@ -250,10 +259,19 @@ export const Main = () => {
     // RENDER
     // ═══════════════════════════════════════════════════════════
 
+    // ═══════════════════════════════════════════════════════════════════════════
+    // ИСПРАВЛЕНО: Не показываем глобальный лоадер когда открыто верхнее меню
+    // ═══════════════════════════════════════════════════════════════════════════
+    const showGlobalLoader = loading
+        && !selectedTable
+        && !selection.selectedWidget
+        && !selection.selectedFormId
+        && !topMenuOpen;  // ← НОВОЕ: не показываем когда меню открыто
+
     return (
         <div className={styles.layout}>
             {/* Глобальный лоадер */}
-            {loading && !selectedTable && !selection.selectedWidget && !selection.selectedFormId && (
+            {showGlobalLoader && (
                 <CenteredLoader fullScreen label="Загружаем рабочее пространство…" />
             )}
 
