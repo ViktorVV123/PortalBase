@@ -145,9 +145,12 @@ export type FormContextValue = {
     setEditDraft: React.Dispatch<React.SetStateAction<Record<number, string>>>;
     setEditStylesDraft: React.Dispatch<React.SetStateAction<Record<string, CellStyles | null>>>;
 
-    // NEW: Валидация required полей
+    // === Валидация Main required полей ===
     showValidationErrors: boolean;
     setShowValidationErrors: React.Dispatch<React.SetStateAction<boolean>>;
+    validationMissingFields: string[];
+    setValidationMissingFields: React.Dispatch<React.SetStateAction<string[]>>;
+    resetValidation: () => void;
 
     // === Sub CRUD ===
     subAdding: {
@@ -163,6 +166,13 @@ export type FormContextValue = {
     setDraftSub: React.Dispatch<React.SetStateAction<Record<number, string>>>;
     setSubEditDraft: React.Dispatch<React.SetStateAction<Record<number, string>>>;
     setSubEditingRowIdx: React.Dispatch<React.SetStateAction<number | null>>;
+
+    // === Валидация Sub required полей ===
+    showSubValidationErrors: boolean;
+    setShowSubValidationErrors: React.Dispatch<React.SetStateAction<boolean>>;
+    subValidationMissingFields: string[];
+    setSubValidationMissingFields: React.Dispatch<React.SetStateAction<string[]>>;
+    resetSubValidation: () => void;
 
     // === Drill Dialog ===
     drill: DrillState;
@@ -252,9 +262,12 @@ export function useMainCrudContext() {
         setDraft: ctx.setDraft,
         setEditDraft: ctx.setEditDraft,
         setEditStylesDraft: ctx.setEditStylesDraft,
-        // NEW
+        // Валидация Main
         showValidationErrors: ctx.showValidationErrors,
         setShowValidationErrors: ctx.setShowValidationErrors,
+        validationMissingFields: ctx.validationMissingFields,
+        setValidationMissingFields: ctx.setValidationMissingFields,
+        resetValidation: ctx.resetValidation,
     };
 }
 
@@ -270,6 +283,12 @@ export function useSubCrudContext() {
         setDraftSub: ctx.setDraftSub,
         setEditDraft: ctx.setSubEditDraft,
         setEditingRowIdx: ctx.setSubEditingRowIdx,
+        // Валидация Sub
+        showSubValidationErrors: ctx.showSubValidationErrors,
+        setShowSubValidationErrors: ctx.setShowSubValidationErrors,
+        subValidationMissingFields: ctx.subValidationMissingFields,
+        setSubValidationMissingFields: ctx.setSubValidationMissingFields,
+        resetSubValidation: ctx.resetSubValidation,
     };
 }
 

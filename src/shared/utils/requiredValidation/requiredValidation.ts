@@ -52,7 +52,6 @@ export function validateAddDraft(
         const value = draft[tcId];
 
         if (isEmptyValue(value)) {
-            // ИСПРАВЛЕНО: ref_column_name вместо table_column_name
             const fieldName = col.column_name || col.ref_column_name || `Поле ${tcId}`;
             errors.push({
                 columnName: fieldName,
@@ -105,7 +104,6 @@ export function validateEditDraft(
         }
 
         if (isEmptyValue(value)) {
-            // ИСПРАВЛЕНО: ref_column_name вместо table_column_name
             const fieldName = col.column_name || col.ref_column_name || `Поле ${tcId}`;
             errors.push({
                 columnName: fieldName,
@@ -124,33 +122,8 @@ export function validateEditDraft(
 }
 
 /**
- * Форматирует ошибки валидации для показа пользователю
- */
-export function formatValidationErrors(result: ValidationResult): string {
-    if (result.isValid) return '';
-
-    if (result.missingFields.length === 1) {
-        return `Заполните обязательное поле: ${result.missingFields[0]}`;
-    }
-
-    return `Заполните обязательные поля:\n• ${result.missingFields.join('\n• ')}`;
-}
-
-/**
  * Проверяет, является ли конкретная колонка обязательной
  */
 export function isColumnRequired(col: ExtCol): boolean {
     return col.required === true && col.visible !== false;
-}
-
-/**
- * Проверяет, пустое ли значение для конкретной колонки в draft
- */
-export function isColumnEmptyInDraft(
-    col: ExtCol,
-    draft: Record<number, string>
-): boolean {
-    const tcId = (col.__write_tc_id ?? col.table_column_id) ?? null;
-    if (tcId === null) return false;
-    return isEmptyValue(draft[tcId]);
 }

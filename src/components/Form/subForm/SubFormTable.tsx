@@ -1,5 +1,5 @@
 import React from 'react';
-import { Checkbox } from '@mui/material';
+import { Checkbox, Tooltip } from '@mui/material';
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
 import ArrowDropUpIcon from '@mui/icons-material/ArrowDropUp';
 import * as sub from './SubWormTable.module.scss';
@@ -14,7 +14,9 @@ import { ExtCol, formatByDatatype } from '@/components/Form/formTable/parts/Form
 import LockIcon from '@/assets/image/LockIcon.svg';
 import * as s from "@/components/setOfTables/SetOfTables.module.scss";
 import * as cls from "@/components/table/tableToolbar/TableToolbar.module.scss";
-import {ButtonForm} from "@/shared/buttonForm/ButtonForm";
+import { ButtonForm } from "@/shared/buttonForm/ButtonForm";
+// Импорт функций валидации
+import { isColumnRequired, isEmptyValue } from '@/shared/utils/requiredValidation/requiredValidation';
 
 type SubformProps = {
     subDisplay: SubDisplay | null;
@@ -56,9 +58,18 @@ type SubformProps = {
     saving?: any;
     selectedWidget?: any;
     buttonClassName?: any;
-    selectFormId?:any
-    startAdd?:any
-    cancelAdd?:any
+    selectFormId?: any;
+    startAdd?: any;
+    cancelAdd?: any;
+
+    /** Показывать ошибки валидации */
+    showValidationErrors?: boolean;
+    /** Сеттер для showValidationErrors */
+    setShowValidationErrors?: React.Dispatch<React.SetStateAction<boolean>>;
+    /** Сеттер для списка незаполненных полей */
+    setValidationMissingFields?: React.Dispatch<React.SetStateAction<string[]>>;
+    /** Сброс валидации */
+    resetValidation?: () => void;
 };
 
 const SYNTHETIC_MIN = -1_000_000;
@@ -89,7 +100,32 @@ function isRlsLockedValue(val: unknown): boolean {
     return s === '1' || s === 'true' || s === 'да' || s === 'yes' || s === 't';
 }
 
+// ═══════════════════════════════════════════════════════════
+// Компонент заголовка с required меткой
+// ═══════════════════════════════════════════════════════════
 
+type HeaderCellProps = {
+    title: string;
+    cols: ExtCol[];
+    colSpan: number;
+};
+
+const HeaderCell: React.FC<HeaderCellProps> = ({ title, cols, colSpan }) => {
+    const hasRequired = cols.some(c => isColumnRequired(c));
+
+    return (
+        <th colSpan={colSpan}>
+            <span className={sub.ellipsis}>
+                {title}
+                {hasRequired && (
+                    <Tooltip title="Обязательное поле" arrow placement="top">
+                        <span className={sub.requiredMark}>*</span>
+                    </Tooltip>
+                )}
+            </span>
+        </th>
+    );
+};
 
 
 export const SubWormTable: React.FC<SubformProps> = (props) => {
@@ -121,6 +157,10 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
         selectFormId,
         startAdd,
         cancelAdd,
+        showValidationErrors = false,
+        setShowValidationErrors,
+        setValidationMissingFields,
+        resetValidation,
     } = props;
 
     const {
@@ -157,6 +197,12 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
         setIsAddingSub,
         draftSub,
         setDraftSub,
+
+        // Передаём функции валидации в хук
+        showSubValidationErrors: showValidationErrors,
+        setShowSubValidationErrors: setShowValidationErrors,
+        setSubValidationMissingFields: setValidationMissingFields,
+        resetSubValidation: resetValidation,
     });
 
     const activeOrder = currentOrder ?? displayedWidgetOrder ?? null;
@@ -202,7 +248,7 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
 
     return (
         <div className={sub.root}>
-            <div style={{display:'flex'}}>
+            <div style={{ display: 'flex' }}>
 
                 {hasTabs && tabs && (
                     <ul className={sub.tabs}>
@@ -215,8 +261,8 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                                         onClick={() => {
                                             // ✅ закрываем режимы редактирования/добавления при смене вкладки
                                             if (editingRowIdx != null) cancelEdit();
-                                            if (isAddingSub) cancelAdd?.(); // если у тебя cancelAdd есть и реально сбрасывает
-                                            setShowSubHeaders(false); // опционально, если хочешь тоже сбрасывать шапку
+                                            if (isAddingSub) cancelAdd?.();
+                                            setShowSubHeaders(false);
 
                                             handleTabClick(sw.widget_order);
                                         }}
@@ -256,10 +302,14 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                     <table className={sub.tbl}>
                         <thead>
                         <tr>
+                            {/* Используем HeaderCell с required меткой */}
                             {renderHeaderPlan.map((g) => (
-                                <th key={`sub-g-top-${g.id}`} colSpan={g.cols.length || 1}>
-                                    <span className={sub.ellipsis}>{g.title}</span>
-                                </th>
+                                <HeaderCell
+                                    key={`sub-g-top-${g.id}`}
+                                    title={g.title}
+                                    cols={g.cols as ExtCol[]}
+                                    colSpan={g.cols.length || 1}
+                                />
                             ))}
                             <th className={sub.actionsHeadCell}>
                                 <button
@@ -281,7 +331,6 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                             <tr>
                                 {renderHeaderPlan.flatMap((g) => {
                                     const labels = (g.labels ?? []).slice(0, g.cols.length);
-                                    // если labels меньше, добьём "—"
                                     while (labels.length < g.cols.length) labels.push('—');
 
                                     const nodes: React.ReactNode[] = [];
@@ -289,15 +338,24 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                                     let i = 0;
                                     while (i < g.cols.length) {
                                         const label = labels[i] ?? '—';
+                                        const col = g.cols[i] as ExtCol;
 
                                         let span = 1;
                                         while (i + span < g.cols.length && (labels[i + span] ?? '—') === label) {
                                             span += 1;
                                         }
 
+                                        // Проверяем required для подзаголовка
+                                        const isReq = isColumnRequired(col);
+
                                         nodes.push(
                                             <th key={`g-sub-${g.id}-${i}`} colSpan={span}>
-                                                <span className={s.ellipsis}>{label}</span>
+                                                <span className={s.ellipsis}>
+                                                    {label}
+                                                    {isReq && (
+                                                        <span className={sub.requiredMark}>*</span>
+                                                    )}
+                                                </span>
                                             </th>
                                         );
 
@@ -314,12 +372,21 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                         <tbody>
                         {/* строка добавления в саб */}
                         {isAddingSub && (
-                            <tr>
+                            <tr className={sub.addRow}>
                                 {renderCols.map((col) => {
                                     const writeTcId = getWriteTcId(col as ExtCol);
 
+                                    // Проверка на required и пустоту
+                                    const isReq = isColumnRequired(col as ExtCol);
+                                    const value = writeTcId == null ? '' : (draftSub[writeTcId] ?? '');
+                                    const isEmpty = isEmptyValue(value);
+                                    const hasError = showValidationErrors && isReq && isEmpty;
+
                                     return (
-                                        <td key={`sub-add-wc${col.widget_column_id}-tc${col.table_column_id}`}>
+                                        <td
+                                            key={`sub-add-wc${col.widget_column_id}-tc${col.table_column_id}`}
+                                            className={`${hasError ? sub.cellError : ''} ${isReq ? sub.requiredCell : ''}`}
+                                        >
                                             {writeTcId == null ? (
                                                 <span className={sub.ellipsis}>—</span>
                                             ) : (
@@ -327,15 +394,16 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                                                     mode="add"
                                                     col={col as ExtCol}
                                                     readOnly={false}
-                                                    value={draftSub[writeTcId] ?? ''}
+                                                    value={value}
                                                     onChange={(v) =>
                                                         setDraftSub((prev) => ({
                                                             ...prev,
                                                             [writeTcId]: v,
                                                         }))
                                                     }
-                                                    placeholder={col.placeholder ?? col.column_name}
+                                                    placeholder={isReq ? `${col.placeholder ?? col.column_name} *` : (col.placeholder ?? col.column_name)}
                                                     comboReloadToken={comboReloadToken}
+                                                    showError={hasError}
                                                 />
                                             )}
                                         </td>
@@ -354,7 +422,6 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
 
                             return (
                                 <tr key={rowIdx}>
-                                    {/* ✅ было flatColumnsInRenderOrder -> стало renderCols */}
                                     {renderCols.map((col) => {
                                         const syntheticTcId =
                                             col.type === 'combobox' &&
@@ -370,8 +437,17 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                                         if (isEditingRow) {
                                             const writeTcId = getWriteTcId(col as ExtCol);
 
+                                            // Проверка на required и пустоту для редактирования
+                                            const isReq = isColumnRequired(col as ExtCol);
+                                            const value = writeTcId == null ? '' : (editDraft[writeTcId] ?? '');
+                                            const isEmpty = isEmptyValue(value);
+                                            const hasError = showValidationErrors && isReq && isEmpty;
+
                                             return (
-                                                <td key={`sub-edit-r${rowIdx}-wc${col.widget_column_id}-tc${col.table_column_id}`}>
+                                                <td
+                                                    key={`sub-edit-r${rowIdx}-wc${col.widget_column_id}-tc${col.table_column_id}`}
+                                                    className={`${sub.editCell} ${hasError ? sub.cellError : ''} ${isReq ? sub.requiredCell : ''}`}
+                                                >
                                                     {writeTcId == null ? (
                                                         <span className={sub.ellipsis}>—</span>
                                                     ) : (
@@ -379,15 +455,16 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                                                             mode="edit"
                                                             col={col as ExtCol}
                                                             readOnly={false}
-                                                            value={editDraft[writeTcId] ?? ''}
+                                                            value={value}
                                                             onChange={(v) =>
                                                                 setEditDraft((prev) => ({
                                                                     ...prev,
                                                                     [writeTcId]: v,
                                                                 }))
                                                             }
-                                                            placeholder={col.placeholder ?? col.column_name}
+                                                            placeholder={isReq ? `${col.placeholder ?? col.column_name} *` : (col.placeholder ?? col.column_name)}
                                                             comboReloadToken={comboReloadToken}
+                                                            showError={hasError}
                                                         />
                                                     )}
                                                 </td>
@@ -467,8 +544,8 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                                                 </button>
                                                 {isRowLocked && (
                                                     <span title="Строка защищена политикой RLS">
-                              <LockIcon className={sub.actionIcon} />
-                            </span>
+                                                        <LockIcon className={sub.actionIcon} />
+                                                    </span>
                                                 )}
                                             </>
                                         ) : (
@@ -502,10 +579,10 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                                                 </button>
 
                                                 {isRowLocked && (
-                                                    <span  className={sub.lockSlot}
-                                                           title="Строка защищена политикой RLS">
-                              <LockIcon className={sub.actionIcon} />
-                            </span>
+                                                    <span className={sub.lockSlot}
+                                                          title="Строка защищена политикой RLS">
+                                                        <LockIcon className={sub.actionIcon} />
+                                                    </span>
                                                 )}
                                             </>
                                         )}

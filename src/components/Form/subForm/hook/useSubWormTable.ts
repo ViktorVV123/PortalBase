@@ -5,6 +5,8 @@ import type { HeaderModelItem } from '@/components/Form/formTable/FormTable';
 import { isEditableValue } from '@/shared/utils/cellFormat';
 import { useHeaderPlan } from '@/components/Form/formTable/hooks/useHeaderPlan';
 import { loadComboOptionsOnce } from '@/components/Form/mainTable/InputCell';
+import type { ExtCol } from '@/components/Form/formTable/parts/FormatByDatatype';
+import { validateEditDraft } from '@/shared/utils/requiredValidation/requiredValidation';
 
 export type UseSubWormTableDeps = {
     subDisplay: SubDisplay | null;
@@ -27,6 +29,12 @@ export type UseSubWormTableDeps = {
     setIsAddingSub: React.Dispatch<React.SetStateAction<boolean>>;
     draftSub: Record<number, string>;
     setDraftSub: React.Dispatch<React.SetStateAction<Record<number, string>>>;
+
+    // NEW: Валидация
+    showSubValidationErrors?: boolean;
+    setShowSubValidationErrors?: React.Dispatch<React.SetStateAction<boolean>>;
+    setSubValidationMissingFields?: React.Dispatch<React.SetStateAction<string[]>>;
+    resetSubValidation?: () => void;
 };
 
 const SYNTHETIC_MIN = -1_000_000;
@@ -51,6 +59,12 @@ export function useSubWormTable({
                                     setIsAddingSub,
                                     draftSub,
                                     setDraftSub,
+
+                                    // NEW: Валидация
+                                    showSubValidationErrors,
+                                    setShowSubValidationErrors,
+                                    setSubValidationMissingFields,
+                                    resetSubValidation,
                                 }: UseSubWormTableDeps) {
     const [deletingRowIdx, setDeletingRowIdx] = useState<number | null>(null);
     const [showSubHeaders, setShowSubHeaders] = useState(false);
@@ -108,6 +122,11 @@ export function useSubWormTable({
 
     const flatColumnsInRenderOrder = useMemo(() => headerPlan.flatMap((g) => g.cols), [headerPlan]);
 
+    // Колонки как ExtCol[] для валидации
+    const subColumnsAsExtCol = useMemo(() => {
+        return (subDisplay?.columns ?? []) as ExtCol[];
+    }, [subDisplay?.columns]);
+
     const valueIndexByKey = useMemo(() => {
         const map = new Map<string, number>();
         (subDisplay?.columns ?? []).forEach((c, i) => {
@@ -159,6 +178,7 @@ export function useSubWormTable({
         if (!pf.ok) return;
 
         setIsAddingSub(false);
+        resetSubValidation?.(); // Сбрасываем ошибки валидации
 
         const row = subDisplay.data[rowIdx];
         const init: Record<number, string> = {};
@@ -195,8 +215,7 @@ export function useSubWormTable({
                 const g = comboGroups.get(gKey) ?? {
                     wcId: col.widget_column_id,
                     writeTcId,
-                    // @ts-ignore
-                    tokens: [],
+                    tokens: [] as string[],
                 };
                 if (shownStr) g.tokens.push(shownStr);
                 comboGroups.set(gKey, g);
@@ -266,17 +285,49 @@ export function useSubWormTable({
         setEditingRowIdx(null);
         setEditDraft({});
         setEditSaving(false);
+        resetSubValidation?.(); // Сбрасываем ошибки валидации
     };
 
     const submitEdit = async () => {
         if (editingRowIdx == null || !formId || !currentWidgetId || !subDisplay) return;
+
+        // ═══════════════════════════════════════════════════════════
+        // ВАЛИДАЦИЯ REQUIRED ПОЛЕЙ
+        // ═══════════════════════════════════════════════════════════
+        const row = subDisplay.data[editingRowIdx];
+
+        console.group('[useSubWormTable] submitEdit VALIDATION');
+        console.log('editDraft:', editDraft);
+        console.log('subColumnsAsExtCol:', subColumnsAsExtCol.map(c => ({
+            column_name: c.column_name,
+            table_column_id: c.table_column_id,
+            __write_tc_id: (c as any).__write_tc_id,
+            required: c.required,
+            type: c.type,
+        })));
+
+        const validation = validateEditDraft(
+            editDraft,
+            row,
+            subColumnsAsExtCol,
+            valueIndexByKey
+        );
+
+        console.log('VALIDATION RESULT:', validation);
+        console.groupEnd();
+
+        if (!validation.isValid) {
+            console.warn('[useSubWormTable] EDIT VALIDATION FAILED — показываем ошибки');
+            setShowSubValidationErrors?.(true);
+            setSubValidationMissingFields?.(validation.missingFields);
+            return; // НЕ отправляем на сервер
+        }
+
         const pf = await preflightUpdate();
         if (!pf.ok) return;
 
         setEditSaving(true);
         try {
-            const row = subDisplay.data[editingRowIdx];
-
             const values = Object.entries(editDraft)
                 .filter(([tcIdStr]) => !isSyntheticComboboxId(Number(tcIdStr)))
                 .map(([tcIdStr, value]) => {

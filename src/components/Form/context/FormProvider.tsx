@@ -236,7 +236,7 @@ export const FormProvider: React.FC<FormProviderProps> = ({
             await reloadTree();
         },
         setActiveFilters,
-        onResetTreeDrawer: resetTreeDrawer, // ← NEW: передаём callback для сброса drawer
+        onResetTreeDrawer: resetTreeDrawer,
     });
 
     // ═══════════════════════════════════════════════════════════
@@ -321,7 +321,7 @@ export const FormProvider: React.FC<FormProviderProps> = ({
         try {
             await resetFiltersHard();
             await reloadTree();
-            resetTreeDrawer(); // ← NEW: сбрасываем drawer при сбросе фильтров
+            resetTreeDrawer();
         } catch (e) {
             console.warn('Ошибка при сбросе фильтров:', e);
         }
@@ -424,6 +424,13 @@ export const FormProvider: React.FC<FormProviderProps> = ({
             setEditDraft: mainCrud.setEditDraft,
             setEditStylesDraft: mainCrud.setEditStylesDraft,
 
+            // Валидация Main required полей
+            showValidationErrors: mainCrud.showValidationErrors,
+            setShowValidationErrors: mainCrud.setShowValidationErrors,
+            validationMissingFields: mainCrud.validationMissingFields,
+            setValidationMissingFields: mainCrud.setValidationMissingFields,
+            resetValidation: mainCrud.resetValidation,
+
             // Sub CRUD
             subAdding: {
                 isAddingSub: subCrud.isAddingSub,
@@ -441,6 +448,13 @@ export const FormProvider: React.FC<FormProviderProps> = ({
             setDraftSub: subCrud.setDraftSub,
             setSubEditDraft: setSubEditDraft,
             setSubEditingRowIdx: setSubEditingRowIdx,
+
+            // Валидация Sub required полей
+            showSubValidationErrors: subCrud.showSubValidationErrors,
+            setShowSubValidationErrors: subCrud.setShowSubValidationErrors,
+            subValidationMissingFields: subCrud.subValidationMissingFields,
+            setSubValidationMissingFields: subCrud.setSubValidationMissingFields,
+            resetSubValidation: subCrud.resetSubValidation,
 
             // Drill
             drill,

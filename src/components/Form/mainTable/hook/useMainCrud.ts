@@ -1,15 +1,13 @@
-// useMainCrud.ts — с валидацией required полей
+// useMainCrud.ts — с валидацией required полей и поддержкой Toast
 import { useCallback, useState } from 'react';
 import { api } from '@/services/api';
 import type { DTable, FormDisplay, Widget, WidgetForm } from '@/shared/hooks/useWorkSpaces';
 import type { ExtCol } from '@/components/Form/formTable/parts/FormatByDatatype';
 import { loadComboOptionsOnce, normalizeValueForColumn } from '@/components/Form/mainTable/InputCell';
 import type { CellStyles } from '@/components/Form/mainTable/CellStylePopover';
-// NEW: Импорт функций валидации
 import {
     validateAddDraft,
     validateEditDraft,
-    formatValidationErrors,
 } from '@/shared/utils/requiredValidation/requiredValidation';
 
 const DEBUG_MAINCRUD = true;
@@ -90,9 +88,10 @@ export function useMainCrud({
     const [editStylesDraft, setEditStylesDraft] = useState<Record<string, CellStyles | null>>({});
 
     // ═══════════════════════════════════════════════════════════
-    // NEW: Состояние для показа ошибок валидации
+    // Состояние валидации
     // ═══════════════════════════════════════════════════════════
     const [showValidationErrors, setShowValidationErrors] = useState(false);
+    const [validationMissingFields, setValidationMissingFields] = useState<string[]>([]);
 
     const getEffectiveFormId = useCallback((): number | null => {
         if (selectedFormId != null) return selectedFormId;
@@ -292,6 +291,14 @@ export function useMainCrud({
     const preflightUpdate = useCallback(() => ensureQuery('update'), [ensureQuery]);
     const preflightDelete = useCallback(() => ensureQuery('delete'), [ensureQuery]);
 
+    // ═══════════════════════════════════════════════════════════
+    // Сброс валидации
+    // ═══════════════════════════════════════════════════════════
+    const resetValidation = useCallback(() => {
+        setShowValidationErrors(false);
+        setValidationMissingFields([]);
+    }, []);
+
     function isSameComboGroupCRUD(a: ExtCol, b: ExtCol): boolean {
         if (!a || !b) return false;
         const aWrite = (a.__write_tc_id ?? a.table_column_id) ?? null;
@@ -313,6 +320,7 @@ export function useMainCrud({
         console.warn('[useMainCrud][startAdd] combobox group has no __write_tc_id', group);
         return null;
     }
+
     // ═══════════════════════════════════════════════════════════
     // ДОБАВЛЕНИЕ
     // ═══════════════════════════════════════════════════════════
@@ -330,7 +338,7 @@ export function useMainCrud({
         setIsAdding(true);
         setEditingRowIdx(null);
         setEditStylesDraft({});
-        setShowValidationErrors(false); // NEW: Сбрасываем ошибки при начале добавления
+        resetValidation();
 
         const init: Record<number, string> = {};
         const seen = new Set<number>();
@@ -363,18 +371,18 @@ export function useMainCrud({
 
         log('startAdd → init draft (unique write ids)', init);
         setDraft(init);
-    }, [preflightInsert, flatColumnsInRenderOrder, selectedFormId, selectedWidget, preflightTableId]);
+    }, [preflightInsert, flatColumnsInRenderOrder, selectedFormId, selectedWidget, preflightTableId, resetValidation]);
 
     const cancelAdd = useCallback(() => {
         setIsAdding(false);
         setDraft({});
         setEditStylesDraft({});
-        setShowValidationErrors(false); // NEW: Сбрасываем ошибки при отмене
-    }, []);
+        resetValidation();
+    }, [resetValidation]);
 
     const submitAdd = useCallback(async () => {
         // ═══════════════════════════════════════════════════════════
-        // NEW: ВАЛИДАЦИЯ REQUIRED ПОЛЕЙ
+        // ВАЛИДАЦИЯ REQUIRED ПОЛЕЙ
         // ═══════════════════════════════════════════════════════════
         const validation = validateAddDraft(draft, flatColumnsInRenderOrder);
 
@@ -385,8 +393,8 @@ export function useMainCrud({
             });
 
             setShowValidationErrors(true);
-            alert(formatValidationErrors(validation));
-            return;
+            setValidationMissingFields(validation.missingFields);
+            return; // Не показываем alert — Toast покажется через состояние
         }
 
         const wid = getEffectiveWidgetId();
@@ -521,7 +529,7 @@ export function useMainCrud({
             setIsAdding(false);
             setDraft({});
             setEditStylesDraft({});
-            setShowValidationErrors(false); // NEW: Сбрасываем после успеха
+            resetValidation();
 
             log('✅ submitAdd COMPLETE');
         } catch (e: any) {
@@ -545,7 +553,9 @@ export function useMainCrud({
         canMatchFilters,
         buildFiltersFromDraft,
         onResetTreeDrawer,
+        resetValidation,
     ]);
+
     // ═══════════════════════════════════════════════════════════
     // РЕДАКТИРОВАНИЕ
     // ═══════════════════════════════════════════════════════════
@@ -563,7 +573,7 @@ export function useMainCrud({
 
             setIsAdding(false);
             setEditStylesDraft({});
-            setShowValidationErrors(false); // NEW: Сбрасываем ошибки при начале редактирования
+            resetValidation();
 
             const row = formDisplay.data[rowIdx];
 
@@ -693,7 +703,7 @@ export function useMainCrud({
             setEditingRowIdx(rowIdx);
             setEditDraft(init);
         },
-        [preflightUpdate, formDisplay.data, flatColumnsInRenderOrder, valueIndexByKey, selectedFormId, selectedWidget]
+        [preflightUpdate, formDisplay.data, flatColumnsInRenderOrder, valueIndexByKey, selectedFormId, selectedWidget, resetValidation]
     );
 
     const cancelEdit = useCallback(() => {
@@ -701,8 +711,8 @@ export function useMainCrud({
         setEditDraft({});
         setEditSaving(false);
         setEditStylesDraft({});
-        setShowValidationErrors(false); // NEW: Сбрасываем ошибки при отмене
-    }, []);
+        resetValidation();
+    }, [resetValidation]);
 
     const submitEdit = useCallback(async () => {
         if (editingRowIdx == null) return;
@@ -710,7 +720,7 @@ export function useMainCrud({
         const row = formDisplay.data[editingRowIdx];
 
         // ═══════════════════════════════════════════════════════════
-        // NEW: ВАЛИДАЦИЯ REQUIRED ПОЛЕЙ
+        // ВАЛИДАЦИЯ REQUIRED ПОЛЕЙ
         // ═══════════════════════════════════════════════════════════
         const validation = validateEditDraft(editDraft, row, flatColumnsInRenderOrder, valueIndexByKey);
 
@@ -721,8 +731,8 @@ export function useMainCrud({
             });
 
             setShowValidationErrors(true);
-            alert(formatValidationErrors(validation));
-            return;
+            setValidationMissingFields(validation.missingFields);
+            return; // Toast покажется через состояние
         }
 
         const wid = getEffectiveWidgetId();
@@ -825,7 +835,7 @@ export function useMainCrud({
             setIsAdding(false);
             setDraft({});
             setEditStylesDraft({});
-            setShowValidationErrors(false); // NEW: Сбрасываем после успеха
+            resetValidation();
             cancelEdit();
 
             log('✅ submitEdit COMPLETE');
@@ -846,7 +856,9 @@ export function useMainCrud({
         reloadDisplay,
         reloadTree,
         cancelEdit,
+        resetValidation,
     ]);
+
     // ═══════════════════════════════════════════════════════════
     // УДАЛЕНИЕ
     // ═══════════════════════════════════════════════════════════
@@ -951,8 +963,11 @@ export function useMainCrud({
         setEditDraft,
         editStylesDraft,
         setEditStylesDraft,
-        // NEW: Экспортируем состояние валидации
+        // Валидация
         showValidationErrors,
         setShowValidationErrors,
+        validationMissingFields,
+        setValidationMissingFields,
+        resetValidation,
     };
 }

@@ -1,9 +1,10 @@
 // src/components/Form/subForm/SubFormWithContext.tsx
 
-import React, {useCallback, useEffect, useMemo, useRef} from 'react';
-import {useFormContext} from '@/components/Form/context';
-import {SubWormTable} from './SubFormTable';
-import type {DrillOpenMeta} from '@/components/Form/context';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useFormContext } from '@/components/Form/context';
+import { SubWormTable } from './SubFormTable';
+import { ValidationToast } from '@/components/Form/mainTable/ValidationToast';
+import type { DrillOpenMeta } from '@/components/Form/context';
 import * as cls from "@/components/table/tableToolbar/TableToolbar.module.scss";
 
 type Props = {
@@ -21,8 +22,12 @@ type Props = {
 export const SubFormWithContext: React.FC<Props> = ({
                                                         onOpenDrill,
                                                         comboReloadToken = 0,
-                                                        submitAdd,saving,selectedWidget,buttonClassName,startAdd,cancelAdd
-
+                                                        submitAdd,
+                                                        saving,
+                                                        selectedWidget,
+                                                        buttonClassName,
+                                                        startAdd,
+                                                        cancelAdd,
                                                     }) => {
     const ctx = useFormContext();
 
@@ -40,12 +45,18 @@ export const SubFormWithContext: React.FC<Props> = ({
         setSubEditingRowIdx,
         setActiveSubOrder,
         loadSubDisplay,
+        // Валидация Sub (отдельная от Main)
+        showSubValidationErrors,
+        subValidationMissingFields,
+        setShowSubValidationErrors,
+        setSubValidationMissingFields,
+        resetSubValidation,
     } = ctx;
 
-    const {selectedFormId, currentForm} = config;
-    const {subDisplay} = data;
-    const {subLoading, subError} = loading;
-    const {activeSubOrder, lastPrimary} = selection;
+    const { selectedFormId, currentForm } = config;
+    const { subDisplay } = data;
+    const { subLoading, subError } = loading;
+    const { activeSubOrder, lastPrimary } = selection;
 
     // Трекаем предыдущий formId для сброса
     const prevFormIdRef = useRef<number | null>(selectedFormId);
@@ -113,6 +124,14 @@ export const SubFormWithContext: React.FC<Props> = ({
     }, [setActiveSubOrder, formIdForSub, lastPrimary, loadSubDisplay]);
 
     // ═══════════════════════════════════════════════════════════
+    // VALIDATION TOAST CLOSE
+    // ═══════════════════════════════════════════════════════════
+
+    const handleCloseValidationToast = useCallback(() => {
+        setShowSubValidationErrors(false);
+    }, [setShowSubValidationErrors]);
+
+    // ═══════════════════════════════════════════════════════════
     // EARLY RETURN: не рендерим если нет выбранной строки
     // ═══════════════════════════════════════════════════════════
 
@@ -124,40 +143,53 @@ export const SubFormWithContext: React.FC<Props> = ({
 
 
     return (
-        <SubWormTable
-            selectFormId={selectedFormId}
-            submitAdd={submitAdd}
-            saving={saving}
-            selectedWidget={selectedWidget}
-            buttonClassName={buttonClassName}
-            startAdd={startAdd}
-            cancelAdd={cancelAdd}
+        <>
+            <SubWormTable
+                selectFormId={selectedFormId}
+                submitAdd={submitAdd}
+                saving={saving}
+                selectedWidget={selectedWidget}
+                buttonClassName={buttonClassName}
+                startAdd={startAdd}
+                cancelAdd={cancelAdd}
 
+                subDisplay={subDisplay}
+                handleTabClick={handleTabClick}
+                subLoading={subLoading}
+                subError={subError}
+                formId={formIdForSub}
+                currentWidgetId={currentWidgetId}
+                currentOrder={currentOrder}
+                comboReloadToken={comboReloadToken}
+                // Editing
+                editingRowIdx={subEditing.editingRowIdx}
+                setEditingRowIdx={setSubEditingRowIdx}
+                editDraft={subEditing.editDraft}
+                setEditDraft={setSubEditDraft}
+                editSaving={subEditing.editSaving}
+                setEditSaving={() => {
+                }} // TODO: добавить в контекст если нужно
+                // Adding
+                isAddingSub={subAdding.isAddingSub}
+                setIsAddingSub={() => {
+                }} // Управляется через контекст
+                draftSub={subAdding.draftSub}
+                setDraftSub={setDraftSub}
+                // Drill
+                onOpenDrill={onOpenDrill}
+                // Валидация Sub — передаём все функции
+                showValidationErrors={showSubValidationErrors}
+                setShowValidationErrors={setShowSubValidationErrors}
+                setValidationMissingFields={setSubValidationMissingFields}
+                resetValidation={resetSubValidation}
+            />
 
-            subDisplay={subDisplay}
-            handleTabClick={handleTabClick}
-            subLoading={subLoading}
-            subError={subError}
-            formId={formIdForSub}
-            currentWidgetId={currentWidgetId}
-            currentOrder={currentOrder}
-            comboReloadToken={comboReloadToken}
-            // Editing
-            editingRowIdx={subEditing.editingRowIdx}
-            setEditingRowIdx={setSubEditingRowIdx}
-            editDraft={subEditing.editDraft}
-            setEditDraft={setSubEditDraft}
-            editSaving={subEditing.editSaving}
-            setEditSaving={() => {
-            }} // TODO: добавить в контекст если нужно
-            // Adding
-            isAddingSub={subAdding.isAddingSub}
-            setIsAddingSub={() => {
-            }} // Управляется через контекст
-            draftSub={subAdding.draftSub}
-            setDraftSub={setDraftSub}
-            // Drill
-            onOpenDrill={onOpenDrill}
-        />
+            {/* Toast для ошибок валидации Sub */}
+            <ValidationToast
+                open={showSubValidationErrors && subValidationMissingFields.length > 0}
+                onClose={handleCloseValidationToast}
+                missingFields={subValidationMissingFields}
+            />
+        </>
     );
 };

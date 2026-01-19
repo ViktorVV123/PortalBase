@@ -3,6 +3,7 @@
 import React, { useCallback } from 'react';
 import { useFormContext } from '@/components/Form/context';
 import { MainTable } from './MainTable';
+import { ValidationToast } from './ValidationToast';
 import type { DrillOpenMeta } from '@/components/Form/context';
 import type { CellStyles } from './CellStylePopover';
 
@@ -40,8 +41,10 @@ export const MainTableWithContext: React.FC<Props> = ({
         setSelectedKey,
         loadSubDisplay,
         config,
-        // NEW: showValidationErrors из контекста
+        // Валидация
         showValidationErrors,
+        validationMissingFields,
+        setShowValidationErrors,
     } = ctx;
 
     const { headerPlan, flatColumnsInRenderOrder, valueIndexByKey, isColReadOnly, stylesColumnMeta } = hp;
@@ -95,38 +98,55 @@ export const MainTableWithContext: React.FC<Props> = ({
         [setEditStylesDraft]
     );
 
+    // ═══════════════════════════════════════════════════════════
+    // VALIDATION TOAST CLOSE
+    // ═══════════════════════════════════════════════════════════
+
+    const handleCloseValidationToast = useCallback(() => {
+        setShowValidationErrors(false);
+    }, [setShowValidationErrors]);
+
     return (
-        <MainTable
-            headerPlan={headerPlan as any}
-            showSubHeaders={showSubHeaders}
-            onToggleSubHeaders={() => setShowSubHeaders((v) => !v)}
-            onOpenDrill={onOpenDrill}
-            isAdding={mainAdding.isAdding}
-            draft={mainAdding.draft}
-            onDraftChange={(tcId, v) => setDraft((prev) => ({ ...prev, [tcId]: v }))}
-            flatColumnsInRenderOrder={flatColumnsInRenderOrder}
-            isColReadOnly={isColReadOnly}
-            placeholderFor={placeholderFor}
-            filteredRows={filteredRows}
-            valueIndexByKey={valueIndexByKey}
-            selectedKey={selectedKey}
-            pkToKey={pkToKey}
-            editingRowIdx={mainEditing.editingRowIdx}
-            editDraft={mainEditing.editDraft}
-            onEditDraftChange={(tcId, v) => setEditDraft((prev) => ({ ...prev, [tcId]: v }))}
-            onSubmitEdit={submitEdit}
-            onCancelEdit={cancelEdit}
-            editSaving={mainEditing.editSaving}
-            onRowClick={handleRowClick}
-            onStartEdit={startEdit}
-            onDeleteRow={deleteRow}
-            deletingRowIdx={deletingRowIdx}
-            disableDrillWhileEditing={disableDrillWhileEditing}
-            comboReloadToken={comboReloadToken}
-            stylesColumnMeta={stylesColumnMeta}
-            editStylesDraft={mainEditing.editStylesDraft}
-            onEditStyleChange={handleEditStyleChange}
-            showValidationErrors={showValidationErrors}
-        />
+        <>
+            <MainTable
+                headerPlan={headerPlan as any}
+                showSubHeaders={showSubHeaders}
+                onToggleSubHeaders={() => setShowSubHeaders((v) => !v)}
+                onOpenDrill={onOpenDrill}
+                isAdding={mainAdding.isAdding}
+                draft={mainAdding.draft}
+                onDraftChange={(tcId, v) => setDraft((prev) => ({ ...prev, [tcId]: v }))}
+                flatColumnsInRenderOrder={flatColumnsInRenderOrder}
+                isColReadOnly={isColReadOnly}
+                placeholderFor={placeholderFor}
+                filteredRows={filteredRows}
+                valueIndexByKey={valueIndexByKey}
+                selectedKey={selectedKey}
+                pkToKey={pkToKey}
+                editingRowIdx={mainEditing.editingRowIdx}
+                editDraft={mainEditing.editDraft}
+                onEditDraftChange={(tcId, v) => setEditDraft((prev) => ({ ...prev, [tcId]: v }))}
+                onSubmitEdit={submitEdit}
+                onCancelEdit={cancelEdit}
+                editSaving={mainEditing.editSaving}
+                onRowClick={handleRowClick}
+                onStartEdit={startEdit}
+                onDeleteRow={deleteRow}
+                deletingRowIdx={deletingRowIdx}
+                disableDrillWhileEditing={disableDrillWhileEditing}
+                comboReloadToken={comboReloadToken}
+                stylesColumnMeta={stylesColumnMeta}
+                editStylesDraft={mainEditing.editStylesDraft}
+                onEditStyleChange={handleEditStyleChange}
+                showValidationErrors={showValidationErrors}
+            />
+
+            {/* Toast для ошибок валидации */}
+            <ValidationToast
+                open={showValidationErrors && validationMissingFields.length > 0}
+                onClose={handleCloseValidationToast}
+                missingFields={validationMissingFields}
+            />
+        </>
     );
 };

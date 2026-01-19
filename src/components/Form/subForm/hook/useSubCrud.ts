@@ -3,6 +3,12 @@
 import { useCallback, useMemo, useState } from 'react';
 import { api } from '@/services/api';
 import type { SubDisplay } from '@/shared/hooks/useWorkSpaces';
+import type { ExtCol } from '@/components/Form/formTable/parts/FormatByDatatype';
+import {
+    validateAddDraft,
+    getRequiredColumns,
+    isEmptyValue,
+} from '@/shared/utils/requiredValidation/requiredValidation';
 
 export type UseSubCrudDeps = {
     formIdForSub: number | null;
@@ -25,20 +31,24 @@ export type UseSubCrudResult = {
     submitAddSub: () => Promise<void>;
 
     subEditableTcIds: number[];
+
+    // Валидация
+    showSubValidationErrors: boolean;
+    setShowSubValidationErrors: React.Dispatch<React.SetStateAction<boolean>>;
+    subValidationMissingFields: string[];
+    setSubValidationMissingFields: React.Dispatch<React.SetStateAction<string[]>>;
+    resetSubValidation: () => void;
 };
 
 // ═══════════════════════════════════════════════════════════
 // УТИЛИТЫ
 // ═══════════════════════════════════════════════════════════
 
-/** Проверка: это синтетический ID от combobox? */
 const isSyntheticComboboxId = (tcId: number): boolean => {
-    return tcId < -1_000_000 + 1; // т.е. tcId <= -1_000_000
+    return tcId < -1_000_000 + 1;
 };
 
-/** Получить реальный write_tc_id для колонки */
 const getWriteTcId = (col: any): number | null => {
-    // Для combobox используем __write_tc_id или ищем реальный table_column_id
     if (col.type === 'combobox') {
         return col.__write_tc_id ?? null;
     }
@@ -58,7 +68,18 @@ export function useSubCrud({
     const [savingSub, setSavingSub] = useState(false);
 
     // ═══════════════════════════════════════════════════════════
-    // COMPUTED: колонки для редактирования
+    // Состояние валидации для Sub
+    // ═══════════════════════════════════════════════════════════
+    const [showSubValidationErrors, setShowSubValidationErrors] = useState(false);
+    const [subValidationMissingFields, setSubValidationMissingFields] = useState<string[]>([]);
+
+    const resetSubValidation = useCallback(() => {
+        setShowSubValidationErrors(false);
+        setSubValidationMissingFields([]);
+    }, []);
+
+    // ═══════════════════════════════════════════════════════════
+    // COMPUTED
     // ═══════════════════════════════════════════════════════════
 
     const subColumnsById = useMemo(() => {
@@ -72,7 +93,10 @@ export function useSubCrud({
         return map;
     }, [subDisplay?.columns]);
 
-    // Редактируемые table_column_id (только реальные, не синтетические)
+    const subColumnsAsExtCol = useMemo(() => {
+        return (subDisplay?.columns ?? []) as ExtCol[];
+    }, [subDisplay?.columns]);
+
     const subEditableTcIds = useMemo(() => {
         const cols = subDisplay?.columns ?? [];
         const ids: number[] = [];
@@ -81,26 +105,19 @@ export function useSubCrud({
         for (const c of cols) {
             const col = c as any;
 
-            // Пропускаем primary, increment, readonly
             if (col.primary || col.increment || col.readonly) continue;
 
-            // Определяем реальный ID для записи
             let writeTcId: number | null = null;
 
             if (col.type === 'combobox') {
-                // Для combobox берём __write_tc_id или реальный table_column_id
                 writeTcId = col.__write_tc_id ?? col.table_column_id ?? null;
-
-                // Если это синтетический ID — пропускаем
                 if (writeTcId != null && isSyntheticComboboxId(writeTcId)) {
-                    // Попробуем найти реальный ID
                     writeTcId = col.__write_tc_id ?? null;
                 }
             } else {
                 writeTcId = col.table_column_id ?? null;
             }
 
-            // Добавляем только реальные, уникальные ID
             if (writeTcId != null && !isSyntheticComboboxId(writeTcId) && !seen.has(writeTcId)) {
                 seen.add(writeTcId);
                 ids.push(writeTcId);
@@ -144,15 +161,18 @@ export function useSubCrud({
         const pf = await preflightInsertSub();
         if (!pf.ok) return;
 
-        // Инициализируем draft только реальными ID
         const init: Record<number, string> = {};
         subEditableTcIds.forEach((tcId) => {
             init[tcId] = '';
         });
 
+        console.debug('[useSubCrud] startAddSub → init draft:', init);
+        console.debug('[useSubCrud] startAddSub → subEditableTcIds:', subEditableTcIds);
+
         setDraftSub(init);
         setIsAddingSub(true);
-    }, [formIdForSub, currentWidgetId, lastPrimary, preflightInsertSub, subEditableTcIds]);
+        resetSubValidation();
+    }, [formIdForSub, currentWidgetId, lastPrimary, preflightInsertSub, subEditableTcIds, resetSubValidation]);
 
     // ═══════════════════════════════════════════════════════════
     // CANCEL ADD
@@ -161,7 +181,8 @@ export function useSubCrud({
     const cancelAddSub = useCallback(() => {
         setIsAddingSub(false);
         setDraftSub({});
-    }, []);
+        resetSubValidation();
+    }, [resetSubValidation]);
 
     // ═══════════════════════════════════════════════════════════
     // SUBMIT ADD
@@ -175,16 +196,62 @@ export function useSubCrud({
             return;
         }
 
+        // ═══════════════════════════════════════════════════════════
+        // ОТЛАДКА: выводим всё для диагностики
+        // ═══════════════════════════════════════════════════════════
+        console.group('[useSubCrud] submitAddSub VALIDATION');
+
+        console.log('draftSub:', draftSub);
+
+        console.log('subColumnsAsExtCol:', subColumnsAsExtCol.map(c => ({
+            column_name: c.column_name,
+            table_column_id: c.table_column_id,
+            __write_tc_id: (c as any).__write_tc_id,
+            required: c.required,
+            visible: c.visible,
+            type: c.type,
+        })));
+
+        const requiredCols = getRequiredColumns(subColumnsAsExtCol);
+        console.log('requiredColumns:', requiredCols.map(c => ({
+            column_name: c.column_name,
+            table_column_id: c.table_column_id,
+            __write_tc_id: (c as any).__write_tc_id,
+            required: c.required,
+        })));
+
+        // Проверяем каждую required колонку вручную
+        for (const col of requiredCols) {
+            const tcId = ((col as any).__write_tc_id ?? col.table_column_id) ?? null;
+            const value = tcId != null ? draftSub[tcId] : undefined;
+            const isEmpty = isEmptyValue(value);
+            console.log(`  Column "${col.column_name}": tcId=${tcId}, value="${value}", isEmpty=${isEmpty}`);
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // ВАЛИДАЦИЯ REQUIRED ПОЛЕЙ
+        // ═══════════════════════════════════════════════════════════
+        const validation = validateAddDraft(draftSub, subColumnsAsExtCol);
+
+        console.log('VALIDATION RESULT:', validation);
+        console.groupEnd();
+
+        if (!validation.isValid) {
+            console.warn('[useSubCrud] VALIDATION FAILED — показываем ошибки');
+            setShowSubValidationErrors(true);
+            setSubValidationMissingFields(validation.missingFields);
+            return; // НЕ отправляем на сервер
+        }
+
+        // Валидация прошла — продолжаем
         const pf = await preflightInsertSub();
         if (!pf.ok) return;
 
         setSavingSub(true);
         try {
-            // Фильтруем только реальные table_column_id (не синтетические)
             const values = Object.entries(draftSub)
                 .filter(([tcIdStr]) => {
                     const tcId = Number(tcIdStr);
-                    // Пропускаем синтетические ID от combobox
                     return !isSyntheticComboboxId(tcId);
                 })
                 .map(([tcIdStr, value]) => {
@@ -229,7 +296,6 @@ export function useSubCrud({
                 const detail = err?.response?.data?.detail ?? err?.response?.data ?? err?.message;
 
                 if (status === 403) {
-                    console.warn('[submitAddSub] 403 Forbidden', { url, body, detail });
                     alert('У вас не хватает прав на добавление новой записи');
                     return;
                 }
@@ -245,12 +311,12 @@ export function useSubCrud({
                 }
             }
 
-            // Перезагрузить текущий саб-виджет
             if (currentOrder != null) {
                 loadSubDisplay(formIdForSub, currentOrder, lastPrimary);
             }
             setIsAddingSub(false);
             setDraftSub({});
+            resetSubValidation();
         } finally {
             setSavingSub(false);
         }
@@ -263,6 +329,8 @@ export function useSubCrud({
         preflightInsertSub,
         loadSubDisplay,
         subColumnsById,
+        subColumnsAsExtCol,
+        resetSubValidation,
     ]);
 
     return {
@@ -275,5 +343,11 @@ export function useSubCrud({
         cancelAddSub,
         submitAddSub,
         subEditableTcIds,
+        // Валидация
+        showSubValidationErrors,
+        setShowSubValidationErrors,
+        subValidationMissingFields,
+        setSubValidationMissingFields,
+        resetSubValidation,
     };
 }
