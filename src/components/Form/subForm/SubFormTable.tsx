@@ -385,7 +385,6 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                                     return (
                                         <td
                                             key={`sub-add-wc${col.widget_column_id}-tc${col.table_column_id}`}
-                                            className={`${hasError ? sub.cellError : ''} ${isReq ? sub.requiredCell : ''}`}
                                         >
                                             {writeTcId == null ? (
                                                 <span className={sub.ellipsis}>—</span>
@@ -446,7 +445,7 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                                             return (
                                                 <td
                                                     key={`sub-edit-r${rowIdx}-wc${col.widget_column_id}-tc${col.table_column_id}`}
-                                                    className={`${sub.editCell} ${hasError ? sub.cellError : ''} ${isReq ? sub.requiredCell : ''}`}
+                                                    className={sub.editCell}
                                                 >
                                                     {writeTcId == null ? (
                                                         <span className={sub.ellipsis}>—</span>

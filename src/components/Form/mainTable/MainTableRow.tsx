@@ -20,7 +20,7 @@ import {
 import { extractRowStyles, getCellStyle } from '@/shared/utils/rowStyles';
 import { CellStyleButton } from './CellStyleButton';
 import type { CellStyles } from './CellStylePopover';
-// NEW: Импорт функций валидации
+// Импорт функций валидации
 import { isColumnRequired, isEmptyValue } from '@/shared/utils/requiredValidation/requiredValidation';
 
 const DEBUG = true;
@@ -85,7 +85,7 @@ type MainTableRowProps = {
     editStylesDraft?: Record<string, CellStyles | null>;
     onEditStyleChange?: (columnName: string, style: CellStyles | null) => void;
 
-    // NEW: Показывать ошибки валидации
+    // Показывать ошибки валидации
     showValidationErrors?: boolean;
 };
 
@@ -294,7 +294,7 @@ export const MainTableRow: React.FC<MainTableRowProps> = (p) => {
                         const writeTcId = (primary.__write_tc_id ?? primary.table_column_id) ?? null;
 
                         if (isEditing) {
-                            // NEW: Проверка на required и пустоту для combobox
+                            // Проверка на required и пустоту для combobox
                             const isReq = isColumnRequired(primary);
                             const value = writeTcId == null ? '' : (p.editDraft[writeTcId] ?? '');
                             const isEmpty = isEmptyValue(value);
@@ -304,7 +304,7 @@ export const MainTableRow: React.FC<MainTableRowProps> = (p) => {
                                 <td
                                     key={`edit-combo-${primary.widget_column_id}:${writeTcId}`}
                                     colSpan={span}
-                                    className={`${s.editCell} ${hasError ? s.cellError : ''} ${isReq ? s.requiredCell : ''}`}
+                                    className={s.editCell}
                                 >
                                     <div className={s.cellEditor}>
                                         <ComboEditDisplay
@@ -374,7 +374,7 @@ export const MainTableRow: React.FC<MainTableRowProps> = (p) => {
                     );
 
                     if (isEditing) {
-                        // NEW: Проверка на required и пустоту для обычной колонки
+                        // Проверка на required и пустоту для обычной колонки
                         const isReq = isColumnRequired(col);
                         const value = writeTcId == null ? '' : (p.editDraft[writeTcId] ?? '');
                         const isEmpty = isEmptyValue(value);
@@ -383,7 +383,7 @@ export const MainTableRow: React.FC<MainTableRowProps> = (p) => {
                         cells.push(
                             <td
                                 key={`edit-${visKey}`}
-                                className={`${s.editCell} ${hasError ? s.cellError : ''} ${isReq ? s.requiredCell : ''}`}
+                                className={s.editCell}
                                 style={cellStyle}
                             >
                                 <div className={s.cellEditor}>

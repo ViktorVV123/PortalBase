@@ -17,7 +17,7 @@ type MainTableAddRowProps = {
     onDraftChange: (tcId: number, v: string) => void;
     placeholderFor: (c: ExtCol) => string;
     comboReloadToken?: number;
-    /** NEW: Показывать ошибки валидации */
+    /** Показывать ошибки валидации */
     showValidationErrors?: boolean;
 };
 
@@ -61,7 +61,7 @@ export const MainTableAddRow: React.FC<MainTableAddRowProps> = ({
                             <td
                                 key={`add-combo-${primary.widget_column_id}:${writeTcId ?? 'null'}`}
                                 colSpan={span}
-                                className={`${s.editCell} ${hasError ? s.cellError : ''} ${isReq ? s.requiredCell : ''}`}
+                                className={s.editCell}
                             >
                                 <InputCell
                                     mode="add"
@@ -73,7 +73,7 @@ export const MainTableAddRow: React.FC<MainTableAddRowProps> = ({
                                     }}
                                     placeholder={isReq ? `${placeholderFor(primary)} *` : placeholderFor(primary)}
                                     comboReloadToken={comboReloadToken}
-                                    showError={showValidationErrors}
+                                    showError={hasError}
                                 />
                             </td>
                         );
@@ -94,7 +94,7 @@ export const MainTableAddRow: React.FC<MainTableAddRowProps> = ({
                     cells.push(
                         <td
                             key={`add-${col.widget_column_id}:${col.table_column_id ?? -1}`}
-                            className={`${s.editCell} ${hasError ? s.cellError : ''} ${isReq ? s.requiredCell : ''}`}
+                            className={s.editCell}
                         >
                             <div className={s.cellEditor}>
                                 <InputCell
@@ -107,7 +107,7 @@ export const MainTableAddRow: React.FC<MainTableAddRowProps> = ({
                                     }}
                                     placeholder={isReq ? `${placeholderFor(col)} *` : placeholderFor(col)}
                                     comboReloadToken={comboReloadToken}
-                                    showError={showValidationErrors}
+                                    showError={hasError}
                                 />
                             </div>
                         </td>
