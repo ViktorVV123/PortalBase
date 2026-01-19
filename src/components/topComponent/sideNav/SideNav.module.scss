@@ -3,35 +3,66 @@
 .wrap {
   position: relative;
   display: inline-block;
+  margin-left: 20px;
 }
 
-/* Кнопка-бургер */
+/* ═══════════════════════════════════════════════════════════════════════════
+   Кнопка "Формы ▾" — стилизована как "Рабочие пространства ▾"
+   ═══════════════════════════════════════════════════════════════════════════ */
 .burger {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  gap: 6px;
+
+  /* Размеры и отступы */
+  height: 36px;
+  padding: 0 14px;
+
+  /* Рамка как у "Рабочие пространства" */
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 6px;
+  background: transparent;
+
+  /* Текст */
+  color: #eee;
+  font-size: 14px;
+  font-family: inherit;
+
   cursor: pointer;
-  border-radius: 4px;
-  transition: background-color 0.15s ease-in-out;
+  transition: all 0.15s ease-in-out;
 
   svg {
-    width: 20px;
-    height: 20px;
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
   }
 
   &:hover {
     background-color: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.4);
   }
 }
 
-/* Всплывашка с деревом форм */
+/* Текст "Формы" */
+.triggerLabel {
+  white-space: nowrap;
+}
+
+/* Стрелочка ▾ */
+.triggerArrow {
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Всплывашка с деревом форм
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 .popup {
   position: absolute;
   top: 120%;
-  right: -1700%;
+
   margin-top: 8px;
   min-width: 580px;
   max-width: 610px;
@@ -40,11 +71,9 @@
   border-radius: 6px;
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.6);
   padding: 8px 0;
-  /* ВАЖНО: вместо overflow: hidden; */
-  overflow-y: auto;   // вертикальный скролл
-  overflow-x: hidden; // по горизонтали скрываем
+  overflow-y: auto;
+  overflow-x: hidden;
   z-index: 9999;
-
 
   &::-webkit-scrollbar {
     width: 9px;
@@ -59,12 +88,15 @@
   }
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   Дерево форм
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 /* Базовый UL дерева */
 .treeList {
   list-style: none;
   margin: 0;
-  padding: 0 8px 0 10px; // справа небольшой отступ под скролл
+  padding: 0 8px 0 10px;
 }
 
 /* Элемент дерева (папка или лист) */
@@ -74,7 +106,6 @@
   gap: 6px;
   padding: 4px 12px;
   cursor: pointer;
-
   color: #e0e0e0;
 
   &:hover {
@@ -106,24 +137,24 @@
   flex: 0 0 14px;
 
   path {
-    /* если svg умеет принимать fill — можно подсветить */
     fill: #e0e0e0;
   }
 }
 
 /* Основная подпись узла (папка/лист) */
 .treeLabel {
-  flex: 1 1 auto;
+  flex: 0 1 550px;
+  max-width: 590px;
+  min-width: 0;
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 /* Название workspace справа от листа */
 .wsName {
   flex: 0 0 auto;
   margin-left: 8px;
-
   color: #9e9e9e;
   white-space: nowrap;
 }
@@ -134,19 +165,21 @@
   margin: 0 6px;
   opacity: 0.4;
   width: 12px;
-  height: 1px; // если svg линия – подстроится сам
+  height: 1px;
 }
 
 /* Имя формы справа от workspace */
 .formName {
-  flex: 0 0 auto;
-
-  color:#66b0ff;
+  flex: 0 1 550px;
+  max-width: 590px;
+  min-width: 0;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #66b0ff;
 }
 
-/* На всякий случай оставлю старый стиль кнопки элемента,
-   вдруг ты ещё где-то используешь forms в плоском виде */
+/* Старый стиль кнопки элемента (для совместимости) */
 .itemBtn {
   display: flex;
   align-items: center;
@@ -157,23 +190,10 @@
   cursor: pointer;
   text-align: left;
   color: #f5f5f5;
-
   gap: 6px;
   border-radius: 4px;
 
   &:hover {
     background-color: rgba(255, 255, 255, 0.06);
   }
-}
-
-
-.treeLabel,
-.formName {
-
-  flex: 0 1 550px;   // базовая ширина ~220px, можно менять число
-  max-width: 590px;  // жёсткий потолок
-  min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }

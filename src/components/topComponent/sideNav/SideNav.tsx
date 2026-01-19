@@ -11,6 +11,8 @@ interface Props {
     toggle: () => void;
     forms: WidgetForm[];
     openForm: (widgetId: number, formId: number) => void;
+    /** Текст рядом с иконкой (например "Формы") */
+    label?: string;
 }
 
 type TreeNode = {
@@ -169,7 +171,7 @@ const Tree: React.FC<TreeProps> = ({ nodes, expanded, toggleNode, onLeafClick })
     );
 };
 
-export const SideNav: React.FC<Props> = ({ open, toggle, forms, openForm }) => {
+export const SideNav: React.FC<Props> = ({ open, toggle, forms, openForm, label }) => {
     const wrapRef = useRef<HTMLDivElement | null>(null);
     const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
@@ -225,6 +227,9 @@ export const SideNav: React.FC<Props> = ({ open, toggle, forms, openForm }) => {
         toggle();
     };
 
+    // Если есть label — показываем текст рядом с иконкой
+    const hasLabel = !!label;
+
     return (
         <div className={s.wrap} ref={wrapRef}>
             <div
@@ -232,8 +237,15 @@ export const SideNav: React.FC<Props> = ({ open, toggle, forms, openForm }) => {
                 onClick={toggle}
                 aria-haspopup="menu"
                 aria-expanded={open}
+                title={label ?? 'Открыть список форм'}
             >
                 <MenuIcon />
+                {hasLabel && (
+                    <>
+                        <span className={s.triggerLabel}>{label}</span>
+                        <span className={s.triggerArrow}>▾</span>
+                    </>
+                )}
             </div>
 
             {open && forms.length > 0 && (

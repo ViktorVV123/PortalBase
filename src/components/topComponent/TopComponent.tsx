@@ -57,11 +57,20 @@ type Props = {
     loadConnections: (opts?: { force?: boolean }) => void;
     connections: Connection[];
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // НОВОЕ: Callback для уведомления родителя об открытии/закрытии меню
-    // ═══════════════════════════════════════════════════════════════════════════
+    // Callback для уведомления родителя об открытии/закрытии меню
     onMenuOpenChange?: (isOpen: boolean) => void;
 };
+
+/**
+ * Проверяет, есть ли у пользователя админские права
+ * Ищет группы, заканчивающиеся на "Admin" или "SuperAdmin"
+ */
+function hasAdminGroup(groups: string[]): boolean {
+    return groups.some(group => {
+        const lower = group.toLowerCase();
+        return lower.endsWith('admin') || lower.endsWith('superadmin');
+    });
+}
 
 export const TopComponent: React.FC<Props> = (props) => {
     const {
@@ -104,6 +113,40 @@ export const TopComponent: React.FC<Props> = (props) => {
     const [editConnOpen, setEditConnOpen] = useState(false);
     const [connToEditId, setConnToEditId] = useState<number | null>(null);
 
+    // ═══════════════════════════════════════════════════════════════════════════
+    // НОВОЕ: Состояние для проверки админских прав
+    // ═══════════════════════════════════════════════════════════════════════════
+    const [isAdmin, setIsAdmin] = useState<boolean | null>(null); // null = ещё не загружено
+
+    useEffect(() => {
+        let mounted = true;
+
+        const checkAdminGroups = async () => {
+            try {
+                const { data } = await api.get<string[]>('/groups');
+
+                if (!mounted) return;
+
+                const hasAdmin = hasAdminGroup(data);
+                setIsAdmin(hasAdmin);
+
+                console.debug('[TopComponent] User groups:', data);
+                console.debug('[TopComponent] Is admin:', hasAdmin);
+            } catch (error) {
+                console.error('[TopComponent] Failed to load user groups:', error);
+                if (mounted) {
+                    setIsAdmin(false); // По умолчанию — не админ
+                }
+            }
+        };
+
+        checkAdminGroups();
+
+        return () => {
+            mounted = false;
+        };
+    }, []);
+
     const state = useTopMenuState({
         loadTables,
         loadWidgetsForTable,
@@ -116,9 +159,7 @@ export const TopComponent: React.FC<Props> = (props) => {
         setTblHover,
     });
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // НОВОЕ: Уведомляем родителя когда меню открывается/закрывается
-    // ═══════════════════════════════════════════════════════════════════════════
+    // Уведомляем родителя когда меню открывается/закрывается
     useEffect(() => {
         onMenuOpenChange?.(state.open);
     }, [state.open, onMenuOpenChange]);
@@ -143,12 +184,17 @@ export const TopComponent: React.FC<Props> = (props) => {
 
     const hasWorkspaces = workSpaces.length > 0;
 
+    // ═══════════════════════════════════════════════════════════════════════════
+    // НОВОЕ: Показываем кнопку "Рабочие пространства" только для админов
+    // ═══════════════════════════════════════════════════════════════════════════
+    const showWorkspacesButton = hasWorkspaces && isAdmin === true;
+
     return (
         <div className={s.bar}>
             <div className={s.logo}>Портал ввода данных</div>
 
             <div className={s.menuWrapper} ref={state.menuRef}>
-                {hasWorkspaces && (
+                {showWorkspacesButton && (
                     <button
                         className={s.trigger}
                         onClick={state.handleTriggerClick}
@@ -166,6 +212,7 @@ export const TopComponent: React.FC<Props> = (props) => {
                     }}
                     forms={Object.values(formsById)}
                     openForm={openFormWithPreload}
+                    label="Формы"
                 />
 
                 {state.open && (
