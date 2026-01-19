@@ -1,10 +1,16 @@
-// useMainCrud.ts — с DEBUG логированием
+// useMainCrud.ts — с валидацией required полей
 import { useCallback, useState } from 'react';
 import { api } from '@/services/api';
 import type { DTable, FormDisplay, Widget, WidgetForm } from '@/shared/hooks/useWorkSpaces';
 import type { ExtCol } from '@/components/Form/formTable/parts/FormatByDatatype';
 import { loadComboOptionsOnce, normalizeValueForColumn } from '@/components/Form/mainTable/InputCell';
 import type { CellStyles } from '@/components/Form/mainTable/CellStylePopover';
+// NEW: Импорт функций валидации
+import {
+    validateAddDraft,
+    validateEditDraft,
+    formatValidationErrors,
+} from '@/shared/utils/requiredValidation/requiredValidation';
 
 const DEBUG_MAINCRUD = true;
 const log = (label: string, payload?: unknown) => {
@@ -83,26 +89,25 @@ export function useMainCrud({
     const [deletingRowIdx, setDeletingRowIdx] = useState<number | null>(null);
     const [editStylesDraft, setEditStylesDraft] = useState<Record<string, CellStyles | null>>({});
 
+    // ═══════════════════════════════════════════════════════════
+    // NEW: Состояние для показа ошибок валидации
+    // ═══════════════════════════════════════════════════════════
+    const [showValidationErrors, setShowValidationErrors] = useState(false);
+
     const getEffectiveFormId = useCallback((): number | null => {
         if (selectedFormId != null) return selectedFormId;
         if (!selectedWidget) return null;
         return formsByWidget[selectedWidget.id]?.form_id ?? null;
     }, [selectedFormId, selectedWidget, formsByWidget]);
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // ИСПРАВЛЕНО: getEffectiveWidgetId — приоритет formDisplay (текущие данные)
-    // ═══════════════════════════════════════════════════════════════════════════
     const getEffectiveWidgetId = useCallback((): number | null => {
         const formId = getEffectiveFormId();
 
-        // 1. Прямой selectedWidget — высший приоритет
         if (selectedWidget?.id) {
             log('getEffectiveWidgetId → from selectedWidget', { widgetId: selectedWidget.id });
             return selectedWidget.id;
         }
 
-        // 2. НОВОЕ: Из formDisplay (текущие актуальные данные формы)
-        // formDisplay.main_widget_id — это widget_id именно для ТЕКУЩЕЙ загруженной формы
         if ((formDisplay as any)?.main_widget_id != null) {
             const wid = (formDisplay as any).main_widget_id as number;
             log('getEffectiveWidgetId → from formDisplay.main_widget_id', { widgetId: wid, formId });
@@ -115,7 +120,6 @@ export function useMainCrud({
             return wid;
         }
 
-        // 3. Из formsById (может быть устаревшим при быстром переключении)
         if (formId != null) {
             const form = formsById[formId];
 
@@ -138,7 +142,6 @@ export function useMainCrud({
                 }
             }
 
-            // 4. Ищем через formsByWidget
             for (const [widStr, f] of Object.entries(formsByWidget)) {
                 if (f?.form_id === formId) {
                     const wid = Number(widStr);
@@ -154,9 +157,6 @@ export function useMainCrud({
         return null;
     }, [selectedWidget, selectedFormId, formsById, formsByWidget, formDisplay, getEffectiveFormId]);
 
-    // ═══════════════════════════════════════════════════════════
-    // HELPER: Reload display with proper filter conversion
-    // ═══════════════════════════════════════════════════════════
     const reloadDisplay = useCallback(async (formId: number, useFilters: boolean = false) => {
         try {
             const filters = useFilters ? activeFilters : [];
@@ -166,12 +166,7 @@ export function useMainCrud({
                 value: String(f.value),
             }));
 
-            log('reloadDisplay', {
-                formId,
-                useFilters,
-                rawFilters: filters,
-                normalizedFilters
-            });
+            log('reloadDisplay', { formId, useFilters, rawFilters: filters, normalizedFilters });
 
             const { data } = await api.post<FormDisplay>(
                 `/display/${formId}/main`,
@@ -189,20 +184,11 @@ export function useMainCrud({
         }
     }, [activeFilters, setFormDisplay, setActiveFilters]);
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // ИСПРАВЛЕНО: ensureQuery с подробным логированием
-    // ═══════════════════════════════════════════════════════════════════════════
     const ensureQuery = useCallback(
         async (kind: EnsureQueryKind): Promise<{ ok: boolean; formId?: number }> => {
             const formId = getEffectiveFormId();
 
-            log('ensureQuery → START', {
-                kind,
-                formId,
-                selectedFormId,
-                selectedWidgetId: selectedWidget?.id,
-                preflightTableId,
-            });
+            log('ensureQuery → START', { kind, formId, selectedFormId, selectedWidgetId: selectedWidget?.id, preflightTableId });
 
             if (!formId) {
                 log('ensureQuery → FAIL: no formId', {});
@@ -211,16 +197,10 @@ export function useMainCrud({
 
             const widgetId = getEffectiveWidgetId();
 
-            log('ensureQuery → widgetId check', {
-                widgetId,
-                preflightTableId,
-                willFail: !widgetId && !preflightTableId,
-            });
+            log('ensureQuery → widgetId check', { widgetId, preflightTableId, willFail: !widgetId && !preflightTableId });
 
             if (!widgetId && !preflightTableId) {
-                log('ensureQuery → FAIL: no widgetId and no preflightTableId', {
-                    hint: 'Нужно либо selectedWidget, либо formsById[formId].main_widget_id, либо preflightTableId'
-                });
+                log('ensureQuery → FAIL: no widgetId and no preflightTableId', {});
                 return { ok: false };
             }
 
@@ -234,9 +214,7 @@ export function useMainCrud({
 
                 if (!tableId && widgetId) {
                     log('ensureQuery → fetching widget to get tableId', { widgetId });
-                    const { data: widgetMeta } = await api.get<{ id: number; table_id: number }>(
-                        `/widgets/${widgetId}`
-                    );
+                    const { data: widgetMeta } = await api.get<{ id: number; table_id: number }>(`/widgets/${widgetId}`);
                     tableId = widgetMeta?.table_id ?? null;
                     log('ensureQuery → got tableId from widget', { tableId });
                 }
@@ -250,12 +228,7 @@ export function useMainCrud({
 
                 const { data: table } = await api.get<DTable>(`/tables/${tableId}`);
 
-                const q =
-                    kind === 'insert'
-                        ? table?.insert_query
-                        : kind === 'update'
-                            ? table?.update_query
-                            : table?.delete_query;
+                const q = kind === 'insert' ? table?.insert_query : kind === 'update' ? table?.update_query : table?.delete_query;
 
                 if (!q || !q.trim()) {
                     if (kind === 'insert') {
@@ -278,9 +251,6 @@ export function useMainCrud({
         [selectedWidget, preflightTableId, getEffectiveFormId, getEffectiveWidgetId, selectedFormId]
     );
 
-    // ═══════════════════════════════════════════════════════════
-    // HELPER: Can new record match current filters?
-    // ═══════════════════════════════════════════════════════════
     const canMatchFilters = useCallback((
         draft: Record<number, string>,
         filters: Array<{ table_column_id: number; value: string | number }>
@@ -289,23 +259,15 @@ export function useMainCrud({
 
         for (const filter of filters) {
             const draftValue = draft[filter.table_column_id];
-
             if (draftValue != null && draftValue !== '') {
                 const filterValue = String(filter.value).toLowerCase().trim();
                 const draftValueNormalized = String(draftValue).toLowerCase().trim();
-
-                if (draftValueNormalized !== filterValue) {
-                    return false;
-                }
+                if (draftValueNormalized !== filterValue) return false;
             }
         }
-
         return true;
     }, []);
 
-    // ═══════════════════════════════════════════════════════════
-    // HELPER: Build new filters from draft
-    // ═══════════════════════════════════════════════════════════
     const buildFiltersFromDraft = useCallback((
         draft: Record<number, string>,
         currentFilters: Array<{ table_column_id: number; value: string | number }>
@@ -316,12 +278,8 @@ export function useMainCrud({
 
         for (const filter of currentFilters) {
             const draftValue = draft[filter.table_column_id];
-
             if (draftValue != null && draftValue !== '') {
-                newFilters.push({
-                    table_column_id: filter.table_column_id,
-                    value: draftValue,
-                });
+                newFilters.push({ table_column_id: filter.table_column_id, value: draftValue });
             } else {
                 return null;
             }
@@ -342,9 +300,7 @@ export function useMainCrud({
             a.type === 'combobox' &&
             b.type === 'combobox' &&
             a.widget_column_id === b.widget_column_id &&
-            aWrite != null &&
-            bWrite != null &&
-            aWrite === bWrite
+            aWrite != null && bWrite != null && aWrite === bWrite
         );
     }
 
@@ -357,19 +313,13 @@ export function useMainCrud({
         console.warn('[useMainCrud][startAdd] combobox group has no __write_tc_id', group);
         return null;
     }
-
     // ═══════════════════════════════════════════════════════════
     // ДОБАВЛЕНИЕ
     // ═══════════════════════════════════════════════════════════
     const startAdd = useCallback(async () => {
-        log('startAdd → called', {
-            selectedFormId,
-            selectedWidgetId: selectedWidget?.id,
-            preflightTableId,
-        });
+        log('startAdd → called', { selectedFormId, selectedWidgetId: selectedWidget?.id, preflightTableId });
 
         const pf = await preflightInsert();
-
         log('startAdd → preflight result', pf);
 
         if (!pf.ok) {
@@ -380,6 +330,7 @@ export function useMainCrud({
         setIsAdding(true);
         setEditingRowIdx(null);
         setEditStylesDraft({});
+        setShowValidationErrors(false); // NEW: Сбрасываем ошибки при начале добавления
 
         const init: Record<number, string> = {};
         const seen = new Set<number>();
@@ -389,10 +340,7 @@ export function useMainCrud({
 
             if (c.type === 'combobox') {
                 let j = i + 1;
-                while (
-                    j < flatColumnsInRenderOrder.length &&
-                    isSameComboGroupCRUD(c, flatColumnsInRenderOrder[j])
-                    ) {
+                while (j < flatColumnsInRenderOrder.length && isSameComboGroupCRUD(c, flatColumnsInRenderOrder[j])) {
                     j += 1;
                 }
                 const group = flatColumnsInRenderOrder.slice(i, j);
@@ -421,9 +369,26 @@ export function useMainCrud({
         setIsAdding(false);
         setDraft({});
         setEditStylesDraft({});
+        setShowValidationErrors(false); // NEW: Сбрасываем ошибки при отмене
     }, []);
 
     const submitAdd = useCallback(async () => {
+        // ═══════════════════════════════════════════════════════════
+        // NEW: ВАЛИДАЦИЯ REQUIRED ПОЛЕЙ
+        // ═══════════════════════════════════════════════════════════
+        const validation = validateAddDraft(draft, flatColumnsInRenderOrder);
+
+        if (!validation.isValid) {
+            log('submitAdd → VALIDATION FAILED', {
+                errors: validation.errors,
+                missingFields: validation.missingFields,
+            });
+
+            setShowValidationErrors(true);
+            alert(formatValidationErrors(validation));
+            return;
+        }
+
         const wid = getEffectiveWidgetId();
         if (!wid) {
             log('submitAdd → BLOCKED: no widgetId', {});
@@ -470,10 +435,7 @@ export function useMainCrud({
                     value = normalized === '' ? null : normalized;
                 }
 
-                return {
-                    table_column_id: tcId,
-                    value,
-                };
+                return { table_column_id: tcId, value };
             });
 
             log('submitAdd → values[]', values);
@@ -502,19 +464,12 @@ export function useMainCrud({
                     log('✅ submitAdd → POST with trailing slash success');
                 } else if (status === 422) {
                     console.error('[submitAdd] 422 от бэка', { detail, body });
-                    alert(
-                        `❌ Не удалось добавить строку (422).\n\n` +
-                        `detail: ${typeof detail === 'string' ? detail : JSON.stringify(detail)}`
-                    );
+                    alert(`❌ Не удалось добавить строку (422).\n\ndetail: ${typeof detail === 'string' ? detail : JSON.stringify(detail)}`);
                     return;
                 } else {
                     throw err;
                 }
             }
-
-            // ═══════════════════════════════════════════════════════════
-            // УМНАЯ ЛОГИКА ФИЛЬТРОВ
-            // ═══════════════════════════════════════════════════════════
 
             const hasFilters = activeFilters.length > 0;
             let shouldResetTreeDrawer = false;
@@ -539,16 +494,10 @@ export function useMainCrud({
                             value: String(f.value),
                         }));
 
-                        const { data } = await api.post<FormDisplay>(
-                            `/display/${pf.formId}/main`,
-                            normalizedFilters
-                        );
+                        const { data } = await api.post<FormDisplay>(`/display/${pf.formId}/main`, normalizedFilters);
                         setFormDisplay(data);
 
-                        log('✅ submitAdd → auto-updated filters', {
-                            oldFilters: activeFilters,
-                            newFilters
-                        });
+                        log('✅ submitAdd → auto-updated filters', { oldFilters: activeFilters, newFilters });
                     } else {
                         await reloadDisplay(pf.formId, false);
 
@@ -557,7 +506,6 @@ export function useMainCrud({
                         }
 
                         shouldResetTreeDrawer = true;
-
                         log('✅ submitAdd → filters reset (cannot auto-update)');
                     }
                 }
@@ -573,16 +521,13 @@ export function useMainCrud({
             setIsAdding(false);
             setDraft({});
             setEditStylesDraft({});
+            setShowValidationErrors(false); // NEW: Сбрасываем после успеха
 
             log('✅ submitAdd COMPLETE');
         } catch (e: any) {
             const status = e?.response?.status;
             const msg = e?.response?.data ?? e?.message;
-            alert(
-                `❌ Не удалось добавить строку: ${status ?? ''}\n\n${
-                    typeof msg === 'string' ? msg : JSON.stringify(msg)
-                }`
-            );
+            alert(`❌ Не удалось добавить строку: ${status ?? ''}\n\n${typeof msg === 'string' ? msg : JSON.stringify(msg)}`);
         } finally {
             setSaving(false);
         }
@@ -601,7 +546,6 @@ export function useMainCrud({
         buildFiltersFromDraft,
         onResetTreeDrawer,
     ]);
-
     // ═══════════════════════════════════════════════════════════
     // РЕДАКТИРОВАНИЕ
     // ═══════════════════════════════════════════════════════════
@@ -610,7 +554,6 @@ export function useMainCrud({
             log('startEdit → called', { rowIdx, selectedFormId, selectedWidgetId: selectedWidget?.id });
 
             const pf = await preflightUpdate();
-
             log('startEdit → preflight result', pf);
 
             if (!pf.ok) {
@@ -620,6 +563,7 @@ export function useMainCrud({
 
             setIsAdding(false);
             setEditStylesDraft({});
+            setShowValidationErrors(false); // NEW: Сбрасываем ошибки при начале редактирования
 
             const row = formDisplay.data[rowIdx];
 
@@ -635,7 +579,6 @@ export function useMainCrud({
                 const shownVal = (idx != null ? row.values[idx] : '') as string | number | null;
                 const shownStr = shownVal == null ? '' : String(shownVal).trim();
 
-                // DEBUG: логируем каждую колонку
                 if (col.type === 'combobox') {
                     log('startEdit → collecting combobox token', {
                         columnName: col.column_name,
@@ -652,11 +595,7 @@ export function useMainCrud({
 
                 if (col.type === 'combobox') {
                     const gKey = `${col.widget_column_id}:${writeTcId}`;
-                    const g = comboGroups.get(gKey) ?? {
-                        wcId: col.widget_column_id,
-                        writeTcId,
-                        tokens: [],
-                    };
+                    const g = comboGroups.get(gKey) ?? { wcId: col.widget_column_id, writeTcId, tokens: [] };
                     if (shownStr) g.tokens.push(shownStr);
                     comboGroups.set(gKey, g);
                 } else {
@@ -669,51 +608,32 @@ export function useMainCrud({
                 try {
                     const options = await loadComboOptionsOnce(g.wcId, g.writeTcId);
                     const tokens = g.tokens.map((t) => t.toLowerCase());
-                    const tokensOriginal = g.tokens; // Сохраняем оригинальные токены для точного сравнения
+                    const tokensOriginal = g.tokens;
 
                     log('startEdit → combobox mapping', {
                         wcId: g.wcId,
                         writeTcId: g.writeTcId,
                         tokens: g.tokens,
                         optionsCount: options.length,
-                        firstOptions: options.slice(0, 3).map(o => ({
-                            id: o.id,
-                            show: o.show,
-                            showHidden: o.showHidden,
-                        })),
+                        firstOptions: options.slice(0, 3).map(o => ({ id: o.id, show: o.show, showHidden: o.showHidden })),
                     });
 
                     let foundId = '';
 
-                    // ═══════════════════════════════════════════════════════════
-                    // СТРАТЕГИЯ 1: Точное совпадение по ID
-                    // Если один из токенов — это ID опции, это точное совпадение
-                    // ═══════════════════════════════════════════════════════════
                     for (const o of options) {
-                        // Проверяем есть ли ID опции среди токенов (как строка)
                         if (tokensOriginal.includes(o.id) || tokensOriginal.includes(String(o.id))) {
                             foundId = o.id;
-                            log('startEdit → combobox: exact match by ID in tokens', {
-                                optionId: o.id,
-                                tokens: tokensOriginal
-                            });
+                            log('startEdit → combobox: exact match by ID in tokens', { optionId: o.id, tokens: tokensOriginal });
                             break;
                         }
 
-                        // Проверяем есть ли ID в show массиве и совпадает с токеном
                         if (o.show.includes(o.id) && tokensOriginal.some(t => t === o.id)) {
                             foundId = o.id;
-                            log('startEdit → combobox: exact match by ID in show', {
-                                optionId: o.id,
-                                show: o.show
-                            });
+                            log('startEdit → combobox: exact match by ID in show', { optionId: o.id, show: o.show });
                             break;
                         }
                     }
 
-                    // ═══════════════════════════════════════════════════════════
-                    // СТРАТЕГИЯ 2: Если не нашли по ID — ищем по максимальному score
-                    // ═══════════════════════════════════════════════════════════
                     if (!foundId) {
                         let bestScore = 0;
                         const candidates: Array<{ id: string; score: number; exactMatch: boolean }> = [];
@@ -722,11 +642,9 @@ export function useMainCrud({
                             const hay = [...o.show, ...o.showHidden].map((x) => x.toLowerCase());
                             const score = tokens.reduce((acc, t) => acc + (hay.includes(t) ? 1 : 0), 0);
 
-                            // Проверяем точное совпадение всей строки
                             const hayJoined = hay.join(' ');
                             const tokensJoined = tokens.join(' ');
-                            const exactMatch = hayJoined.includes(tokensJoined) ||
-                                tokens.every(t => hay.includes(t));
+                            const exactMatch = hayJoined.includes(tokensJoined) || tokens.every(t => hay.includes(t));
 
                             if (score > 0) {
                                 candidates.push({ id: o.id, score, exactMatch });
@@ -737,18 +655,14 @@ export function useMainCrud({
                             }
                         }
 
-                        // Сортируем: сначала по exactMatch, потом по score
                         candidates.sort((a, b) => {
-                            if (a.exactMatch !== b.exactMatch) {
-                                return a.exactMatch ? -1 : 1;
-                            }
+                            if (a.exactMatch !== b.exactMatch) return a.exactMatch ? -1 : 1;
                             return b.score - a.score;
                         });
 
                         const topCandidates = candidates.filter(c => c.score === bestScore);
 
                         if (candidates.length > 0) {
-                            // Берём лучшего кандидата (с exactMatch или первого по score)
                             foundId = candidates[0].id;
 
                             if (topCandidates.length > 1) {
@@ -787,10 +701,29 @@ export function useMainCrud({
         setEditDraft({});
         setEditSaving(false);
         setEditStylesDraft({});
+        setShowValidationErrors(false); // NEW: Сбрасываем ошибки при отмене
     }, []);
 
     const submitEdit = useCallback(async () => {
         if (editingRowIdx == null) return;
+
+        const row = formDisplay.data[editingRowIdx];
+
+        // ═══════════════════════════════════════════════════════════
+        // NEW: ВАЛИДАЦИЯ REQUIRED ПОЛЕЙ
+        // ═══════════════════════════════════════════════════════════
+        const validation = validateEditDraft(editDraft, row, flatColumnsInRenderOrder, valueIndexByKey);
+
+        if (!validation.isValid) {
+            log('submitEdit → VALIDATION FAILED', {
+                errors: validation.errors,
+                missingFields: validation.missingFields,
+            });
+
+            setShowValidationErrors(true);
+            alert(formatValidationErrors(validation));
+            return;
+        }
 
         const wid = getEffectiveWidgetId();
         if (!wid) {
@@ -806,8 +739,6 @@ export function useMainCrud({
 
         setEditSaving(true);
         try {
-            const row = formDisplay.data[editingRowIdx];
-
             const pkObj = Object.fromEntries(
                 Object.entries(row.primary_keys).map(([k, v]) => [k, String(v)])
             );
@@ -853,20 +784,13 @@ export function useMainCrud({
                         }
                     });
 
-                    const stylesValue =
-                        Object.keys(currentStyles).length > 0 ? JSON.stringify(currentStyles) : null;
+                    const stylesValue = Object.keys(currentStyles).length > 0 ? JSON.stringify(currentStyles) : null;
 
-                    values.push({
-                        table_column_id: stylesTcId,
-                        value: stylesValue,
-                    });
+                    values.push({ table_column_id: stylesTcId, value: stylesValue });
                 }
             }
 
-            const body = {
-                pk: { primary_keys: pkObj },
-                values,
-            };
+            const body = { pk: { primary_keys: pkObj }, values };
             const url = `/data/${pf.formId}/${wid}`;
 
             log('submitEdit → request', { url, body });
@@ -901,6 +825,7 @@ export function useMainCrud({
             setIsAdding(false);
             setDraft({});
             setEditStylesDraft({});
+            setShowValidationErrors(false); // NEW: Сбрасываем после успеха
             cancelEdit();
 
             log('✅ submitEdit COMPLETE');
@@ -916,11 +841,12 @@ export function useMainCrud({
         editDraft,
         editStylesDraft,
         stylesColumnMeta,
+        flatColumnsInRenderOrder,
+        valueIndexByKey,
         reloadDisplay,
         reloadTree,
         cancelEdit,
     ]);
-
     // ═══════════════════════════════════════════════════════════
     // УДАЛЕНИЕ
     // ═══════════════════════════════════════════════════════════
@@ -935,7 +861,6 @@ export function useMainCrud({
             }
 
             const pf = await preflightDelete();
-
             log('deleteRow → preflight result', pf);
 
             if (!pf.ok || !pf.formId) {
@@ -1026,5 +951,8 @@ export function useMainCrud({
         setEditDraft,
         editStylesDraft,
         setEditStylesDraft,
+        // NEW: Экспортируем состояние валидации
+        showValidationErrors,
+        setShowValidationErrors,
     };
 }

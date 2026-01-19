@@ -643,7 +643,71 @@ h2 {
 }
 
 
+// ═══════════════════════════════════════════════════════════
+// ДОБАВИТЬ В КОНЕЦ SetOfTables.module.scss
+// Стили для валидации required полей
+// ═══════════════════════════════════════════════════════════
 
+$error-color: #ef4444;
+$error-bg: rgba(239, 68, 68, 0.08);
+$required-mark-color: #ef4444;
+
+// ═══════════════════════════════════════════════════════════
+// REQUIRED FIELD MARKER (звёздочка *)
+// ═══════════════════════════════════════════════════════════
+
+.requiredMark {
+  color: $required-mark-color;
+  font-weight: 700;
+  margin-left: 2px;
+  font-size: 1.1em;
+  line-height: 1;
+  vertical-align: middle;
+  cursor: help;
+}
+
+// ═══════════════════════════════════════════════════════════
+// REQUIRED CELL (обязательная ячейка)
+// ═══════════════════════════════════════════════════════════
+
+.requiredCell {
+  position: relative;
+}
+
+// ═══════════════════════════════════════════════════════════
+// CELL ERROR (ячейка с ошибкой валидации)
+// ═══════════════════════════════════════════════════════════
+
+.cellError {
+  background: $error-bg !important;
+  border-color: $error-color !important;
+
+  // Анимация для привлечения внимания
+  animation: cellErrorPulse 0.3s ease-out;
+}
+
+@keyframes cellErrorPulse {
+  0% {
+    background: rgba(239, 68, 68, 0.2);
+  }
+  100% {
+    background: $error-bg;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// ADD ROW (строка добавления)
+// ═══════════════════════════════════════════════════════════
+
+.addRow {
+  td {
+    background: rgba(74, 222, 128, 0.05);
+  }
+
+  &:hover td {
+    background: rgba(74, 222, 128, 0.08);
+  }
+}
 
 
 

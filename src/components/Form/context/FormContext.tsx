@@ -145,6 +145,10 @@ export type FormContextValue = {
     setEditDraft: React.Dispatch<React.SetStateAction<Record<number, string>>>;
     setEditStylesDraft: React.Dispatch<React.SetStateAction<Record<string, CellStyles | null>>>;
 
+    // NEW: Валидация required полей
+    showValidationErrors: boolean;
+    setShowValidationErrors: React.Dispatch<React.SetStateAction<boolean>>;
+
     // === Sub CRUD ===
     subAdding: {
         isAddingSub: boolean;
@@ -248,6 +252,9 @@ export function useMainCrudContext() {
         setDraft: ctx.setDraft,
         setEditDraft: ctx.setEditDraft,
         setEditStylesDraft: ctx.setEditStylesDraft,
+        // NEW
+        showValidationErrors: ctx.showValidationErrors,
+        setShowValidationErrors: ctx.setShowValidationErrors,
     };
 }
 

@@ -8,6 +8,8 @@ import {
     isSameComboGroup,
     pickPrimaryCombo,
 } from './MainTableCombo';
+import {isColumnRequired, isEmptyValue} from "@/shared/utils/requiredValidation/requiredValidation";
+
 
 type MainTableAddRowProps = {
     flatColumnsInRenderOrder: ExtCol[];
@@ -15,6 +17,8 @@ type MainTableAddRowProps = {
     onDraftChange: (tcId: number, v: string) => void;
     placeholderFor: (c: ExtCol) => string;
     comboReloadToken?: number;
+    /** NEW: Показывать ошибки валидации */
+    showValidationErrors?: boolean;
 };
 
 export const MainTableAddRow: React.FC<MainTableAddRowProps> = ({
@@ -23,11 +27,12 @@ export const MainTableAddRow: React.FC<MainTableAddRowProps> = ({
                                                                     onDraftChange,
                                                                     placeholderFor,
                                                                     comboReloadToken,
+                                                                    showValidationErrors = false,
                                                                 }) => {
     const cols = flatColumnsInRenderOrder;
 
     return (
-        <tr>
+        <tr className={s.addRow}>
             {(() => {
                 const cells: React.ReactNode[] = [];
                 let i = 0;
@@ -47,10 +52,16 @@ export const MainTableAddRow: React.FC<MainTableAddRowProps> = ({
                         const ro = false;
                         const value = writeTcId == null ? '' : (draft[writeTcId] ?? '');
 
+                        // Проверка на required и пустоту
+                        const isReq = isColumnRequired(primary);
+                        const isEmpty = isEmptyValue(value);
+                        const hasError = showValidationErrors && isReq && isEmpty;
+
                         cells.push(
                             <td
                                 key={`add-combo-${primary.widget_column_id}:${writeTcId ?? 'null'}`}
                                 colSpan={span}
+                                className={`${s.editCell} ${hasError ? s.cellError : ''} ${isReq ? s.requiredCell : ''}`}
                             >
                                 <InputCell
                                     mode="add"
@@ -60,8 +71,9 @@ export const MainTableAddRow: React.FC<MainTableAddRowProps> = ({
                                     onChange={(v) => {
                                         if (writeTcId != null) onDraftChange(writeTcId, v);
                                     }}
-                                    placeholder={placeholderFor(primary)}
+                                    placeholder={isReq ? `${placeholderFor(primary)} *` : placeholderFor(primary)}
                                     comboReloadToken={comboReloadToken}
+                                    showError={showValidationErrors}
                                 />
                             </td>
                         );
@@ -74,10 +86,15 @@ export const MainTableAddRow: React.FC<MainTableAddRowProps> = ({
                     const ro = false;
                     const value = writeTcId == null ? '' : (draft[writeTcId] ?? '');
 
+                    // Проверка на required и пустоту
+                    const isReq = isColumnRequired(col);
+                    const isEmpty = isEmptyValue(value);
+                    const hasError = showValidationErrors && isReq && isEmpty;
+
                     cells.push(
                         <td
                             key={`add-${col.widget_column_id}:${col.table_column_id ?? -1}`}
-                            className={s.editCell}
+                            className={`${s.editCell} ${hasError ? s.cellError : ''} ${isReq ? s.requiredCell : ''}`}
                         >
                             <div className={s.cellEditor}>
                                 <InputCell
@@ -88,8 +105,9 @@ export const MainTableAddRow: React.FC<MainTableAddRowProps> = ({
                                     onChange={(v) => {
                                         if (writeTcId != null) onDraftChange(writeTcId, v);
                                     }}
-                                    placeholder={placeholderFor(col)}
+                                    placeholder={isReq ? `${placeholderFor(col)} *` : placeholderFor(col)}
                                     comboReloadToken={comboReloadToken}
+                                    showError={showValidationErrors}
                                 />
                             </div>
                         </td>

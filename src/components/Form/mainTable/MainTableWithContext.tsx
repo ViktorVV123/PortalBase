@@ -35,11 +35,13 @@ export const MainTableWithContext: React.FC<Props> = ({
         deleteRow,
         setDraft,
         setEditDraft,
-        setEditStylesDraft, // ← NEW
+        setEditStylesDraft,
         setLastPrimary,
         setSelectedKey,
         loadSubDisplay,
         config,
+        // NEW: showValidationErrors из контекста
+        showValidationErrors,
     } = ctx;
 
     const { headerPlan, flatColumnsInRenderOrder, valueIndexByKey, isColReadOnly, stylesColumnMeta } = hp;
@@ -122,8 +124,9 @@ export const MainTableWithContext: React.FC<Props> = ({
             disableDrillWhileEditing={disableDrillWhileEditing}
             comboReloadToken={comboReloadToken}
             stylesColumnMeta={stylesColumnMeta}
-            editStylesDraft={mainEditing.editStylesDraft} // ← NEW
-            onEditStyleChange={handleEditStyleChange} // ← NEW
+            editStylesDraft={mainEditing.editStylesDraft}
+            onEditStyleChange={handleEditStyleChange}
+            showValidationErrors={showValidationErrors}
         />
     );
 };

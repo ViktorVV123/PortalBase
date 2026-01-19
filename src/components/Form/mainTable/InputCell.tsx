@@ -5,11 +5,14 @@ import { api } from '@/services/api';
 import { ExtCol, getCanonicalType } from '@/components/Form/formTable/parts/FormatByDatatype';
 import { fromInputValue, toInputValue } from '@/components/Form/formTable/parts/ToInputValue';
 import { MenuItem, Select, TextField, Checkbox, CircularProgress } from '@mui/material';
+import {isColumnRequired, isEmptyValue} from "@/shared/utils/requiredValidation/requiredValidation";
+
+
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // DEBUG
 // ═══════════════════════════════════════════════════════════════════════════════
-const DEBUG_COMBO = true;
+const DEBUG_COMBO = false;
 
 function logCombo(action: string, data: Record<string, any>) {
     if (!DEBUG_COMBO) return;
@@ -21,7 +24,7 @@ function logCombo(action: string, data: Record<string, any>) {
     );
 }
 
-/** combobox-мета с бэка (если понадобится) */
+/** combobox-мета с бэка */
 type ComboColumnMeta = { ref_column_order: number; width: number; combobox_alias: string | null };
 type ComboResp = {
     columns: ComboColumnMeta[];
@@ -33,9 +36,9 @@ type ComboResp = {
 };
 
 export type ComboOption = {
-    id: string;           // primary[0] → как строка
-    show: string[];       // то, что backend даёт в show
-    showHidden: string[]; // то, что backend даёт в show_hidden
+    id: string;
+    show: string[];
+    showHidden: string[];
 };
 
 /** общий кеш для combobox-опций */
@@ -77,30 +80,18 @@ export const normalizeValueForColumn = (
     return trimmed.replace(/,/g, '.');
 };
 
-/** 👇 ОДИН общий loader, который можно вызывать и из хуков, и из useMainCrud */
 export async function loadComboOptionsOnce(
     widgetColumnId: number,
     writeTcId: number,
 ): Promise<ComboOption[]> {
     const key = makeComboKey(widgetColumnId, writeTcId);
 
-    logCombo('loadComboOptionsOnce', { widgetColumnId, writeTcId, key, hasCached: comboCache.has(key) });
-
     const cached = comboCache.get(key);
     if (cached) {
-        logCombo('loadComboOptionsOnce → from cache', { key, count: cached.options.length });
         return cached.options;
     }
 
-    logCombo('loadComboOptionsOnce → fetching from API', { url: `/display/combobox/${widgetColumnId}/${writeTcId}` });
-
     const { data } = await api.get<ComboResp>(`/display/combobox/${widgetColumnId}/${writeTcId}`);
-
-    logCombo('loadComboOptionsOnce → API response', {
-        columnsCount: data.columns?.length,
-        dataCount: data.data?.length,
-        firstItem: data.data?.[0],
-    });
 
     const opts: ComboOption[] = data.data.map((row) => ({
         id: String(row.primary?.[0] ?? ''),
@@ -110,24 +101,18 @@ export async function loadComboOptionsOnce(
 
     comboCache.set(key, { options: opts, columns: data.columns });
 
-    logCombo('loadComboOptionsOnce → cached', { key, count: opts.length });
-
     return opts;
 }
 
-/** Очистка кеша для конкретного combobox (вызывать после CRUD) */
 export function clearComboCache(widgetColumnId?: number, writeTcId?: number) {
     if (widgetColumnId != null && writeTcId != null) {
         const key = makeComboKey(widgetColumnId, writeTcId);
         comboCache.delete(key);
-        logCombo('clearComboCache → specific', { key });
     } else {
         comboCache.clear();
-        logCombo('clearComboCache → ALL', {});
     }
 }
 
-/** Собираем красивую подпись из show + show_hidden (как у тебя было) */
 export function buildOptionLabel(opt: ComboOption): string {
     const base = opt.show ?? [];
     const extra = (opt.showHidden ?? []).filter(v => !base.includes(v));
@@ -135,7 +120,6 @@ export function buildOptionLabel(opt: ComboOption): string {
     return parts.length ? parts.join(' · ') : opt.id;
 }
 
-/** Загружает и кэширует варианты для combobox колонки */
 export function useComboOptions(
     widgetColumnId: number,
     writeTcId: number | null,
@@ -147,10 +131,7 @@ export function useComboOptions(
     const [ready, setReady] = React.useState(false);
 
     React.useEffect(() => {
-        logCombo('useComboOptions:effect', { widgetColumnId, writeTcId, reloadToken });
-
         if (!widgetColumnId || !writeTcId) {
-            logCombo('useComboOptions:skip', { reason: 'no widgetColumnId or writeTcId' });
             setReady(true);
             return;
         }
@@ -168,26 +149,22 @@ export function useComboOptions(
                 if (reloadToken === 0) {
                     const cached = comboCache.get(key);
                     if (cached) {
-                        logCombo('useComboOptions:fromCache', { key, count: cached.options.length });
                         setOptions(cached.options);
                         setReady(true);
                         return;
                     }
                 } else {
                     comboCache.delete(key);
-                    logCombo('useComboOptions:cacheCleared', { key, reloadToken });
                 }
 
                 const opts = await loadComboOptionsOnce(widgetColumnId, writeTcId);
                 if (!cancelled) {
-                    logCombo('useComboOptions:loaded', { count: opts.length });
                     setOptions(opts);
                     setReady(true);
                 }
             } catch (e: any) {
                 if (!cancelled) {
                     const errMsg = String(e?.message ?? 'Ошибка загрузки combobox');
-                    logCombo('useComboOptions:ERROR', { error: errMsg, e });
                     setError(errMsg);
                     setReady(true);
                 }
@@ -216,6 +193,8 @@ export type InputCellProps = {
     readOnly: boolean;
     placeholder: string;
     comboReloadToken?: number;
+    /** NEW: Показывать ошибку валидации (красная рамка) */
+    showError?: boolean;
 };
 
 /** Универсальный инпут для Main/Sub: текст, combobox, date/time/timestamp(+tz) */
@@ -227,32 +206,32 @@ export const InputCell: React.FC<InputCellProps> = ({
                                                         readOnly,
                                                         placeholder,
                                                         comboReloadToken = 0,
+                                                        showError = false,
                                                     }) => {
     const writeTcId = (col.__write_tc_id ?? col.table_column_id) ?? null;
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // DEBUG: Логируем при рендере combobox колонки
+    // НОВОЕ: Определяем обязательность и пустоту
     // ═══════════════════════════════════════════════════════════════════════════
-    const isComboType = col.type === 'combobox';
+    const isRequired = isColumnRequired(col);
+    const isEmpty = isEmptyValue(value);
+    const hasError = showError && isRequired && isEmpty;
 
-    if (DEBUG_COMBO && isComboType) {
-        logCombo('RENDER', {
-            columnName: col.column_name ?? col.ref_column_name,
-            type: col.type,
-            widget_column_id: col.widget_column_id,
-            table_column_id: col.table_column_id,
-            writeTcId,
-            __is_primary_combo_input: col.__is_primary_combo_input,
-            __write_tc_id: col.__write_tc_id,
-            readOnly,
-            value,
-        });
-    }
+    // Стили для ошибки
+    const errorSx = hasError ? {
+        '& .MuiOutlinedInput-notchedOutline': {
+            borderColor: '#ef4444 !important',
+            borderWidth: '2px !important',
+        },
+        '&:hover .MuiOutlinedInput-notchedOutline': {
+            borderColor: '#ef4444 !important',
+        },
+        '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+            borderColor: '#ef4444 !important',
+        },
+    } : {};
 
     if (readOnly || writeTcId == null) {
-        if (DEBUG_COMBO && isComboType) {
-            logCombo('RENDER → readonly/no writeTcId', { readOnly, writeTcId });
-        }
         return (
             <span className={s.readonlyValue} title="Только для чтения">
                 {value || '—'}
@@ -260,42 +239,16 @@ export const InputCell: React.FC<InputCellProps> = ({
         );
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // ИСПРАВЛЕНО: Проверяем type === 'combobox' даже если __is_primary_combo_input не установлен
-    // ═══════════════════════════════════════════════════════════════════════════
-    const isComboPrimary = col.type === 'combobox' && col.__is_primary_combo_input;
-
-    // НОВОЕ: Если type === 'combobox' но __is_primary_combo_input не установлен,
-    // всё равно пытаемся показать как combobox
     const shouldRenderAsCombo = col.type === 'combobox';
-
-    if (DEBUG_COMBO && isComboType) {
-        logCombo('COMBO CHECK', {
-            isComboPrimary,
-            shouldRenderAsCombo,
-            willLoadOptions: shouldRenderAsCombo,
-        });
-    }
 
     const { options, loading, ready } = useComboOptions(
         col.widget_column_id,
-        // ИСПРАВЛЕНО: загружаем опции если это combobox (не только если primary)
         shouldRenderAsCombo ? writeTcId : null,
         comboReloadToken,
     );
 
     // ───── combobox ─────
     if (shouldRenderAsCombo) {
-        if (DEBUG_COMBO) {
-            logCombo('COMBO RENDER', {
-                loading,
-                ready,
-                optionsCount: options.length,
-                currentValue: value,
-            });
-        }
-
-        // Пока опции не загружены — показываем loading
         if (loading || !ready) {
             return (
                 <div
@@ -316,11 +269,9 @@ export const InputCell: React.FC<InputCellProps> = ({
             );
         }
 
-        // Проверяем: если value есть, но его нет в options
         const currentValue = value ?? '';
         const hasValueInOptions = !currentValue || options.some(o => o.id === currentValue);
 
-        // Если значение не найдено в опциях — добавляем его как "временный" пункт
         const effectiveOptions = hasValueInOptions
             ? options
             : [
@@ -328,24 +279,15 @@ export const InputCell: React.FC<InputCellProps> = ({
                 ...options
             ];
 
-        if (DEBUG_COMBO) {
-            logCombo('COMBO SELECT', {
-                currentValue,
-                hasValueInOptions,
-                effectiveOptionsCount: effectiveOptions.length,
-                firstOptions: effectiveOptions.slice(0, 3).map(o => ({ id: o.id, label: buildOptionLabel(o) })),
-            });
-        }
-
         return (
             <Select
                 size="small"
                 fullWidth
                 value={currentValue}
                 displayEmpty
+                error={hasError}
                 onChange={(e) => {
                     const newVal = String(e.target.value ?? '');
-                    logCombo('COMBO onChange', { oldValue: currentValue, newValue: newVal });
                     onChange(newVal);
                 }}
                 className={s.inpInCell}
@@ -359,6 +301,7 @@ export const InputCell: React.FC<InputCellProps> = ({
                         whiteSpace: 'nowrap',
                         textOverflow: 'ellipsis',
                     },
+                    ...errorSx,
                 }}
             >
                 <MenuItem value="">
@@ -410,6 +353,7 @@ export const InputCell: React.FC<InputCellProps> = ({
                 size="small"
                 checked={checked}
                 onChange={(e) => onChange(e.target.checked ? 'true' : 'false')}
+                sx={hasError ? { color: '#ef4444' } : undefined}
             />
         );
     }
@@ -455,6 +399,7 @@ export const InputCell: React.FC<InputCellProps> = ({
             value={inputValue}
             onChange={handleChange}
             placeholder={placeholder}
+            error={hasError}
             inputProps={
                 !isMultiline && inputType === 'time'
                     ? { step: 1 }
@@ -477,6 +422,7 @@ export const InputCell: React.FC<InputCellProps> = ({
                     overflowWrap: 'anywhere',
                     wordBreak: 'break-word',
                 },
+                ...errorSx,
             }}
         />
     );

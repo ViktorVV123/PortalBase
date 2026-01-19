@@ -5,9 +5,12 @@ import type { FormDisplay } from '@/shared/hooks/useWorkSpaces';
 import type { ExtCol } from '@/components/Form/formTable/parts/FormatByDatatype';
 import ArrowDropUpIcon from '@mui/icons-material/ArrowDropUp';
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
+import { Tooltip } from '@mui/material';
 
 import { MainTableAddRow } from './MainTableAddRow';
 import { MainTableRow } from './MainTableRow';
+import { isColumnRequired } from '@/shared/utils/requiredValidation/requiredValidation';
+
 
 // ═══════════════════════════════════════════════════════════
 // ШИРИНА КОЛОНОК — УМНАЯ ЛОГИКА
@@ -19,9 +22,6 @@ type ColWithDatatype = ExtCol & {
     column_name?: string | null;
 };
 
-/**
- * Проверяем, является ли колонка checkbox/boolean
- */
 const isCheckboxColumn = (col: ColWithDatatype): boolean => {
     const type = (col.type ?? '').toLowerCase();
     const dt = (col.datatype ?? '').toLowerCase();
@@ -35,10 +35,6 @@ const isCheckboxColumn = (col: ColWithDatatype): boolean => {
     );
 };
 
-/**
- * Получить ширину для колонки.
- * Возвращает объект с min, max и preferred шириной
- */
 const getColWidthConfig = (col: ColWithDatatype): {
     min: number;
     max: number;
@@ -48,37 +44,30 @@ const getColWidthConfig = (col: ColWithDatatype): {
     const dt = (col.datatype ?? '').toLowerCase();
     const type = (col.type ?? '').toLowerCase();
 
-    // checkbox / boolean — ФИКСИРОВАННАЯ узкая ширина
     if (isCheckboxColumn(col)) {
         return { min: 50, max: 90, preferred: 70, fixed: true };
     }
 
-    // rls — тоже фиксированная
     if (type === 'rls') {
         return { min: 40, max: 60, preferred: 50, fixed: true };
     }
 
-    // combobox — средняя
     if (type === 'combobox') {
         return { min: 80, max: 200, preferred: 120, fixed: false };
     }
 
-    // числа — компактная
     if (/int|numeric|number|float|double|real|money|decimal/.test(dt)) {
         return { min: 60, max: 120, preferred: 80, fixed: false };
     }
 
-    // дата
     if (dt === 'date' || type === 'date') {
         return { min: 90, max: 120, preferred: 100, fixed: false };
     }
 
-    // время
     if (dt === 'time' || dt === 'timetz' || type === 'time' || type === 'timetz') {
         return { min: 70, max: 100, preferred: 85, fixed: false };
     }
 
-    // datetime / timestamp
     if (
         dt.includes('timestamp') ||
         dt.includes('datetime') ||
@@ -89,21 +78,15 @@ const getColWidthConfig = (col: ColWithDatatype): {
         return { min: 130, max: 200, preferred: 160, fixed: false };
     }
 
-    // текст по умолчанию — больше места для длинного контента
     return { min: 100, max: 400, preferred: 200, fixed: false };
 };
 
-/**
- * Рассчитывает ширины колонок с учётом доступного пространства.
- * Возвращает стили для colgroup
- */
 const calcColStyles = (cols: ColWithDatatype[]): React.CSSProperties[] => {
     if (!cols.length) return [];
 
     return cols.map((col) => {
         const config = getColWidthConfig(col);
 
-        // Фиксированная ширина — строгие ограничения
         if (config.fixed) {
             return {
                 width: `${config.preferred}px`,
@@ -113,7 +96,6 @@ const calcColStyles = (cols: ColWithDatatype[]): React.CSSProperties[] => {
         }
 
         const mult = Number(col.width);
-        // width > 0 → множитель, иначе 1
         const factor = Number.isFinite(mult) && mult > 0 ? mult : 1;
 
         const preferred = Math.min(config.max, Math.max(config.min, config.preferred * factor));
@@ -124,6 +106,32 @@ const calcColStyles = (cols: ColWithDatatype[]): React.CSSProperties[] => {
             maxWidth: `${config.max}px`,
         };
     });
+};
+// ═══════════════════════════════════════════════════════════
+// КОМПОНЕНТ: Заголовок колонки с required меткой
+// ═══════════════════════════════════════════════════════════
+
+type HeaderCellProps = {
+    title: string;
+    cols: ExtCol[];
+    colSpan: number;
+};
+
+const HeaderCell: React.FC<HeaderCellProps> = ({ title, cols, colSpan }) => {
+    const hasRequired = cols.some(c => isColumnRequired(c));
+
+    return (
+        <th colSpan={colSpan}>
+            <span className={s.ellipsis}>
+                {title}
+                {hasRequired && (
+                    <Tooltip title="Обязательное поле" arrow placement="top">
+                        <span className={s.requiredMark}>*</span>
+                    </Tooltip>
+                )}
+            </span>
+        </th>
+    );
 };
 
 // ═══════════════════════════════════════════════════════════
@@ -189,20 +197,20 @@ type Props = {
 
     editStylesDraft?: any;
     onEditStyleChange?: any;
-};
 
+    /** NEW: Показывать ошибки валидации */
+    showValidationErrors?: boolean;
+};
 // ═══════════════════════════════════════════════════════════
 // КОМПОНЕНТ
 // ═══════════════════════════════════════════════════════════
 
 export const MainTable: React.FC<Props> = (p) => {
-    // Безопасные строки
     const safeRows = React.useMemo(
         () => (p.filteredRows ?? []).filter((v) => v?.row && (v.row as any).primary_keys != null),
         [p.filteredRows]
     );
 
-    // RLS мета
     const rlsMeta = React.useMemo(() => {
         const col = p.flatColumnsInRenderOrder.find((c) => c.type === 'rls');
         if (!col) return null;
@@ -214,13 +222,11 @@ export const MainTable: React.FC<Props> = (p) => {
         return { col, idx };
     }, [p.flatColumnsInRenderOrder, p.valueIndexByKey]);
 
-    // Колонки без rls
     const renderCols = React.useMemo(
         () => p.flatColumnsInRenderOrder.filter((c) => c.type !== 'rls'),
         [p.flatColumnsInRenderOrder]
     );
 
-    // Header plan без rls
     const renderHeaderPlan = React.useMemo(() => {
         return (p.headerPlan ?? [])
             .map((g) => {
@@ -237,7 +243,6 @@ export const MainTable: React.FC<Props> = (p) => {
             .filter(Boolean) as typeof p.headerPlan;
     }, [p.headerPlan]);
 
-    // Стили колонок (min/max/preferred)
     const colStyles = React.useMemo(
         () => calcColStyles(renderCols as ColWithDatatype[]),
         [renderCols]
@@ -257,17 +262,19 @@ export const MainTable: React.FC<Props> = (p) => {
                             style={colStyles[idx]}
                         />
                     ))}
-                    {/* Actions column */}
                     <col style={{ width: '70px', minWidth: '56px', maxWidth: '80px' }} />
                 </colgroup>
 
                 <thead>
-                {/* Первая строка — группы */}
+                {/* Первая строка — группы с required меткой */}
                 <tr>
                     {renderHeaderPlan.map((g) => (
-                        <th key={`g-top-${g.id}`} colSpan={g.cols.length || 1}>
-                            <span className={s.ellipsis}>{g.title}</span>
-                        </th>
+                        <HeaderCell
+                            key={`g-top-${g.id}`}
+                            title={g.title}
+                            cols={g.cols}
+                            colSpan={g.cols.length || 1}
+                        />
                     ))}
                     <th className={s.actionsCell}>
                         <button
@@ -295,6 +302,7 @@ export const MainTable: React.FC<Props> = (p) => {
 
                             while (i < g.cols.length) {
                                 const label = labels[i] ?? '—';
+                                const col = g.cols[i];
                                 let span = 1;
 
                                 while (
@@ -304,9 +312,16 @@ export const MainTable: React.FC<Props> = (p) => {
                                     span += 1;
                                 }
 
+                                const isReq = isColumnRequired(col);
+
                                 nodes.push(
                                     <th key={`g-sub-${g.id}-${i}`} colSpan={span}>
-                                        <span className={s.ellipsis}>{label}</span>
+                                        <span className={s.ellipsis}>
+                                            {label}
+                                            {isReq && (
+                                                <span className={s.requiredMark}>*</span>
+                                            )}
+                                        </span>
                                     </th>
                                 );
 
@@ -329,6 +344,7 @@ export const MainTable: React.FC<Props> = (p) => {
                         onDraftChange={p.onDraftChange}
                         placeholderFor={p.placeholderFor}
                         comboReloadToken={p.comboReloadToken}
+                        showValidationErrors={p.showValidationErrors}
                     />
                 )}
 
@@ -360,6 +376,7 @@ export const MainTable: React.FC<Props> = (p) => {
                         stylesColumnMeta={p.stylesColumnMeta}
                         editStylesDraft={p.editStylesDraft}
                         onEditStyleChange={p.onEditStyleChange}
+                        showValidationErrors={p.showValidationErrors}
                     />
                 ))}
                 </tbody>

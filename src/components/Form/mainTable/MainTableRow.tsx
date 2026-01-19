@@ -20,10 +20,9 @@ import {
 import { extractRowStyles, getCellStyle } from '@/shared/utils/rowStyles';
 import { CellStyleButton } from './CellStyleButton';
 import type { CellStyles } from './CellStylePopover';
+// NEW: Импорт функций валидации
+import { isColumnRequired, isEmptyValue } from '@/shared/utils/requiredValidation/requiredValidation';
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// DEBUG: Включить/выключить логирование
-// ═══════════════════════════════════════════════════════════════════════════════
 const DEBUG = true;
 
 function logRow(action: string, data: Record<string, any>) {
@@ -85,6 +84,9 @@ type MainTableRowProps = {
 
     editStylesDraft?: Record<string, CellStyles | null>;
     onEditStyleChange?: (columnName: string, style: CellStyles | null) => void;
+
+    // NEW: Показывать ошибки валидации
+    showValidationErrors?: boolean;
 };
 
 function isRlsLockedValue(val: unknown): boolean {
@@ -95,7 +97,6 @@ function isRlsLockedValue(val: unknown): boolean {
     const str = String(val).trim().toLowerCase();
     return str === '1' || str === 'true' || str === 'да' || str === 'yes';
 }
-
 export const MainTableRow: React.FC<MainTableRowProps> = (p) => {
     const { row, idx: rowIdx } = p.rowView;
 
@@ -107,13 +108,11 @@ export const MainTableRow: React.FC<MainTableRowProps> = (p) => {
 
     const drillDisabled = p.disableDrillWhileEditing && p.editingRowIdx != null;
 
-    // Стили включены только если колонка существует, есть valueIndex и НЕ readonly
     const stylesEnabled =
         !!p.stylesColumnMeta?.exists &&
         p.stylesColumnMeta.valueIndex != null &&
         !p.stylesColumnMeta.readonly;
 
-    // Стили из данных строки (для отображения — работает даже при readonly)
     const rowStylesFromData = useMemo(() => {
         if (!p.stylesColumnMeta?.exists || p.stylesColumnMeta.valueIndex == null) {
             return {};
@@ -125,7 +124,6 @@ export const MainTableRow: React.FC<MainTableRowProps> = (p) => {
         );
     }, [row.values, p.stylesColumnMeta]);
 
-    // Мержим стили с draft при редактировании
     const mergedRowStyles = useMemo(() => {
         if (!isEditing || !p.editStylesDraft) return rowStylesFromData;
 
@@ -142,11 +140,7 @@ export const MainTableRow: React.FC<MainTableRowProps> = (p) => {
         return merged;
     }, [rowStylesFromData, p.editStylesDraft, isEditing]);
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // DEBUG: Логируем при рендере
-    // ═══════════════════════════════════════════════════════════════════════════
     if (DEBUG && rowIdx === 0) {
-        // Логируем только для первой строки чтобы не спамить
         console.log(
             `%c[MainTableRow] %cRENDER row[0]`,
             'color: #FF9800; font-weight: bold',
@@ -157,29 +151,16 @@ export const MainTableRow: React.FC<MainTableRowProps> = (p) => {
                 isRowLocked,
                 editingRowIdx: p.editingRowIdx,
                 deletingRowIdx: p.deletingRowIdx,
-                // Проверяем что функции переданы
+                showValidationErrors: p.showValidationErrors,
                 hasOnStartEdit: typeof p.onStartEdit === 'function',
                 hasOnDeleteRow: typeof p.onDeleteRow === 'function',
-                hasOnSubmitEdit: typeof p.onSubmitEdit === 'function',
-                hasOnCancelEdit: typeof p.onCancelEdit === 'function',
-                hasOnRowClick: typeof p.onRowClick === 'function',
             }
         );
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // Обёртки с логированием
-    // ═══════════════════════════════════════════════════════════════════════════
     const handleEditClick = (e: React.MouseEvent) => {
         e.stopPropagation();
-
-        logRow('CLICK: Edit button', {
-            rowIdx,
-            isRowLocked,
-            isEditing,
-            editingRowIdx: p.editingRowIdx,
-            isFunction: typeof p.onStartEdit === 'function',
-        });
+        logRow('CLICK: Edit button', { rowIdx, isRowLocked, isEditing });
 
         if (isRowLocked) {
             logRow('BLOCKED: Edit - row is locked (RLS)', { rowIdx });
@@ -202,13 +183,7 @@ export const MainTableRow: React.FC<MainTableRowProps> = (p) => {
 
     const handleDeleteClick = (e: React.MouseEvent) => {
         e.stopPropagation();
-
-        logRow('CLICK: Delete button', {
-            rowIdx,
-            isRowLocked,
-            deletingRowIdx: p.deletingRowIdx,
-            isFunction: typeof p.onDeleteRow === 'function',
-        });
+        logRow('CLICK: Delete button', { rowIdx, isRowLocked, deletingRowIdx: p.deletingRowIdx });
 
         if (isRowLocked) {
             logRow('BLOCKED: Delete - row is locked (RLS)', { rowIdx });
@@ -236,12 +211,7 @@ export const MainTableRow: React.FC<MainTableRowProps> = (p) => {
 
     const handleSubmitEdit = (e: React.MouseEvent) => {
         e.stopPropagation();
-
-        logRow('CLICK: Submit edit (✓)', {
-            rowIdx,
-            editSaving: p.editSaving,
-            isFunction: typeof p.onSubmitEdit === 'function',
-        });
+        logRow('CLICK: Submit edit (✓)', { rowIdx, editSaving: p.editSaving });
 
         if (p.editSaving) {
             logRow('BLOCKED: Submit - saving in progress', {});
@@ -264,12 +234,7 @@ export const MainTableRow: React.FC<MainTableRowProps> = (p) => {
 
     const handleCancelEdit = (e: React.MouseEvent) => {
         e.stopPropagation();
-
-        logRow('CLICK: Cancel edit (×)', {
-            rowIdx,
-            editSaving: p.editSaving,
-            isFunction: typeof p.onCancelEdit === 'function',
-        });
+        logRow('CLICK: Cancel edit (×)', { rowIdx, editSaving: p.editSaving });
 
         if (p.editSaving) {
             logRow('BLOCKED: Cancel - saving in progress', {});
@@ -291,11 +256,7 @@ export const MainTableRow: React.FC<MainTableRowProps> = (p) => {
     };
 
     const handleRowClick = () => {
-        logRow('CLICK: Row', {
-            rowIdx,
-            isEditing,
-            willProcess: !isEditing,
-        });
+        logRow('CLICK: Row', { rowIdx, isEditing, willProcess: !isEditing });
 
         if (isEditing) {
             logRow('BLOCKED: Row click - currently editing', { rowIdx });
@@ -309,7 +270,6 @@ export const MainTableRow: React.FC<MainTableRowProps> = (p) => {
 
         p.onRowClick({ row, idx: rowIdx });
     };
-
     return (
         <tr
             className={p.selectedKey === rowKey ? s.selectedRow : undefined}
@@ -334,11 +294,17 @@ export const MainTableRow: React.FC<MainTableRowProps> = (p) => {
                         const writeTcId = (primary.__write_tc_id ?? primary.table_column_id) ?? null;
 
                         if (isEditing) {
+                            // NEW: Проверка на required и пустоту для combobox
+                            const isReq = isColumnRequired(primary);
+                            const value = writeTcId == null ? '' : (p.editDraft[writeTcId] ?? '');
+                            const isEmpty = isEmptyValue(value);
+                            const hasError = p.showValidationErrors && isReq && isEmpty;
+
                             cells.push(
                                 <td
                                     key={`edit-combo-${primary.widget_column_id}:${writeTcId}`}
                                     colSpan={span}
-                                    className={s.editCell}
+                                    className={`${s.editCell} ${hasError ? s.cellError : ''} ${isReq ? s.requiredCell : ''}`}
                                 >
                                     <div className={s.cellEditor}>
                                         <ComboEditDisplay
@@ -408,22 +374,32 @@ export const MainTableRow: React.FC<MainTableRowProps> = (p) => {
                     );
 
                     if (isEditing) {
+                        // NEW: Проверка на required и пустоту для обычной колонки
+                        const isReq = isColumnRequired(col);
+                        const value = writeTcId == null ? '' : (p.editDraft[writeTcId] ?? '');
+                        const isEmpty = isEmptyValue(value);
+                        const hasError = p.showValidationErrors && isReq && isEmpty;
+
                         cells.push(
-                            <td key={`edit-${visKey}`} className={s.editCell} style={cellStyle}>
+                            <td
+                                key={`edit-${visKey}`}
+                                className={`${s.editCell} ${hasError ? s.cellError : ''} ${isReq ? s.requiredCell : ''}`}
+                                style={cellStyle}
+                            >
                                 <div className={s.cellEditor}>
                                     <InputCell
                                         mode="edit"
                                         col={col}
                                         readOnly={ro}
-                                        value={writeTcId == null ? '' : (p.editDraft[writeTcId] ?? '')}
+                                        value={value}
                                         onChange={(v) => {
                                             if (writeTcId != null) p.onEditDraftChange(writeTcId, v);
                                         }}
-                                        placeholder={p.placeholderFor(col)}
+                                        placeholder={isReq ? `${p.placeholderFor(col)} *` : p.placeholderFor(col)}
                                         comboReloadToken={p.comboReloadToken}
+                                        showError={hasError}
                                     />
 
-                                    {/* Кнопка стилей — только если НЕ readonly */}
                                     {stylesEnabled && col.column_name && (
                                         <CellStyleButton
                                             columnName={col.column_name}
@@ -440,8 +416,7 @@ export const MainTableRow: React.FC<MainTableRowProps> = (p) => {
                         const clickable = col.form_id != null && !!p.onOpenDrill && !drillDisabled;
                         const pretty = formatByDatatype(shownVal, col as ExtCol);
 
-                        const isCheckboxCol =
-                            col.type === 'checkbox' || (col as ExtCol).type === 'bool';
+                        const isCheckboxCol = col.type === 'checkbox' || (col as ExtCol).type === 'bool';
 
                         if (isCheckboxCol) {
                             const checked = isRlsLockedValue(rawVal);
@@ -453,12 +428,8 @@ export const MainTableRow: React.FC<MainTableRowProps> = (p) => {
                                         disabled
                                         sx={{
                                             color: 'rgba(255, 255, 255, 0.4)',
-                                            '&.Mui-checked': {
-                                                color: 'rgba(255, 255, 255, 0.9)',
-                                            },
-                                            '&.Mui-disabled': {
-                                                color: 'rgba(255, 255, 255, 0.7)',
-                                            },
+                                            '&.Mui-checked': { color: 'rgba(255, 255, 255, 0.9)' },
+                                            '&.Mui-disabled': { color: 'rgba(255, 255, 255, 0.7)' },
                                         }}
                                     />
                                 </td>
@@ -496,7 +467,6 @@ export const MainTableRow: React.FC<MainTableRowProps> = (p) => {
 
                 return cells;
             })()}
-
             {/* ───── Actions ───── */}
             <td className={s.actionsCell}>
                 {isEditing ? (
