@@ -1,5 +1,8 @@
+// src/components/WidgetColumnsOfTable/WidgetColumnTable/WidgetColumnsOfTable.tsx
+
 import React, { useCallback, useEffect, useState, useMemo } from 'react';
-import * as s from '@/components/setOfTables/SetOfTables.module.scss';
+import * as s from './WidgetColumnOfTable.module.scss';
+import * as tblStyles from '@/components/setOfTables/SetOfTables.module.scss';
 import {
     Column,
     Widget,
@@ -133,7 +136,7 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
     const [loadingRefs, setLoadingRefs] = useState(false);
 
     // ─────────────────────────────────────────────────────────────────────────
-    // ИСПРАВЛЕНО: Загрузка references ПОСЛЕДОВАТЕЛЬНО (избегаем race condition при 401)
+    // Загрузка references ПОСЛЕДОВАТЕЛЬНО
     // ─────────────────────────────────────────────────────────────────────────
     useEffect(() => {
         if (!widgetColumns.length) return;
@@ -145,8 +148,6 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
 
             const map: Record<number, WcReference[]> = {};
 
-            // ПОСЛЕДОВАТЕЛЬНАЯ загрузка — если первый запрос получит 401,
-            // api.ts сделает refresh, и следующие запросы уже пойдут с новым токеном
             for (const wc of widgetColumns) {
                 if (cancelled) break;
 
@@ -156,11 +157,8 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                 } catch (e: any) {
                     const status = e?.response?.status;
                     console.warn(`[WidgetColumnsOfTable] fetchReferences(${wc.id}) failed:`, status, e?.message);
-
-                    // FALLBACK: используем wc.reference если API упал
                     map[wc.id] = wc.reference ?? [];
 
-                    // Если 401 — возможно токен ещё обновляется, подождём немного
                     if (status === 401) {
                         console.log(`[WidgetColumnsOfTable] Got 401, waiting for token refresh...`);
                         await new Promise(r => setTimeout(r, 500));
@@ -170,7 +168,6 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
 
             if (cancelled) return;
 
-            // Проверяем что все группы имеют данные
             for (const wc of widgetColumns) {
                 if (!map[wc.id]) {
                     console.warn(`[WidgetColumnsOfTable] No refs for wc ${wc.id}, using wc.reference`);
@@ -238,7 +235,7 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
     );
 
     // ─────────────────────────────────────────────────────────────────────────
-    // ИСПРАВЛЕНО: refreshReferences с fallback
+    // refreshReferences с fallback
     // ─────────────────────────────────────────────────────────────────────────
     const refreshReferences = useCallback(
         async (wcId: number) => {
@@ -247,10 +244,8 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                 setReferencesMap((prev) => ({ ...prev, [wcId]: fresh ?? [] }));
             } catch (e) {
                 console.warn(`[refreshReferences] Failed for wc ${wcId}:`, e);
-                // Не трогаем referencesMap при ошибке — оставляем старые данные
             }
 
-            // Перезагружаем колонки виджета
             if (selectedWidget) {
                 try {
                     await loadColumnsWidget(selectedWidget.id);
@@ -263,13 +258,12 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
     );
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Мержим referencesMap с wc.reference для гарантии данных
+    // Мержим referencesMap с wc.reference
     // ─────────────────────────────────────────────────────────────────────────
     const mergedReferencesMap = useMemo(() => {
         const merged: Record<number, WcReference[]> = {};
 
         for (const wc of widgetColumns) {
-            // Приоритет: referencesMap > wc.reference
             const fromMap = referencesMap[wc.id];
             const fromWc = wc.reference ?? [];
 
@@ -286,68 +280,37 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
         return merged;
     }, [widgetColumns, referencesMap]);
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // RENDER с новой структурой
+    // ─────────────────────────────────────────────────────────────────────────
     return (
-        <div>
-            {/* Верхние ссылки */}
-            <div style={{ display: 'flex', gap: 24 }}>
-                <Typography
-                    variant="h6"
-                    onClick={() => setModalOpen(true)}
-                    gutterBottom
-                    sx={{
-                        cursor: 'pointer',
-                        textDecoration: 'underline',
-                        color: '#8ac7ff',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 1,
-                    }}
-                >
+        <div className={s.root}>
+            {/* ═══════════════════════════════════════════════════════════
+                HEADER — фиксированный блок с ссылками
+            ═══════════════════════════════════════════════════════════ */}
+            <div className={s.header}>
+                <span className={s.headerLink} onClick={() => setModalOpen(true)}>
                     Посмотреть таблицу
                     <EditIcon />
-                </Typography>
+                </span>
 
-                <Typography
-                    variant="h6"
-                    onClick={() => setWidgetModalOpen(true)}
-                    gutterBottom
-                    sx={{
-                        cursor: 'pointer',
-                        textDecoration: 'underline',
-                        color: '#8ac7ff',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 1,
-                    }}
-                >
+                <span className={s.headerLink} onClick={() => setWidgetModalOpen(true)}>
                     Метаданные widget
                     <EditIcon />
-                </Typography>
+                </span>
 
-                <Typography
-                    variant="h6"
-                    onClick={() => setAddOpen(true)}
-                    gutterBottom
-                    sx={{
-                        cursor: 'pointer',
-                        textDecoration: 'underline',
-                        color: '#8ac7ff',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 1,
-                    }}
-                >
+                <span className={s.headerLink} onClick={() => setAddOpen(true)}>
                     Добавить столбец
                     <EditIcon />
-                </Typography>
+                </span>
             </div>
 
-            {/* Шапка формы (превью) */}
-            <div style={{ margin: '12px 0 20px' }}>
-                <div style={{ opacity: 0.8, fontSize: 12, marginBottom: 6 }}>
-                    Шапка формы (превью)
-                </div>
-                <table className={s.tbl}>
+            {/* ═══════════════════════════════════════════════════════════
+                PREVIEW — превью шапки формы (фиксированный)
+            ═══════════════════════════════════════════════════════════ */}
+            <div className={s.preview}>
+                <div className={s.previewLabel}>Шапка формы (превью)</div>
+                <table className={s.previewTable}>
                     <thead>
                     <tr>
                         {headerGroups.map((g) => (
@@ -367,27 +330,33 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                 </table>
             </div>
 
-            {/* Основная таблица */}
-            {loadingRefs ? (
-                <div style={{ padding: 20, textAlign: 'center', opacity: 0.6 }}>
-                    Загрузка связей...
-                </div>
-            ) : (
-                <WidgetColumnsMainTable
-                    workspaceId={workspaceId}
-                    formsById={formsById}
-                    loadWidgetForms={loadWidgetForms}
-                    onRefsChange={setLiveRefsForHeader}
-                    deleteColumnWidget={deleteColumnWidget}
-                    updateReference={updateReference}
-                    refreshReferences={refreshReferences}
-                    updateWidgetColumn={updateWidgetColumn}
-                    widgetColumns={widgetColumns}
-                    handleDeleteReference={handleDeleteReference}
-                    referencesMap={mergedReferencesMap}  // ← Используем merged!
-                    allColumns={columns}
-                />
-            )}
+            {/* ═══════════════════════════════════════════════════════════
+                CONTENT — скроллируемая область с группами
+            ═══════════════════════════════════════════════════════════ */}
+            <div className={s.content}>
+                {loadingRefs ? (
+                    <div className={s.loading}>Загрузка связей...</div>
+                ) : (
+                    <WidgetColumnsMainTable
+                        workspaceId={workspaceId}
+                        formsById={formsById}
+                        loadWidgetForms={loadWidgetForms}
+                        onRefsChange={setLiveRefsForHeader}
+                        deleteColumnWidget={deleteColumnWidget}
+                        updateReference={updateReference}
+                        refreshReferences={refreshReferences}
+                        updateWidgetColumn={updateWidgetColumn}
+                        widgetColumns={widgetColumns}
+                        handleDeleteReference={handleDeleteReference}
+                        referencesMap={mergedReferencesMap}
+                        allColumns={columns}
+                    />
+                )}
+            </div>
+
+            {/* ═══════════════════════════════════════════════════════════
+                MODALS
+            ═══════════════════════════════════════════════════════════ */}
 
             {/* Modal «Посмотреть таблицу» */}
             <Modal open={modalOpen} onClose={() => setModalOpen(false)}>

@@ -12,6 +12,8 @@ type Props = {
     rootFocus: number;
     rootItemRefs: React.MutableRefObject<Array<HTMLButtonElement | null>>;
     isDesktop: boolean;
+    /** Является ли пользователь супер-админом */
+    isSuperAdmin?: boolean;
 
     onRootKeyDown: (e: React.KeyboardEvent) => void;
     onOpenWs: (ws: WorkSpaceTypes, anchor: HTMLElement | null) => void;
@@ -27,6 +29,7 @@ export const WorkspaceMenu = memo(function WorkspaceMenu({
                                                              rootFocus,
                                                              rootItemRefs,
                                                              isDesktop,
+                                                             isSuperAdmin = false,
                                                              onRootKeyDown,
                                                              onOpenWs,
                                                              onEditWs,
@@ -37,15 +40,20 @@ export const WorkspaceMenu = memo(function WorkspaceMenu({
     return (
         <div className={s.menuRoot} role="menu" aria-label={title} onKeyDown={onRootKeyDown}>
             <div className={s.scrollArea}>
-                <div className={s.sectionTitle}>Действия</div>
-                <ul className={s.list} role="none">
-                    <li className={s.item} data-disabled="true" role="none">
-                        <button className={s.itemBtn} role="menuitem" onClick={onCreateWorkspace}>
-                            <AddIcon className={s.icon} />
-                            <span className={s.label}>Создать рабочее пространство</span>
-                        </button>
-                    </li>
-                </ul>
+                {/* Показываем секцию "Действия" только для супер-админов */}
+                {isSuperAdmin && (
+                    <>
+                        <div className={s.sectionTitle}>Действия</div>
+                        <ul className={s.list} role="none">
+                            <li className={s.item} role="none">
+                                <button className={s.itemBtn} role="menuitem" onClick={onCreateWorkspace}>
+                                    <AddIcon className={s.icon} />
+                                    <span className={s.label}>Создать рабочее пространство</span>
+                                </button>
+                            </li>
+                        </ul>
+                    </>
+                )}
 
                 <div className={s.sectionTitle}>Рабочее пространство</div>
                 <ul className={s.list} role="none">
@@ -81,22 +89,25 @@ export const WorkspaceMenu = memo(function WorkspaceMenu({
                                 <WorkspacesIcon className={s.icon} />
                                 <span className={s.label}>{ws.name}</span>
 
-                                <span className={s.actions} aria-hidden>
-                  <EditIcon
-                      className={s.actionIcon}
-                      onClick={(e) => {
-                          e.stopPropagation();
-                          onEditWs(ws);
-                      }}
-                  />
-                  <DeleteIcon
-                      className={`${s.actionIcon} ${s.actionDanger}`}
-                      onClick={(e) => {
-                          e.stopPropagation();
-                          onDeleteWs(ws);
-                      }}
-                  />
-                </span>
+                                {/* Показываем кнопки редактирования только для супер-админов */}
+                                {isSuperAdmin && (
+                                    <span className={s.actions} aria-hidden>
+                                        <EditIcon
+                                            className={s.actionIcon}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                onEditWs(ws);
+                                            }}
+                                        />
+                                        <DeleteIcon
+                                            className={`${s.actionIcon} ${s.actionDanger}`}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                onDeleteWs(ws);
+                                            }}
+                                        />
+                                    </span>
+                                )}
                             </button>
                         </li>
                     ))}

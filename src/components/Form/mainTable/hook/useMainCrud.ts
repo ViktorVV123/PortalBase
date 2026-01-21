@@ -439,6 +439,7 @@ export function useMainCrud({
                     const normalized = s.trim();
                     value = normalized === '' ? 'false' : normalized;
                 } else {
+                    // ✅ Нормализуем запятые в точки для чисел
                     const normalized = normalizeValueForColumn(tcId, s, flatColumnsInRenderOrder);
                     value = normalized === '' ? null : normalized;
                 }
@@ -753,18 +754,41 @@ export function useMainCrud({
                 Object.entries(row.primary_keys).map(([k, v]) => [k, String(v)])
             );
 
-            const getSendingValue = (raw: unknown): string | null => {
+            // ═══════════════════════════════════════════════════════════
+            // ИСПРАВЛЕНО: Нормализуем запятые в точки для числовых полей
+            // ═══════════════════════════════════════════════════════════
+            const getSendingValue = (tcId: number, raw: unknown): string | null => {
                 const s = raw == null ? '' : String(raw).trim();
-                return s === '' ? null : s;
+                if (s === '') return null;
+
+                // Находим колонку для этого tcId
+                const colForTc = flatColumnsInRenderOrder.find((c) => {
+                    const w = (c.__write_tc_id ?? c.table_column_id) ?? null;
+                    return w === tcId;
+                });
+
+                const isCheckboxCol = colForTc?.type === 'checkbox' || colForTc?.type === 'bool';
+
+                if (isCheckboxCol) {
+                    // Для checkbox не нормализуем
+                    return s;
+                }
+
+                // ✅ Нормализуем запятые в точки для чисел
+                const normalized = normalizeValueForColumn(tcId, s, flatColumnsInRenderOrder);
+                return normalized === '' ? null : normalized;
             };
 
             const entries = Object.entries(editDraft);
 
             const values: Array<{ table_column_id: number; value: string | null }> = entries.map(
-                ([tcIdStr, v]) => ({
-                    table_column_id: Number(tcIdStr),
-                    value: getSendingValue(v),
-                })
+                ([tcIdStr, v]) => {
+                    const tcId = Number(tcIdStr);
+                    return {
+                        table_column_id: tcId,
+                        value: getSendingValue(tcId, v),
+                    };
+                }
             );
 
             if (

@@ -62,13 +62,22 @@ type Props = {
 };
 
 /**
- * Проверяет, есть ли у пользователя админские права
- * Ищет группы, заканчивающиеся на "Admin" или "SuperAdmin"
+ * Проверяет, есть ли у пользователя админские права (Admin или SuperAdmin)
  */
 function hasAdminGroup(groups: string[]): boolean {
     return groups.some(group => {
         const lower = group.toLowerCase();
         return lower.endsWith('admin') || lower.endsWith('superadmin');
+    });
+}
+
+/**
+ * Проверяет, есть ли у пользователя супер-админские права (только SuperAdmin)
+ */
+function hasSuperAdminGroup(groups: string[]): boolean {
+    return groups.some(group => {
+        const lower = group.toLowerCase();
+        return lower.endsWith('superadmin');
     });
 }
 
@@ -114,9 +123,10 @@ export const TopComponent: React.FC<Props> = (props) => {
     const [connToEditId, setConnToEditId] = useState<number | null>(null);
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // НОВОЕ: Состояние для проверки админских прав
+    // Состояние для проверки прав
     // ═══════════════════════════════════════════════════════════════════════════
-    const [isAdmin, setIsAdmin] = useState<boolean | null>(null); // null = ещё не загружено
+    const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+    const [isSuperAdmin, setIsSuperAdmin] = useState<boolean | null>(null);
 
     useEffect(() => {
         let mounted = true;
@@ -128,14 +138,19 @@ export const TopComponent: React.FC<Props> = (props) => {
                 if (!mounted) return;
 
                 const hasAdmin = hasAdminGroup(data);
+                const hasSuperAdmin = hasSuperAdminGroup(data);
+
                 setIsAdmin(hasAdmin);
+                setIsSuperAdmin(hasSuperAdmin);
 
                 console.debug('[TopComponent] User groups:', data);
                 console.debug('[TopComponent] Is admin:', hasAdmin);
+                console.debug('[TopComponent] Is super admin:', hasSuperAdmin);
             } catch (error) {
                 console.error('[TopComponent] Failed to load user groups:', error);
                 if (mounted) {
-                    setIsAdmin(false); // По умолчанию — не админ
+                    setIsAdmin(false);
+                    setIsSuperAdmin(false);
                 }
             }
         };
@@ -184,9 +199,7 @@ export const TopComponent: React.FC<Props> = (props) => {
 
     const hasWorkspaces = workSpaces.length > 0;
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // НОВОЕ: Показываем кнопку "Рабочие пространства" только для админов
-    // ═══════════════════════════════════════════════════════════════════════════
+    // Показываем кнопку "Рабочие пространства" только для админов
     const showWorkspacesButton = hasWorkspaces && isAdmin === true;
 
     return (
@@ -222,6 +235,7 @@ export const TopComponent: React.FC<Props> = (props) => {
                         rootFocus={state.rootFocus}
                         rootItemRefs={state.rootItemRefs}
                         isDesktop={state.isDesktop}
+                        isSuperAdmin={isSuperAdmin === true}
                         onRootKeyDown={(e) => state.onRootKeyDown(e, workSpaces)}
                         onOpenWs={(ws, anchor) => state.openWs(ws, anchor)}
                         onEditWs={(ws) => {

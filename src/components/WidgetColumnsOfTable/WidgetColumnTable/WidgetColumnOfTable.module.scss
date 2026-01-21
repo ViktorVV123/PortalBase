@@ -1,0 +1,163 @@
+// src/components/WidgetColumnsOfTable/WidgetColumnTable/WidgetColumnsOfTable.module.scss
+// Стили для WidgetColumnsOfTable — с вертикальным скроллом
+
+// ═══════════════════════════════════════════════════════════
+// SCROLLBAR MIXIN
+// ═══════════════════════════════════════════════════════════
+
+@mixin custom-scrollbar($thumb-color: rgba(255, 255, 255, 0.3), $track-color: rgba(50, 50, 50, 0.4)) {
+  &::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: $thumb-color;
+    border-radius: 4px;
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.45);
+    }
+  }
+
+  &::-webkit-scrollbar-track {
+    background: $track-color;
+    border-radius: 4px;
+  }
+
+  &::-webkit-scrollbar-corner {
+    background: $track-color;
+  }
+
+  scrollbar-width: thin;
+  scrollbar-color: $thumb-color $track-color;
+}
+
+// ═══════════════════════════════════════════════════════════
+// ROOT — главный контейнер
+// ═══════════════════════════════════════════════════════════
+
+.root {
+  display: flex;
+  flex-direction: column;
+
+  // Ограничиваем высоту — это ключевое для скролла!
+  height: calc(100vh - 100px);
+  max-height: calc(100vh - 100px);
+
+  min-width: 0;
+  width: 100%;
+
+  overflow: hidden;
+}
+
+// ═══════════════════════════════════════════════════════════
+// HEADER — верхняя часть с ссылками (фиксированная)
+// ═══════════════════════════════════════════════════════════
+
+.header {
+  flex: 0 0 auto;
+  padding: 12px 16px;
+
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 24px;
+
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(30, 30, 30, 0.5);
+}
+
+.headerLink {
+  cursor: pointer;
+  text-decoration: underline;
+  color: #8ac7ff;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  transition: color 0.15s ease;
+
+  &:hover {
+    color: #b8daff;
+  }
+
+  svg {
+    width: 16px;
+    height: 16px;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// PREVIEW — превью шапки (фиксированная)
+// ═══════════════════════════════════════════════════════════
+
+.preview {
+  flex: 0 0 auto;
+  padding: 12px 16px;
+
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(25, 25, 25, 0.4);
+}
+
+.previewLabel {
+  opacity: 0.6;
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+
+.previewTable {
+  width: 100%;
+  border-collapse: collapse;
+
+  th {
+    background: var(--header-color, #333);
+    color: #eee;
+    font-weight: 600;
+    font-size: 13px;
+    padding: 8px 10px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    white-space: nowrap;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// CONTENT — скроллируемая область с группами
+// ═══════════════════════════════════════════════════════════
+
+.content {
+  flex: 1 1 auto;
+  min-height: 0;
+
+  // ✅ КЛЮЧЕВОЕ: вертикальный скролл!
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+
+  padding: 16px;
+
+  @include custom-scrollbar();
+}
+
+// ═══════════════════════════════════════════════════════════
+// LOADING STATE
+// ═══════════════════════════════════════════════════════════
+
+.loading {
+  padding: 40px 20px;
+  text-align: center;
+  opacity: 0.6;
+  font-size: 14px;
+}
+
+// ═══════════════════════════════════════════════════════════
+// TITLE
+// ═══════════════════════════════════════════════════════════
+
+.title {
+  margin: 16px 0 12px;
+  text-align: center;
+  font-size: 18px;
+  font-weight: 600;
+  color: #e0e0e0;
+}

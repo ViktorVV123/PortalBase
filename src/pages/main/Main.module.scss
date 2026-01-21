@@ -1,13 +1,33 @@
-
-  .container {
-    flex: 1 1 auto;       /* прежние стили контейнера */
-    display: flex;
-    flex-direction: column;
-
-  }
-
+// src/pages/main/Main.module.scss
 
 .layout {
   display: flex;
-  height: 100vh;        /* меню тянется на всю высоту */
+  flex-direction: row;
+
+  // ФИКСИРОВАННАЯ высота = весь viewport
+  height: 100vh;
+  max-height: 100vh;
+
+  // Ширина тоже фиксирована
+  width: 100%;
+  max-width: 100vw;
+
+  // КРИТИЧНО: никакого скролла!
+  overflow: hidden;
+}
+
+.container {
+  // Занимает всё доступное пространство
+  flex: 1 1 auto;
+
+  display: flex;
+  flex-direction: column;
+
+  // КРИТИЧНО: ограничиваем размеры
+  min-width: 0;
+  min-height: 0;
+  max-height: 100vh;
+
+  // Никакого скролла — он будет внутри таблиц
+  overflow: hidden;
 }

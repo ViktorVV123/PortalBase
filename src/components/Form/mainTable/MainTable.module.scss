@@ -1,5 +1,5 @@
 // src/components/Form/mainTable/MainTable.module.scss
-// Стили для MainTable и MainTableRow
+// ФИНАЛЬНАЯ ВЕРСИЯ — таблица с горизонтальным скроллом
 
 @use '@/assets/styles/fluid-type' as *;
 
@@ -7,41 +7,42 @@
 // VARIABLES
 // ═══════════════════════════════════════════════════════════
 
-$border-color: rgba(255, 255, 255, 0.74);
-$header-bg: var(--header-color, #3a3a3a);
-$hover-bg: var(--hover-color, rgba(255, 255, 255, 0.08));
-$link-color: var(--link, #66b0ff);
-$text-color: #ddd;
+$border-color: rgba(255, 255, 255, 0.15);
+$header-bg: var(--header-color, #2d2d2d);
+$hover-bg: var(--hover-color, rgba(255, 255, 255, 0.06));
+$selected-bg: rgba(100, 150, 255, 0.12);
+$link-color: var(--link, #6db3f2);
+$text-color: #e0e0e0;
 $text-muted: #888;
 
 :root {
-  --main-head-row-1: 40px;
+  --main-head-row-1: 42px;
 }
 
 // ═══════════════════════════════════════════════════════════
-// TABLE WRAPPER — контейнер без своего скролла
+// TABLE WRAPPER
+// Этот div находится ВНУТРИ .mainTableScroll
+// Его задача — позволить таблице быть шире контейнера
 // ═══════════════════════════════════════════════════════════
 
 .tableWrapper {
-  width: 100%;
-  min-width: 0;
+  // Минимальная ширина = 100% контейнера
+  // Но если таблица шире — wrapper растянется
+  min-width: 100%;
+  width: max-content;
 }
 
 // ═══════════════════════════════════════════════════════════
-// TABLE BASE — КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ
+// TABLE BASE
 // ═══════════════════════════════════════════════════════════
 
 .tbl {
-  // Ширина по контенту, но не меньше контейнера
+  // Таблица занимает ширину по контенту
   width: max-content;
   min-width: 100%;
 
-  // table-layout: auto позволяет колонкам расширяться под контент
-  // colgroup задаёт минимальные ширины
   table-layout: auto;
-
-  border-collapse: separate;
-  border-spacing: 0;
+  border-collapse: collapse;
   @include fluid-type(13, 15);
 }
 
@@ -52,11 +53,10 @@ $text-muted: #888;
 .tbl th,
 .tbl td {
   border: 1px solid $border-color;
-  padding: 6px 8px;
+  padding: 8px 12px;
   text-align: center;
   vertical-align: middle;
 
-  // Показываем весь текст с переносами
   white-space: normal;
   word-wrap: break-word;
   overflow-wrap: break-word;
@@ -68,36 +68,36 @@ $text-muted: #888;
 
 .tbl thead th {
   background: $header-bg;
-  color: #eee;
+  color: #f0f0f0;
   font-weight: 600;
   font-size: 13px;
-  line-height: 1.2;
-  z-index: 2;
+  line-height: 1.3;
 
   white-space: normal;
   word-break: break-word;
   hyphens: auto;
-  padding: 6px 4px;
+  padding: 10px 8px;
 }
 
-// Первая строка шапки (группы) — липкая
+// Первая строка шапки — sticky
 .tbl thead tr:nth-child(1) th {
   position: sticky;
   top: 0;
-  z-index: 4;
-  min-height: 36px;
-  white-space: normal;
-  line-height: 1.3;
+  z-index: 10;
+  min-height: 40px;
+
+  // Тень под шапкой при скролле
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
-// Вторая строка шапки (подписи) — липкая под первой
+// Вторая строка шапки — sticky под первой
 .tbl thead tr:nth-child(2) th {
   position: sticky;
   top: var(--main-head-row-1);
-  z-index: 3;
+  z-index: 9;
   font-weight: 500;
   font-size: 12px;
-  white-space: normal;
+  background: rgba(35, 35, 35, 1); // Чуть темнее header-bg
 
   .ellipsis {
     white-space: normal;
@@ -114,7 +114,7 @@ $text-muted: #888;
   color: $text-color;
   background: transparent;
   cursor: pointer;
-  transition: background 0.1s ease;
+  transition: background 0.12s ease;
 }
 
 .tbl tbody tr:hover td {
@@ -126,15 +126,14 @@ $text-muted: #888;
 // ═══════════════════════════════════════════════════════════
 
 .selectedRow td {
-  background: $hover-bg;
-  font-weight: 600;
+  background: $selected-bg !important;
+  font-weight: 500;
 }
 
 // ═══════════════════════════════════════════════════════════
 // TEXT HELPERS
 // ═══════════════════════════════════════════════════════════
 
-// Однострочный текст с троеточием
 .ellipsis {
   display: block;
   max-width: 100%;
@@ -143,7 +142,6 @@ $text-muted: #888;
   white-space: nowrap;
 }
 
-// Многострочный текст с переносом (основной для данных)
 .wrap {
   display: block;
   white-space: normal;
@@ -153,7 +151,6 @@ $text-muted: #888;
   text-align: center;
 }
 
-// Ограничение по строкам (clamp)
 .clamp {
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -169,15 +166,15 @@ $text-muted: #888;
 // ═══════════════════════════════════════════════════════════
 
 .editCell {
-  padding: 2px 4px !important;
-  background: rgba(255, 255, 255, 0.03);
+  padding: 4px 6px !important;
+  background: rgba(255, 255, 255, 0.02);
 }
 
 .cellEditor {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: 6px;
   width: 100%;
   min-width: 0;
 }
@@ -197,13 +194,13 @@ $text-muted: #888;
   }
 
   :global(.MuiInputBase-input) {
-    padding: 4px 6px;
+    padding: 6px 8px;
     font-size: 13px;
     text-align: center;
   }
 
   :global(.MuiSelect-select) {
-    padding: 4px 6px;
+    padding: 6px 8px;
     text-align: center;
   }
 }
@@ -212,18 +209,19 @@ $text-muted: #888;
 .inpN {
   width: 100%;
   box-sizing: border-box;
-  padding: 4px 6px;
+  padding: 6px 8px;
   font: inherit;
   font-size: 13px;
   color: inherit;
-  background: #1e1e1e;
+  background: rgba(20, 20, 20, 0.8);
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 4px;
   text-align: center;
+  transition: border-color 0.15s ease;
 
   &:focus {
     outline: none;
-    border-color: rgba(100, 150, 255, 0.5);
+    border-color: rgba(100, 150, 255, 0.6);
   }
 }
 
@@ -238,7 +236,7 @@ $text-muted: #888;
 .comboEditWrapper {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   width: 100%;
   min-width: 0;
 }
@@ -252,7 +250,7 @@ $text-muted: #888;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: 6px;
   max-width: 100%;
   overflow: hidden;
 }
@@ -268,11 +266,12 @@ $text-muted: #888;
   border: none;
   background: none;
   cursor: pointer;
-  opacity: 0.7;
+  opacity: 0.6;
   font-size: 16px;
   color: #fff;
   padding: 0;
   flex-shrink: 0;
+  transition: opacity 0.15s;
 
   &:hover {
     opacity: 1;
@@ -280,24 +279,25 @@ $text-muted: #888;
 }
 
 // ═══════════════════════════════════════════════════════════
-// LINK BUTTON (для drill)
+// LINK BUTTON (drill)
 // ═══════════════════════════════════════════════════════════
 
 .linkButton {
-  padding: 0;
+  padding: 2px 4px;
   border: none;
   background: none;
   cursor: pointer;
-  text-decoration: underline;
+  text-decoration: none;
   color: $link-color;
   font: inherit;
-
-  // Текст внутри кнопки тоже ограничиваем
   max-width: 100%;
-  display: block;
+  display: inline-block;
+  border-radius: 3px;
+  transition: all 0.15s ease;
 
   &:hover {
-    text-decoration: none;
+    background: rgba(100, 150, 255, 0.1);
+    text-decoration: underline;
   }
 }
 
@@ -312,7 +312,7 @@ $text-muted: #888;
 .readonlyValue {
   user-select: text;
   pointer-events: none;
-  opacity: 0.85;
+  opacity: 0.75;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -325,7 +325,7 @@ $text-muted: #888;
 
     &::-webkit-calendar-picker-indicator {
       filter: invert(1);
-      opacity: 1;
+      opacity: 0.8;
     }
 
     &::-webkit-inner-spin-button {
@@ -343,12 +343,13 @@ $text-muted: #888;
 // ═══════════════════════════════════════════════════════════
 
 .actionsCell {
-  padding: 0 4px !important;
+  padding: 4px 8px !important;
   text-align: center;
   white-space: nowrap;
   width: 80px;
-  min-width: 56px;
+  min-width: 60px;
   max-width: 100px;
+  background: inherit;
 }
 
 .actionsRow {
@@ -361,39 +362,42 @@ $text-muted: #888;
 .actionsBtn {
   background: none;
   border: 0;
-  padding: 0;
-  width: 22px;
-  height: 22px;
+  padding: 4px;
+  width: 26px;
+  height: 26px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: #ccc;
-  transition: color 0.15s;
+  color: #aaa;
+  border-radius: 4px;
+  transition: all 0.15s ease;
 
   &:hover {
     color: #fff;
+    background: rgba(255, 255, 255, 0.1);
   }
 }
 
 .actionsBtnDisabled {
   cursor: not-allowed;
-  opacity: 0.4;
+  opacity: 0.3;
   pointer-events: none;
 }
 
 .actionIcon {
-  width: 1.1em;
-  height: 1.1em;
+  width: 16px;
+  height: 16px;
   color: inherit;
 }
 
 .lockSlot {
-  width: 18px;
+  width: 20px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   pointer-events: none;
+  opacity: 0.6;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -404,24 +408,20 @@ $text-muted: #888;
 .cancelBtn {
   background: none;
   border: 0;
-  width: 22px;
-  height: 22px;
+  width: 26px;
+  height: 26px;
   padding: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   font-size: 16px;
   line-height: 1;
-  color: #ccc;
   cursor: pointer;
-  transition: color 0.15s;
-
-  &:hover {
-    color: #fff;
-  }
+  border-radius: 4px;
+  transition: all 0.15s ease;
 
   &:disabled {
-    opacity: 0.5;
+    opacity: 0.4;
     cursor: not-allowed;
   }
 }
@@ -429,7 +429,8 @@ $text-muted: #888;
 .okBtn {
   color: #4ade80;
 
-  &:hover {
+  &:hover:not(:disabled) {
+    background: rgba(74, 222, 128, 0.15);
     color: #22c55e;
   }
 }
@@ -437,7 +438,8 @@ $text-muted: #888;
 .cancelBtn {
   color: #f87171;
 
-  &:hover {
+  &:hover:not(:disabled) {
+    background: rgba(248, 113, 113, 0.15);
     color: #ef4444;
   }
 }
@@ -449,15 +451,18 @@ $text-muted: #888;
 .toggleBtn {
   background: none;
   border: 0;
-  padding: 0;
+  padding: 4px;
   cursor: pointer;
-  color: #fff;
+  color: #ccc;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  border-radius: 4px;
+  transition: all 0.15s ease;
 
   &:hover {
-    opacity: 0.8;
+    color: #fff;
+    background: rgba(255, 255, 255, 0.1);
   }
 }
 
@@ -466,69 +471,48 @@ $text-muted: #888;
 // ═══════════════════════════════════════════════════════════
 
 .checkboxCell {
-  padding: 2px !important;
+  padding: 4px !important;
 }
 
-
 // ═══════════════════════════════════════════════════════════
-// ДОБАВИТЬ В КОНЕЦ MainTable.module.scss
-// Стили для валидации required полей
+// VALIDATION STYLES
 // ═══════════════════════════════════════════════════════════
 
 $error-color: #ef4444;
-$error-bg: rgba(239, 68, 68, 0.08);
+$error-bg: rgba(239, 68, 68, 0.1);
 $required-mark-color: #ef4444;
-
-// ═══════════════════════════════════════════════════════════
-// REQUIRED FIELD MARKER (звёздочка *)
-// ═══════════════════════════════════════════════════════════
 
 .requiredMark {
   color: $required-mark-color;
   font-weight: 700;
-  margin-left: 2px;
+  margin-left: 3px;
   font-size: 1.1em;
   line-height: 1;
   vertical-align: middle;
-  cursor: help;
 }
-
-// ═══════════════════════════════════════════════════════════
-// REQUIRED CELL (обязательная ячейка — лёгкий визуальный акцент)
-// ═══════════════════════════════════════════════════════════
 
 .requiredCell {
   position: relative;
 }
 
-// ═══════════════════════════════════════════════════════════
-// CELL ERROR (ячейка с ошибкой валидации)
-// ═══════════════════════════════════════════════════════════
-
 .cellError {
   background: $error-bg !important;
   border-color: $error-color !important;
-
-  // Анимация для привлечения внимания
   animation: cellErrorPulse 0.3s ease-out;
 }
 
 @keyframes cellErrorPulse {
   0% {
-    background: rgba(239, 68, 68, 0.2);
+    background: rgba(239, 68, 68, 0.25);
   }
   100% {
     background: $error-bg;
   }
 }
 
-// ═══════════════════════════════════════════════════════════
-// ADD ROW (строка добавления — лёгкий зелёный фон)
-// ═══════════════════════════════════════════════════════════
-
 .addRow {
   td {
-    background: rgba(74, 222, 128, 0.05);
+    background: rgba(74, 222, 128, 0.04);
   }
 
   &:hover td {

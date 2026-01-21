@@ -120,10 +120,20 @@
   }
 
   span:first-child {
-    flex: 1;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    flex: 1 1 auto;
+    min-width: 0;
+
+    // ✅ Разрешаем перенос текста
+    white-space: normal;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    line-height: 1.4;
+  }
+
+  // Иконка стрелки — фиксированная
+  span:last-child {
+    flex: 0 0 auto;
+    min-width: 20px;
   }
 
 }

@@ -1,17 +1,35 @@
+// src/components/setOfTables/SetOfTables.module.scss
+
 @use '@/assets/styles/fluid-type' as *;
 
 $border: #f6f6f6;
-$gray-95: #fafafa;
-$gray-90: #f3f3f3;
 $error: #d33;
 
-/* ─── базовое ─── */
+// ═══════════════════════════════════════════════════════════
+// WRAPPER — ГЛАВНЫЙ КОНТЕЙНЕР
+// КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: flex: 1 + min-height: 0 вместо calc()
+// ═══════════════════════════════════════════════════════════
+
 .wrapper {
-  padding: 10px;
+  // Занимает всё доступное пространство от родителя
+  flex: 1 1 auto;
+
+  // КРИТИЧНО: позволяет сжиматься меньше контента!
+  min-height: 0;
+  min-width: 0;
+
+  // Ограничиваем максимум
+  max-height: 100%;
+  max-width: 100%;
+
   display: flex;
   flex-direction: column;
-  min-height: calc(100vh - 80px); // 80px – высота верхней панели
-  overflow-x: hidden; // 👈 страница НЕ скроллится по горизонтали
+
+  // КРИТИЧНО: никакого скролла на этом уровне!
+  overflow: hidden;
+
+  padding: 10px;
+  box-sizing: border-box;
 }
 
 .loaderArea {
@@ -20,6 +38,15 @@ $error: #d33;
   align-items: center;
   justify-content: center;
 }
+
+.error {
+  color: $error;
+  padding: 16px 0;
+}
+
+// ═══════════════════════════════════════════════════════════
+// BREADCRUMB & HEADERS
+// ═══════════════════════════════════════════════════════════
 
 .breadcrumb {
   @include fluid-type(18, 20);
@@ -56,19 +83,17 @@ h2 {
   padding: 24px 0;
 }
 
-.error {
-  color: $error;
-  padding: 16px 0;
-}
+// ═══════════════════════════════════════════════════════════
+// CONTENT ROW LAYOUT
+// ═══════════════════════════════════════════════════════════
 
-/* ─── раскладка основного контента ─── */
 .contentRow {
   display: flex;
   gap: 10px;
   position: relative;
-  height: calc(100vh - 80px);
+  flex: 1 1 auto;
   min-height: 0;
-  /* горизонтальный скролл у строки не нужен, он внутри таблиц */
+  overflow: hidden;
 }
 
 .mainCol {
@@ -77,20 +102,21 @@ h2 {
   gap: 20px;
   flex: 1 1 auto;
   min-height: 0;
-  min-width: 0; /* 👈 важно: позволяет ужиматься по ширине */
+  min-width: 0;
 }
 
+// ═══════════════════════════════════════════════════════════
+// TABLE STYLES
+// ═══════════════════════════════════════════════════════════
 
-/* высота 1-й строки thead под твою типографику */
 :root {
   --head-row-1: 40px;
 }
 
-/* ─── сама таблица ─── */
 .tbl {
-  width: max-content; /* ширина по содержимому */
-  min-width: 100%; /* но не уже контейнера */
-  table-layout: fixed; /* стабильные ширины через colgroup */
+  width: max-content;
+  min-width: 100%;
+  table-layout: fixed;
   border-collapse: separate;
   border-spacing: 0;
   @include fluid-type(13, 16);
@@ -104,16 +130,12 @@ h2 {
   font-size: 13px;
 }
 
-/* ─── спец-стили для MUI TextField внутри ячейки ─── */
-
-/* корневая обёртка TextField внутри ячейки */
 .inpInCell {
   width: 100%;
   min-width: 0;
   box-sizing: border-box;
 }
 
-/* сам input MUI (то, что внутри рамки) */
 .inpInCell :global(.MuiInputBase-root) {
   width: 100%;
   min-width: 0;
@@ -123,24 +145,19 @@ h2 {
 .inpInCell :global(.MuiInputBase-input) {
   padding: 2px 4px;
   font-size: 13px;
-  text-align: center; // чтобы текст был по центру, как в режиме просмотра
-}
-
-/* для Select (combobox primary), если будем использовать TextField+Select */
-.inpInCell :global(.MuiSelect-select) {
-  padding: 2px 4px;
-
   text-align: center;
 }
 
-/* ячейка в режиме редактирования — убираем лишний padding,
-   чтобы рамка TextField не выглядела «съехавшей» */
-.editCell {
-  padding: 0;
-  overflow: hidden; // не даём содержимому вылезти за пределы td
+.inpInCell :global(.MuiSelect-select) {
+  padding: 2px 4px;
+  text-align: center;
 }
 
-/* базовые ячейки */
+.editCell {
+  padding: 0;
+  overflow: hidden;
+}
+
 .tbl th,
 .tbl td {
   font-size: 14px;
@@ -149,10 +166,9 @@ h2 {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 320px; /* чтобы огромные тексты не раздували ячейку по высоте */
+  max-width: 320px;
 }
 
-/* шапка */
 .tbl thead th {
   background: var(--header-color);
   color: #eee;
@@ -161,7 +177,6 @@ h2 {
   z-index: 2;
 }
 
-/* 1-я строка шапки (группы) */
 .tbl thead tr:nth-child(1) th {
   position: sticky;
   top: 0;
@@ -169,30 +184,25 @@ h2 {
   height: var(--head-row-1);
 }
 
-/* 2-я строка шапки (подписи) */
 .tbl thead tr:nth-child(2) th {
   position: sticky;
   top: var(--head-row-1);
   z-index: 3;
 }
 
-/* тело */
 .tbl td {
   color: #ddd;
   background: transparent;
 }
 
-/* hover строк тела */
 .tbl tbody tr:hover {
   background: var(--hover-color);
 }
 
-/* курсор-рука только по телу */
 .tbl tbody td {
   cursor: pointer;
 }
 
-/* выбранная строка */
 .selectedRow {
   background: var(--hover-color);
 }
@@ -201,14 +211,6 @@ h2 {
   font-weight: 600;
 }
 
-/* контейнер внутри ячейки для инпута */
-/* td в режиме редактирования */
-.editCell {
-  padding: 0;
-  overflow: hidden; // содержимое не выходит за границы ячейки
-}
-
-/* общий контейнер для любого редактора внутри td */
 .cellEditor {
   display: flex;
   align-items: center;
@@ -216,11 +218,10 @@ h2 {
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
-  padding: 4px 6px; // те же, что у обычной ячейки
+  padding: 4px 6px;
   overflow: hidden;
 }
 
-/* именно combobox-редактор (текст + крестик) */
 .comboEditInner {
   display: flex;
   align-items: center;
@@ -230,7 +231,6 @@ h2 {
   overflow: hidden;
 }
 
-/* текст внутри редактируемой combobox-ячейки */
 .comboText {
   max-width: 100%;
   white-space: nowrap;
@@ -238,7 +238,6 @@ h2 {
   text-overflow: ellipsis;
 }
 
-/* кнопка очистки "×" рядом с текстом */
 .comboClearBtn {
   border: none;
   background: none;
@@ -247,14 +246,13 @@ h2 {
   font-size: 16px;
   color: #fff;
   padding: 0;
-  flex: 0 0 auto; // не растягивается
+  flex: 0 0 auto;
 }
 
 .comboClearBtn:hover {
   opacity: 1;
 }
 
-/* однострочный текст с троеточием */
 .ellipsis {
   display: block;
   max-width: 100%;
@@ -264,12 +262,11 @@ h2 {
 }
 
 .tbl thead tr:nth-child(2) .ellipsis {
-  white-space: normal; // разрешаем перенос
-  word-break: break-word; // ломаем длинные слова
-  text-overflow: clip; // убираем троеточие
+  white-space: normal;
+  word-break: break-word;
+  text-overflow: clip;
 }
 
-/* многострочный clamp – если где-то используешь */
 .clamp {
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -279,22 +276,10 @@ h2 {
   word-break: break-word;
 }
 
-/* ─── инпуты внутри таблицы (в т.ч. MUI) ─── */
-
-.tbl input,
-.tbl select {
-  width: 100%;
-  min-width: 0;
-  box-sizing: border-box;
-  font-size: 13px;
-}
-
-/* MUI-обёртка TextField / Select */
 .tbl :global(.MuiInputBase-root) {
   width: 100%;
 }
 
-/* datetime / date / time – чтобы выглядели нормально на тёмном фоне */
 .dateTimeInput {
   input {
     color: #fff;
@@ -314,7 +299,6 @@ h2 {
   }
 }
 
-/* read-only ячейки – курсор обычный и текст можно выделять */
 .cellReadonly {
   cursor: default;
 }
@@ -325,28 +309,21 @@ h2 {
   opacity: .85;
 }
 
-/* ─── actions-колонка ─── */
-
 .actionsCell {
   padding: 0 4px;
   text-align: center;
   white-space: nowrap;
-  width: 1%; /* колонка старается занимать минимум ширины */
-
+  width: 1%;
 }
-//для того чтобы текст в Main на несколько строчек был а не с троеточием
+
 .wrap {
   white-space: normal;
   overflow: visible;
   text-overflow: clip;
-
-  /* чтобы длинные слова/uuid не ломали верстку */
   overflow-wrap: anywhere;
   word-break: break-word;
-
-  display: block; /* чтобы перенос работал предсказуемо в кнопке/спане */
+  display: block;
 }
-
 
 .actionsRow {
   display: inline-flex;
@@ -381,7 +358,6 @@ h2 {
   pointer-events: none;
 }
 
-/* одна версия .actionIcon */
 .actionIcon {
   width: 1.1em;
   height: 1.1em;
@@ -413,7 +389,6 @@ h2 {
   fill: #fff;
 }
 
-/* ─── инпуты в ячейках ─── */
 .inp, .inpN {
   width: 100%;
   box-sizing: border-box;
@@ -428,7 +403,9 @@ h2 {
   text-align: right;
 }
 
-/* ─── блок дерева / ссылки / вкладки и т.п. ниже без изменений ─── */
+// ═══════════════════════════════════════════════════════════
+// TREE STYLES
+// ═══════════════════════════════════════════════════════════
 
 .treeList {
   margin-bottom: 24px;
@@ -506,8 +483,6 @@ h2 {
   }
 }
 
-
-//все для tree
 .nestedItem {
   position: relative;
   margin-bottom: 4px;
@@ -541,120 +516,13 @@ h2 {
   margin-top: 4px;
 }
 
-
-
-
-
-
-/* ───────────────── FormTable layout ───────────────── */
-
-.formLayout {
-  /* чтобы скроллились именно таблицы, а не вся страница */
-  height: calc(100dvh - var(--appHeaderH, 80px));
-  min-height: 0;
-
-  display: grid;
-  grid-template-columns: var(--treeW, 300px) minmax(0, 1fr);
-  gap: 12px;
-
-  overflow: hidden; /* запрещаем общий скролл контейнера */
-  padding: 10px;
-
-
-  &::-webkit-scrollbar {
-    width: 6px;
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, .2);
-    border-radius: 6px;
-  }
-
-  &::-webkit-scrollbar-track {
-    background: transparent;
-  }
-
-}
-
-.formLayout[data-has-tree='false'] {
-  grid-template-columns: minmax(0, 1fr);
-}
-
-.treePane {
-  min-height: 0;
-  overflow: auto; /* отдельный скролл дерева */
-  padding-right: 6px;
-
-}
-
-.rightPane {
-  min-height: 0;
-  overflow: hidden;
-
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto; /* toolbar, main, sub */
-  gap: 10px;
-
-}
-
-.toolbarPane {
-  /* просто “липнет” сверху, без скролла */
-}
-
-.mainPane {
-  min-height: 0;
-  overflow: hidden; /* ✅ было auto */
-  overscroll-behavior: contain;
-
-}
-
-.mainTableScroll {
-  width: 100%;
-  max-height: 100%;   /* важно: не выше mainPane */
-  min-height: 0;
-  overflow: auto;
-  overscroll-behavior: contain;
-
-  &::-webkit-scrollbar {
-    width: 6px;
-    height: 10px;
-  }
-  &::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.3);
-    border-radius: 6px;
-  }
-  &::-webkit-scrollbar-track {
-    background: #4c4c4c;
-  }
-}
-
-.subPane {
-  min-height: 0;
-  max-height: clamp(170px, 28vh, 360px); /* саб меньше по высоте */
-  overflow: auto; /* отдельный скролл SUB */
-  overscroll-behavior: contain;
-  padding-bottom:20px ;
-}
-
-/* чтобы горизонтальный скролл появлялся корректно */
-.mainPane :global(table) {
-  min-width: 100%;
-  width: max-content;
-}
-
-
 // ═══════════════════════════════════════════════════════════
-// ДОБАВИТЬ В КОНЕЦ SetOfTables.module.scss
-// Стили для валидации required полей
+// VALIDATION STYLES
 // ═══════════════════════════════════════════════════════════
 
 $error-color: #ef4444;
 $error-bg: rgba(239, 68, 68, 0.08);
 $required-mark-color: #ef4444;
-
-// ═══════════════════════════════════════════════════════════
-// REQUIRED FIELD MARKER (звёздочка *)
-// ═══════════════════════════════════════════════════════════
 
 .requiredMark {
   color: $required-mark-color;
@@ -666,23 +534,13 @@ $required-mark-color: #ef4444;
   cursor: help;
 }
 
-// ═══════════════════════════════════════════════════════════
-// REQUIRED CELL (обязательная ячейка)
-// ═══════════════════════════════════════════════════════════
-
 .requiredCell {
   position: relative;
 }
 
-// ═══════════════════════════════════════════════════════════
-// CELL ERROR (ячейка с ошибкой валидации)
-// ═══════════════════════════════════════════════════════════
-
 .cellError {
   background: $error-bg !important;
   border-color: $error-color !important;
-
-  // Анимация для привлечения внимания
   animation: cellErrorPulse 0.3s ease-out;
 }
 
@@ -695,10 +553,6 @@ $required-mark-color: #ef4444;
   }
 }
 
-// ═══════════════════════════════════════════════════════════
-// ADD ROW (строка добавления)
-// ═══════════════════════════════════════════════════════════
-
 .addRow {
   td {
     background: rgba(74, 222, 128, 0.05);
@@ -708,8 +562,3 @@ $required-mark-color: #ef4444;
     background: rgba(74, 222, 128, 0.08);
   }
 }
-
-
-
-
-

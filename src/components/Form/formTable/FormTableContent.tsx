@@ -1,6 +1,6 @@
 // src/components/Form/formTable/FormTableContent.tsx
 
-import React, { useCallback, useEffect, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import * as s from '@/components/Form/formTable/FormTable.module.scss';
 import { api } from '@/services/api';
 
@@ -66,6 +66,104 @@ export const FormTableContent: React.FC<Props> = ({
     const { subLoading, subError } = loading;
     const { lastPrimary, activeSubOrder } = selection;
     const { isOpen: isTreeOpen, expandedKeys, childrenCache } = treeDrawer;
+
+    // ═══════════════════════════════════════════════════════════
+    // KEYBOARD NAVIGATION — скролл стрелками
+    // ═══════════════════════════════════════════════════════════
+
+    const mainScrollRef = useRef<HTMLDivElement>(null);
+    const subScrollRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // Не перехватываем если фокус в инпуте
+            const active = document.activeElement;
+            const isInput =
+                active?.tagName === 'INPUT' ||
+                active?.tagName === 'TEXTAREA' ||
+                active?.tagName === 'SELECT' ||
+                active?.getAttribute('contenteditable') === 'true';
+
+            if (isInput) return;
+
+            // Определяем какой контейнер скроллить
+            // Если subPane видна и мышь над ней — скроллим sub, иначе main
+            const container = mainScrollRef.current;
+            if (!container) return;
+
+            // Шаг скролла: обычный или быстрый (с Ctrl)
+            const step = e.ctrlKey || e.metaKey ? 300 : 100;
+
+            let handled = false;
+
+            switch (e.key) {
+                case 'ArrowLeft':
+                    container.scrollLeft -= step;
+                    handled = true;
+                    break;
+
+                case 'ArrowRight':
+                    container.scrollLeft += step;
+                    handled = true;
+                    break;
+
+                case 'ArrowUp':
+                    container.scrollTop -= step;
+                    handled = true;
+                    break;
+
+                case 'ArrowDown':
+                    container.scrollTop += step;
+                    handled = true;
+                    break;
+
+                case 'Home':
+                    if (e.ctrlKey || e.metaKey) {
+                        // Ctrl+Home — в самое начало
+                        container.scrollTop = 0;
+                        container.scrollLeft = 0;
+                    } else {
+                        // Home — в начало строки (влево)
+                        container.scrollLeft = 0;
+                    }
+                    handled = true;
+                    break;
+
+                case 'End':
+                    if (e.ctrlKey || e.metaKey) {
+                        // Ctrl+End — в самый конец
+                        container.scrollTop = container.scrollHeight;
+                        container.scrollLeft = container.scrollWidth;
+                    } else {
+                        // End — в конец строки (вправо)
+                        container.scrollLeft = container.scrollWidth;
+                    }
+                    handled = true;
+                    break;
+
+                case 'PageUp':
+                    container.scrollTop -= container.clientHeight * 0.8;
+                    handled = true;
+                    break;
+
+                case 'PageDown':
+                    container.scrollTop += container.clientHeight * 0.8;
+                    handled = true;
+                    break;
+            }
+
+            if (handled) {
+                e.preventDefault();
+            }
+        };
+
+        // Слушаем на document чтобы работало везде
+        document.addEventListener('keydown', handleKeyDown);
+
+        return () => {
+            document.removeEventListener('keydown', handleKeyDown);
+        };
+    }, []);
 
     // ═══════════════════════════════════════════════════════════
     // SUB WIDGETS
@@ -264,7 +362,10 @@ export const FormTableContent: React.FC<Props> = ({
 
                     {/* MAIN TABLE */}
                     <div className={s.mainPane}>
-                        <div className={s.mainTableScroll}>
+                        <div
+                            ref={mainScrollRef}
+                            className={s.mainTableScroll}
+                        >
                             <MainTableWithContext
                                 onOpenDrill={handleOpenDrill}
                                 comboReloadToken={comboReloadToken}

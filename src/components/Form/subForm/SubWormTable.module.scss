@@ -1,5 +1,5 @@
 // src/components/Form/subForm/SubWormTable.module.scss
-// Стили для SubWormTable — унифицированы с MainTable
+// ФИНАЛЬНАЯ ВЕРСИЯ — SubTable с собственным горизонтальным скроллом
 
 @use '@/assets/styles/fluid-type' as *;
 
@@ -7,11 +7,12 @@
 // VARIABLES
 // ═══════════════════════════════════════════════════════════
 
-$border-color: rgba(255, 255, 255, 0.74);
-$header-bg: var(--header-color, #3a3a3a);
-$hover-bg: var(--hover-color, rgba(255, 255, 255, 0.08));
-$link-color: var(--link, #66b0ff);
-$text-color: #ddd;
+$border-color: rgba(255, 255, 255, 0.12);
+$header-bg: var(--header-color, #2a2a2a);
+$hover-bg: var(--hover-color, rgba(255, 255, 255, 0.05));
+$selected-bg: rgba(100, 150, 255, 0.1);
+$link-color: var(--link, #6db3f2);
+$text-color: #d8d8d8;
 $text-muted: #888;
 $error-color: #d33;
 
@@ -23,87 +24,120 @@ $error-color: #d33;
 // SCROLLBAR MIXIN
 // ═══════════════════════════════════════════════════════════
 
-@mixin custom-scrollbar($width: 6px, $height: 8px) {
+@mixin custom-scrollbar($thumb-color: rgba(255, 255, 255, 0.3), $track-color: rgba(50, 50, 50, 0.5)) {
   &::-webkit-scrollbar {
-    width: $width;
-    height: $height;
+    width: 7px;
+    height: 9px;
   }
 
   &::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.3);
-    border-radius: 6px;
+    background: $thumb-color;
+    border-radius: 4px;
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.45);
+    }
   }
 
   &::-webkit-scrollbar-track {
-    background: #3a3a3a;
+    background: $track-color;
+    border-radius: 4px;
   }
+
+  &::-webkit-scrollbar-corner {
+    background: $track-color;
+  }
+
+  scrollbar-width: thin;
+  scrollbar-color: $thumb-color $track-color;
 }
 
 // ═══════════════════════════════════════════════════════════
-// ROOT — занимает всё пространство subPane, БЕЗ своего скролла
+// ROOT — главный контейнер SubWormTable
+// Находится внутри .subPane
 // ═══════════════════════════════════════════════════════════
 
 .root {
   display: flex;
   flex-direction: column;
+
+  flex: 1 1 auto;
   min-height: 0;
   height: 100%;
-  overflow: hidden; // Скролл только внутри tableScroll
+
+  min-width: 0;
+  width: 100%;
+
+  overflow: hidden;
+
+  // Внутренние отступы
+  padding: 8px;
 }
 
 // ═══════════════════════════════════════════════════════════
-// TABS — фиксированная высота сверху
+// TABS — вкладки сверху
 // ═══════════════════════════════════════════════════════════
 
 .tabs {
-  display: inline-flex;
+  display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 
   list-style: none;
-  padding: 4px 0;
-  margin: 0 0 4px 0;
+  padding: 0;
+  margin: 0 0 8px 0;
 
-  flex-shrink: 0; // Не сжимается
+  flex-shrink: 0;
+  min-width: 0;
 }
 
 .tab,
 .tabActive {
-  padding: 4px 14px 6px;
-  border: 1px solid #666;
+  padding: 6px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
   border-bottom: none;
   border-radius: 6px 6px 0 0;
-  background: #3a3a3a;
-  color: #eee;
-  font-size: 14px;
+  background: rgba(50, 50, 50, 0.6);
+  color: #ccc;
+  font-size: 13px;
   cursor: pointer;
   white-space: nowrap;
-  transition: background 0.15s;
-}
+  transition: all 0.15s ease;
 
-.tab:hover {
-  background: #505050;
+  &:hover {
+    background: rgba(70, 70, 70, 0.7);
+    color: #fff;
+  }
 }
 
 .tabActive {
-  background: #656464;
+  background: rgba(80, 80, 85, 0.8);
+  color: #fff;
   font-weight: 600;
-  position: relative;
-  z-index: 1;
+  border-color: rgba(255, 255, 255, 0.2);
 }
 
 // ═══════════════════════════════════════════════════════════
-// TABLE SCROLL — ЕДИНСТВЕННЫЙ скролл для SubWormTable
+// TABLE SCROLL — СОБСТВЕННЫЙ СКРОЛЛ для SubTable
+// ЭТО КЛЮЧЕВОЙ КОНТЕЙНЕР!
 // ═══════════════════════════════════════════════════════════
 
 .tableScroll {
   flex: 1 1 auto;
   min-height: 0;
-  overflow: auto; // ← Скролл ТОЛЬКО здесь
+  min-width: 0;
+  width: 100%;
+
+  // ✅ СОБСТВЕННЫЙ горизонтальный и вертикальный скролл
+  overflow-x: auto;
+  overflow-y: auto;
   overscroll-behavior: contain;
 
-  @include custom-scrollbar(6px, 8px);
+  @include custom-scrollbar();
+
+  // Скруглённые углы внутри
+  border-radius: 4px;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -111,31 +145,34 @@ $error-color: #d33;
 // ═══════════════════════════════════════════════════════════
 
 .tbl {
-  // Ширина по контенту, но не меньше контейнера
   width: max-content;
   min-width: 100%;
 
   table-layout: auto;
-  border-collapse: separate;
-  border-spacing: 0;
-  @include fluid-type(13, 15);
+  border-collapse: collapse;
+  @include fluid-type(12, 14);
 }
 
 // ═══════════════════════════════════════════════════════════
-// CELLS BASE
+// CELLS BASE — ОГРАНИЧИВАЕМ ШИРИНУ ТЕКСТОВЫХ КОЛОНОК
 // ═══════════════════════════════════════════════════════════
 
 .tbl th,
 .tbl td {
   border: 1px solid $border-color;
-  padding: 6px 8px;
+  padding: 6px 10px;
   text-align: center;
   vertical-align: middle;
 
-  // Показываем весь текст с переносами
+  // ✅ КЛЮЧЕВОЕ: Ограничиваем максимальную ширину колонки
+  max-width: 280px;
+  min-width: 80px;
+
+  // Разрешаем перенос текста
   white-space: normal;
   word-wrap: break-word;
   overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -146,34 +183,34 @@ $error-color: #d33;
   background: $header-bg;
   color: #eee;
   font-weight: 600;
-  font-size: 13px;
-  line-height: 1.2;
-  z-index: 2;
+  font-size: 12px;
+  line-height: 1.3;
 
   white-space: normal;
   word-break: break-word;
   hyphens: auto;
-  padding: 6px 4px;
+  padding: 8px 6px;
+
+  // Заголовки могут быть чуть шире
+  max-width: 320px;
 }
 
-// Первая строка шапки — липкая
+// Первая строка шапки — sticky
 .tbl thead tr:nth-child(1) th {
   position: sticky;
   top: 0;
-  z-index: 4;
-  min-height: 36px;
-  white-space: normal;
-  line-height: 1.3;
+  z-index: 5;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
 }
 
-// Вторая строка шапки — липкая под первой
+// Вторая строка шапки — sticky под первой
 .tbl thead tr:nth-child(2) th {
   position: sticky;
   top: var(--sub-head-row-1);
-  z-index: 3;
+  z-index: 4;
   font-weight: 500;
-  font-size: 12px;
-  white-space: normal;
+  font-size: 11px;
+  background: rgba(35, 35, 35, 1); // Чуть темнее header-bg
 
   .ellipsis {
     white-space: normal;
@@ -202,20 +239,29 @@ $error-color: #d33;
 // ═══════════════════════════════════════════════════════════
 
 .selectedRow td {
-  background: $hover-bg;
-  font-weight: 600;
+  background: $selected-bg !important;
+  font-weight: 500;
 }
 
 // ═══════════════════════════════════════════════════════════
-// TEXT HELPERS
+// TEXT HELPERS — ИСПРАВЛЕНО: разрешаем перенос текста
 // ═══════════════════════════════════════════════════════════
 
 .ellipsis {
   display: block;
   max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+
+  // ✅ ИСПРАВЛЕНО: Переносим текст вместо обрезания
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  line-height: 1.4;
+
+  // Опционально: ограничиваем количество строк
+  // display: -webkit-box;
+  // -webkit-box-orient: vertical;
+  // -webkit-line-clamp: 3;
+  // overflow: hidden;
 }
 
 .wrap {
@@ -242,8 +288,8 @@ $error-color: #d33;
 // ═══════════════════════════════════════════════════════════
 
 .editCell {
-  padding: 2px 4px !important;
-  background: rgba(255, 255, 255, 0.03);
+  padding: 3px 5px !important;
+  background: rgba(255, 255, 255, 0.02);
 }
 
 .cellEditor {
@@ -270,13 +316,13 @@ $error-color: #d33;
   }
 
   :global(.MuiInputBase-input) {
-    padding: 4px 6px;
-    font-size: 13px;
+    padding: 5px 6px;
+    font-size: 12px;
     text-align: center;
   }
 
   :global(.MuiSelect-select) {
-    padding: 4px 6px;
+    padding: 5px 6px;
     text-align: center;
   }
 }
@@ -285,14 +331,15 @@ $error-color: #d33;
 .inpN {
   width: 100%;
   box-sizing: border-box;
-  padding: 4px 6px;
+  padding: 5px 6px;
   font: inherit;
-  font-size: 13px;
+  font-size: 12px;
   color: inherit;
-  background: #1e1e1e;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(20, 20, 20, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 4px;
   text-align: center;
+  transition: border-color 0.15s;
 
   &:focus {
     outline: none;
@@ -341,8 +388,8 @@ $error-color: #d33;
   border: none;
   background: none;
   cursor: pointer;
-  opacity: 0.7;
-  font-size: 16px;
+  opacity: 0.6;
+  font-size: 14px;
   color: #fff;
   padding: 0;
   flex-shrink: 0;
@@ -353,22 +400,30 @@ $error-color: #d33;
 }
 
 // ═══════════════════════════════════════════════════════════
-// LINK BUTTON
+// LINK BUTTON — ИСПРАВЛЕНО: перенос текста
 // ═══════════════════════════════════════════════════════════
 
 .linkButton {
-  padding: 0;
+  padding: 2px 4px;
   border: none;
   background: none;
   cursor: pointer;
-  text-decoration: underline;
   color: $link-color;
   font: inherit;
   max-width: 100%;
-  display: block;
+  display: inline-block;
+  border-radius: 3px;
+  transition: all 0.15s;
+
+  // ✅ Разрешаем перенос текста в ссылках
+  white-space: normal;
+  word-break: break-word;
+  text-align: center;
+  line-height: 1.4;
 
   &:hover {
-    text-decoration: none;
+    background: rgba(100, 150, 255, 0.1);
+    text-decoration: underline;
   }
 }
 
@@ -383,7 +438,7 @@ $error-color: #d33;
 .readonlyValue {
   user-select: text;
   pointer-events: none;
-  opacity: 0.85;
+  opacity: 0.75;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -396,7 +451,7 @@ $error-color: #d33;
 
     &::-webkit-calendar-picker-indicator {
       filter: invert(1);
-      opacity: 1;
+      opacity: 0.7;
     }
 
     &::-webkit-inner-spin-button {
@@ -414,57 +469,59 @@ $error-color: #d33;
 // ═══════════════════════════════════════════════════════════
 
 .actionsHeadCell {
-  padding: 0 4px !important;
+  padding: 4px 6px !important;
   text-align: center;
   white-space: nowrap;
-  width: 80px;
-  min-width: 56px;
-  max-width: 100px;
+  width: 70px;
+  min-width: 50px;
+  max-width: 90px;
 }
 
 .actionsCell {
-  padding: 0 4px !important;
+  padding: 4px 6px !important;
   text-align: center;
   white-space: nowrap;
-  width: 80px;
-  min-width: 56px;
-  max-width: 100px;
+  width: 70px;
+  min-width: 50px;
+  max-width: 90px;
 }
 
 .actionsRow {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: 3px;
 }
 
 .actionsBtn {
   background: none;
   border: 0;
-  padding: 0;
-  width: 22px;
-  height: 22px;
+  padding: 3px;
+  width: 24px;
+  height: 24px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: #ccc;
-  transition: color 0.15s;
+  color: #aaa;
+  border-radius: 4px;
+  transition: all 0.15s;
 
   &:hover {
     color: #fff;
+    background: rgba(255, 255, 255, 0.1);
   }
 }
 
 .actionsBtnDisabled {
   cursor: not-allowed;
-  opacity: 0.4;
+  opacity: 0.3;
   pointer-events: none;
 }
 
 .actionIcon {
-  width: 1.1em;
-  height: 1.1em;
+  width: 14px;
+  height: 14px;
   color: inherit;
 }
 
@@ -474,6 +531,7 @@ $error-color: #d33;
   align-items: center;
   justify-content: center;
   pointer-events: none;
+  opacity: 0.5;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -483,22 +541,24 @@ $error-color: #d33;
 .iconBtn {
   background: none;
   border: 0;
-  padding: 0;
-  width: 22px;
-  height: 22px;
+  padding: 3px;
+  width: 24px;
+  height: 24px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: #ccc;
-  transition: color 0.15s;
+  color: #aaa;
+  border-radius: 4px;
+  transition: all 0.15s;
 
   &:hover {
     color: #fff;
+    background: rgba(255, 255, 255, 0.1);
   }
 
   &:disabled {
-    opacity: 0.4;
+    opacity: 0.3;
     cursor: not-allowed;
     pointer-events: none;
   }
@@ -512,24 +572,20 @@ $error-color: #d33;
 .cancelBtn {
   background: none;
   border: 0;
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   padding: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
+  font-size: 14px;
   line-height: 1;
-  color: #ccc;
   cursor: pointer;
-  transition: color 0.15s;
-
-  &:hover {
-    color: #fff;
-  }
+  border-radius: 4px;
+  transition: all 0.15s;
 
   &:disabled {
-    opacity: 0.5;
+    opacity: 0.4;
     cursor: not-allowed;
   }
 }
@@ -537,7 +593,8 @@ $error-color: #d33;
 .okBtn {
   color: #4ade80;
 
-  &:hover {
+  &:hover:not(:disabled) {
+    background: rgba(74, 222, 128, 0.12);
     color: #22c55e;
   }
 }
@@ -545,7 +602,8 @@ $error-color: #d33;
 .cancelBtn {
   color: #f87171;
 
-  &:hover {
+  &:hover:not(:disabled) {
+    background: rgba(248, 113, 113, 0.12);
     color: #ef4444;
   }
 }
@@ -557,20 +615,23 @@ $error-color: #d33;
 .toggleBtn {
   background: none;
   border: 0;
-  padding: 0;
+  padding: 3px;
   cursor: pointer;
-  color: #fff;
+  color: #bbb;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  border-radius: 4px;
+  transition: all 0.15s;
 
   &:hover {
-    opacity: 0.8;
+    color: #fff;
+    background: rgba(255, 255, 255, 0.08);
   }
 }
 
 .toggleIcon {
-  color: #fff;
+  color: inherit;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -578,7 +639,7 @@ $error-color: #d33;
 // ═══════════════════════════════════════════════════════════
 
 .checkboxCell {
-  padding: 2px !important;
+  padding: 3px !important;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -587,51 +648,34 @@ $error-color: #d33;
 
 .error {
   color: $error-color;
-  padding: 16px 0;
+  padding: 12px 8px;
+  font-size: 13px;
 }
 
-
-
 // ═══════════════════════════════════════════════════════════
-// ДОБАВИТЬ В КОНЕЦ SubWormTable.module.scss
-// Стили для валидации required полей
+// VALIDATION STYLES
 // ═══════════════════════════════════════════════════════════
 
 $validation-error-color: #ef4444;
-$validation-error-bg: rgba(239, 68, 68, 0.08);
+$validation-error-bg: rgba(239, 68, 68, 0.1);
 $required-mark-color: #ef4444;
-
-// ═══════════════════════════════════════════════════════════
-// REQUIRED FIELD MARKER (звёздочка *)
-// ═══════════════════════════════════════════════════════════
 
 .requiredMark {
   color: $required-mark-color;
   font-weight: 700;
   margin-left: 2px;
-  font-size: 1.1em;
+  font-size: 1em;
   line-height: 1;
   vertical-align: middle;
-  cursor: help;
 }
-
-// ═══════════════════════════════════════════════════════════
-// REQUIRED CELL (обязательная ячейка — лёгкий визуальный акцент)
-// ═══════════════════════════════════════════════════════════
 
 .requiredCell {
   position: relative;
 }
 
-// ═══════════════════════════════════════════════════════════
-// CELL ERROR (ячейка с ошибкой валидации)
-// ═══════════════════════════════════════════════════════════
-
 .cellError {
   background: $validation-error-bg !important;
   border-color: $validation-error-color !important;
-
-  // Анимация для привлечения внимания
   animation: subCellErrorPulse 0.3s ease-out;
 }
 
@@ -644,83 +688,12 @@ $required-mark-color: #ef4444;
   }
 }
 
-// ═══════════════════════════════════════════════════════════
-// ADD ROW (строка добавления — лёгкий зелёный фон)
-// ═══════════════════════════════════════════════════════════
-
 .addRow {
   td {
-    background: rgba(74, 222, 128, 0.05);
+    background: rgba(74, 222, 128, 0.03);
   }
 
   &:hover td {
-    background: rgba(74, 222, 128, 0.08);
-  }
-}
-
-
-// ═══════════════════════════════════════════════════════════
-// ДОБАВИТЬ В КОНЕЦ SubWormTable.module.scss
-// Стили для валидации required полей
-// ═══════════════════════════════════════════════════════════
-
-$validation-error-color: #ef4444;
-$validation-error-bg: rgba(239, 68, 68, 0.08);
-$required-mark-color: #ef4444;
-
-// ═══════════════════════════════════════════════════════════
-// REQUIRED FIELD MARKER (звёздочка *)
-// ═══════════════════════════════════════════════════════════
-
-.requiredMark {
-  color: $required-mark-color;
-  font-weight: 700;
-  margin-left: 2px;
-  font-size: 1.1em;
-  line-height: 1;
-  vertical-align: middle;
-  cursor: help;
-}
-
-// ═══════════════════════════════════════════════════════════
-// REQUIRED CELL (обязательная ячейка — лёгкий визуальный акцент)
-// ═══════════════════════════════════════════════════════════
-
-.requiredCell {
-  position: relative;
-}
-
-// ═══════════════════════════════════════════════════════════
-// CELL ERROR (ячейка с ошибкой валидации)
-// ═══════════════════════════════════════════════════════════
-
-.cellError {
-  background: $validation-error-bg !important;
-  border-color: $validation-error-color !important;
-
-  // Анимация для привлечения внимания
-  animation: subCellErrorPulse 0.3s ease-out;
-}
-
-@keyframes subCellErrorPulse {
-  0% {
-    background: rgba(239, 68, 68, 0.2);
-  }
-  100% {
-    background: $validation-error-bg;
-  }
-}
-
-// ═══════════════════════════════════════════════════════════
-// ADD ROW (строка добавления — лёгкий зелёный фон)
-// ═══════════════════════════════════════════════════════════
-
-.addRow {
-  td {
-    background: rgba(74, 222, 128, 0.05);
-  }
-
-  &:hover td {
-    background: rgba(74, 222, 128, 0.08);
+    background: rgba(74, 222, 128, 0.07);
   }
 }
