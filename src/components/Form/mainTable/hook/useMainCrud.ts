@@ -1,4 +1,4 @@
-// useMainCrud.ts — с валидацией required полей и поддержкой Toast
+// useMainCrud.ts — с валидацией required полей, поддержкой Toast и автозаполнением из фильтров дерева
 import { useCallback, useState } from 'react';
 import { api } from '@/services/api';
 import type { DTable, FormDisplay, Widget, WidgetForm } from '@/shared/hooks/useWorkSpaces';
@@ -322,10 +322,67 @@ export function useMainCrud({
     }
 
     // ═══════════════════════════════════════════════════════════
+    // ХЕЛПЕР: Построить маппинг table_column_id → write_tc_id
+    // для combobox колонок (фильтры дерева приходят с table_column_id,
+    // а draft использует write_tc_id)
+    // ═══════════════════════════════════════════════════════════
+    const buildTableColumnToWriteIdMap = useCallback((): Map<number, number> => {
+        const map = new Map<number, number>();
+
+        for (let i = 0; i < flatColumnsInRenderOrder.length; ) {
+            const c = flatColumnsInRenderOrder[i];
+
+            if (c.type === 'combobox') {
+                // Группируем combobox колонки
+                let j = i + 1;
+                while (j < flatColumnsInRenderOrder.length && isSameComboGroupCRUD(c, flatColumnsInRenderOrder[j])) {
+                    j += 1;
+                }
+                const group = flatColumnsInRenderOrder.slice(i, j);
+                const writeTcId = getWriteTcIdForComboGroupCRUD(group);
+
+                // Для combobox: оригинальный table_column_id хранится в __write_tc_id
+                // Маппим его на себя
+                if (writeTcId != null) {
+                    map.set(writeTcId, writeTcId);
+                }
+
+                // Также проверяем все колонки группы на наличие оригинального table_column_id
+                for (const col of group) {
+                    const originalTcId = col.__write_tc_id ?? col.table_column_id;
+                    if (originalTcId != null && writeTcId != null) {
+                        map.set(originalTcId, writeTcId);
+                    }
+                }
+
+                i = j;
+                continue;
+            }
+
+            // Обычная колонка
+            const writeTcId = (c.__write_tc_id ?? c.table_column_id) ?? null;
+            const originalTcId = c.table_column_id ?? null;
+
+            if (originalTcId != null && writeTcId != null) {
+                map.set(originalTcId, writeTcId);
+            }
+
+            i += 1;
+        }
+
+        return map;
+    }, [flatColumnsInRenderOrder]);
+
+    // ═══════════════════════════════════════════════════════════
     // ДОБАВЛЕНИЕ
     // ═══════════════════════════════════════════════════════════
     const startAdd = useCallback(async () => {
-        log('startAdd → called', { selectedFormId, selectedWidgetId: selectedWidget?.id, preflightTableId });
+        log('startAdd → called', {
+            selectedFormId,
+            selectedWidgetId: selectedWidget?.id,
+            preflightTableId,
+            activeFilters,
+        });
 
         const pf = await preflightInsert();
         log('startAdd → preflight result', pf);
@@ -343,6 +400,9 @@ export function useMainCrud({
         const init: Record<number, string> = {};
         const seen = new Set<number>();
 
+        // ═══════════════════════════════════════════════════════════
+        // 1. Инициализируем все поля дефолтными значениями
+        // ═══════════════════════════════════════════════════════════
         for (let i = 0; i < flatColumnsInRenderOrder.length; ) {
             const c = flatColumnsInRenderOrder[i];
 
@@ -369,9 +429,51 @@ export function useMainCrud({
             i += 1;
         }
 
-        log('startAdd → init draft (unique write ids)', init);
+        // ═══════════════════════════════════════════════════════════
+        // 2. НОВОЕ: Автозаполнение из activeFilters (фильтры дерева)
+        // ═══════════════════════════════════════════════════════════
+        if (activeFilters.length > 0) {
+            const tableColumnToWriteId = buildTableColumnToWriteIdMap();
+
+            log('startAdd → applying tree filters to draft', {
+                activeFilters,
+                tableColumnToWriteIdMap: Object.fromEntries(tableColumnToWriteId),
+            });
+
+            for (const filter of activeFilters) {
+                // Ищем write_tc_id для этого table_column_id
+                const writeTcId = tableColumnToWriteId.get(filter.table_column_id);
+
+                if (writeTcId != null) {
+                    // Устанавливаем значение из фильтра
+                    init[writeTcId] = String(filter.value);
+
+                    log('startAdd → auto-filled from tree filter', {
+                        table_column_id: filter.table_column_id,
+                        writeTcId,
+                        value: filter.value,
+                    });
+                } else {
+                    log('startAdd → filter table_column_id not found in columns', {
+                        table_column_id: filter.table_column_id,
+                        value: filter.value,
+                    });
+                }
+            }
+        }
+
+        log('startAdd → init draft (with tree filters applied)', init);
         setDraft(init);
-    }, [preflightInsert, flatColumnsInRenderOrder, selectedFormId, selectedWidget, preflightTableId, resetValidation]);
+    }, [
+        preflightInsert,
+        flatColumnsInRenderOrder,
+        selectedFormId,
+        selectedWidget,
+        preflightTableId,
+        resetValidation,
+        activeFilters,
+        buildTableColumnToWriteIdMap,
+    ]);
 
     const cancelAdd = useCallback(() => {
         setIsAdding(false);
