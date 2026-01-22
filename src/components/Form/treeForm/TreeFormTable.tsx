@@ -19,13 +19,17 @@ type TreeFormTableProps = {
     onResetFilters?: () => Promise<void>;
 };
 
-type SortMode = 'asc' | 'desc';
+// null = без сортировки (порядок с бэка)
+type SortMode = 'asc' | 'desc' | null;
 type Filter = { table_column_id: number; value: string | number };
 type ValuePair = { value: string | number; displayValue: string | number };
 
 const collator = new Intl.Collator(undefined, {numeric: true, sensitivity: 'base'});
 
 function sortValuePairs(pairs: ValuePair[], mode: SortMode): ValuePair[] {
+    // Если mode === null — возвращаем как есть (порядок с бэка)
+    if (mode === null) return pairs;
+
     const dir = mode === 'asc' ? 1 : -1;
     return [...pairs].sort((a, b) =>
         collator.compare(String(a.displayValue), String(b.displayValue)) * dir
@@ -85,6 +89,7 @@ export const TreeFormTable: React.FC<TreeFormTableProps> = ({
                                                                 setChildrenCache,
                                                                 onResetFilters,
                                                             }) => {
+    // null = порядок с бэка (по умолчанию)
     const [sortModes, setSortModes] = useState<Record<number, SortMode>>({});
     const [loadingKeys, setLoadingKeys] = useState<Set<string>>(new Set());
 
@@ -95,11 +100,20 @@ export const TreeFormTable: React.FC<TreeFormTableProps> = ({
         setLoadingKeys(new Set());
     }, [selectedFormId, setExpandedKeys, setChildrenCache]);
 
+    // Переключение: null → asc → desc → null
     const toggleSort = useCallback((idx: number) => {
-        setSortModes((prev) => ({
-            ...prev,
-            [idx]: (prev[idx] ?? 'asc') === 'asc' ? 'desc' : 'asc',
-        }));
+        setSortModes((prev) => {
+            const current = prev[idx] ?? null;
+            let next: SortMode;
+            if (current === null) {
+                next = 'asc';
+            } else if (current === 'asc') {
+                next = 'desc';
+            } else {
+                next = null;
+            }
+            return { ...prev, [idx]: next };
+        });
     }, []);
 
     const loadAndExpandRecursively = useCallback(async (
@@ -378,8 +392,16 @@ export const TreeFormTable: React.FC<TreeFormTableProps> = ({
     return (
         <div className={s.treeContainer}>
             {tree.map((treeColumn, idx) => {
-                const mode: SortMode = sortModes[idx] ?? 'asc';
-                const title = mode === 'asc' ? 'А→Я / 0→9' : 'Я→А / 9→0';
+                // null = без сортировки (порядок с бэка)
+                const mode: SortMode = sortModes[idx] ?? null;
+
+                // Подсказка для кнопки
+                const title = mode === null
+                    ? 'Сортировать А→Я'
+                    : mode === 'asc'
+                        ? 'Сортировать Я→А'
+                        : 'Сбросить сортировку';
+
                 const pairs = getValuePairs(treeColumn);
                 const sortedPairs = sortValuePairs(pairs, mode);
 
@@ -394,7 +416,9 @@ export const TreeFormTable: React.FC<TreeFormTableProps> = ({
                                     display: 'inline-flex',
                                     alignItems: 'center',
                                     marginLeft: 8,
+                                    // Визуальная индикация состояния сортировки
                                     transform: mode === 'desc' ? 'rotate(180deg)' : undefined,
+                                    opacity: mode === null ? 0.4 : 1,
                                     background: 'transparent',
                                     border: 0,
                                     padding: 0,
