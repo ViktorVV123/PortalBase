@@ -1,7 +1,8 @@
 import React from 'react';
-import { Checkbox, Tooltip } from '@mui/material';
+import { Checkbox, Tooltip, IconButton } from '@mui/material';
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
 import ArrowDropUpIcon from '@mui/icons-material/ArrowDropUp';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import * as sub from './SubWormTable.module.scss';
 
 import EditIcon from '@/assets/image/EditIcon.svg';
@@ -124,6 +125,86 @@ const HeaderCell: React.FC<HeaderCellProps> = ({ title, cols, colSpan }) => {
                 )}
             </span>
         </th>
+    );
+};
+
+// ═══════════════════════════════════════════════════════════
+// Компонент ячейки редактирования с кнопкой drill для combobox
+// ═══════════════════════════════════════════════════════════
+
+type EditCellWithDrillProps = {
+    col: ExtCol;
+    writeTcId: number | null;
+    value: string;
+    onChange: (v: string) => void;
+    placeholder: string;
+    comboReloadToken: number;
+    showError: boolean;
+    onOpenDrill?: SubformProps['onOpenDrill'];
+    rowPrimaryKeys?: Record<string, unknown>;
+    mode: 'add' | 'edit';
+};
+
+const EditCellWithDrill: React.FC<EditCellWithDrillProps> = ({
+                                                                 col,
+                                                                 writeTcId,
+                                                                 value,
+                                                                 onChange,
+                                                                 placeholder,
+                                                                 comboReloadToken,
+                                                                 showError,
+                                                                 onOpenDrill,
+                                                                 rowPrimaryKeys,
+                                                                 mode,
+                                                             }) => {
+    if (writeTcId == null) {
+        return <span className={sub.ellipsis}>—</span>;
+    }
+
+    const isCombobox = col.type === 'combobox';
+    const hasDrill = isCombobox && col.form_id != null && !!onOpenDrill;
+
+    return (
+        <div className={sub.cellEditor}>
+            <InputCell
+                mode={mode}
+                col={col}
+                readOnly={false}
+                value={value}
+                onChange={onChange}
+                placeholder={placeholder}
+                comboReloadToken={comboReloadToken}
+                showError={showError}
+            />
+
+            {/* Кнопка drill для combobox — открыть справочник */}
+            {hasDrill && (
+                <Tooltip title="Открыть справочник" arrow>
+                    <IconButton
+                        size="small"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onOpenDrill?.(col.form_id!, {
+                                originColumnType: 'combobox',
+                                primary: rowPrimaryKeys,
+                                openedFromEdit: true,
+                                targetWriteTcId: writeTcId ?? undefined,
+                            });
+                        }}
+                        sx={{
+                            ml: 0.5,
+                            p: 0.5,
+                            color: 'var(--link, #66b0ff)',
+                            '&:hover': {
+                                backgroundColor: 'rgba(102, 176, 255, 0.1)',
+                            },
+                        }}
+                    >
+                        <OpenInNewIcon sx={{ fontSize: 16 }} />
+                    </IconButton>
+                </Tooltip>
+            )}
+        </div>
     );
 };
 
@@ -385,26 +466,25 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                                     return (
                                         <td
                                             key={`sub-add-wc${col.widget_column_id}-tc${col.table_column_id}`}
+                                            className={sub.editCell}
                                         >
-                                            {writeTcId == null ? (
-                                                <span className={sub.ellipsis}>—</span>
-                                            ) : (
-                                                <InputCell
-                                                    mode="add"
-                                                    col={col as ExtCol}
-                                                    readOnly={false}
-                                                    value={value}
-                                                    onChange={(v) =>
-                                                        setDraftSub((prev) => ({
-                                                            ...prev,
-                                                            [writeTcId]: v,
-                                                        }))
-                                                    }
-                                                    placeholder={isReq ? `${col.placeholder ?? col.column_name} *` : (col.placeholder ?? col.column_name)}
-                                                    comboReloadToken={comboReloadToken}
-                                                    showError={hasError}
-                                                />
-                                            )}
+                                            <EditCellWithDrill
+                                                col={col as ExtCol}
+                                                writeTcId={writeTcId}
+                                                value={value}
+                                                onChange={(v) =>
+                                                    setDraftSub((prev) => ({
+                                                        ...prev,
+                                                        [writeTcId!]: v,
+                                                    }))
+                                                }
+                                                placeholder={isReq ? `${col.placeholder ?? col.column_name} *` : (col.placeholder ?? col.column_name)}
+                                                comboReloadToken={comboReloadToken}
+                                                showError={hasError}
+                                                onOpenDrill={onOpenDrill}
+                                                rowPrimaryKeys={undefined} // При добавлении нет primary keys
+                                                mode="add"
+                                            />
                                         </td>
                                     );
                                 })}
@@ -447,25 +527,23 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                                                     key={`sub-edit-r${rowIdx}-wc${col.widget_column_id}-tc${col.table_column_id}`}
                                                     className={sub.editCell}
                                                 >
-                                                    {writeTcId == null ? (
-                                                        <span className={sub.ellipsis}>—</span>
-                                                    ) : (
-                                                        <InputCell
-                                                            mode="edit"
-                                                            col={col as ExtCol}
-                                                            readOnly={false}
-                                                            value={value}
-                                                            onChange={(v) =>
-                                                                setEditDraft((prev) => ({
-                                                                    ...prev,
-                                                                    [writeTcId]: v,
-                                                                }))
-                                                            }
-                                                            placeholder={isReq ? `${col.placeholder ?? col.column_name} *` : (col.placeholder ?? col.column_name)}
-                                                            comboReloadToken={comboReloadToken}
-                                                            showError={hasError}
-                                                        />
-                                                    )}
+                                                    <EditCellWithDrill
+                                                        col={col as ExtCol}
+                                                        writeTcId={writeTcId}
+                                                        value={value}
+                                                        onChange={(v) =>
+                                                            setEditDraft((prev) => ({
+                                                                ...prev,
+                                                                [writeTcId!]: v,
+                                                            }))
+                                                        }
+                                                        placeholder={isReq ? `${col.placeholder ?? col.column_name} *` : (col.placeholder ?? col.column_name)}
+                                                        comboReloadToken={comboReloadToken}
+                                                        showError={hasError}
+                                                        onOpenDrill={onOpenDrill}
+                                                        rowPrimaryKeys={row.primary_keys as Record<string, unknown>}
+                                                        mode="edit"
+                                                    />
                                                 </td>
                                             );
                                         }

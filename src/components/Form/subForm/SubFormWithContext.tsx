@@ -5,6 +5,7 @@ import { useFormContext } from '@/components/Form/context';
 import { SubWormTable } from './SubFormTable';
 import { ValidationToast } from '@/components/Form/mainTable/ValidationToast';
 import type { DrillOpenMeta } from '@/components/Form/context';
+import type { FormDisplay } from '@/shared/hooks/useWorkSpaces';
 import * as cls from "@/components/table/tableToolbar/TableToolbar.module.scss";
 
 type Props = {
@@ -51,6 +52,8 @@ export const SubFormWithContext: React.FC<Props> = ({
         setShowSubValidationErrors,
         setSubValidationMissingFields,
         resetSubValidation,
+        // Drill state для получения targetWriteTcId
+        drill,
     } = ctx;
 
     const { selectedFormId, currentForm } = config;
@@ -132,6 +135,70 @@ export const SubFormWithContext: React.FC<Props> = ({
     }, [setShowSubValidationErrors]);
 
     // ═══════════════════════════════════════════════════════════
+    // HANDLE PICK FROM DRILL (для Sub)
+    // Когда пользователь выбирает значение в DrillDialog для combobox
+    // ═══════════════════════════════════════════════════════════
+
+    const handlePickFromDrillForSub = useCallback((payload: {
+        row: FormDisplay['data'][number];
+        primary: Record<string, unknown>;
+    }) => {
+        // Получаем targetWriteTcId из drill state
+        const targetWriteTcId = drill.targetWriteTcId;
+
+        if (targetWriteTcId == null) {
+            console.warn('[SubFormWithContext] handlePickFromDrillForSub: no targetWriteTcId');
+            return;
+        }
+
+        // Получаем ID выбранной строки (первый primary key)
+        const pkEntries = Object.entries(payload.primary);
+        const selectedId = pkEntries.length > 0 ? String(pkEntries[0][1]) : '';
+
+        console.log('[SubFormWithContext] handlePickFromDrillForSub:', {
+            targetWriteTcId,
+            selectedId,
+            primary: payload.primary,
+            isAddingSub: subAdding.isAddingSub,
+            editingRowIdx: subEditing.editingRowIdx,
+        });
+
+        // Определяем, в какой draft записывать — добавления или редактирования
+        if (subAdding.isAddingSub) {
+            // Режим добавления — обновляем draftSub
+            setDraftSub((prev) => ({
+                ...prev,
+                [targetWriteTcId]: selectedId,
+            }));
+        } else if (subEditing.editingRowIdx != null) {
+            // Режим редактирования — обновляем editDraft
+            setSubEditDraft((prev) => ({
+                ...prev,
+                [targetWriteTcId]: selectedId,
+            }));
+        }
+    }, [drill.targetWriteTcId, subAdding.isAddingSub, subEditing.editingRowIdx, setDraftSub, setSubEditDraft]);
+
+    // ═══════════════════════════════════════════════════════════
+    // WRAPPED onOpenDrill для Sub
+    // Передаём targetWriteTcId в meta
+    // ═══════════════════════════════════════════════════════════
+
+    const handleOpenDrillForSub = useCallback((
+        fid?: number | null,
+        meta?: DrillOpenMeta
+    ) => {
+        if (!onOpenDrill) return;
+
+        // Вызываем родительский onOpenDrill с meta
+        onOpenDrill(fid, {
+            ...meta,
+            // openedFromEdit: true говорит что мы в режиме выбора значения
+            openedFromEdit: true,
+        });
+    }, [onOpenDrill]);
+
+    // ═══════════════════════════════════════════════════════════
     // EARLY RETURN: не рендерим если нет выбранной строки
     // ═══════════════════════════════════════════════════════════
 
@@ -175,8 +242,8 @@ export const SubFormWithContext: React.FC<Props> = ({
                 }} // Управляется через контекст
                 draftSub={subAdding.draftSub}
                 setDraftSub={setDraftSub}
-                // Drill
-                onOpenDrill={onOpenDrill}
+                // Drill — используем обёртку
+                onOpenDrill={handleOpenDrillForSub}
                 // Валидация Sub — передаём все функции
                 showValidationErrors={showSubValidationErrors}
                 setShowValidationErrors={setShowSubValidationErrors}
@@ -193,3 +260,55 @@ export const SubFormWithContext: React.FC<Props> = ({
         </>
     );
 };
+
+// ═══════════════════════════════════════════════════════════
+// ЭКСПОРТ ХУКА для использования в родительском компоненте
+// ═══════════════════════════════════════════════════════════
+
+export function useSubPickFromDrill() {
+    const ctx = useFormContext();
+
+    const {
+        drill,
+        subAdding,
+        subEditing,
+        setDraftSub,
+        setSubEditDraft,
+    } = ctx;
+
+    const handlePickFromDrill = useCallback((payload: {
+        row: FormDisplay['data'][number];
+        primary: Record<string, unknown>;
+    }) => {
+        const targetWriteTcId = drill.targetWriteTcId;
+
+        if (targetWriteTcId == null) {
+            console.warn('[useSubPickFromDrill] no targetWriteTcId');
+            return;
+        }
+
+        const pkEntries = Object.entries(payload.primary);
+        const selectedId = pkEntries.length > 0 ? String(pkEntries[0][1]) : '';
+
+        console.log('[useSubPickFromDrill] picked:', {
+            targetWriteTcId,
+            selectedId,
+            isAddingSub: subAdding.isAddingSub,
+            editingRowIdx: subEditing.editingRowIdx,
+        });
+
+        if (subAdding.isAddingSub) {
+            setDraftSub((prev) => ({
+                ...prev,
+                [targetWriteTcId]: selectedId,
+            }));
+        } else if (subEditing.editingRowIdx != null) {
+            setSubEditDraft((prev) => ({
+                ...prev,
+                [targetWriteTcId]: selectedId,
+            }));
+        }
+    }, [drill.targetWriteTcId, subAdding.isAddingSub, subEditing.editingRowIdx, setDraftSub, setSubEditDraft]);
+
+    return { handlePickFromDrill };
+}

@@ -298,19 +298,6 @@ export function useDrillContext() {
     return { drill, openDrill, closeDrill };
 }
 
-/** Хук для доступа к tree drawer */
-export function useTreeDrawerContext() {
-    const ctx = useFormContext();
-    return {
-        treeDrawer: ctx.treeDrawer,
-        openTreeDrawer: ctx.openTreeDrawer,
-        closeTreeDrawer: ctx.closeTreeDrawer,
-        toggleTreeDrawer: ctx.toggleTreeDrawer,
-        resetTreeDrawer: ctx.resetTreeDrawer,
-        setExpandedKeys: ctx.setExpandedKeys,
-        setChildrenCache: ctx.setChildrenCache,
-    };
-}
 
 /** Хук для доступа к selection */
 export function useSelectionContext() {

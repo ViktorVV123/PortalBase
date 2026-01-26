@@ -394,7 +394,6 @@ export const FormTableContent: React.FC<Props> = ({
             {/* DRILL DIALOG */}
             <DrillDialogWithContext
                 onSyncParentMain={handleSyncParentMain}
-                onPickFromDrill={drill.disableNestedDrill ? handlePickFromDrill : undefined}
                 onComboboxChanged={triggerComboReload}
             />
         </>

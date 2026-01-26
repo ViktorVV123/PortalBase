@@ -1,5 +1,6 @@
 // src/components/Form/mainTable/MainTable.module.scss
 // ФИНАЛЬНАЯ ВЕРСИЯ — таблица с горизонтальным скроллом
+// ОБНОВЛЕНО: Адаптивный размер шрифта для разных разрешений экрана
 
 @use '@/assets/styles/fluid-type' as *;
 
@@ -15,8 +16,47 @@ $link-color: var(--link, #6db3f2);
 $text-color: #e0e0e0;
 $text-muted: #888;
 
+// ═══════════════════════════════════════════════════════════
+// АДАПТИВНЫЕ ПЕРЕМЕННЫЕ ДЛЯ РАЗНЫХ ЭКРАНОВ
+// ═══════════════════════════════════════════════════════════
+
 :root {
-  --main-head-row-1: 42px;
+  // Дефолтные значения для Full HD (1920x1080) и меньше
+  --main-head-row-1: 34px;
+  --tbl-font-size: 11px;
+  --tbl-header-font-size: 11px;
+  --tbl-subheader-font-size: 10px;
+  --tbl-cell-padding: 4px 6px;
+  --tbl-header-padding: 5px 6px;
+  --tbl-input-font-size: 11px;
+  --tbl-input-padding: 4px 6px;
+  --tbl-line-height: 1.25;
+
+  // Для экранов шире 1920px (2K, 4K, большие мониторы)
+  @media (min-width: 1921px) {
+    --main-head-row-1: 40px;
+    --tbl-font-size: 13px;
+    --tbl-header-font-size: 13px;
+    --tbl-subheader-font-size: 12px;
+    --tbl-cell-padding: 6px 10px;
+    --tbl-header-padding: 8px 8px;
+    --tbl-input-font-size: 13px;
+    --tbl-input-padding: 6px 8px;
+    --tbl-line-height: 1.35;
+  }
+
+  // Для экранов шире 2560px (2K+ / UltraWide)
+  @media (min-width: 2561px) {
+    --main-head-row-1: 44px;
+    --tbl-font-size: 14px;
+    --tbl-header-font-size: 14px;
+    --tbl-subheader-font-size: 13px;
+    --tbl-cell-padding: 8px 12px;
+    --tbl-header-padding: 10px 10px;
+    --tbl-input-font-size: 14px;
+    --tbl-input-padding: 6px 10px;
+    --tbl-line-height: 1.4;
+  }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -43,7 +83,8 @@ $text-muted: #888;
 
   table-layout: auto;
   border-collapse: collapse;
-  @include fluid-type(13, 15);
+  font-size: var(--tbl-font-size);
+  line-height: var(--tbl-line-height);
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -53,7 +94,7 @@ $text-muted: #888;
 .tbl th,
 .tbl td {
   border: 1px solid $border-color;
-  padding: 8px 12px;
+  padding: var(--tbl-cell-padding);
   text-align: center;
   vertical-align: middle;
 
@@ -70,13 +111,13 @@ $text-muted: #888;
   background: $header-bg;
   color: #f0f0f0;
   font-weight: 600;
-  font-size: 13px;
-  line-height: 1.3;
+  font-size: var(--tbl-header-font-size);
+  line-height: 1.25;
 
   white-space: normal;
   word-break: break-word;
   hyphens: auto;
-  padding: 10px 8px;
+  padding: var(--tbl-header-padding);
 }
 
 // Первая строка шапки — sticky
@@ -84,7 +125,7 @@ $text-muted: #888;
   position: sticky;
   top: 0;
   z-index: 10;
-  min-height: 40px;
+  min-height: 32px;
 
   // Тень под шапкой при скролле
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
@@ -96,7 +137,7 @@ $text-muted: #888;
   top: var(--main-head-row-1);
   z-index: 9;
   font-weight: 500;
-  font-size: 12px;
+  font-size: var(--tbl-subheader-font-size);
   background: rgba(35, 35, 35, 1); // Чуть темнее header-bg
 
   .ellipsis {
@@ -115,6 +156,8 @@ $text-muted: #888;
   background: transparent;
   cursor: pointer;
   transition: background 0.12s ease;
+  font-size: var(--tbl-font-size);
+  line-height: var(--tbl-line-height);
 }
 
 .tbl tbody tr:hover td {
@@ -147,7 +190,7 @@ $text-muted: #888;
   white-space: normal;
   overflow-wrap: anywhere;
   word-break: break-word;
-  line-height: 1.4;
+  line-height: var(--tbl-line-height);
   text-align: center;
 }
 
@@ -158,7 +201,7 @@ $text-muted: #888;
   overflow: hidden;
   white-space: normal;
   word-break: break-word;
-  line-height: 1.4;
+  line-height: var(--tbl-line-height);
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -166,7 +209,7 @@ $text-muted: #888;
 // ═══════════════════════════════════════════════════════════
 
 .editCell {
-  padding: 4px 6px !important;
+  padding: 3px 4px !important;
   background: rgba(255, 255, 255, 0.02);
 }
 
@@ -174,7 +217,7 @@ $text-muted: #888;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 4px;
   width: 100%;
   min-width: 0;
 }
@@ -194,14 +237,15 @@ $text-muted: #888;
   }
 
   :global(.MuiInputBase-input) {
-    padding: 6px 8px;
-    font-size: 13px;
+    padding: var(--tbl-input-padding);
+    font-size: var(--tbl-input-font-size);
     text-align: center;
   }
 
   :global(.MuiSelect-select) {
-    padding: 6px 8px;
+    padding: var(--tbl-input-padding);
     text-align: center;
+    font-size: var(--tbl-input-font-size);
   }
 }
 
@@ -209,9 +253,9 @@ $text-muted: #888;
 .inpN {
   width: 100%;
   box-sizing: border-box;
-  padding: 6px 8px;
+  padding: var(--tbl-input-padding);
   font: inherit;
-  font-size: 13px;
+  font-size: var(--tbl-input-font-size);
   color: inherit;
   background: rgba(20, 20, 20, 0.8);
   border: 1px solid rgba(255, 255, 255, 0.2);
@@ -236,7 +280,7 @@ $text-muted: #888;
 .comboEditWrapper {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   width: 100%;
   min-width: 0;
 }
@@ -250,7 +294,7 @@ $text-muted: #888;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 4px;
   max-width: 100%;
   overflow: hidden;
 }
@@ -267,7 +311,7 @@ $text-muted: #888;
   background: none;
   cursor: pointer;
   opacity: 0.6;
-  font-size: 16px;
+  font-size: 14px;
   color: #fff;
   padding: 0;
   flex-shrink: 0;
@@ -290,6 +334,7 @@ $text-muted: #888;
   text-decoration: none;
   color: $link-color;
   font: inherit;
+  font-size: var(--tbl-font-size);
   max-width: 100%;
   display: inline-block;
   border-radius: 3px;
@@ -322,6 +367,7 @@ $text-muted: #888;
 .dateTimeInput {
   input {
     color: #fff;
+    font-size: var(--tbl-input-font-size);
 
     &::-webkit-calendar-picker-indicator {
       filter: invert(1);
@@ -343,12 +389,12 @@ $text-muted: #888;
 // ═══════════════════════════════════════════════════════════
 
 .actionsCell {
-  padding: 4px 8px !important;
+  padding: 3px 6px !important;
   text-align: center;
   white-space: nowrap;
-  width: 80px;
-  min-width: 60px;
-  max-width: 100px;
+  width: 70px;
+  min-width: 56px;
+  max-width: 90px;
   background: inherit;
 }
 
@@ -356,15 +402,15 @@ $text-muted: #888;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: 2px;
 }
 
 .actionsBtn {
   background: none;
   border: 0;
-  padding: 4px;
-  width: 26px;
-  height: 26px;
+  padding: 3px;
+  width: 22px;
+  height: 22px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -377,6 +423,13 @@ $text-muted: #888;
     color: #fff;
     background: rgba(255, 255, 255, 0.1);
   }
+
+  // Увеличиваем на больших экранах
+  @media (min-width: 1921px) {
+    padding: 4px;
+    width: 26px;
+    height: 26px;
+  }
 }
 
 .actionsBtnDisabled {
@@ -386,18 +439,27 @@ $text-muted: #888;
 }
 
 .actionIcon {
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   color: inherit;
+
+  @media (min-width: 1921px) {
+    width: 16px;
+    height: 16px;
+  }
 }
 
 .lockSlot {
-  width: 20px;
+  width: 18px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   pointer-events: none;
   opacity: 0.6;
+
+  @media (min-width: 1921px) {
+    width: 20px;
+  }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -408,17 +470,23 @@ $text-muted: #888;
 .cancelBtn {
   background: none;
   border: 0;
-  width: 26px;
-  height: 26px;
+  width: 22px;
+  height: 22px;
   padding: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
+  font-size: 14px;
   line-height: 1;
   cursor: pointer;
   border-radius: 4px;
   transition: all 0.15s ease;
+
+  @media (min-width: 1921px) {
+    width: 26px;
+    height: 26px;
+    font-size: 16px;
+  }
 
   &:disabled {
     opacity: 0.4;
@@ -451,7 +519,7 @@ $text-muted: #888;
 .toggleBtn {
   background: none;
   border: 0;
-  padding: 4px;
+  padding: 3px;
   cursor: pointer;
   color: #ccc;
   display: inline-flex;
@@ -464,6 +532,16 @@ $text-muted: #888;
     color: #fff;
     background: rgba(255, 255, 255, 0.1);
   }
+
+  svg {
+    width: 18px;
+    height: 18px;
+
+    @media (min-width: 1921px) {
+      width: 22px;
+      height: 22px;
+    }
+  }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -471,7 +549,7 @@ $text-muted: #888;
 // ═══════════════════════════════════════════════════════════
 
 .checkboxCell {
-  padding: 4px !important;
+  padding: 2px !important;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -485,7 +563,7 @@ $required-mark-color: #ef4444;
 .requiredMark {
   color: $required-mark-color;
   font-weight: 700;
-  margin-left: 3px;
+  margin-left: 2px;
   font-size: 1.1em;
   line-height: 1;
   vertical-align: middle;
