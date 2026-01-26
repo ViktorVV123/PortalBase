@@ -127,6 +127,20 @@ export function useSubWormTable({
         return (subDisplay?.columns ?? []) as ExtCol[];
     }, [subDisplay?.columns]);
 
+    // ═══════════════════════════════════════════════════════════
+    // Карта колонок по table_column_id для фильтрации rls
+    // ═══════════════════════════════════════════════════════════
+    const subColumnsById = useMemo(() => {
+        const map = new Map<number, SubDisplay['columns'][number]>();
+        const cols = subDisplay?.columns ?? [];
+        for (const c of cols) {
+            if (c.table_column_id != null) {
+                map.set(c.table_column_id as number, c);
+            }
+        }
+        return map;
+    }, [subDisplay?.columns]);
+
     const valueIndexByKey = useMemo(() => {
         const map = new Map<string, number>();
         (subDisplay?.columns ?? []).forEach((c, i) => {
@@ -191,6 +205,11 @@ export function useSubWormTable({
         }>();
 
         flatColumnsInRenderOrder.forEach((col) => {
+            // ═══════════════════════════════════════════════════════════
+            // ИСПРАВЛЕНО: Пропускаем колонки rls
+            // ═══════════════════════════════════════════════════════════
+            if (col.type === 'rls') return;
+
             const writeTcId =
                 col.type === 'combobox'
                     ? ((col as any).__write_tc_id ?? col.table_column_id ?? null)
@@ -220,8 +239,42 @@ export function useSubWormTable({
                 if (shownStr) g.tokens.push(shownStr);
                 comboGroups.set(gKey, g);
             } else {
-                // Обычные колонки
-                if (isEditableValue(val)) {
+                // ═══════════════════════════════════════════════════════════
+                // checkboxNull: поддерживает три состояния (true/false/null)
+                // checkbox/bool: только два состояния (true/false)
+                // ═══════════════════════════════════════════════════════════
+                const isTriStateCheckbox = col.type === 'checkboxNull';
+                const isRegularCheckbox = col.type === 'checkbox' || col.type === 'bool';
+
+                if (isTriStateCheckbox) {
+                    // TRISTATE: поддерживает null
+                    if (val === null || val === undefined || shownStr === '') {
+                        init[writeTcId] = 'null';
+                    } else if (
+                        shownStr.toLowerCase() === 'true' ||
+                        shownStr === '1' ||
+                        shownStr.toLowerCase() === 't' ||
+                        shownStr.toLowerCase() === 'yes' ||
+                        shownStr.toLowerCase() === 'да'
+                    ) {
+                        init[writeTcId] = 'true';
+                    } else {
+                        init[writeTcId] = 'false';
+                    }
+                } else if (isRegularCheckbox) {
+                    // Обычный checkbox: только true/false
+                    if (
+                        shownStr.toLowerCase() === 'true' ||
+                        shownStr === '1' ||
+                        shownStr.toLowerCase() === 't' ||
+                        shownStr.toLowerCase() === 'yes' ||
+                        shownStr.toLowerCase() === 'да'
+                    ) {
+                        init[writeTcId] = 'true';
+                    } else {
+                        init[writeTcId] = 'false';
+                    }
+                } else if (isEditableValue(val)) {
                     init[writeTcId] = shownStr;
                 }
             }
@@ -328,11 +381,53 @@ export function useSubWormTable({
 
         setEditSaving(true);
         try {
+            // ═══════════════════════════════════════════════════════════
+            // ИСПРАВЛЕНО: Фильтруем rls колонки при формировании values
+            // ═══════════════════════════════════════════════════════════
             const values = Object.entries(editDraft)
-                .filter(([tcIdStr]) => !isSyntheticComboboxId(Number(tcIdStr)))
+                .filter(([tcIdStr]) => {
+                    const tcId = Number(tcIdStr);
+                    // Фильтруем синтетические ID
+                    if (isSyntheticComboboxId(tcId)) return false;
+
+                    // Фильтруем rls колонки
+                    const col = subColumnsById.get(tcId);
+                    if ((col as any)?.type === 'rls') return false;
+
+                    return true;
+                })
                 .map(([tcIdStr, value]) => {
                     const tcId = Number(tcIdStr);
+                    const col = subColumnsById.get(tcId);
                     const s = value == null ? '' : String(value).trim();
+
+                    const isTriStateCheckbox = (col as any)?.type === 'checkboxNull';
+                    const isRegularCheckbox =
+                        (col as any)?.type === 'checkbox' ||
+                        (col as any)?.type === 'bool';
+
+                    if (isTriStateCheckbox) {
+                        // TRISTATE: может быть null
+                        const normalized = s.toLowerCase();
+                        if (normalized === 'null' || normalized === '') {
+                            return { table_column_id: tcId, value: null };
+                        } else if (normalized === 'true' || normalized === '1' || normalized === 't' || normalized === 'yes' || normalized === 'да') {
+                            return { table_column_id: tcId, value: 'true' };
+                        } else {
+                            return { table_column_id: tcId, value: 'false' };
+                        }
+                    }
+
+                    if (isRegularCheckbox) {
+                        // Обычный checkbox: только true/false
+                        const normalized = s.toLowerCase();
+                        if (normalized === 'true' || normalized === '1' || normalized === 't' || normalized === 'yes' || normalized === 'да') {
+                            return { table_column_id: tcId, value: 'true' };
+                        } else {
+                            return { table_column_id: tcId, value: 'false' };
+                        }
+                    }
+
                     return { table_column_id: tcId, value: s === '' ? null : s };
                 });
 

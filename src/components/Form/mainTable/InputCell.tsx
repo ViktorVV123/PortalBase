@@ -1,12 +1,12 @@
-// src/components/Form/parts/InputCell.tsx
+// src/components/Form/mainTable/InputCell.tsx
 import React from 'react';
 import * as s from '@/components/setOfTables/SetOfTables.module.scss';
 import { api } from '@/services/api';
 import { ExtCol, getCanonicalType } from '@/components/Form/formTable/parts/FormatByDatatype';
 import { fromInputValue, toInputValue } from '@/components/Form/formTable/parts/ToInputValue';
-import { MenuItem, Select, TextField, Checkbox, CircularProgress } from '@mui/material';
-import {isColumnRequired, isEmptyValue} from "@/shared/utils/requiredValidation/requiredValidation";
-
+import { MenuItem, Select, TextField, CircularProgress, Checkbox } from '@mui/material';
+import { isColumnRequired, isEmptyValue } from "@/shared/utils/requiredValidation/requiredValidation";
+import {TriStateCheckbox} from "@/shared/ui/TriStateCheckbox";
 
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -197,7 +197,7 @@ export type InputCellProps = {
     showError?: boolean;
 };
 
-/** Универсальный инпут для Main/Sub: текст, combobox, date/time/timestamp(+tz) */
+/** Универсальный инпут для Main/Sub: текст, combobox, date/time/timestamp(+tz), checkbox */
 export const InputCell: React.FC<InputCellProps> = ({
                                                         mode,
                                                         col,
@@ -211,7 +211,7 @@ export const InputCell: React.FC<InputCellProps> = ({
     const writeTcId = (col.__write_tc_id ?? col.table_column_id) ?? null;
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // НОВОЕ: Определяем обязательность и пустоту
+    // Определяем обязательность и пустоту
     // ═══════════════════════════════════════════════════════════════════════════
     const isRequired = isColumnRequired(col);
     const isEmpty = isEmptyValue(value);
@@ -337,9 +337,28 @@ export const InputCell: React.FC<InputCellProps> = ({
                     ? 'datetime-local'
                     : undefined;
 
-    const isCheckbox = col.type === 'checkbox' || col.type === 'bool';
+    // ═══════════════════════════════════════════════════════════════════════════
+    // CHECKBOX — два варианта:
+    // - checkboxNull: трёхпозиционный (false → true → null)
+    // - checkbox/bool: обычный двухпозиционный (false ↔ true)
+    // ═══════════════════════════════════════════════════════════════════════════
+    const isTriStateCheckbox = col.type === 'checkboxNull';
+    const isRegularCheckbox = col.type === 'checkbox' || col.type === 'bool';
 
-    if (isCheckbox) {
+    if (isTriStateCheckbox) {
+        return (
+            <TriStateCheckbox
+                value={value}
+                onChange={(newState) => {
+                    // Передаём 'true', 'false' или 'null' как строку
+                    onChange(newState);
+                }}
+                showError={hasError}
+            />
+        );
+    }
+
+    if (isRegularCheckbox) {
         const checked =
             value === 'true' ||
             value === '1' ||
@@ -389,7 +408,8 @@ export const InputCell: React.FC<InputCellProps> = ({
     const isMultiline =
         mode === 'edit' &&
         !isDateLike &&
-        !isCheckbox;
+        !isTriStateCheckbox &&
+        !isRegularCheckbox;
 
     return (
         <TextField

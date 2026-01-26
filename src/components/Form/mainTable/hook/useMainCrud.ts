@@ -93,6 +93,21 @@ export function useMainCrud({
     const [showValidationErrors, setShowValidationErrors] = useState(false);
     const [validationMissingFields, setValidationMissingFields] = useState<string[]>([]);
 
+    // ═══════════════════════════════════════════════════════════
+    // NEW: Автозаполненные поля (write_tc_id)
+    // ═══════════════════════════════════════════════════════════
+    const [autoFilledFields, setAutoFilledFields] = useState<Set<number>>(new Set());
+
+    // Очистить индикацию автозаполнения для конкретного поля
+    const clearAutoFilledField = useCallback((tcId: number) => {
+        setAutoFilledFields((prev) => {
+            if (!prev.has(tcId)) return prev;
+            const next = new Set(prev);
+            next.delete(tcId);
+            return next;
+        });
+    }, []);
+
     const getEffectiveFormId = useCallback((): number | null => {
         if (selectedFormId != null) return selectedFormId;
         if (!selectedWidget) return null;
@@ -323,8 +338,6 @@ export function useMainCrud({
 
     // ═══════════════════════════════════════════════════════════
     // ХЕЛПЕР: Построить маппинг table_column_id → write_tc_id
-    // для combobox колонок (фильтры дерева приходят с table_column_id,
-    // а draft использует write_tc_id)
     // ═══════════════════════════════════════════════════════════
     const buildTableColumnToWriteIdMap = useCallback((): Map<number, number> => {
         const map = new Map<number, number>();
@@ -333,7 +346,6 @@ export function useMainCrud({
             const c = flatColumnsInRenderOrder[i];
 
             if (c.type === 'combobox') {
-                // Группируем combobox колонки
                 let j = i + 1;
                 while (j < flatColumnsInRenderOrder.length && isSameComboGroupCRUD(c, flatColumnsInRenderOrder[j])) {
                     j += 1;
@@ -341,13 +353,10 @@ export function useMainCrud({
                 const group = flatColumnsInRenderOrder.slice(i, j);
                 const writeTcId = getWriteTcIdForComboGroupCRUD(group);
 
-                // Для combobox: оригинальный table_column_id хранится в __write_tc_id
-                // Маппим его на себя
                 if (writeTcId != null) {
                     map.set(writeTcId, writeTcId);
                 }
 
-                // Также проверяем все колонки группы на наличие оригинального table_column_id
                 for (const col of group) {
                     const originalTcId = col.__write_tc_id ?? col.table_column_id;
                     if (originalTcId != null && writeTcId != null) {
@@ -359,7 +368,6 @@ export function useMainCrud({
                 continue;
             }
 
-            // Обычная колонка
             const writeTcId = (c.__write_tc_id ?? c.table_column_id) ?? null;
             const originalTcId = c.table_column_id ?? null;
 
@@ -399,6 +407,7 @@ export function useMainCrud({
 
         const init: Record<number, string> = {};
         const seen = new Set<number>();
+        const newAutoFilledFields = new Set<number>();
 
         // ═══════════════════════════════════════════════════════════
         // 1. Инициализируем все поля дефолтными значениями
@@ -423,14 +432,27 @@ export function useMainCrud({
 
             const writeTcId = (c.__write_tc_id ?? c.table_column_id) ?? null;
             if (writeTcId != null && !seen.has(writeTcId)) {
-                init[writeTcId] = String(c.default ?? '');
+                // ═══════════════════════════════════════════════════════════
+                // CHECKBOX: по умолчанию 'false'
+                // checkboxNull: по умолчанию 'null' (поддерживает три состояния)
+                // ═══════════════════════════════════════════════════════════
+                const isTriStateCheckbox = c.type === 'checkboxNull';
+                const isRegularCheckbox = c.type === 'checkbox' || c.type === 'bool';
+
+                if (isTriStateCheckbox) {
+                    init[writeTcId] = 'null'; // Tri-state по умолчанию null
+                } else if (isRegularCheckbox) {
+                    init[writeTcId] = 'false';
+                } else {
+                    init[writeTcId] = String(c.default ?? '');
+                }
                 seen.add(writeTcId);
             }
             i += 1;
         }
 
         // ═══════════════════════════════════════════════════════════
-        // 2. НОВОЕ: Автозаполнение из activeFilters (фильтры дерева)
+        // 2. Автозаполнение из activeFilters (фильтры дерева) + отслеживание
         // ═══════════════════════════════════════════════════════════
         if (activeFilters.length > 0) {
             const tableColumnToWriteId = buildTableColumnToWriteIdMap();
@@ -441,12 +463,11 @@ export function useMainCrud({
             });
 
             for (const filter of activeFilters) {
-                // Ищем write_tc_id для этого table_column_id
                 const writeTcId = tableColumnToWriteId.get(filter.table_column_id);
 
                 if (writeTcId != null) {
-                    // Устанавливаем значение из фильтра
                     init[writeTcId] = String(filter.value);
+                    newAutoFilledFields.add(writeTcId); // Помечаем как автозаполненное
 
                     log('startAdd → auto-filled from tree filter', {
                         table_column_id: filter.table_column_id,
@@ -463,7 +484,10 @@ export function useMainCrud({
         }
 
         log('startAdd → init draft (with tree filters applied)', init);
+        log('startAdd → autoFilledFields:', Array.from(newAutoFilledFields));
+
         setDraft(init);
+        setAutoFilledFields(newAutoFilledFields);
     }, [
         preflightInsert,
         flatColumnsInRenderOrder,
@@ -479,6 +503,7 @@ export function useMainCrud({
         setIsAdding(false);
         setDraft({});
         setEditStylesDraft({});
+        setAutoFilledFields(new Set());
         resetValidation();
     }, [resetValidation]);
 
@@ -496,7 +521,7 @@ export function useMainCrud({
 
             setShowValidationErrors(true);
             setValidationMissingFields(validation.missingFields);
-            return; // Не показываем alert — Toast покажется через состояние
+            return;
         }
 
         const wid = getEffectiveWidgetId();
@@ -533,15 +558,34 @@ export function useMainCrud({
                     return w === tcId;
                 });
 
-                const isCheckboxCol = colForTc?.type === 'checkbox' || colForTc?.type === 'bool';
+                // ═══════════════════════════════════════════════════════════
+                // checkboxNull: поддерживает три состояния (true/false/null)
+                // checkbox/bool: только два состояния (true/false)
+                // ═══════════════════════════════════════════════════════════
+                const isTriStateCheckbox = colForTc?.type === 'checkboxNull';
+                const isRegularCheckbox = colForTc?.type === 'checkbox' || colForTc?.type === 'bool';
 
                 let value: string | null;
 
-                if (isCheckboxCol) {
-                    const normalized = s.trim();
-                    value = normalized === '' ? 'false' : normalized;
+                if (isTriStateCheckbox) {
+                    // TRISTATE: может быть null
+                    const normalized = s.trim().toLowerCase();
+                    if (normalized === 'null' || normalized === '') {
+                        value = null;
+                    } else if (normalized === 'true' || normalized === '1' || normalized === 't' || normalized === 'yes' || normalized === 'да') {
+                        value = 'true';
+                    } else {
+                        value = 'false';
+                    }
+                } else if (isRegularCheckbox) {
+                    // Обычный checkbox: только true/false, никогда null
+                    const normalized = s.trim().toLowerCase();
+                    if (normalized === 'true' || normalized === '1' || normalized === 't' || normalized === 'yes' || normalized === 'да') {
+                        value = 'true';
+                    } else {
+                        value = 'false';
+                    }
                 } else {
-                    // ✅ Нормализуем запятые в точки для чисел
                     const normalized = normalizeValueForColumn(tcId, s, flatColumnsInRenderOrder);
                     value = normalized === '' ? null : normalized;
                 }
@@ -632,6 +676,7 @@ export function useMainCrud({
             setIsAdding(false);
             setDraft({});
             setEditStylesDraft({});
+            setAutoFilledFields(new Set());
             resetValidation();
 
             log('✅ submitAdd COMPLETE');
@@ -676,6 +721,7 @@ export function useMainCrud({
 
             setIsAdding(false);
             setEditStylesDraft({});
+            setAutoFilledFields(new Set());
             resetValidation();
 
             const row = formDisplay.data[rowIdx];
@@ -712,7 +758,44 @@ export function useMainCrud({
                     if (shownStr) g.tokens.push(shownStr);
                     comboGroups.set(gKey, g);
                 } else {
-                    init[writeTcId] = shownStr;
+                    // ═══════════════════════════════════════════════════════════
+                    // checkboxNull: поддерживает три состояния (true/false/null)
+                    // checkbox/bool: только два состояния (true/false)
+                    // ═══════════════════════════════════════════════════════════
+                    const isTriStateCheckbox = col.type === 'checkboxNull';
+                    const isRegularCheckbox = col.type === 'checkbox' || col.type === 'bool';
+
+                    if (isTriStateCheckbox) {
+                        // TRISTATE: поддерживает null
+                        if (shownVal === null || shownVal === undefined || shownStr === '') {
+                            init[writeTcId] = 'null';
+                        } else if (
+                            shownStr.toLowerCase() === 'true' ||
+                            shownStr === '1' ||
+                            shownStr.toLowerCase() === 't' ||
+                            shownStr.toLowerCase() === 'yes' ||
+                            shownStr.toLowerCase() === 'да'
+                        ) {
+                            init[writeTcId] = 'true';
+                        } else {
+                            init[writeTcId] = 'false';
+                        }
+                    } else if (isRegularCheckbox) {
+                        // Обычный checkbox: только true/false
+                        if (
+                            shownStr.toLowerCase() === 'true' ||
+                            shownStr === '1' ||
+                            shownStr.toLowerCase() === 't' ||
+                            shownStr.toLowerCase() === 'yes' ||
+                            shownStr.toLowerCase() === 'да'
+                        ) {
+                            init[writeTcId] = 'true';
+                        } else {
+                            init[writeTcId] = 'false';
+                        }
+                    } else {
+                        init[writeTcId] = shownStr;
+                    }
                 }
             });
 
@@ -814,6 +897,7 @@ export function useMainCrud({
         setEditDraft({});
         setEditSaving(false);
         setEditStylesDraft({});
+        setAutoFilledFields(new Set());
         resetValidation();
     }, [resetValidation]);
 
@@ -835,7 +919,7 @@ export function useMainCrud({
 
             setShowValidationErrors(true);
             setValidationMissingFields(validation.missingFields);
-            return; // Toast покажется через состояние
+            return;
         }
 
         const wid = getEffectiveWidgetId();
@@ -856,27 +940,45 @@ export function useMainCrud({
                 Object.entries(row.primary_keys).map(([k, v]) => [k, String(v)])
             );
 
-            // ═══════════════════════════════════════════════════════════
-            // ИСПРАВЛЕНО: Нормализуем запятые в точки для числовых полей
-            // ═══════════════════════════════════════════════════════════
             const getSendingValue = (tcId: number, raw: unknown): string | null => {
                 const s = raw == null ? '' : String(raw).trim();
-                if (s === '') return null;
 
-                // Находим колонку для этого tcId
                 const colForTc = flatColumnsInRenderOrder.find((c) => {
                     const w = (c.__write_tc_id ?? c.table_column_id) ?? null;
                     return w === tcId;
                 });
 
-                const isCheckboxCol = colForTc?.type === 'checkbox' || colForTc?.type === 'bool';
+                // ═══════════════════════════════════════════════════════════
+                // checkboxNull: поддерживает три состояния (true/false/null)
+                // checkbox/bool: только два состояния (true/false)
+                // ═══════════════════════════════════════════════════════════
+                const isTriStateCheckbox = colForTc?.type === 'checkboxNull';
+                const isRegularCheckbox = colForTc?.type === 'checkbox' || colForTc?.type === 'bool';
 
-                if (isCheckboxCol) {
-                    // Для checkbox не нормализуем
-                    return s;
+                if (isTriStateCheckbox) {
+                    // TRISTATE: может быть null
+                    const normalized = s.toLowerCase();
+                    if (normalized === 'null' || normalized === '') {
+                        return null;
+                    } else if (normalized === 'true' || normalized === '1' || normalized === 't' || normalized === 'yes' || normalized === 'да') {
+                        return 'true';
+                    } else {
+                        return 'false';
+                    }
                 }
 
-                // ✅ Нормализуем запятые в точки для чисел
+                if (isRegularCheckbox) {
+                    // Обычный checkbox: только true/false, никогда null
+                    const normalized = s.toLowerCase();
+                    if (normalized === 'true' || normalized === '1' || normalized === 't' || normalized === 'yes' || normalized === 'да') {
+                        return 'true';
+                    } else {
+                        return 'false';
+                    }
+                }
+
+                if (s === '') return null;
+
                 const normalized = normalizeValueForColumn(tcId, s, flatColumnsInRenderOrder);
                 return normalized === '' ? null : normalized;
             };
@@ -961,6 +1063,7 @@ export function useMainCrud({
             setIsAdding(false);
             setDraft({});
             setEditStylesDraft({});
+            setAutoFilledFields(new Set());
             resetValidation();
             cancelEdit();
 
@@ -1095,5 +1198,8 @@ export function useMainCrud({
         validationMissingFields,
         setValidationMissingFields,
         resetValidation,
+        // NEW: Автозаполненные поля
+        autoFilledFields,
+        clearAutoFilledField,
     };
 }

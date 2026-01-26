@@ -20,10 +20,12 @@ import {
 import { extractRowStyles, getCellStyle } from '@/shared/utils/rowStyles';
 import { CellStyleButton } from './CellStyleButton';
 import type { CellStyles } from './CellStylePopover';
+
 // Импорт функций валидации
 import { isColumnRequired, isEmptyValue } from '@/shared/utils/requiredValidation/requiredValidation';
+import {TriStateCheckboxDisplay} from "@/shared/ui/TriStateCheckbox";
 
-const DEBUG = true;
+const DEBUG = false;
 
 function logRow(action: string, data: Record<string, any>) {
     if (!DEBUG) return;
@@ -97,6 +99,7 @@ function isRlsLockedValue(val: unknown): boolean {
     const str = String(val).trim().toLowerCase();
     return str === '1' || str === 'true' || str === 'да' || str === 'yes';
 }
+
 export const MainTableRow: React.FC<MainTableRowProps> = (p) => {
     const { row, idx: rowIdx } = p.rowView;
 
@@ -270,6 +273,7 @@ export const MainTableRow: React.FC<MainTableRowProps> = (p) => {
 
         p.onRowClick({ row, idx: rowIdx });
     };
+
     return (
         <tr
             className={p.selectedKey === rowKey ? s.selectedRow : undefined}
@@ -416,9 +420,23 @@ export const MainTableRow: React.FC<MainTableRowProps> = (p) => {
                         const clickable = col.form_id != null && !!p.onOpenDrill && !drillDisabled;
                         const pretty = formatByDatatype(shownVal, col as ExtCol);
 
-                        const isCheckboxCol = col.type === 'checkbox' || (col as ExtCol).type === 'bool';
+                        // ═══════════════════════════════════════════════════════════
+                        // CHECKBOX — два варианта:
+                        // - checkboxNull: трёхпозиционный (false, true, null)
+                        // - checkbox/bool: обычный двухпозиционный
+                        // ═══════════════════════════════════════════════════════════
+                        const isTriStateCheckbox = col.type === 'checkboxNull';
+                        const isRegularCheckbox = col.type === 'checkbox' || (col as ExtCol).type === 'bool';
 
-                        if (isCheckboxCol) {
+                        if (isTriStateCheckbox) {
+                            // Трёхпозиционный checkbox с поддержкой null
+                            cells.push(
+                                <td key={`cell-${visKey}`} className={s.checkboxCell}>
+                                    <TriStateCheckboxDisplay value={rawVal} />
+                                </td>
+                            );
+                        } else if (isRegularCheckbox) {
+                            // Обычный двухпозиционный checkbox
                             const checked = isRlsLockedValue(rawVal);
                             cells.push(
                                 <td key={`cell-${visKey}`} className={s.checkboxCell}>
@@ -467,6 +485,7 @@ export const MainTableRow: React.FC<MainTableRowProps> = (p) => {
 
                 return cells;
             })()}
+
             {/* ───── Actions ───── */}
             <td className={s.actionsCell}>
                 {isEditing ? (
