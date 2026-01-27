@@ -1,0 +1,525 @@
+// src/assets/styles/_theme-variables.scss
+// ═══════════════════════════════════════════════════════════════════════════
+// СИСТЕМА ТЕМ: CSS-переменные для светлой и тёмной темы
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DARK THEME (по умолчанию)
+// ═══════════════════════════════════════════════════════════════════════════
+
+:root,
+[data-theme="dark"] {
+  // ─── Основные цвета ───
+  --theme-primary: #90CAF9;
+  --theme-primary-light: #C3FDFF;
+  --theme-primary-dark: #5D99C6;
+
+  --theme-secondary: #FFD54F;
+  --theme-secondary-light: #FFE97D;
+  --theme-secondary-dark: #C8A415;
+
+  // ─── Фоны ───
+  --theme-background: #2e2e2e;
+  --theme-background-secondary: #2D2D2D;
+  --theme-surface: #363636;
+  --theme-surface-elevated: #424242;
+
+  // ─── Текст ───
+  --theme-text-primary: #E0E0E0;
+  --theme-text-secondary: #B0B0B0;
+  --theme-text-muted: #757575;
+  --theme-text-inverse: #212121;
+
+  // ─── Границы и разделители ───
+  --theme-border: rgba(255, 255, 255, 0.12);
+  --theme-border-light: rgba(255, 255, 255, 0.08);
+  --theme-divider: rgba(255, 255, 255, 0.06);
+
+  // ─── Состояния ───
+  --theme-hover: rgba(255, 255, 255, 0.08);
+  --theme-active: rgba(255, 255, 255, 0.12);
+  --theme-selected: rgba(100, 150, 255, 0.15);
+  --theme-focus: rgba(144, 202, 249, 0.3);
+
+  // ─── Статусы ───
+  --theme-success: #66BB6A;
+  --theme-error: #EF5350;
+  --theme-warning: #FFA726;
+  --theme-info: #29B6F6;
+
+  // ─── Тени ───
+  --theme-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --theme-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --theme-shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.5);
+  --theme-shadow-elevated: 0 8px 24px rgba(0, 0, 0, 0.4), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+
+  // ─── Компоненты: Меню / Header ───
+  --menu-bg: #1a1a1a;
+  --menu-elev: rgba(0, 0, 0, 0.35);
+  --menu-border: rgba(255, 255, 255, 0.08);
+  --menu-text: #e9eef5;
+  --menu-muted: #9aa4af;
+  --menu-accent: #90CAF9;
+  --menu-danger: #ff6b6b;
+  --menu-hover: rgba(255, 255, 255, 0.06);
+  --menu-focus: rgba(59, 60, 60, 0.35);
+  --shadow-2: 0 10px 30px rgba(0, 0, 0, 0.35), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+
+  // ─── Компоненты: Таблицы ───
+  --table-bg: #1a1a1a;
+  --table-header-bg: #2d2d2d;
+  --table-header-text: #e0e0e0;
+  --table-row-bg: #1a1a1a;
+  --table-row-alt-bg: #242424;
+  --table-row-hover: rgba(255, 255, 255, 0.06);
+  --table-row-selected: rgba(100, 150, 255, 0.12);
+  --table-border: rgba(255, 255, 255, 0.15);
+  --table-text: #e0e0e0;
+  --table-text-secondary: #b0b0b0;
+
+  // ─── Компоненты: Checkbox ───
+  --checkbox-unchecked: rgba(255, 255, 255, 0.5);
+  --checkbox-checked: #66bb6a;
+  --checkbox-checked-bg: rgba(102, 187, 106, 0.2);
+  --checkbox-indeterminate: #ffb74d;
+  --checkbox-indeterminate-bg: rgba(255, 183, 77, 0.2);
+  --checkbox-disabled: rgba(255, 255, 255, 0.3);
+  --checkbox-hover-bg: rgba(255, 255, 255, 0.08);
+
+  // ─── Компоненты: Инпуты ───
+  --input-bg: rgba(30, 30, 30, 0.9);
+  --input-border: rgba(255, 255, 255, 0.25);
+  --input-border-hover: rgba(255, 255, 255, 0.4);
+  --input-border-focus: rgba(100, 150, 255, 0.7);
+  --input-text: #e0e0e0;
+  --input-placeholder: #757575;
+
+  // ─── Компоненты: Кнопки ───
+  --button-primary-bg: #90CAF9;
+  --button-primary-text: #1a1a1a;
+  --button-primary-hover: #a8d4fa;
+  --button-secondary-bg: transparent;
+  --button-secondary-border: rgba(255, 255, 255, 0.2);
+  --button-secondary-text: #e0e0e0;
+  --button-secondary-hover: rgba(255, 255, 255, 0.08);
+
+  // ─── Компоненты: Иконки ───
+  --icon-primary: #b0b0b0;
+  --icon-secondary: #757575;
+  --icon-active: #90CAF9;
+
+  // ─── Ссылки ───
+  --link-color: #6db3f2;
+  --link-hover: #90CAF9;
+  --link: #6db3f2;
+
+  // ─── Скроллбар ───
+  --scrollbar-thumb: rgba(255, 255, 255, 0.25);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.4);
+  --scrollbar-track: rgba(60, 60, 60, 0.5);
+
+  // ─── Toolbar ───
+  --toolbar-bg: #2d2d2d;
+  --toolbar-border: rgba(255, 255, 255, 0.08);
+
+  // ─── Search ───
+  --search-bg: rgba(255, 255, 255, 0.08);
+  --search-bg-focus: rgba(255, 255, 255, 0.12);
+  --search-border: transparent;
+  --search-border-focus: rgba(100, 150, 255, 0.5);
+  --search-text: #e0e0e0;
+  --search-placeholder: #757575;
+
+  // ─── Компоненты: Tree (дерево фильтров) ───
+  --tree-item-bg: #2e2e2e;
+  --tree-item-text: #eee;
+  --tree-item-border: #605f5f;
+  --tree-item-hover: rgba(255, 255, 255, 0.1);
+  --tree-item-expanded-bg: rgba(100, 150, 255, 0.15);
+  --tree-item-expanded-hover: rgba(100, 150, 255, 0.2);
+  --tree-nested-bg: rgba(255, 255, 255, 0.03);
+  --tree-nested-hover: rgba(255, 255, 255, 0.08);
+
+  // ─── Overlay / Backdrop ───
+  --overlay-bg: rgba(0, 0, 0, 0.5);
+
+  // ─── Legacy переменные (для совместимости) ───
+  --primary-color: #1a1a1a;
+  --color-text: #e0e0e0;
+  --header-color: #2d2d2d;
+  --hover-color: rgba(255, 255, 255, 0.06);
+
+  // ─── Dropdown / Popover ───
+  --dropdown-bg: #1a1a1a;
+  --dropdown-text: #e0e0e0;
+  --dropdown-border: rgba(255, 255, 255, 0.15);
+  --dropdown-hover: rgba(255, 255, 255, 0.08);
+
+  // ─── Календарь / Date Picker ───
+  --color-scheme: dark;
+  --calendar-icon-filter: white;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// LIGHT THEME
+// ═══════════════════════════════════════════════════════════════════════════
+
+[data-theme="light"] {
+  // ─── Основные цвета ───
+  --theme-primary: #1976D2;
+  --theme-primary-light: #42A5F5;
+  --theme-primary-dark: #1565C0;
+
+  --theme-secondary: #FF9800;
+  --theme-secondary-light: #FFB74D;
+  --theme-secondary-dark: #F57C00;
+
+  // ─── Фоны ───
+  --theme-background: #F5F7FA;
+  --theme-background-secondary: #FFFFFF;
+  --theme-surface: #FFFFFF;
+  --theme-surface-elevated: #FFFFFF;
+
+  // ─── Текст ───
+  --theme-text-primary: #1A1A1A;
+  --theme-text-secondary: #5F6368;
+  --theme-text-muted: #9AA0A6;
+  --theme-text-inverse: #FFFFFF;
+
+  // ─── Границы и разделители ───
+  --theme-border: #E0E0E0;
+  --theme-border-light: #EEEEEE;
+  --theme-divider: #E8EAED;
+
+  // ─── Состояния ───
+  --theme-hover: rgba(0, 0, 0, 0.04);
+  --theme-active: rgba(0, 0, 0, 0.08);
+  --theme-selected: rgba(25, 118, 210, 0.12);
+  --theme-focus: rgba(25, 118, 210, 0.2);
+
+  // ─── Статусы ───
+  --theme-success: #2E7D32;
+  --theme-error: #D32F2F;
+  --theme-warning: #ED6C02;
+  --theme-info: #0288D1;
+
+  // ─── Тени ───
+  --theme-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --theme-shadow-md: 0 4px 6px rgba(0, 0, 0, 0.07);
+  --theme-shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
+  --theme-shadow-elevated: 0 4px 20px rgba(0, 0, 0, 0.08);
+
+  // ─── Компоненты: Меню / Header ───
+  --menu-bg: #FFFFFF;
+  --menu-elev: rgba(0, 0, 0, 0.04);
+  --menu-border: #E0E0E0;
+  --menu-text: #1A1A1A;
+  --menu-muted: #5F6368;
+  --menu-accent: #1976D2;
+  --menu-danger: #D32F2F;
+  --menu-hover: rgba(0, 0, 0, 0.04);
+  --menu-focus: rgba(25, 118, 210, 0.12);
+  --shadow-2: 0 4px 20px rgba(0, 0, 0, 0.1);
+
+  // ─── Компоненты: Таблицы ───
+  --table-bg: #FFFFFF;
+  --table-header-bg: #F8F9FA;
+  --table-header-text: #1A1A1A;
+  --table-row-bg: #FFFFFF;
+  --table-row-alt-bg: #FAFBFC;
+  --table-row-hover: rgba(25, 118, 210, 0.04);
+  --table-row-selected: rgba(25, 118, 210, 0.08);
+  --table-border: #E8EAED;
+  --table-text: #1A1A1A;
+  --table-text-secondary: #5F6368;
+
+  // ─── Компоненты: Checkbox ───
+  --checkbox-unchecked: rgba(0, 0, 0, 0.4);
+  --checkbox-checked: #2E7D32;
+  --checkbox-checked-bg: rgba(46, 125, 50, 0.15);
+  --checkbox-indeterminate: #ED6C02;
+  --checkbox-indeterminate-bg: rgba(237, 108, 2, 0.15);
+  --checkbox-disabled: rgba(0, 0, 0, 0.26);
+  --checkbox-hover-bg: rgba(0, 0, 0, 0.04);
+
+  // ─── Компоненты: Инпуты ───
+  --input-bg: #FFFFFF;
+  --input-border: #BDBDBD;
+  --input-border-hover: #9E9E9E;
+  --input-border-focus: #1976D2;
+  --input-text: #1A1A1A;
+  --input-placeholder: #9AA0A6;
+
+  // ─── Компоненты: Кнопки ───
+  --button-primary-bg: #1976D2;
+  --button-primary-text: #FFFFFF;
+  --button-primary-hover: #1565C0;
+  --button-secondary-bg: transparent;
+  --button-secondary-border: #DADCE0;
+  --button-secondary-text: #1A1A1A;
+  --button-secondary-hover: rgba(0, 0, 0, 0.04);
+
+  // ─── Компоненты: Иконки ───
+  --icon-primary: #5F6368;
+  --icon-secondary: #9AA0A6;
+  --icon-active: #1976D2;
+
+  // ─── Ссылки ───
+  --link-color: #1976D2;
+  --link-hover: #1565C0;
+  --link: #1976D2;
+
+  // ─── Скроллбар ───
+  --scrollbar-thumb: rgba(0, 0, 0, 0.2);
+  --scrollbar-thumb-hover: rgba(0, 0, 0, 0.3);
+  --scrollbar-track: rgba(0, 0, 0, 0.05);
+
+  // ─── Toolbar ───
+  --toolbar-bg: #FFFFFF;
+  --toolbar-border: #E8EAED;
+
+  // ─── Search ───
+  --search-bg: #F1F3F4;
+  --search-bg-focus: #FFFFFF;
+  --search-border: transparent;
+  --search-border-focus: #1976D2;
+  --search-text: #1A1A1A;
+  --search-placeholder: #9AA0A6;
+
+  // ─── Компоненты: Tree (дерево фильтров) ───
+  --tree-item-bg: #FFFFFF;
+  --tree-item-text: #1A1A1A;
+  --tree-item-border: #E0E0E0;
+  --tree-item-hover: rgba(0, 0, 0, 0.04);
+  --tree-item-expanded-bg: rgba(25, 118, 210, 0.12);
+  --tree-item-expanded-hover: rgba(25, 118, 210, 0.18);
+  --tree-nested-bg: rgba(0, 0, 0, 0.02);
+  --tree-nested-hover: rgba(0, 0, 0, 0.06);
+
+  // ─── Overlay / Backdrop ───
+  --overlay-bg: rgba(0, 0, 0, 0.4);
+
+  // ─── Legacy переменные (для совместимости) ───
+  --primary-color: #F5F7FA;
+  --color-text: #1A1A1A;
+  --header-color: #FFFFFF;
+  --hover-color: rgba(0, 0, 0, 0.04);
+
+  // ─── Dropdown / Popover ───
+  --dropdown-bg: #FFFFFF;
+  --dropdown-text: #1A1A1A;
+  --dropdown-border: #E0E0E0;
+  --dropdown-hover: rgba(0, 0, 0, 0.04);
+
+  // ─── Календарь / Date Picker ───
+  --color-scheme: light;
+  --calendar-icon-filter: none;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ПЛАВНЫЙ ПЕРЕХОД МЕЖДУ ТЕМАМИ
+// ═══════════════════════════════════════════════════════════════════════════
+
+:root {
+  // Переход применяется к основным свойствам, зависящим от темы
+  --theme-transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+// Применяем переход к базовым элементам
+body,
+.appRoot {
+  transition: var(--theme-transition);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ГЛОБАЛЬНЫЕ СТИЛИ ДЛЯ MUI КОМПОНЕНТОВ (Portal)
+// ═══════════════════════════════════════════════════════════════════════════
+
+// MUI Menu / Select Dropdown
+:global(.MuiMenu-paper),
+:global(.MuiPopover-paper),
+:global(.MuiAutocomplete-paper) {
+  background-color: var(--menu-bg) !important;
+  color: var(--theme-text-primary) !important;
+  border: 1px solid var(--theme-border);
+  box-shadow: var(--theme-shadow-lg) !important;
+}
+
+// MUI Menu Items
+:global(.MuiMenuItem-root) {
+  color: var(--theme-text-primary) !important;
+
+  &:hover {
+    background-color: var(--theme-hover) !important;
+  }
+
+  &.Mui-selected {
+    background-color: var(--theme-selected) !important;
+
+    &:hover {
+      background-color: var(--theme-selected) !important;
+    }
+  }
+}
+
+// MUI List Items (для Select)
+:global(.MuiList-root) {
+  background-color: var(--menu-bg);
+}
+
+:global(.MuiListItem-root),
+:global(.MuiListItemButton-root) {
+  color: var(--theme-text-primary) !important;
+
+  &:hover {
+    background-color: var(--theme-hover) !important;
+  }
+
+  &.Mui-selected {
+    background-color: var(--theme-selected) !important;
+  }
+}
+
+// MUI Autocomplete Options
+:global(.MuiAutocomplete-option) {
+  color: var(--theme-text-primary) !important;
+
+  &:hover {
+    background-color: var(--theme-hover) !important;
+  }
+
+  &[aria-selected="true"] {
+    background-color: var(--theme-selected) !important;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MUI Checkbox — глобальные стили для всех checkbox
+// ═══════════════════════════════════════════════════════════════════════════
+
+:global(.MuiCheckbox-root) {
+  color: var(--checkbox-unchecked) !important;
+
+  &.Mui-checked {
+    color: var(--checkbox-checked) !important;
+  }
+
+  &.MuiCheckbox-indeterminate {
+    color: var(--checkbox-indeterminate) !important;
+  }
+
+  &.Mui-disabled {
+    color: var(--checkbox-disabled) !important;
+  }
+
+  &:hover {
+    background-color: var(--checkbox-hover-bg) !important;
+  }
+}
+
+// Иконка внутри checkbox
+:global(.MuiCheckbox-root svg) {
+  color: inherit;
+}
+
+// MUI Switch — глобальные стили
+:global(.MuiSwitch-root) {
+  .MuiSwitch-track {
+    background-color: var(--checkbox-unchecked) !important;
+  }
+
+  .MuiSwitch-switchBase {
+    color: var(--theme-surface-elevated) !important;
+
+    &.Mui-checked {
+      color: var(--checkbox-checked) !important;
+
+      + .MuiSwitch-track {
+        background-color: var(--checkbox-checked) !important;
+        opacity: 0.5;
+      }
+    }
+
+    &.Mui-disabled {
+      color: var(--checkbox-disabled) !important;
+    }
+  }
+}
+
+// MUI Radio — глобальные стили
+:global(.MuiRadio-root) {
+  color: var(--checkbox-unchecked) !important;
+
+  &.Mui-checked {
+    color: var(--checkbox-checked) !important;
+  }
+
+  &.Mui-disabled {
+    color: var(--checkbox-disabled) !important;
+  }
+
+  &:hover {
+    background-color: var(--checkbox-hover-bg) !important;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MUI Dialog — глобальные стили
+// ═══════════════════════════════════════════════════════════════════════════
+
+:global(.MuiDialog-paper) {
+  background-color: var(--theme-background) !important;
+  color: var(--theme-text-primary) !important;
+}
+
+:global(.MuiDialogTitle-root) {
+  background-color: var(--theme-surface) !important;
+  color: var(--theme-text-primary) !important;
+  border-bottom: 1px solid var(--theme-border) !important;
+}
+
+:global(.MuiDialogContent-root) {
+  background-color: var(--theme-background) !important;
+  color: var(--theme-text-primary) !important;
+}
+
+:global(.MuiDialogActions-root) {
+  background-color: var(--theme-surface) !important;
+  border-top: 1px solid var(--theme-border) !important;
+}
+
+:global(.MuiDialogContentText-root) {
+  color: var(--theme-text-secondary) !important;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MUI Button — глобальные стили
+// ═══════════════════════════════════════════════════════════════════════════
+
+:global(.MuiButton-root) {
+  &.MuiButton-text {
+    color: var(--theme-primary) !important;
+
+    &:hover {
+      background-color: var(--theme-hover) !important;
+    }
+  }
+
+  &.MuiButton-outlined {
+    color: var(--theme-primary) !important;
+    border-color: var(--theme-primary) !important;
+
+    &:hover {
+      background-color: var(--theme-hover) !important;
+    }
+  }
+
+  &.MuiButton-contained {
+    background-color: var(--button-primary-bg) !important;
+    color: var(--button-primary-text) !important;
+
+    &:hover {
+      background-color: var(--button-primary-hover) !important;
+    }
+  }
+}

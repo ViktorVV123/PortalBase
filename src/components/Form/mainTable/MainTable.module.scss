@@ -1,27 +1,33 @@
 // src/components/Form/mainTable/MainTable.module.scss
 // ФИНАЛЬНАЯ ВЕРСИЯ — таблица с горизонтальным скроллом
-// ОБНОВЛЕНО: Адаптивный размер шрифта для разных разрешений экрана
+// ОБНОВЛЕНО: Полная поддержка светлой и тёмной темы
 
 @use '@/assets/styles/fluid-type' as *;
 
 // ═══════════════════════════════════════════════════════════
-// VARIABLES
+// VARIABLES — используем CSS переменные из темы
 // ═══════════════════════════════════════════════════════════
 
-$border-color: rgba(255, 255, 255, 0.15);
-$header-bg: var(--header-color, #2d2d2d);
-$hover-bg: var(--hover-color, rgba(255, 255, 255, 0.06));
-$selected-bg: rgba(100, 150, 255, 0.12);
-$link-color: var(--link, #6db3f2);
-$text-color: #e0e0e0;
-$text-muted: #888;
+$border-color: var(--table-border);
+$header-bg: var(--table-header-bg);
+$header-text: var(--table-header-text);
+$hover-bg: var(--table-row-hover);
+$selected-bg: var(--table-row-selected);
+$link-color: var(--link-color);
+$text-color: var(--table-text);
+$text-muted: var(--table-text-secondary);
+$table-bg: var(--table-bg);
+$row-bg: var(--table-row-bg);
+$row-alt-bg: var(--table-row-alt-bg);
+$input-bg: var(--input-bg);
+$input-border: var(--input-border);
+$input-border-focus: var(--input-border-focus);
 
 // ═══════════════════════════════════════════════════════════
 // АДАПТИВНЫЕ ПЕРЕМЕННЫЕ ДЛЯ РАЗНЫХ ЭКРАНОВ
 // ═══════════════════════════════════════════════════════════
 
 :root {
-  // Дефолтные значения для Full HD (1920x1080) и меньше
   --main-head-row-1: 34px;
   --tbl-font-size: 11px;
   --tbl-header-font-size: 11px;
@@ -32,7 +38,6 @@ $text-muted: #888;
   --tbl-input-padding: 4px 6px;
   --tbl-line-height: 1.25;
 
-  // Для экранов шире 1920px (2K, 4K, большие мониторы)
   @media (min-width: 1921px) {
     --main-head-row-1: 40px;
     --tbl-font-size: 13px;
@@ -45,7 +50,6 @@ $text-muted: #888;
     --tbl-line-height: 1.35;
   }
 
-  // Для экранов шире 2560px (2K+ / UltraWide)
   @media (min-width: 2561px) {
     --main-head-row-1: 44px;
     --tbl-font-size: 14px;
@@ -61,13 +65,9 @@ $text-muted: #888;
 
 // ═══════════════════════════════════════════════════════════
 // TABLE WRAPPER
-// Этот div находится ВНУТРИ .mainTableScroll
-// Его задача — позволить таблице быть шире контейнера
 // ═══════════════════════════════════════════════════════════
 
 .tableWrapper {
-  // Минимальная ширина = 100% контейнера
-  // Но если таблица шире — wrapper растянется
   min-width: 100%;
   width: max-content;
 }
@@ -77,14 +77,13 @@ $text-muted: #888;
 // ═══════════════════════════════════════════════════════════
 
 .tbl {
-  // Таблица занимает ширину по контенту
   width: max-content;
   min-width: 100%;
-
   table-layout: auto;
   border-collapse: collapse;
   font-size: var(--tbl-font-size);
   line-height: var(--tbl-line-height);
+  background: $table-bg;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -97,10 +96,10 @@ $text-muted: #888;
   padding: var(--tbl-cell-padding);
   text-align: center;
   vertical-align: middle;
-
   white-space: normal;
   word-wrap: break-word;
   overflow-wrap: break-word;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -109,36 +108,31 @@ $text-muted: #888;
 
 .tbl thead th {
   background: $header-bg;
-  color: #f0f0f0;
+  color: $header-text;
   font-weight: 600;
   font-size: var(--tbl-header-font-size);
   line-height: 1.25;
-
   white-space: normal;
   word-break: break-word;
   hyphens: auto;
   padding: var(--tbl-header-padding);
 }
 
-// Первая строка шапки — sticky
 .tbl thead tr:nth-child(1) th {
   position: sticky;
   top: 0;
   z-index: 10;
   min-height: 32px;
-
-  // Тень под шапкой при скролле
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
 }
 
-// Вторая строка шапки — sticky под первой
 .tbl thead tr:nth-child(2) th {
   position: sticky;
   top: var(--main-head-row-1);
   z-index: 9;
   font-weight: 500;
   font-size: var(--tbl-subheader-font-size);
-  background: rgba(35, 35, 35, 1); // Чуть темнее header-bg
+  background: var(--table-header-bg);
 
   .ellipsis {
     white-space: normal;
@@ -153,7 +147,7 @@ $text-muted: #888;
 
 .tbl tbody td {
   color: $text-color;
-  background: transparent;
+  background: $row-bg;
   cursor: pointer;
   transition: background 0.12s ease;
   font-size: var(--tbl-font-size);
@@ -161,6 +155,14 @@ $text-muted: #888;
 }
 
 .tbl tbody tr:hover td {
+  background: $hover-bg;
+}
+
+.tbl tbody tr:nth-child(even) td {
+  background: $row-alt-bg;
+}
+
+.tbl tbody tr:nth-child(even):hover td {
   background: $hover-bg;
 }
 
@@ -210,7 +212,7 @@ $text-muted: #888;
 
 .editCell {
   padding: 3px 4px !important;
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--theme-hover);
 }
 
 .cellEditor {
@@ -223,7 +225,7 @@ $text-muted: #888;
 }
 
 // ═══════════════════════════════════════════════════════════
-// INPUT IN CELL
+// INPUT IN CELL — УЛУЧШЕНО ДЛЯ СВЕТЛОЙ ТЕМЫ
 // ═══════════════════════════════════════════════════════════
 
 .inpInCell {
@@ -234,18 +236,43 @@ $text-muted: #888;
   :global(.MuiInputBase-root) {
     width: 100%;
     min-width: 0;
+    background: $input-bg;
+    color: var(--input-text);
   }
 
   :global(.MuiInputBase-input) {
     padding: var(--tbl-input-padding);
     font-size: var(--tbl-input-font-size);
     text-align: center;
+    color: var(--input-text);
   }
 
-  :global(.MuiSelect-select) {
+  :global(.MuiSelect-select),
+  :global(.MuiNativeSelect-select) {
     padding: var(--tbl-input-padding);
     text-align: center;
     font-size: var(--tbl-input-font-size);
+    color: var(--input-text);
+  }
+
+  // Иконка стрелки в Select
+  :global(.MuiSelect-icon),
+  :global(.MuiNativeSelect-icon) {
+    color: var(--icon-primary);
+  }
+
+  :global(.MuiOutlinedInput-notchedOutline) {
+    border-color: $input-border;
+    border-width: 1px;
+  }
+
+  :global(.MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline) {
+    border-color: var(--input-border-hover);
+  }
+
+  :global(.MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline) {
+    border-color: $input-border-focus;
+    border-width: 2px;
   }
 }
 
@@ -256,16 +283,23 @@ $text-muted: #888;
   padding: var(--tbl-input-padding);
   font: inherit;
   font-size: var(--tbl-input-font-size);
-  color: inherit;
-  background: rgba(20, 20, 20, 0.8);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: var(--input-text);
+  background: $input-bg;
+  // ✅ УЛУЧШЕНО: Более заметная граница
+  border: 1px solid $input-border;
   border-radius: 4px;
   text-align: center;
-  transition: border-color 0.15s ease;
+  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+
+  &:hover {
+    border-color: var(--input-border-hover);
+  }
 
   &:focus {
     outline: none;
-    border-color: rgba(100, 150, 255, 0.6);
+    border-color: $input-border-focus;
+    // ✅ Добавляем тень для лучшей видимости фокуса
+    box-shadow: 0 0 0 2px var(--theme-focus);
   }
 }
 
@@ -288,6 +322,36 @@ $text-muted: #888;
 .comboSelect {
   flex: 1;
   min-width: 0;
+
+  // ✅ Улучшаем стили для Select в светлой теме
+  :global(.MuiOutlinedInput-notchedOutline) {
+    border-color: $input-border;
+  }
+
+  :global(.MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline) {
+    border-color: var(--input-border-hover);
+  }
+
+  :global(.MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline) {
+    border-color: $input-border-focus;
+  }
+
+  // ✅ КЛЮЧЕВОЕ: Цвет текста в Select
+  :global(.MuiSelect-select),
+  :global(.MuiNativeSelect-select) {
+    color: var(--input-text);
+  }
+
+  :global(.MuiInputBase-root) {
+    color: var(--input-text);
+    background: $input-bg;
+  }
+
+  // Иконка стрелки
+  :global(.MuiSelect-icon),
+  :global(.MuiNativeSelect-icon) {
+    color: var(--icon-primary);
+  }
 }
 
 .comboEditInner {
@@ -312,7 +376,7 @@ $text-muted: #888;
   cursor: pointer;
   opacity: 0.6;
   font-size: 14px;
-  color: #fff;
+  color: var(--theme-text-primary);
   padding: 0;
   flex-shrink: 0;
   transition: opacity 0.15s;
@@ -341,7 +405,7 @@ $text-muted: #888;
   transition: all 0.15s ease;
 
   &:hover {
-    background: rgba(100, 150, 255, 0.1);
+    background: var(--theme-selected);
     text-decoration: underline;
   }
 }
@@ -366,21 +430,21 @@ $text-muted: #888;
 
 .dateTimeInput {
   input {
-    color: #fff;
+    color: var(--input-text);
     font-size: var(--tbl-input-font-size);
+  }
 
-    &::-webkit-calendar-picker-indicator {
-      filter: invert(1);
-      opacity: 0.8;
-    }
+  // ✅ Улучшаем стили для DatePicker
+  :global(.MuiOutlinedInput-notchedOutline) {
+    border-color: $input-border;
+  }
 
-    &::-webkit-inner-spin-button {
-      filter: invert(1);
-    }
+  :global(.MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline) {
+    border-color: var(--input-border-hover);
+  }
 
-    &::-webkit-clear-button {
-      filter: invert(1);
-    }
+  :global(.MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline) {
+    border-color: $input-border-focus;
   }
 }
 
@@ -415,16 +479,15 @@ $text-muted: #888;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: #aaa;
+  color: var(--icon-primary);
   border-radius: 4px;
   transition: all 0.15s ease;
 
   &:hover {
-    color: #fff;
-    background: rgba(255, 255, 255, 0.1);
+    color: var(--theme-text-primary);
+    background: var(--theme-hover);
   }
 
-  // Увеличиваем на больших экранах
   @media (min-width: 1921px) {
     padding: 4px;
     width: 26px;
@@ -495,7 +558,7 @@ $text-muted: #888;
 }
 
 .okBtn {
-  color: #4ade80;
+  color: var(--theme-success);
 
   &:hover:not(:disabled) {
     background: rgba(74, 222, 128, 0.15);
@@ -504,7 +567,7 @@ $text-muted: #888;
 }
 
 .cancelBtn {
-  color: #f87171;
+  color: var(--theme-error);
 
   &:hover:not(:disabled) {
     background: rgba(248, 113, 113, 0.15);
@@ -521,7 +584,7 @@ $text-muted: #888;
   border: 0;
   padding: 3px;
   cursor: pointer;
-  color: #ccc;
+  color: var(--icon-primary);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -529,8 +592,8 @@ $text-muted: #888;
   transition: all 0.15s ease;
 
   &:hover {
-    color: #fff;
-    background: rgba(255, 255, 255, 0.1);
+    color: var(--theme-text-primary);
+    background: var(--theme-hover);
   }
 
   svg {
@@ -556,12 +619,8 @@ $text-muted: #888;
 // VALIDATION STYLES
 // ═══════════════════════════════════════════════════════════
 
-$error-color: #ef4444;
-$error-bg: rgba(239, 68, 68, 0.1);
-$required-mark-color: #ef4444;
-
 .requiredMark {
-  color: $required-mark-color;
+  color: var(--theme-error);
   font-weight: 700;
   margin-left: 2px;
   font-size: 1.1em;
@@ -574,8 +633,8 @@ $required-mark-color: #ef4444;
 }
 
 .cellError {
-  background: $error-bg !important;
-  border-color: $error-color !important;
+  background: rgba(239, 68, 68, 0.1) !important;
+  border-color: var(--theme-error) !important;
   animation: cellErrorPulse 0.3s ease-out;
 }
 
@@ -584,7 +643,7 @@ $required-mark-color: #ef4444;
     background: rgba(239, 68, 68, 0.25);
   }
   100% {
-    background: $error-bg;
+    background: rgba(239, 68, 68, 0.1);
   }
 }
 

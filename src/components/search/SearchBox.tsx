@@ -1,3 +1,6 @@
+// src/components/search/SearchBox.tsx
+// Поддержка светлой и тёмной темы
+
 import React, { useMemo, useState } from 'react';
 import TextField from '@mui/material/TextField';
 import InputAdornment from '@mui/material/InputAdornment';
@@ -12,9 +15,10 @@ type Props = {
     placeholder?: string;
     autoFocus?: boolean;
     onKeyDown?: React.KeyboardEventHandler;
-    /** ширины анимации (можно не трогать) */
-    collapsedWidth?: number;   // px
-    expandedWidth?: number;    // px
+    onFocus?: () => void;
+    onBlur?: () => void;
+    collapsedWidth?: number;
+    expandedWidth?: number;
 };
 
 export const SearchBox: React.FC<Props> = ({
@@ -23,6 +27,8 @@ export const SearchBox: React.FC<Props> = ({
                                                placeholder = 'Search',
                                                autoFocus,
                                                onKeyDown,
+                                               onFocus,
+                                               onBlur,
                                                collapsedWidth = 180,
                                                expandedWidth = 180
                                            }) => {
@@ -31,12 +37,21 @@ export const SearchBox: React.FC<Props> = ({
 
     const styleVars = useMemo(
         () => ({
-            // прокидываем в css-переменные контейнера
             ['--collapsed' as any]: `${collapsedWidth}px`,
             ['--expanded' as any]: `${expandedWidth}px`,
         }),
         [collapsedWidth, expandedWidth]
     );
+
+    const handleFocus = () => {
+        setFocused(true);
+        onFocus?.();
+    };
+
+    const handleBlur = () => {
+        setFocused(false);
+        onBlur?.();
+    };
 
     return (
         <div
@@ -52,32 +67,60 @@ export const SearchBox: React.FC<Props> = ({
                 size="small"
                 autoFocus={autoFocus}
                 variant="outlined"
-                onFocus={() => setFocused(true)}
-                onBlur={() => setFocused(false)}
-                // ширину управляем обёрткой, поэтому fullWidth не нужен
+                onFocus={handleFocus}
+                onBlur={handleBlur}
                 sx={{
+                    width: '100%',
                     '& .MuiOutlinedInput-root': {
                         borderRadius: 9999,
-                        backgroundColor: '#444545',
-                        // делаем похожий на скрин вид
-                        '& fieldset': { borderColor: '#e5e8ef' },
-                        '&:hover fieldset': { borderColor: '#d5dbe7' },
-                        '&.Mui-focused fieldset': { borderColor: '#c7cfdd' },
-                        fontSize: 16,
-                        paddingRight: 0
+                        backgroundColor: 'var(--search-bg, #F1F3F4)',
+                        transition: 'background-color 0.2s ease, border-color 0.2s ease',
+                        '& fieldset': {
+                            borderColor: 'var(--search-border, transparent)',
+                        },
+                        '&:hover fieldset': {
+                            borderColor: 'var(--theme-border, rgba(0, 0, 0, 0.12))',
+                        },
+                        '&.Mui-focused': {
+                            backgroundColor: 'var(--search-bg-focus, #FFFFFF)',
+                            '& fieldset': {
+                                borderColor: 'var(--search-border-focus, var(--theme-primary))',
+                            },
+                        },
+                        fontSize: 14,
+                        paddingRight: 0,
                     },
-                    '& .MuiInputAdornment-root': { color: '#eff0f1' }, // серый для иконок
-                    minWidth: 0   // чтобы не было минимальной ширины от MUI
+                    '& .MuiInputBase-input': {
+                        color: 'var(--search-text, #1A1A1A)',
+                        '&::placeholder': {
+                            color: 'var(--search-placeholder, #9AA0A6)',
+                            opacity: 1,
+                        },
+                    },
+                    '& .MuiInputAdornment-root': {
+                        color: 'var(--icon-secondary, #9AA0A6)',
+                    },
+                    minWidth: 0,
                 }}
                 InputProps={{
                     startAdornment: (
-                        <InputAdornment position="start" sx={{ ml: .5 }}>
+                        <InputAdornment position="start" sx={{ ml: 0.5 }}>
                             <SearchIcon fontSize="small" />
                         </InputAdornment>
                     ),
                     endAdornment: value ? (
                         <InputAdornment position="end">
-                            <IconButton size="small" onClick={() => onChange('')}>
+                            <IconButton
+                                size="small"
+                                onClick={() => onChange('')}
+                                sx={{
+                                    color: 'var(--icon-secondary, #9AA0A6)',
+                                    '&:hover': {
+                                        color: 'var(--icon-primary, #5F6368)',
+                                        backgroundColor: 'var(--theme-hover, rgba(0, 0, 0, 0.04))',
+                                    },
+                                }}
+                            >
                                 <ClearIcon fontSize="small" />
                             </IconButton>
                         </InputAdornment>

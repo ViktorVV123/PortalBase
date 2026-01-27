@@ -52,6 +52,10 @@ export function triStateToBackendValue(state: 'true' | 'false' | 'null'): string
     }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// TRI-STATE CHECKBOX (три состояния: false → true → null)
+// ═══════════════════════════════════════════════════════════════════════════
+
 type TriStateCheckboxProps = {
     value: TriStateValue;
     onChange: (newValue: 'true' | 'false' | 'null') => void;
@@ -90,21 +94,6 @@ export const TriStateCheckbox: React.FC<TriStateCheckboxProps> = ({
     const isChecked = state === 'true';
     const isIndeterminate = state === 'null';
 
-    // Базовые стили
-    const baseSx: SxProps<Theme> = {
-        color: showError ? '#ef4444' : 'rgba(255, 255, 255, 0.4)',
-        '&.Mui-checked': {
-            color: showError ? '#ef4444' : 'rgba(255, 255, 255, 0.9)'
-        },
-        '&.MuiCheckbox-indeterminate': {
-            color: showError ? '#ef4444' : '#ffb74d' // Оранжевый для null
-        },
-        '&.Mui-disabled': {
-            color: 'rgba(255, 255, 255, 0.3)'
-        },
-        ...sx,
-    };
-
     return (
         <Checkbox
             size={size}
@@ -116,9 +105,10 @@ export const TriStateCheckbox: React.FC<TriStateCheckboxProps> = ({
                 <QuestionMarkIcon
                     sx={{
                         fontSize: size === 'small' ? 18 : 22,
-                        backgroundColor: 'rgba(255, 183, 77, 0.2)',
+                        backgroundColor: 'var(--checkbox-indeterminate-bg)',
                         borderRadius: '4px',
                         padding: '2px',
+                        color: 'var(--checkbox-indeterminate)',
                     }}
                 />
             }
@@ -126,25 +116,45 @@ export const TriStateCheckbox: React.FC<TriStateCheckboxProps> = ({
                 <CheckIcon
                     sx={{
                         fontSize: size === 'small' ? 18 : 22,
-                        backgroundColor: 'rgba(102, 187, 106, 0.2)',
+                        backgroundColor: 'var(--checkbox-checked-bg)',
                         borderRadius: '4px',
                         padding: '2px',
+                        color: 'var(--checkbox-checked)',
                     }}
                 />
             }
-            sx={baseSx}
+            sx={{
+                color: showError ? 'var(--theme-error)' : 'var(--checkbox-unchecked)',
+                '&.Mui-checked': {
+                    color: showError ? 'var(--theme-error)' : 'var(--checkbox-checked)',
+                },
+                '&.MuiCheckbox-indeterminate': {
+                    color: showError ? 'var(--theme-error)' : 'var(--checkbox-indeterminate)',
+                },
+                '&.Mui-disabled': {
+                    color: 'var(--checkbox-disabled)',
+                },
+                '&:hover': {
+                    backgroundColor: 'var(--checkbox-hover-bg)',
+                },
+                ...(sx as object),
+            }}
         />
     );
 };
 
-/**
- * Компонент для отображения checkbox в режиме просмотра (только чтение)
- */
+// ═══════════════════════════════════════════════════════════════════════════
+// TRI-STATE CHECKBOX DISPLAY (только чтение)
+// ═══════════════════════════════════════════════════════════════════════════
+
 type TriStateCheckboxDisplayProps = {
     value: unknown;
     size?: 'small' | 'medium';
 };
 
+/**
+ * Компонент для отображения tri-state checkbox в режиме просмотра (только чтение)
+ */
 export const TriStateCheckboxDisplay: React.FC<TriStateCheckboxDisplayProps> = ({
                                                                                     value,
                                                                                     size = 'small',
@@ -164,16 +174,119 @@ export const TriStateCheckboxDisplay: React.FC<TriStateCheckboxDisplayProps> = (
                 <QuestionMarkIcon
                     sx={{
                         fontSize: size === 'small' ? 18 : 22,
-                        color: '#ffb74d',
+                        color: 'var(--checkbox-indeterminate)',
                         opacity: 0.7,
                     }}
                 />
             }
             sx={{
-                color: 'rgba(255, 255, 255, 0.4)',
-                '&.Mui-checked': { color: 'rgba(255, 255, 255, 0.9)' },
-                '&.MuiCheckbox-indeterminate': { color: '#ffb74d' },
-                '&.Mui-disabled': { color: 'rgba(255, 255, 255, 0.7)' },
+                color: 'var(--checkbox-unchecked)',
+                '&.Mui-checked': {
+                    color: 'var(--checkbox-checked)',
+                },
+                '&.MuiCheckbox-indeterminate': {
+                    color: 'var(--checkbox-indeterminate)',
+                },
+                '&.Mui-disabled': {
+                    color: 'var(--checkbox-disabled)',
+                    opacity: 0.7,
+                },
+            }}
+        />
+    );
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// REGULAR CHECKBOX (обычный, два состояния: false ↔ true)
+// ═══════════════════════════════════════════════════════════════════════════
+
+type RegularCheckboxProps = {
+    checked: boolean;
+    onChange: (checked: boolean) => void;
+    disabled?: boolean;
+    size?: 'small' | 'medium';
+    sx?: SxProps<Theme>;
+    /** Показывать ошибку валидации */
+    showError?: boolean;
+};
+
+/**
+ * Обычный двухпозиционный Checkbox:
+ * - false (пустой квадрат)
+ * - true (галочка ✓)
+ */
+export const RegularCheckbox: React.FC<RegularCheckboxProps> = ({
+                                                                    checked,
+                                                                    onChange,
+                                                                    disabled = false,
+                                                                    size = 'small',
+                                                                    sx,
+                                                                    showError = false,
+                                                                }) => {
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        e.stopPropagation();
+        if (disabled) return;
+        onChange(e.target.checked);
+    };
+
+    const handleClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
+    };
+
+    return (
+        <Checkbox
+            size={size}
+            checked={checked}
+            onChange={handleChange}
+            onClick={handleClick}
+            disabled={disabled}
+            sx={{
+                color: showError ? 'var(--theme-error)' : 'var(--checkbox-unchecked)',
+                '&.Mui-checked': {
+                    color: showError ? 'var(--theme-error)' : 'var(--checkbox-checked)',
+                },
+                '&.Mui-disabled': {
+                    color: 'var(--checkbox-disabled)',
+                },
+                '&:hover': {
+                    backgroundColor: 'var(--checkbox-hover-bg)',
+                },
+                ...(sx as object),
+            }}
+        />
+    );
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// REGULAR CHECKBOX DISPLAY (только чтение)
+// ═══════════════════════════════════════════════════════════════════════════
+
+type RegularCheckboxDisplayProps = {
+    checked: boolean;
+    size?: 'small' | 'medium';
+};
+
+/**
+ * Компонент для отображения обычного checkbox в режиме просмотра (только чтение)
+ */
+export const RegularCheckboxDisplay: React.FC<RegularCheckboxDisplayProps> = ({
+                                                                                  checked,
+                                                                                  size = 'small',
+                                                                              }) => {
+    return (
+        <Checkbox
+            size={size}
+            checked={checked}
+            disabled
+            sx={{
+                color: 'var(--checkbox-unchecked)',
+                '&.Mui-checked': {
+                    color: 'var(--checkbox-checked)',
+                },
+                '&.Mui-disabled': {
+                    color: 'var(--checkbox-disabled)',
+                    opacity: 0.7,
+                },
             }}
         />
     );

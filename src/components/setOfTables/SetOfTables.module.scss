@@ -1,35 +1,34 @@
 // src/components/setOfTables/SetOfTables.module.scss
+// Поддержка светлой и тёмной темы
 
 @use '@/assets/styles/fluid-type' as *;
 
-$border: #f6f6f6;
-$error: #d33;
+// ═══════════════════════════════════════════════════════════
+// VARIABLES — используем CSS переменные из темы
+// ═══════════════════════════════════════════════════════════
+
+$border: var(--table-border);
+$error: var(--theme-error);
+$input-border: var(--input-border);
+$input-border-focus: var(--input-border-focus);
 
 // ═══════════════════════════════════════════════════════════
 // WRAPPER — ГЛАВНЫЙ КОНТЕЙНЕР
-// КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: flex: 1 + min-height: 0 вместо calc()
 // ═══════════════════════════════════════════════════════════
 
 .wrapper {
-  // Занимает всё доступное пространство от родителя
   flex: 1 1 auto;
-
-  // КРИТИЧНО: позволяет сжиматься меньше контента!
   min-height: 0;
   min-width: 0;
-
-  // Ограничиваем максимум
   max-height: 100%;
   max-width: 100%;
-
   display: flex;
   flex-direction: column;
-
-  // КРИТИЧНО: никакого скролла на этом уровне!
   overflow: hidden;
-
   padding: 10px;
   box-sizing: border-box;
+  background: var(--theme-background);
+  transition: background-color 0.3s ease;
 }
 
 .loaderArea {
@@ -54,17 +53,20 @@ $error: #d33;
   display: flex;
   align-items: center;
   gap: 6px;
+  color: var(--theme-text-primary);
 }
 
 .arrow {
   @include fluid-type(14, 16);
   opacity: .6;
+  color: var(--theme-text-secondary);
 }
 
 h2 {
   margin: 0 0 16px;
   @include fluid-type(18, 20);
   font-weight: 600;
+  color: var(--theme-text-primary);
 }
 
 .headRow {
@@ -79,7 +81,7 @@ h2 {
 }
 
 .placeholder {
-  color: #888;
+  color: var(--theme-text-muted);
   padding: 24px 0;
 }
 
@@ -120,6 +122,7 @@ h2 {
   border-collapse: separate;
   border-spacing: 0;
   @include fluid-type(13, 16);
+  background: var(--table-bg);
 }
 
 .tbl input,
@@ -128,29 +131,71 @@ h2 {
   min-width: 0;
   box-sizing: border-box;
   font-size: 13px;
+  color: var(--input-text);
+  background: var(--input-bg);
 }
+
+// ═══════════════════════════════════════════════════════════
+// INPUT IN CELL — УЛУЧШЕНО ДЛЯ СВЕТЛОЙ ТЕМЫ
+// ═══════════════════════════════════════════════════════════
 
 .inpInCell {
   width: 100%;
   min-width: 0;
   box-sizing: border-box;
-}
 
-.inpInCell :global(.MuiInputBase-root) {
-  width: 100%;
-  min-width: 0;
-  box-sizing: border-box;
-}
+  // ✅ Стили для MUI OutlinedInput
+  :global(.MuiInputBase-root) {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    background: var(--input-bg);
+    color: var(--input-text);
+  }
 
-.inpInCell :global(.MuiInputBase-input) {
-  padding: 2px 4px;
-  font-size: 13px;
-  text-align: center;
-}
+  :global(.MuiInputBase-input) {
+    padding: 2px 4px;
+    font-size: 13px;
+    text-align: center;
+    color: var(--input-text);
+  }
 
-.inpInCell :global(.MuiSelect-select) {
-  padding: 2px 4px;
-  text-align: center;
+  :global(.MuiSelect-select),
+  :global(.MuiNativeSelect-select) {
+    padding: 2px 4px;
+    text-align: center;
+    color: var(--input-text);
+  }
+
+  // Иконка стрелки в Select
+  :global(.MuiSelect-icon),
+  :global(.MuiNativeSelect-icon) {
+    color: var(--icon-primary);
+  }
+
+  // ✅ КЛЮЧЕВОЕ: Стили границ для MUI
+  :global(.MuiOutlinedInput-notchedOutline) {
+    border-color: $input-border;
+    border-width: 1px;
+  }
+
+  :global(.MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline) {
+    border-color: var(--input-border-hover);
+  }
+
+  :global(.MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline) {
+    border-color: $input-border-focus;
+    border-width: 2px;
+  }
+
+  // ✅ Стили для textarea (multiline)
+  :global(.MuiInputBase-multiline) {
+    padding: 4px;
+  }
+
+  :global(.MuiInputBase-inputMultiline) {
+    padding: 2px 4px;
+  }
 }
 
 .editCell {
@@ -167,11 +212,12 @@ h2 {
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 320px;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
 .tbl thead th {
-  background: var(--header-color);
-  color: #eee;
+  background: var(--table-header-bg);
+  color: var(--table-header-text);
   font-weight: 500;
   @include fluid-type(16, 20);
   z-index: 2;
@@ -191,12 +237,12 @@ h2 {
 }
 
 .tbl td {
-  color: #ddd;
-  background: transparent;
+  color: var(--table-text);
+  background: var(--table-row-bg);
 }
 
 .tbl tbody tr:hover {
-  background: var(--hover-color);
+  background: var(--table-row-hover);
 }
 
 .tbl tbody td {
@@ -204,7 +250,7 @@ h2 {
 }
 
 .selectedRow {
-  background: var(--hover-color);
+  background: var(--table-row-selected);
 }
 
 .selectedRow td {
@@ -244,13 +290,14 @@ h2 {
   cursor: pointer;
   opacity: 0.7;
   font-size: 16px;
-  color: #fff;
+  color: var(--theme-text-primary);
   padding: 0;
   flex: 0 0 auto;
-}
+  transition: opacity 0.15s ease;
 
-.comboClearBtn:hover {
-  opacity: 1;
+  &:hover {
+    opacity: 1;
+  }
 }
 
 .ellipsis {
@@ -282,20 +329,20 @@ h2 {
 
 .dateTimeInput {
   input {
-    color: #fff;
+    color: var(--input-text);
+  }
 
-    &::-webkit-calendar-picker-indicator {
-      filter: invert(1);
-      opacity: 1;
-    }
+  // ✅ Стили для DatePicker
+  :global(.MuiOutlinedInput-notchedOutline) {
+    border-color: $input-border;
+  }
 
-    &::-webkit-inner-spin-button {
-      filter: invert(1);
-    }
+  :global(.MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline) {
+    border-color: var(--input-border-hover);
+  }
 
-    &::-webkit-clear-button {
-      filter: invert(1);
-    }
+  :global(.MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline) {
+    border-color: $input-border-focus;
   }
 }
 
@@ -342,12 +389,20 @@ h2 {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: white;
+  color: var(--icon-primary);
+  border-radius: 4px;
+  transition: all 0.15s ease;
+
+  &:hover {
+    color: var(--theme-text-primary);
+    background: var(--theme-hover);
+  }
 }
 
 .actionsBtnDisabled {
   cursor: not-allowed;
   opacity: 0.4;
+  pointer-events: none;
 }
 
 .lockSlot {
@@ -356,12 +411,21 @@ h2 {
   align-items: center;
   justify-content: center;
   pointer-events: none;
+  opacity: 0.6;
 }
 
 .actionIcon {
-  width: 1.1em;
-  height: 1.1em;
-  color: #d1d0d0;
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  min-height: 18px;
+  color: var(--icon-primary);
+  cursor: pointer;
+  transition: color 0.15s ease;
+
+  &:hover {
+    color: var(--theme-text-primary);
+  }
 }
 
 .okBtn,
@@ -376,17 +440,27 @@ h2 {
   justify-content: center;
   font-size: 14px;
   line-height: 1;
-  color: #ccc;
-  fill: #ccc;
   cursor: pointer;
-  transition: color .15s, fill .15s;
+  border-radius: 4px;
+  transition: all 0.15s ease;
 }
 
-.actionIcon:hover,
-.okBtn:hover,
-.cancelBtn:hover {
-  color: #fff;
-  fill: #fff;
+.okBtn {
+  color: var(--theme-success);
+
+  &:hover {
+    background: rgba(74, 222, 128, 0.15);
+    color: #22c55e;
+  }
+}
+
+.cancelBtn {
+  color: var(--theme-error);
+
+  &:hover {
+    background: rgba(248, 113, 113, 0.15);
+    color: #ef4444;
+  }
 }
 
 .inp, .inpN {
@@ -394,9 +468,21 @@ h2 {
   box-sizing: border-box;
   padding: 2px 4px;
   font: inherit;
-  color: inherit;
-  background: #1e1e1e;
+  color: var(--input-text);
+  background: var(--input-bg);
+  border: 1px solid $input-border;
   border-radius: 3px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+
+  &:hover {
+    border-color: var(--input-border-hover);
+  }
+
+  &:focus {
+    outline: none;
+    border-color: $input-border-focus;
+    box-shadow: 0 0 0 2px var(--theme-focus);
+  }
 }
 
 .inpN {
@@ -415,8 +501,8 @@ h2 {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: var(--header-color);
-  color: #fff;
+  background: var(--table-header-bg);
+  color: var(--table-header-text);
   font-weight: 600;
   padding: 6px 10px;
   border-radius: 4px;
@@ -438,7 +524,7 @@ h2 {
   }
 
   &::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, .2);
+    background: var(--scrollbar-thumb);
     border-radius: 6px;
   }
 
@@ -450,12 +536,12 @@ h2 {
 .treeItem {
   padding: 6px 12px;
   margin-bottom: 4px;
-  background: #2e2e2e;
-  color: #eee;
-  border: 1px solid #605f5f;
+  background: var(--tree-item-bg);
+  color: var(--tree-item-text);
+  border: 1px solid var(--tree-item-border);
   border-radius: 4px;
   cursor: pointer;
-  transition: background .15s;
+  transition: background 0.15s ease;
   flex: 1 1 auto;
   min-height: 0;
   max-height: 140px;
@@ -466,7 +552,7 @@ h2 {
   white-space: normal;
 
   &:hover {
-    background: var(--hover-color);
+    background: var(--tree-item-hover);
   }
 
   &::-webkit-scrollbar {
@@ -474,7 +560,7 @@ h2 {
   }
 
   &::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, .2);
+    background: var(--scrollbar-thumb);
     border-radius: 6px;
   }
 
@@ -488,11 +574,11 @@ h2 {
   margin-bottom: 4px;
   cursor: pointer;
   padding: 6px 14px 6px 24px;
-  border-left: 3px solid #555;
-  background: linear-gradient(to right, #3a3a3a, #2e2e2e);
-  color: #ccc;
+  border-left: 3px solid var(--theme-border);
+  background: var(--tree-nested-bg);
+  color: var(--theme-text-secondary);
   border-radius: 4px;
-  transition: background .15s, color .15s;
+  transition: background 0.15s ease, color 0.15s ease;
 
   &::before {
     content: '↳';
@@ -500,13 +586,13 @@ h2 {
     left: 8px;
     top: 50%;
     transform: translateY(-50%);
-    color: #888;
+    color: var(--theme-text-muted);
     font-size: 12px;
   }
 
   &:hover {
-    background: var(--hover-color);
-    color: #fff;
+    background: var(--tree-nested-hover);
+    color: var(--theme-text-primary);
   }
 }
 
@@ -520,12 +606,8 @@ h2 {
 // VALIDATION STYLES
 // ═══════════════════════════════════════════════════════════
 
-$error-color: #ef4444;
-$error-bg: rgba(239, 68, 68, 0.08);
-$required-mark-color: #ef4444;
-
 .requiredMark {
-  color: $required-mark-color;
+  color: var(--theme-error);
   font-weight: 700;
   margin-left: 2px;
   font-size: 1.1em;
@@ -539,8 +621,8 @@ $required-mark-color: #ef4444;
 }
 
 .cellError {
-  background: $error-bg !important;
-  border-color: $error-color !important;
+  background: rgba(239, 68, 68, 0.08) !important;
+  border-color: var(--theme-error) !important;
   animation: cellErrorPulse 0.3s ease-out;
 }
 
@@ -549,7 +631,7 @@ $required-mark-color: #ef4444;
     background: rgba(239, 68, 68, 0.2);
   }
   100% {
-    background: $error-bg;
+    background: rgba(239, 68, 68, 0.08);
   }
 }
 

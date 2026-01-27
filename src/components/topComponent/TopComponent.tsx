@@ -1,3 +1,5 @@
+// src/components/topComponent/TopComponent.tsx
+
 import React, { useState, useEffect } from 'react';
 import * as s from './TopComponent.module.scss';
 
@@ -15,6 +17,8 @@ import { WidgetsMenu } from '@/components/topComponent/widgetsMenu/WidgetsMenu';
 import { FormsMenu } from '@/components/topComponent/formsMenu/FormsMenu';
 import { ModalEditConnection } from "@/components/modals/modalEditConnection/ModalEditConnection";
 import { Connection } from "@/shared/hooks/stores";
+import ThemeToggle from "@/shared/ui/ThemeToggle/ThemeToggle";
+
 
 
 type Props = {
@@ -345,6 +349,13 @@ export const TopComponent: React.FC<Props> = (props) => {
                         />
                     </Floating>
                 )}
+            </div>
+
+            {/* ═══════════════════════════════════════════════════════════════════════
+                ПРАВАЯ ЧАСТЬ: Кнопка переключения темы
+                ═══════════════════════════════════════════════════════════════════════ */}
+            <div className={s.rightSection}>
+                <ThemeToggle size="small" />
             </div>
 
             {selectedWS && (

@@ -1,20 +1,112 @@
 // src/components/modals/ModalEditForm.tsx
 
-import React, {useMemo, useState, useEffect} from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
     Dialog, DialogTitle, DialogContent, DialogActions,
     Tabs, Tab, Box, Stack, TextField, Button, MenuItem,
-    FormControl, InputLabel, Select, createTheme, ThemeProvider,
+    FormControl, InputLabel, Select,
     IconButton, Tooltip, Autocomplete, CircularProgress, Divider,
     Alert, FormControlLabel, Switch, Typography, Paper
 } from '@mui/material';
 import DeleteIcon from "@mui/icons-material/Delete";
 import AddIcon from "@mui/icons-material/Add";
 import SaveIcon from "@mui/icons-material/Save";
-import {WidgetForm, Widget, Column} from '@/shared/hooks/useWorkSpaces';
-import {api} from '@/services/api';
+import { WidgetForm, Widget, Column } from '@/shared/hooks/useWorkSpaces';
+import { api } from '@/services/api';
 
-const dark = createTheme({palette: {mode: 'dark', primary: {main: '#ffffff'}}});
+// ═══════════════════════════════════════════════════════════
+// СТИЛИ ДЛЯ ДИАЛОГА — используем CSS переменные темы
+// ═══════════════════════════════════════════════════════════
+const dialogPaperSx = {
+    backgroundColor: 'var(--theme-background)',
+    color: 'var(--theme-text-primary)',
+    '& .MuiDialogTitle-root': {
+        backgroundColor: 'var(--theme-surface)',
+        color: 'var(--theme-text-primary)',
+        borderBottom: '1px solid var(--theme-border)',
+    },
+    '& .MuiDialogContent-root': {
+        backgroundColor: 'var(--theme-background)',
+        color: 'var(--theme-text-primary)',
+    },
+    '& .MuiDialogActions-root': {
+        backgroundColor: 'var(--theme-surface)',
+        borderTop: '1px solid var(--theme-border)',
+    },
+};
+
+const textFieldSx = {
+    '& .MuiOutlinedInput-root': {
+        color: 'var(--input-text)',
+        backgroundColor: 'var(--input-bg)',
+        '& .MuiOutlinedInput-notchedOutline': {
+            borderColor: 'var(--input-border)',
+        },
+        '&:hover .MuiOutlinedInput-notchedOutline': {
+            borderColor: 'var(--input-border-hover)',
+        },
+        '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+            borderColor: 'var(--input-border-focus)',
+        },
+    },
+    '& .MuiInputLabel-root': {
+        color: 'var(--theme-text-secondary)',
+        '&.Mui-focused': {
+            color: 'var(--theme-primary)',
+        },
+    },
+};
+
+const selectSx = {
+    color: 'var(--input-text)',
+    backgroundColor: 'var(--input-bg)',
+    '& .MuiOutlinedInput-notchedOutline': {
+        borderColor: 'var(--input-border)',
+    },
+    '&:hover .MuiOutlinedInput-notchedOutline': {
+        borderColor: 'var(--input-border-hover)',
+    },
+    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+        borderColor: 'var(--input-border-focus)',
+    },
+    '& .MuiSelect-icon': {
+        color: 'var(--icon-primary)',
+    },
+};
+
+const switchSx = {
+    '& .MuiSwitch-switchBase': {
+        color: 'var(--theme-surface-elevated)',
+        '&.Mui-checked': {
+            color: 'var(--checkbox-checked)',
+            '& + .MuiSwitch-track': {
+                backgroundColor: 'var(--checkbox-checked)',
+            },
+        },
+    },
+    '& .MuiSwitch-track': {
+        backgroundColor: 'var(--checkbox-unchecked)',
+    },
+};
+
+const tabsSx = {
+    '& .MuiTab-root': {
+        color: 'var(--theme-text-secondary)',
+        '&.Mui-selected': {
+            color: 'var(--theme-primary)',
+        },
+    },
+    '& .MuiTabs-indicator': {
+        backgroundColor: 'var(--theme-primary)',
+    },
+};
+
+const paperSx = {
+    p: 2,
+    bgcolor: 'transparent',
+    backgroundImage: 'none',
+    borderColor: 'var(--theme-border)',
+};
 
 type Props = {
     open: boolean;
@@ -90,7 +182,6 @@ export const ModalEditForm: React.FC<Props> = ({
     const [deletingSub, setDeletingSub] = useState(false);
     const [subQueryDelete, setSubQueryDelete] = useState('');
 
-    // New sub
     const [newSubOrder, setNewSubOrder] = useState<number>(1);
     const [newSubWhere, setNewSubWhere] = useState<string>('');
     const [newSubWidget, setNewSubWidget] = useState<Widget | null>(null);
@@ -106,7 +197,6 @@ export const ModalEditForm: React.FC<Props> = ({
     const [savingTree, setSavingTree] = useState(false);
     const [deletingTree, setDeletingTree] = useState(false);
 
-    // New tree
     const [newTreeOrder, setNewTreeOrder] = useState<number>(1);
     const [newTreeColumn, setNewTreeColumn] = useState<Column | null>(null);
     const [addingTree, setAddingTree] = useState(false);
@@ -137,13 +227,6 @@ export const ModalEditForm: React.FC<Props> = ({
         return m;
     }, [availableColumns]);
 
-    const getNextSubOrder = () =>
-        subList.length ? Math.max(...subList.map(it => it.widget_order ?? 0)) + 1 : 1;
-
-    const getNextTreeOrder = () =>
-        treeList.length ? Math.max(...treeList.map(it => it.column_order ?? 0)) + 1 : 1;
-
-    // Проверка изменений для Sub
     const subHasChanges =
         !!currentSub &&
         (
@@ -152,7 +235,6 @@ export const ModalEditForm: React.FC<Props> = ({
             subQueryDelete !== (currentSub.delete_sub_query ?? '')
         );
 
-    // Проверка изменений для Tree
     const treeHasChanges = currentTree && (
         treeOrder !== (currentTree.column_order ?? 0)
     );
@@ -161,7 +243,6 @@ export const ModalEditForm: React.FC<Props> = ({
     // EFFECTS
     // ═══════════════════════════════════════════════════════════
 
-    // Синхронизация при открытии
     useEffect(() => {
         if (!open) return;
 
@@ -181,7 +262,6 @@ export const ModalEditForm: React.FC<Props> = ({
         setMainWidgetId(form.main_widget_id);
         setMainSearchBar(!!form.search_bar);
 
-        // Reset selections
         setSubId(freshSubList[0]?.sub_widget_id ?? 0);
         setTreeColId(freshTreeList[0]?.table_column_id ?? 0);
 
@@ -194,7 +274,6 @@ export const ModalEditForm: React.FC<Props> = ({
         setNewTreeColumn(null);
     }, [open, form]);
 
-    // Загрузка списков
     useEffect(() => {
         if (!open) return;
         let cancelled = false;
@@ -227,7 +306,6 @@ export const ModalEditForm: React.FC<Props> = ({
         return () => { cancelled = true; };
     }, [open, form.main_widget_id]);
 
-    // Синхронизация выбранного sub
     useEffect(() => {
         if (subList.length === 0) {
             setSubId(0);
@@ -244,7 +322,6 @@ export const ModalEditForm: React.FC<Props> = ({
         }
     }, [currentSub]);
 
-    // Синхронизация выбранного tree
     useEffect(() => {
         if (treeList.length === 0) {
             setTreeColId(0);
@@ -302,7 +379,6 @@ export const ModalEditForm: React.FC<Props> = ({
             return;
         }
 
-        // Проверка конфликта order
         if (subList.some(s => s.widget_order === order && s.sub_widget_id !== subId)) {
             showError(`Порядок ${order} уже занят`);
             return;
@@ -310,12 +386,12 @@ export const ModalEditForm: React.FC<Props> = ({
 
         setSavingSub(true);
         try {
-            const body = { widget_order: order, where_conditional: subWhere || null, delete_sub_query: subQueryDelete || null, };
+            const body = { widget_order: order, where_conditional: subWhere || null, delete_sub_query: subQueryDelete || null };
             await api.patch(`/forms/${form.form_id}/sub/${subId}`, body);
 
             setSubList(prev => prev.map(it =>
                 it.sub_widget_id === subId
-                    ? { ...it, widget_order: order, where_conditional: subWhere || null,delete_sub_query: subQueryDelete || null, }
+                    ? { ...it, widget_order: order, where_conditional: subWhere || null, delete_sub_query: subQueryDelete || null }
                     : it
             ));
 
@@ -498,368 +574,403 @@ export const ModalEditForm: React.FC<Props> = ({
     // RENDER
     // ═══════════════════════════════════════════════════════════
 
-    const clearPaperSx = {
-        bgcolor: 'transparent',
-        backgroundImage: 'none', // важно для MUI dark overlay
-    } as const;
-
     return (
-        <ThemeProvider theme={dark}>
-            <Dialog open={open} onClose={onClose} fullWidth maxWidth="md">
-                <DialogTitle>
+        <Dialog
+            open={open}
+            onClose={onClose}
+            fullWidth
+            maxWidth="md"
+            PaperProps={{ sx: dialogPaperSx }}
+        >
+            <DialogTitle>
+                <Box sx={{ color: 'var(--theme-text-primary)' }}>
                     Редактирование формы #{form.form_id}
-                    <Typography variant="body2" color="text.secondary">
-                        {form.name}
-                    </Typography>
-                </DialogTitle>
+                </Box>
+                <Typography variant="body2" sx={{ color: 'var(--theme-text-secondary)' }}>
+                    {form.name}
+                </Typography>
+            </DialogTitle>
 
-                <Tabs value={tab} onChange={(_, v) => setTab(v)} variant="fullWidth">
-                    <Tab value="main" label="Основное" />
-                    <Tab value="sub" label={`Sub-виджеты (${subList.length})`} />
-                    <Tab value="tree" label={`Tree-поля (${treeList.length})`} />
-                </Tabs>
+            <Tabs value={tab} onChange={(_, v) => setTab(v)} variant="fullWidth" sx={tabsSx}>
+                <Tab value="main" label="Основное" />
+                <Tab value="sub" label={`Sub-виджеты (${subList.length})`} />
+                <Tab value="tree" label={`Tree-поля (${treeList.length})`} />
+            </Tabs>
 
-                <DialogContent dividers>
-                    {err && <Alert severity="error" sx={{ mb: 2 }}>{err}</Alert>}
-                    {info && <Alert severity="success" sx={{ mb: 2 }}>{info}</Alert>}
+            <DialogContent dividers>
+                {err && <Alert severity="error" sx={{ mb: 2 }}>{err}</Alert>}
+                {info && <Alert severity="success" sx={{ mb: 2 }}>{info}</Alert>}
 
-                    {/* ═══════════════ MAIN TAB ═══════════════ */}
-                    {tab === 'main' && (
-                        <Stack spacing={2} sx={{ mt: 1 }}>
-                           {/* <TextField
-                                label="Main widget ID"
-                                type="number"
-                                value={mainWidgetId}
-                                onChange={e => setMainWidgetId(Number(e.target.value))}
-                            />*/}
+                {/* ═══════════════ MAIN TAB ═══════════════ */}
+                {tab === 'main' && (
+                    <Stack spacing={2} sx={{ mt: 1 }}>
+                        <TextField
+                            label="Название"
+                            value={mainName}
+                            onChange={e => setMainName(e.target.value)}
+                            sx={textFieldSx}
+                        />
+                        <TextField
+                            label="Описание"
+                            value={mainDesc}
+                            onChange={e => setMainDesc(e.target.value)}
+                            sx={textFieldSx}
+                        />
+                        <TextField
+                            label="Путь"
+                            value={mainPath}
+                            onChange={e => setMainPath(e.target.value)}
+                            sx={textFieldSx}
+                        />
+                        <TextField
+                            label="Группа"
+                            value={mainGroup}
+                            onChange={e => setMainGroup(e.target.value)}
+                            sx={textFieldSx}
+                        />
 
-                            <TextField
-                                label="Название"
-                                value={mainName}
-                                onChange={e => setMainName(e.target.value)}
+                        <Stack direction="row" alignItems="center" justifyContent="space-between">
+                            <Typography sx={{ color: 'var(--theme-text-primary)' }}>Строка поиска</Typography>
+                            <FormControlLabel
+                                control={
+                                    <Switch
+                                        checked={mainSearchBar}
+                                        onChange={e => setMainSearchBar(e.target.checked)}
+                                        sx={switchSx}
+                                    />
+                                }
+                                label={
+                                    <Box sx={{ color: 'var(--theme-text-secondary)' }}>
+                                        {mainSearchBar ? 'Вкл' : 'Выкл'}
+                                    </Box>
+                                }
                             />
-                            <TextField
-                                label="Описание"
-                                value={mainDesc}
-                                onChange={e => setMainDesc(e.target.value)}
-                            />
-                            <TextField
-                                label="Путь"
-                                value={mainPath}
-                                onChange={e => setMainPath(e.target.value)}
-                            />
-                            <TextField
-                                label="Группа"
-                                value={mainGroup}
-                                onChange={e => setMainGroup(e.target.value)}
-                            />
+                        </Stack>
+                    </Stack>
+                )}
 
-                            <Stack direction="row" alignItems="center" justifyContent="space-between">
-                                <Typography>Строка поиска</Typography>
-                                <FormControlLabel
-                                    control={
-                                        <Switch
-                                            checked={mainSearchBar}
-                                            onChange={e => setMainSearchBar(e.target.checked)}
+                {/* ═══════════════ SUB TAB ═══════════════ */}
+                {tab === 'sub' && (
+                    <Stack spacing={3} sx={{ mt: 1 }}>
+                        {subList.length > 0 && (
+                            <Paper variant="outlined" sx={paperSx}>
+                                <Typography variant="subtitle2" gutterBottom sx={{ color: 'var(--theme-text-primary)' }}>
+                                    Редактирование
+                                </Typography>
+
+                                <Stack spacing={2}>
+                                    <Stack direction="row" spacing={1} alignItems="center">
+                                        <FormControl fullWidth size="small">
+                                            <InputLabel sx={{ color: 'var(--theme-text-secondary)', '&.Mui-focused': { color: 'var(--theme-primary)' } }}>
+                                                Sub-виджет
+                                            </InputLabel>
+                                            <Select
+                                                label="Sub-виджет"
+                                                value={subId || ''}
+                                                onChange={e => setSubId(Number(e.target.value))}
+                                                sx={selectSx}
+                                            >
+                                                {subList.map(s => (
+                                                    <MenuItem key={s.sub_widget_id} value={s.sub_widget_id}>
+                                                        #{s.sub_widget_id} • order: {s.widget_order ?? 0}
+                                                        {widgetById.get(s.sub_widget_id)?.name
+                                                            ? ` • ${widgetById.get(s.sub_widget_id)!.name}`
+                                                            : ''
+                                                        }
+                                                    </MenuItem>
+                                                ))}
+                                            </Select>
+                                        </FormControl>
+
+                                        <Tooltip title="Удалить">
+                                            <IconButton
+                                                onClick={deleteSub}
+                                                disabled={!subId || deletingSub}
+                                                sx={{ color: 'var(--theme-error)' }}
+                                                size="small"
+                                            >
+                                                <DeleteIcon />
+                                            </IconButton>
+                                        </Tooltip>
+                                    </Stack>
+
+                                    <Stack direction="row" spacing={3}>
+                                        <TextField
+                                            label="Порядок"
+                                            type="number"
+                                            size="small"
+                                            value={subOrder}
+                                            onChange={e => setSubOrder(Number(e.target.value))}
+                                            sx={{ ...textFieldSx, width: 120 }}
                                         />
-                                    }
-                                    label={mainSearchBar ? 'Вкл' : 'Выкл'}
+                                        <TextField
+                                            label="where_conditional"
+                                            size="small"
+                                            value={subWhere}
+                                            onChange={e => setSubWhere(e.target.value)}
+                                            sx={{ ...textFieldSx, flex: 1 }}
+                                        />
+                                        <TextField
+                                            label="delete_sub_query"
+                                            size="small"
+                                            value={subQueryDelete}
+                                            onChange={e => setSubQueryDelete(e.target.value)}
+                                            sx={{ ...textFieldSx, flex: 1 }}
+                                        />
+
+                                        <Button
+                                            variant="contained"
+                                            size="small"
+                                            startIcon={<SaveIcon />}
+                                            onClick={saveSub}
+                                            disabled={savingSub || !subHasChanges}
+                                            sx={{
+                                                backgroundColor: 'var(--button-primary-bg)',
+                                                color: 'var(--button-primary-text)',
+                                                '&:hover': { backgroundColor: 'var(--button-primary-hover)' },
+                                                '&.Mui-disabled': { backgroundColor: 'var(--checkbox-disabled)' },
+                                            }}
+                                        >
+                                            {savingSub ? '...' : 'Сохранить'}
+                                        </Button>
+                                    </Stack>
+                                </Stack>
+                            </Paper>
+                        )}
+
+                        <Paper variant="outlined" sx={paperSx}>
+                            <Typography variant="subtitle2" gutterBottom sx={{ color: 'var(--theme-text-primary)' }}>
+                                Добавить новый
+                            </Typography>
+
+                            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+                                <TextField
+                                    label="Порядок"
+                                    type="number"
+                                    size="small"
+                                    value={newSubOrder}
+                                    onChange={e => setNewSubOrder(Number(e.target.value))}
+                                    sx={{ ...textFieldSx, width: 100 }}
                                 />
+
+                                <Autocomplete
+                                    sx={{ minWidth: 280 }}
+                                    size="small"
+                                    options={availableWidgets.filter(w => w.id !== form.main_widget_id)}
+                                    loading={listsLoading}
+                                    value={newSubWidget}
+                                    onChange={(_, val) => setNewSubWidget(val)}
+                                    getOptionLabel={w => w ? `${w.name} (#${w.id})` : ''}
+                                    isOptionEqualToValue={(a, b) => a.id === b.id}
+                                    renderInput={params => (
+                                        <TextField
+                                            {...params}
+                                            label="Виджет"
+                                            sx={textFieldSx}
+                                            InputProps={{
+                                                ...params.InputProps,
+                                                endAdornment: (
+                                                    <>
+                                                        {listsLoading && <CircularProgress size={16} />}
+                                                        {params.InputProps.endAdornment}
+                                                    </>
+                                                ),
+                                            }}
+                                        />
+                                    )}
+                                />
+
+                                <TextField
+                                    label="where_conditional"
+                                    size="small"
+                                    value={newSubWhere}
+                                    onChange={e => setNewSubWhere(e.target.value)}
+                                    sx={{ ...textFieldSx, flex: 1, minWidth: 180 }}
+                                />
+                                <TextField
+                                    label="delete_sub_query"
+                                    size="small"
+                                    value={newSubDeleteQuery}
+                                    onChange={e => setNewSubDeleteQuery(e.target.value)}
+                                    sx={{ ...textFieldSx, flex: 1, minWidth: 180 }}
+                                />
+
+                                <Button
+                                    variant="outlined"
+                                    size="small"
+                                    startIcon={<AddIcon />}
+                                    onClick={addSub}
+                                    disabled={addingSub || !newSubWidget}
+                                    sx={{
+                                        color: 'var(--theme-primary)',
+                                        borderColor: 'var(--theme-primary)',
+                                        '&:hover': { borderColor: 'var(--theme-primary)', backgroundColor: 'var(--theme-hover)' },
+                                    }}
+                                >
+                                    {addingSub ? '...' : 'Добавить'}
+                                </Button>
                             </Stack>
-                        </Stack>
-                    )}
+                        </Paper>
+                    </Stack>
+                )}
 
-                    {/* ═══════════════ SUB TAB ═══════════════ */}
-                    {tab === 'sub' && (
-                        <Stack spacing={3} sx={{ mt: 1 }}>
-                            {/* Существующие */}
-                            {subList.length > 0 && (
-                                <Paper variant="outlined" sx={{ p: 2, ...clearPaperSx }}>
-                                    <Typography variant="subtitle2" gutterBottom>
-                                        Редактирование
-                                    </Typography>
-
-
-                                    <Stack spacing={2}>
-                                        <Stack direction="row" spacing={1} alignItems="center">
-                                            <FormControl fullWidth size="small">
-                                                <InputLabel>Sub-виджет</InputLabel>
-                                                <Select
-                                                    label="Sub-виджет"
-                                                    value={subId || ''}
-                                                    onChange={e => setSubId(Number(e.target.value))}
-                                                >
-                                                    {subList.map(s => (
-                                                        <MenuItem key={s.sub_widget_id} value={s.sub_widget_id}>
-                                                            #{s.sub_widget_id} • order: {s.widget_order ?? 0}
-                                                            {widgetById.get(s.sub_widget_id)?.name
-                                                                ? ` • ${widgetById.get(s.sub_widget_id)!.name}`
-                                                                : ''
-                                                            }
-                                                        </MenuItem>
-                                                    ))}
-                                                </Select>
-                                            </FormControl>
-
-                                            <Tooltip title="Удалить">
-                                                <IconButton
-                                                    onClick={deleteSub}
-                                                    disabled={!subId || deletingSub}
-                                                    color="error"
-                                                    size="small"
-                                                >
-                                                    <DeleteIcon />
-                                                </IconButton>
-                                            </Tooltip>
-                                        </Stack>
-
-                                        <Stack direction="row" spacing={3}>
-                                            <TextField
-                                                label="Порядок"
-                                                type="number"
-                                                size="small"
-                                                value={subOrder}
-                                                onChange={e => setSubOrder(Number(e.target.value))}
-                                                sx={{ width: 120 }}
-                                            />
-                                            <TextField
-                                                label="where_conditional"
-                                                size="small"
-                                                value={subWhere}
-                                                onChange={e => setSubWhere(e.target.value)}
-                                                sx={{ flex: 1 }}
-                                            />
-                                            <TextField
-                                                label="delete_sub_query"
-                                                size="small"
-                                                value={subQueryDelete}
-                                                onChange={e => setSubQueryDelete(e.target.value)}
-                                                sx={{ flex: 1 }}
-                                            />
-
-                                            <Button
-                                                variant="contained"
-                                                size="small"
-                                                startIcon={<SaveIcon />}
-                                                onClick={saveSub}
-                                                disabled={savingSub || !subHasChanges}
-                                            >
-                                                {savingSub ? '...' : 'Сохранить'}
-                                            </Button>
-                                        </Stack>
-                                    </Stack>
-                                </Paper>
-                            )}
-
-                            {/* Добавление нового */}
-                            <Paper variant="outlined" sx={{ p: 2, ...clearPaperSx }}>
-                                <Typography variant="subtitle2" gutterBottom>
-                                    Добавить новый
+                {/* ═══════════════ TREE TAB ═══════════════ */}
+                {tab === 'tree' && (
+                    <Stack spacing={3} sx={{ mt: 1 }}>
+                        {treeList.length > 0 && (
+                            <Paper variant="outlined" sx={paperSx}>
+                                <Typography variant="subtitle2" gutterBottom sx={{ color: 'var(--theme-text-primary)' }}>
+                                    Редактирование
                                 </Typography>
 
-                                <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
-                                    <TextField
-                                        label="Порядок"
-                                        type="number"
-                                        size="small"
-                                        value={newSubOrder}
-                                        onChange={e => setNewSubOrder(Number(e.target.value))}
-                                        sx={{ width: 100 }}
-                                    />
-
-                                    <Autocomplete
-                                        sx={{ minWidth: 280 }}
-                                        size="small"
-                                        options={availableWidgets.filter(w => w.id !== form.main_widget_id)}
-                                        loading={listsLoading}
-                                        value={newSubWidget}
-                                        onChange={(_, val) => setNewSubWidget(val)}
-                                        getOptionLabel={w => w ? `${w.name} (#${w.id})` : ''}
-                                        isOptionEqualToValue={(a, b) => a.id === b.id}
-                                        renderInput={params => (
-                                            <TextField
-                                                {...params}
-                                                label="Виджет"
-                                                InputProps={{
-                                                    ...params.InputProps,
-                                                    endAdornment: (
-                                                        <>
-                                                            {listsLoading && <CircularProgress size={16} />}
-                                                            {params.InputProps.endAdornment}
-                                                        </>
-                                                    ),
-                                                }}
-                                            />
-                                        )}
-                                    />
-
-                                    <TextField
-                                        label="where_conditional"
-                                        size="small"
-                                        value={newSubWhere}
-                                        onChange={e => setNewSubWhere(e.target.value)}
-                                        sx={{ flex: 1, minWidth: 180 }}
-                                    />
-                                    <TextField
-                                        label="delete_sub_query"
-                                        size="small"
-                                        value={newSubDeleteQuery}
-                                        onChange={e => setNewSubDeleteQuery(e.target.value)}
-                                        sx={{ flex: 1, minWidth: 180 }}
-                                    />
-
-                                    <Button
-                                        variant="outlined"
-                                        size="small"
-                                        startIcon={<AddIcon />}
-                                        onClick={addSub}
-                                        disabled={addingSub || !newSubWidget}
-                                    >
-                                        {addingSub ? '...' : 'Добавить'}
-                                    </Button>
-                                </Stack>
-                            </Paper>
-                        </Stack>
-                    )}
-
-                    {/* ═══════════════ TREE TAB ═══════════════ */}
-                    {tab === 'tree' && (
-                        <Stack spacing={3} sx={{ mt: 1 }}>
-                            {/* Существующие */}
-                            {treeList.length > 0 && (
-                                <Paper variant="outlined" sx={{ p: 2, ...clearPaperSx }}>
-                                    <Typography variant="subtitle2" gutterBottom>
-                                        Редактирование
-                                    </Typography>
-
-                                    <Stack spacing={3}>
-                                        <Stack direction="row" spacing={1} alignItems="center">
-                                            <FormControl fullWidth size="small">
-                                                <InputLabel>Tree-поле</InputLabel>
-                                                <Select
-                                                    label="Tree-поле"
-                                                    value={treeColId || ''}
-                                                    onChange={e => setTreeColId(Number(e.target.value))}
-                                                >
-                                                    {treeList.map(tf => (
-                                                        <MenuItem key={tf.table_column_id} value={tf.table_column_id}>
-                                                            #{tf.table_column_id} • order: {tf.column_order ?? 0}
-                                                            {columnById.get(tf.table_column_id)?.name
-                                                                ? ` • ${columnById.get(tf.table_column_id)!.name}`
-                                                                : ''
-                                                            }
-                                                        </MenuItem>
-                                                    ))}
-                                                </Select>
-
-                                            </FormControl>
-
-                                            <Tooltip title="Удалить">
-                                                <IconButton
-                                                    onClick={deleteTree}
-                                                    disabled={!treeColId || deletingTree}
-                                                    color="error"
-                                                    size="small"
-                                                >
-                                                    <DeleteIcon />
-                                                </IconButton>
-                                            </Tooltip>
-                                        </Stack>
-
-                                        <Stack direction="row" spacing={2}>
-                                            <TextField
-                                                label="Порядок"
-                                                type="number"
-                                                size="small"
-                                                value={treeOrder}
-                                                onChange={e => setTreeOrder(Number(e.target.value))}
-                                                sx={{ width: 120 }}
-                                            />
-                                            <Button
-                                                variant="contained"
-                                                size="small"
-                                                startIcon={<SaveIcon />}
-                                                onClick={saveTree}
-                                                disabled={savingTree || !treeHasChanges}
+                                <Stack spacing={3}>
+                                    <Stack direction="row" spacing={1} alignItems="center">
+                                        <FormControl fullWidth size="small">
+                                            <InputLabel sx={{ color: 'var(--theme-text-secondary)', '&.Mui-focused': { color: 'var(--theme-primary)' } }}>
+                                                Tree-поле
+                                            </InputLabel>
+                                            <Select
+                                                label="Tree-поле"
+                                                value={treeColId || ''}
+                                                onChange={e => setTreeColId(Number(e.target.value))}
+                                                sx={selectSx}
                                             >
-                                                {savingTree ? '...' : 'Сохранить'}
-                                            </Button>
-                                        </Stack>
+                                                {treeList.map(tf => (
+                                                    <MenuItem key={tf.table_column_id} value={tf.table_column_id}>
+                                                        #{tf.table_column_id} • order: {tf.column_order ?? 0}
+                                                        {columnById.get(tf.table_column_id)?.name
+                                                            ? ` • ${columnById.get(tf.table_column_id)!.name}`
+                                                            : ''
+                                                        }
+                                                    </MenuItem>
+                                                ))}
+                                            </Select>
+                                        </FormControl>
+
+                                        <Tooltip title="Удалить">
+                                            <IconButton
+                                                onClick={deleteTree}
+                                                disabled={!treeColId || deletingTree}
+                                                sx={{ color: 'var(--theme-error)' }}
+                                                size="small"
+                                            >
+                                                <DeleteIcon />
+                                            </IconButton>
+                                        </Tooltip>
                                     </Stack>
-                                </Paper>
-                            )}
 
-                            {/* Добавление нового */}
-                            <Paper variant="outlined" sx={{ p: 2, ...clearPaperSx }}>
-                                <Typography variant="subtitle2" gutterBottom>
-                                    Добавить новое
-                                </Typography>
-
-                                <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
-                                    <TextField
-                                        label="Порядок"
-                                        type="number"
-                                        size="small"
-                                        value={newTreeOrder}
-                                        onChange={e => setNewTreeOrder(Number(e.target.value))}
-                                        sx={{ width: 100 }}
-                                    />
-
-                                    <Autocomplete
-                                        sx={{ minWidth: 280 }}
-                                        size="small"
-                                        options={availableColumns}
-                                        loading={listsLoading}
-                                        value={newTreeColumn}
-                                        onChange={(_, val) => setNewTreeColumn(val)}
-                                        getOptionLabel={c => c ? `${c.name} (#${c.id})` : ''}
-                                        isOptionEqualToValue={(a, b) => a.id === b.id}
-                                        renderInput={params => (
-                                            <TextField
-                                                {...params}
-                                                label="Колонка"
-                                                InputProps={{
-                                                    ...params.InputProps,
-                                                    endAdornment: (
-                                                        <>
-                                                            {listsLoading && <CircularProgress size={16} />}
-                                                            {params.InputProps.endAdornment}
-                                                        </>
-                                                    ),
-                                                }}
-                                            />
-                                        )}
-                                    />
-
-                                    <Button
-                                        variant="outlined"
-                                        size="small"
-                                        startIcon={<AddIcon />}
-                                        onClick={addTree}
-                                        disabled={addingTree || !newTreeColumn}
-                                    >
-                                        {addingTree ? '...' : 'Добавить'}
-                                    </Button>
+                                    <Stack direction="row" spacing={2}>
+                                        <TextField
+                                            label="Порядок"
+                                            type="number"
+                                            size="small"
+                                            value={treeOrder}
+                                            onChange={e => setTreeOrder(Number(e.target.value))}
+                                            sx={{ ...textFieldSx, width: 120 }}
+                                        />
+                                        <Button
+                                            variant="contained"
+                                            size="small"
+                                            startIcon={<SaveIcon />}
+                                            onClick={saveTree}
+                                            disabled={savingTree || !treeHasChanges}
+                                            sx={{
+                                                backgroundColor: 'var(--button-primary-bg)',
+                                                color: 'var(--button-primary-text)',
+                                                '&:hover': { backgroundColor: 'var(--button-primary-hover)' },
+                                                '&.Mui-disabled': { backgroundColor: 'var(--checkbox-disabled)' },
+                                            }}
+                                        >
+                                            {savingTree ? '...' : 'Сохранить'}
+                                        </Button>
+                                    </Stack>
                                 </Stack>
                             </Paper>
-                        </Stack>
-                    )}
-                </DialogContent>
+                        )}
 
-                <DialogActions>
-                    <Button onClick={onClose}>Закрыть</Button>
-                    {tab === 'main' && (
-                        <Button
-                            onClick={saveMain}
-                            variant="contained"
-                            disabled={savingMain}
-                            startIcon={<SaveIcon />}
-                        >
-                            {savingMain ? 'Сохраняю...' : 'Сохранить'}
-                        </Button>
-                    )}
-                </DialogActions>
-            </Dialog>
-        </ThemeProvider>
+                        <Paper variant="outlined" sx={paperSx}>
+                            <Typography variant="subtitle2" gutterBottom sx={{ color: 'var(--theme-text-primary)' }}>
+                                Добавить новое
+                            </Typography>
+
+                            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+                                <TextField
+                                    label="Порядок"
+                                    type="number"
+                                    size="small"
+                                    value={newTreeOrder}
+                                    onChange={e => setNewTreeOrder(Number(e.target.value))}
+                                    sx={{ ...textFieldSx, width: 100 }}
+                                />
+
+                                <Autocomplete
+                                    sx={{ minWidth: 280 }}
+                                    size="small"
+                                    options={availableColumns}
+                                    loading={listsLoading}
+                                    value={newTreeColumn}
+                                    onChange={(_, val) => setNewTreeColumn(val)}
+                                    getOptionLabel={c => c ? `${c.name} (#${c.id})` : ''}
+                                    isOptionEqualToValue={(a, b) => a.id === b.id}
+                                    renderInput={params => (
+                                        <TextField
+                                            {...params}
+                                            label="Колонка"
+                                            sx={textFieldSx}
+                                            InputProps={{
+                                                ...params.InputProps,
+                                                endAdornment: (
+                                                    <>
+                                                        {listsLoading && <CircularProgress size={16} />}
+                                                        {params.InputProps.endAdornment}
+                                                    </>
+                                                ),
+                                            }}
+                                        />
+                                    )}
+                                />
+
+                                <Button
+                                    variant="outlined"
+                                    size="small"
+                                    startIcon={<AddIcon />}
+                                    onClick={addTree}
+                                    disabled={addingTree || !newTreeColumn}
+                                    sx={{
+                                        color: 'var(--theme-primary)',
+                                        borderColor: 'var(--theme-primary)',
+                                        '&:hover': { borderColor: 'var(--theme-primary)', backgroundColor: 'var(--theme-hover)' },
+                                    }}
+                                >
+                                    {addingTree ? '...' : 'Добавить'}
+                                </Button>
+                            </Stack>
+                        </Paper>
+                    </Stack>
+                )}
+            </DialogContent>
+
+            <DialogActions>
+                <Button onClick={onClose} sx={{ color: 'var(--theme-text-secondary)' }}>
+                    Закрыть
+                </Button>
+                {tab === 'main' && (
+                    <Button
+                        onClick={saveMain}
+                        variant="contained"
+                        disabled={savingMain}
+                        startIcon={<SaveIcon />}
+                        sx={{
+                            backgroundColor: 'var(--button-primary-bg)',
+                            color: 'var(--button-primary-text)',
+                            '&:hover': { backgroundColor: 'var(--button-primary-hover)' },
+                            '&.Mui-disabled': { backgroundColor: 'var(--checkbox-disabled)' },
+                        }}
+                    >
+                        {savingMain ? 'Сохраняю...' : 'Сохранить'}
+                    </Button>
+                )}
+            </DialogActions>
+        </Dialog>
     );
 };

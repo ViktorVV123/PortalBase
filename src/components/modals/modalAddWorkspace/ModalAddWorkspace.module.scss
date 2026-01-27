@@ -1,21 +1,24 @@
 .addConnBtn {
-  border: 1px solid;
+  border: 1px solid var(--theme-border);
   display: flex;
   align-items: center;
   padding: 2px;
   border-radius: 5px;
   width: 180px;
   justify-content: center;
-background: #3f3f40;
+  background: var(--theme-surface);
+  color: var(--theme-text-primary);
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+
   &:hover {
-    background: #656567;
+    background: var(--theme-hover);
   }
 }
 
-
 .descriptionModal {
   font-size: 0.75rem;
-  color:grey;
+  color: var(--theme-text-muted);
   display: flex;
-  gap:2px
+  gap: 2px;
 }

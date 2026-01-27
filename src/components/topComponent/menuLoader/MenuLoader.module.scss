@@ -1,3 +1,6 @@
+// src/components/topComponent/menuLoader/MenuLoader.module.scss
+// Поддержка светлой и тёмной темы
+
 .loader {
   display: flex;
   align-items: center;
@@ -20,8 +23,8 @@
 .spinner {
   width: 16px;
   height: 16px;
-  border: 2px solid rgba(255, 255, 255, 0.1);
-  border-top-color: var(--menu-muted, #9aa4af);
+  border: 2px solid var(--theme-border, rgba(255, 255, 255, 0.1));
+  border-top-color: var(--theme-primary, #90CAF9);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -35,6 +38,7 @@
 .text {
   font-size: 13px;
   opacity: 0.8;
+  color: var(--menu-muted, #9aa4af);
 }
 
 .loader.md .text {

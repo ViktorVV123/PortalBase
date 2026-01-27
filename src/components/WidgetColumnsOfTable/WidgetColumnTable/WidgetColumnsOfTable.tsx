@@ -10,12 +10,7 @@ import {
     WidgetForm,
 } from '@/shared/hooks/useWorkSpaces';
 import { TableColumn } from '@/components/table/tableColumn/TableColumn';
-import {
-    Box,
-    createTheme,
-    Modal,
-    Typography,
-} from '@mui/material';
+import { Box, Modal } from '@mui/material';
 import { WidgetColumnsMainTable } from '@/components/WidgetColumnsOfTable/WidgetColumnsMainTable';
 import EditIcon from '@/assets/image/EditIcon.svg';
 import { WidgetMetaDialog } from '@/components/modals/modalWidget/WidgetMetaDialog';
@@ -78,35 +73,23 @@ interface Props {
     workspaceId: number | null;
 }
 
+// ═══════════════════════════════════════════════════════════
+// СТИЛИ ДЛЯ МОДАЛЬНОГО ОКНА — используем CSS переменные
+// ═══════════════════════════════════════════════════════════
 const modalStyle = {
     position: 'absolute' as const,
     top: '50%',
     left: '50%',
     transform: 'translate(-50%, -50%)',
-    backgroundColor: '#1E1E1E',
-    border: '1px solid #555',
+    backgroundColor: 'var(--theme-surface)',
+    border: '1px solid var(--theme-border)',
     boxShadow: 24,
     maxHeight: '80vh',
     overflowY: 'auto',
     width: '90vw',
     padding: '20px',
-    color: 'white',
+    color: 'var(--theme-text-primary)',
 };
-
-const dark = createTheme({
-    palette: { mode: 'dark', primary: { main: '#ffffff' } },
-    components: {
-        MuiOutlinedInput: {
-            styleOverrides: {
-                root: {
-                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#ffffff' },
-                },
-            },
-        },
-        MuiInputLabel: { styleOverrides: { root: { '&.Mui-focused': { color: '#ffffff' } } } },
-        MuiSelect: { styleOverrides: { icon: { color: '#ffffff' } } },
-    },
-});
 
 export const WidgetColumnsOfTable: React.FC<Props> = ({
                                                           deleteColumnWidget,
@@ -281,7 +264,7 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
     }, [widgetColumns, referencesMap]);
 
     // ─────────────────────────────────────────────────────────────────────────
-    // RENDER с новой структурой
+    // RENDER
     // ─────────────────────────────────────────────────────────────────────────
     return (
         <div className={s.root}>
@@ -361,7 +344,7 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
             {/* Modal «Посмотреть таблицу» */}
             <Modal open={modalOpen} onClose={() => setModalOpen(false)}>
                 <Box sx={modalStyle}>
-                    <h3 style={{ marginBottom: 15 }}>Таблица</h3>
+                    <h3 style={{ marginBottom: 15, color: 'var(--theme-text-primary)' }}>Таблица</h3>
                     {columns.length ? (
                         <TableColumn
                             columns={columns}
@@ -369,7 +352,7 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                             deleteColumnTable={deleteColumnTable}
                         />
                     ) : (
-                        <p>Нет данных для отображения</p>
+                        <p style={{ color: 'var(--theme-text-secondary)' }}>Нет данных для отображения</p>
                     )}
                 </Box>
             </Modal>

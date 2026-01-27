@@ -1,16 +1,17 @@
 // src/components/Form/tableToolbar/TableToolbar.module.scss
+// Поддержка светлой и тёмной темы
 
 .root {
-  position: sticky; /* как меню в Google-таблицах */
+  position: sticky;
   top: 0;
   z-index: 4;
   padding: 8px 10px;
-
+  background: var(--toolbar-bg, transparent);
   backdrop-filter: saturate(140%) blur(6px);
-  border-bottom: 1px solid rgba(255, 255, 255, .06);
+  border-bottom: 1px solid var(--toolbar-border, rgba(255, 255, 255, 0.06));
+  transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
-/* сам бар */
 .bar {
   display: flex;
   align-items: center;
@@ -18,35 +19,30 @@
   gap: 12px;
 }
 
-/* групка слева: иконки */
 .leftGroup {
   display: inline-flex;
   align-items: center;
   gap: 8px;
 }
 
-/* групка справа: поиск + настройки */
 .rightGroup {
   display: inline-flex;
   align-items: center;
   gap: 8px;
 }
 
-/* визуальный делитель между группами */
 .divider {
   width: 1px;
   height: 28px;
-  background: rgba(255, 255, 255, .08);
+  background: var(--theme-border, rgba(255, 255, 255, 0.08));
   margin: 0 4px;
 }
 
-/* чтобы SearchBox выглядел «пилюлей» и расширялся */
 .searchWrap {
   --collapsed: 180px;
   --expanded: 420px;
-
   width: var(--collapsed);
-  transition: width .25s ease;
+  transition: width 0.25s ease;
 }
 
 .searchWrap[data-expanded='1'] {
@@ -60,7 +56,10 @@
   }
 }
 
-/* кнопка-иконка (для svg из /assets) */
+// ═══════════════════════════════════════════════════════════
+// ICON BUTTON — с поддержкой тем
+// ═══════════════════════════════════════════════════════════
+
 .iconBtn {
   display: inline-flex;
   align-items: center;
@@ -68,22 +67,30 @@
   width: 32px;
   height: 32px;
   border-radius: 9999px;
-  background: #e6e3e3;
-  border: 1px solid rgba(255, 255, 255, .12);
+  background: var(--button-secondary-bg, transparent);
+  border: 1px solid var(--button-secondary-border, rgba(0, 0, 0, 0.12));
+  color: var(--icon-primary, #5F6368);
   cursor: pointer;
-  transition: background .15s, border-color .15s, opacity .15s;
-}
+  transition: background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
 
-.iconBtn:hover {
-  background: #838282;
-  border-color: rgba(255, 255, 255, .2);
-}
+  svg {
+    width: 18px;
+    height: 18px;
+    color: inherit;
+  }
 
-.iconBtn:active {
-  opacity: .8;
-}
+  &:hover {
+    background: var(--button-secondary-hover, rgba(0, 0, 0, 0.04));
+    border-color: var(--theme-border, rgba(0, 0, 0, 0.2));
+    color: var(--theme-text-primary, #1A1A1A);
+  }
 
-.iconBtn[disabled] {
-  opacity: .5;
-  cursor: not-allowed;
+  &:active {
+    opacity: 0.8;
+  }
+
+  &[disabled] {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
 }

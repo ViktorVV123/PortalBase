@@ -1,7 +1,8 @@
-// Добавить в src/components/setOfTables/SetOfTables.module.scss
+// src/components/Form/treeForm/TreeFormTable.module.scss
+// Поддержка светлой и тёмной темы
 
 // ═══════════════════════════════════════════════════════════
-// TREE STYLES
+// TREE CONTAINER
 // ═══════════════════════════════════════════════════════════
 
 .treeContainer {
@@ -12,13 +13,12 @@
   height: 80%;
   overflow-y: auto;
 
-
   &::-webkit-scrollbar {
     width: 4px;
   }
 
   &::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, .2);
+    background: var(--scrollbar-thumb);
     border-radius: 5px;
   }
 
@@ -27,33 +27,39 @@
   }
 }
 
+// ═══════════════════════════════════════════════════════════
+// RESET FILTERS BUTTON
+// ═══════════════════════════════════════════════════════════
 
 .resetFiltersBtn {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: var(--button-secondary-bg);
+  border: 1px solid var(--button-secondary-border);
   border-radius: 4px;
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--theme-text-secondary);
   padding: 6px 12px;
   cursor: pointer;
   transition: all 0.2s ease;
   align-self: flex-start;
 
   &:hover {
-    background: rgba(255, 255, 255, 0.15);
-    border-color: rgba(255, 255, 255, 0.3);
-    color: #fff;
+    background: var(--button-secondary-hover);
+    border-color: var(--theme-border);
+    color: var(--theme-text-primary);
   }
 
   &:active {
-    background: rgba(255, 255, 255, 0.2);
+    background: var(--theme-focus);
   }
 }
+
+// ═══════════════════════════════════════════════════════════
+// TREE LIST
+// ═══════════════════════════════════════════════════════════
 
 .treeList {
   display: flex;
   flex-direction: column;
   gap: 4px;
-
 }
 
 .treeHeader {
@@ -61,7 +67,7 @@
   align-items: center;
   gap: 8px;
   padding: 4px 0;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--theme-text-primary);
 
   button {
     display: inline-flex;
@@ -93,18 +99,25 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-
 }
+
+// ═══════════════════════════════════════════════════════════
+// TREE ITEM — КЛЮЧЕВОЙ ЭЛЕМЕНТ
+// ═══════════════════════════════════════════════════════════
 
 .treeItem {
   padding: 6px 12px;
   margin-bottom: 4px;
-  background: #2e2e2e;
-  color: #eee;
-  border: 1px solid #605f5f;
+
+  // ✅ Используем переменные темы без fallback
+  background: var(--tree-item-bg);
+  color: var(--tree-item-text);
+  border: 1px solid var(--tree-item-border);
+
   border-radius: 4px;
   cursor: pointer;
-  transition: background .15s;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+
   flex: 1 1 auto;
   min-height: 0;
   max-height: 140px;
@@ -113,68 +126,71 @@
   padding-right: 8px;
   word-break: break-word;
   white-space: normal;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
 
   &:hover {
-    background: rgba(255, 255, 255, 0.1);
-    color: #fff;
+    background: var(--tree-item-hover);
+    color: var(--theme-text-primary);
   }
 
   span:first-child {
     flex: 1 1 auto;
     min-width: 0;
-
-    // ✅ Разрешаем перенос текста
     white-space: normal;
     word-break: break-word;
     overflow-wrap: anywhere;
     line-height: 1.4;
   }
 
-  // Иконка стрелки — фиксированная
   span:last-child {
     flex: 0 0 auto;
     min-width: 20px;
+    color: var(--theme-text-muted);
   }
-
 }
 
 .treeItemExpanded {
-  background: rgba(100, 150, 255, 0.15);
-  color: #fff;
+  background: var(--tree-item-expanded-bg);
+  color: var(--theme-text-primary);
+  border-color: var(--theme-primary);
 
   &:hover {
-    background: rgba(64, 65, 66, 0.2);
+    background: var(--tree-item-expanded-hover);
   }
-
 }
+
+// ═══════════════════════════════════════════════════════════
+// NESTED ITEMS
+// ═══════════════════════════════════════════════════════════
 
 .nestedUl {
   list-style: none;
   margin: 4px 0 4px 12px;
   padding: 0 0 0 12px;
-  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  border-left: 1px solid var(--theme-border);
   display: flex;
   flex-direction: column;
   gap: 2px;
-
 }
 
 .nestedItem {
   padding: 5px 10px;
   border-radius: 4px;
-  background: rgba(255, 255, 255, 0.03);
-  color: rgba(255, 255, 255, 0.8);
-
+  background: var(--tree-nested-bg);
+  color: var(--theme-text-secondary);
   cursor: pointer;
   transition: all 0.15s ease;
+
   &:hover {
-    background: rgba(255, 255, 255, 0.08);
-    color: #fff;
+    background: var(--tree-nested-hover);
+    color: var(--theme-text-primary);
   }
 }
 
 // ═══════════════════════════════════════════════════════════
-// TREE PANE LAYOUT (если ещё нет)
+// TREE PANE LAYOUT
 // ═══════════════════════════════════════════════════════════
 
 .treePane {
@@ -185,12 +201,12 @@
   overflow-y: auto;
 }
 
-
+// ═══════════════════════════════════════════════════════════
+// ICON
+// ═══════════════════════════════════════════════════════════
 
 .iconTree {
-
-    width: 1.3em;
-    height: 1.3em;
-    color: #d1d0d0;
-
+  width: 1.3em;
+  height: 1.3em;
+  color: var(--icon-primary);
 }

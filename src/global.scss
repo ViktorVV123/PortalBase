@@ -1,10 +1,16 @@
-@use '@/assets/color/color' as color;
+// src/assets/styles/global.scss
+// ═══════════════════════════════════════════════════════════════════════════
+// ГЛОБАЛЬНЫЕ СТИЛИ
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Подключаем CSS переменные тем
+@use './theme-variables' as *;
 
 @mixin fluid-type($min-font, $max-font, $min-vw, $max-vw) {
     font-size: calc(#{$min-font}px + (#{$max-font - $min-font} * ((100vw - #{$min-vw}px) / (#{$max-vw - $min-vw}))));
 }
 
-// viewport границы (можно вынести в config, если хочешь)
+// viewport границы
 $min-vw: 220;
 $max-vw: 1440;
 
@@ -28,7 +34,6 @@ $max-font-h3: 18;
     font-style: normal;
 }
 
-/* Если хотите подключить также наклонную версию (italic) с тем же весом 400 */
 @font-face {
     font-family: 'Inter';
     font-weight: 400;
@@ -36,30 +41,143 @@ $max-font-h3: 18;
 }
 
 
+// ═══════════════════════════════════════════════════════════════════════════
+// БАЗОВЫЕ СТИЛИ
+// ═══════════════════════════════════════════════════════════════════════════
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+html {
+    // Плавный переход при смене темы
+    color-scheme: light dark;
+}
+
 body {
-    background-color: var(--primary-color);
-    color: var(--color-text);
-    font-family: 'Inter', sans-serif;
+    background-color: var(--theme-background);
+    color: var(--theme-text-primary);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     font-weight: 400;
     margin: 0;
+    padding: 0;
     @include fluid-type($min-font-body, $max-font-body, $min-vw, $max-vw);
     line-height: 1.6;
+
+    // Плавный переход при смене темы
+    transition: background-color 0.3s ease, color 0.3s ease;
+
+    // Предотвращаем FOUC (Flash of Unstyled Content)
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ЗАГОЛОВКИ
+// ═══════════════════════════════════════════════════════════════════════════
 
 h1 {
     font-weight: 600;
     @include fluid-type($min-font-h1, $max-font-h1, $min-vw, $max-vw);
     line-height: 1.2;
+    color: var(--theme-text-primary);
 }
 
 h2 {
     font-weight: 600;
     @include fluid-type($min-font-h2, $max-font-h2, $min-vw, $max-vw);
     line-height: 1.3;
+    color: var(--theme-text-primary);
 }
 
 h3 {
     font-weight: 500;
     @include fluid-type($min-font-h3, $max-font-h3, $min-vw, $max-vw);
     line-height: 1.35;
+    color: var(--theme-text-primary);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ССЫЛКИ
+// ═══════════════════════════════════════════════════════════════════════════
+
+a {
+    color: var(--link-color);
+    text-decoration: none;
+    transition: color 0.2s ease;
+
+    &:hover {
+        color: var(--link-hover);
+        text-decoration: underline;
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// СКРОЛЛБАРЫ (глобально)
+// ═══════════════════════════════════════════════════════════════════════════
+
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+    border-radius: 4px;
+
+    &:hover {
+        background: var(--scrollbar-thumb-hover);
+    }
+}
+
+::-webkit-scrollbar-track {
+    background: var(--scrollbar-track);
+    border-radius: 4px;
+}
+
+// Firefox
+* {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ВЫДЕЛЕНИЕ ТЕКСТА
+// ═══════════════════════════════════════════════════════════════════════════
+
+::selection {
+    background: var(--theme-primary);
+    color: var(--theme-text-inverse);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ФОКУС (accessibility)
+// ═══════════════════════════════════════════════════════════════════════════
+
+:focus-visible {
+    outline: 2px solid var(--theme-primary);
+    outline-offset: 2px;
+}
+
+// Убираем outline для mouse users
+:focus:not(:focus-visible) {
+    outline: none;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// УТИЛИТЫ
+// ═══════════════════════════════════════════════════════════════════════════
+
+.visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
 }

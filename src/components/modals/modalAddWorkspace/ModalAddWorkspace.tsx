@@ -1,23 +1,21 @@
 /* ModalAddWorkspace.tsx */
-import {ChangeEvent, useEffect, useState} from 'react';
+import { ChangeEvent, useEffect, useState } from 'react';
 import {
     Dialog, DialogTitle, DialogContent, DialogActions,
     TextField, Button, IconButton,
     FormControl, InputLabel, Select, MenuItem, Stack,
-    CircularProgress, ThemeProvider, SelectChangeEvent,
+    CircularProgress, SelectChangeEvent, Box,
 } from '@mui/material';
 
 import AddIcon from '@/assets/image/AddIcon.svg';
 import DeleteIcon from '@/assets/image/DeleteIcon.svg';
 import EditIcon from '@/assets/image/EditIcon.svg';
 
-import {api} from '@/services/api';
+import { api } from '@/services/api';
 
 import * as styles from './ModalAddWorkspace.module.scss';
-import {dark} from '@/shared/themeUI/themeModal/ThemeModalUI';
-import {Connection} from "@/shared/hooks/stores";
+import { Connection } from "@/shared/hooks/stores";
 
-/** Если у твоего Connection уже есть эти поля — отдельный тип не нужен */
 type ConnectionItem = Connection & {
     url?: {
         drivername?: string;
@@ -40,6 +38,66 @@ type Props = {
     onEditConnection?: (conn: ConnectionItem) => void;
 };
 
+// ═══════════════════════════════════════════════════════════
+// СТИЛИ ДЛЯ ДИАЛОГА — используем CSS переменные темы
+// ═══════════════════════════════════════════════════════════
+const dialogPaperSx = {
+    backgroundColor: 'var(--theme-background)',
+    color: 'var(--theme-text-primary)',
+    '& .MuiDialogTitle-root': {
+        backgroundColor: 'var(--theme-surface)',
+        color: 'var(--theme-text-primary)',
+        borderBottom: '1px solid var(--theme-border)',
+    },
+    '& .MuiDialogContent-root': {
+        backgroundColor: 'var(--theme-background)',
+        color: 'var(--theme-text-primary)',
+    },
+    '& .MuiDialogActions-root': {
+        backgroundColor: 'var(--theme-surface)',
+        borderTop: '1px solid var(--theme-border)',
+    },
+};
+
+const textFieldSx = {
+    '& .MuiOutlinedInput-root': {
+        color: 'var(--input-text)',
+        backgroundColor: 'var(--input-bg)',
+        '& .MuiOutlinedInput-notchedOutline': {
+            borderColor: 'var(--input-border)',
+        },
+        '&:hover .MuiOutlinedInput-notchedOutline': {
+            borderColor: 'var(--input-border-hover)',
+        },
+        '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+            borderColor: 'var(--input-border-focus)',
+        },
+    },
+    '& .MuiInputLabel-root': {
+        color: 'var(--theme-text-secondary)',
+        '&.Mui-focused': {
+            color: 'var(--theme-primary)',
+        },
+    },
+};
+
+const selectSx = {
+    color: 'var(--input-text)',
+    backgroundColor: 'var(--input-bg)',
+    '& .MuiOutlinedInput-notchedOutline': {
+        borderColor: 'var(--input-border)',
+    },
+    '&:hover .MuiOutlinedInput-notchedOutline': {
+        borderColor: 'var(--input-border-hover)',
+    },
+    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+        borderColor: 'var(--input-border-focus)',
+    },
+    '& .MuiSelect-icon': {
+        color: 'var(--icon-primary)',
+    },
+};
+
 export const ModalAddWorkspace = ({
                                       deleteConnection,
                                       connections,
@@ -49,7 +107,6 @@ export const ModalAddWorkspace = ({
                                       open,
                                       onEditConnection,
                                   }: Props) => {
-    // Изначально выбираем ПОСЛЕДНЕЕ подключение
     const [form, setForm] = useState<{
         connection_id: any;
         group: string;
@@ -65,8 +122,6 @@ export const ModalAddWorkspace = ({
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    // 👉 Ключевой эффект: при изменении списка connections
-    // автоматически выбираем последнее подключение
     useEffect(() => {
         if (!connections.length) {
             setForm(prev => ({ ...prev, connection_id: '' }));
@@ -77,7 +132,6 @@ export const ModalAddWorkspace = ({
         if (lastId == null) return;
 
         setForm(prev => {
-            // если уже выбран lastId — ничего не меняем, чтобы не дергать лишние рендеры
             if (prev.connection_id === lastId) return prev;
             return { ...prev, connection_id: lastId };
         });
@@ -128,186 +182,204 @@ export const ModalAddWorkspace = ({
     };
 
     return (
-        <ThemeProvider theme={dark}>
-            <Dialog open={open} onClose={onCancel} fullWidth maxWidth="sm">
-                <DialogTitle>Создать workspace</DialogTitle>
+        <Dialog
+            open={open}
+            onClose={onCancel}
+            fullWidth
+            maxWidth="sm"
+            PaperProps={{ sx: dialogPaperSx }}
+        >
+            <DialogTitle>Создать workspace</DialogTitle>
 
-                <form onSubmit={submit}>
-                    <DialogContent dividers>
-                        <Stack spacing={2}>
-                            {/* SELECT подключения */}
-                            <FormControl fullWidth size="small">
-                                <InputLabel id="conn-label">Подключение</InputLabel>
-                                <Select
-                                    labelId="conn-label"
-                                    name="connection_id"
-                                    label="Подключение"
-                                    value={form.connection_id}
-                                    onChange={handleSelect}
-                                    renderValue={(value) => {
-                                        const id =
-                                            typeof value === 'number'
-                                                ? value
-                                                : Number(value);
-                                        const conn = connections.find(c => c.id === id);
-                                        return conn
-                                            ? (conn.name ??
-                                                conn.connection?.name ??
-                                                `#${id}`)
-                                            : '';
-                                    }}
-                                    required
-                                >
-                                    {connections.map((c) => (
-                                        <MenuItem
-                                            key={c.id}
-                                            value={c.id}
-                                            style={{
+            <form onSubmit={submit}>
+                <DialogContent dividers>
+                    <Stack spacing={2}>
+                        {/* SELECT подключения */}
+                        <FormControl fullWidth size="small">
+                            <InputLabel
+                                id="conn-label"
+                                sx={{
+                                    color: 'var(--theme-text-secondary)',
+                                    '&.Mui-focused': { color: 'var(--theme-primary)' },
+                                }}
+                            >
+                                Подключение
+                            </InputLabel>
+                            <Select
+                                labelId="conn-label"
+                                name="connection_id"
+                                label="Подключение"
+                                value={form.connection_id}
+                                onChange={handleSelect}
+                                sx={selectSx}
+                                renderValue={(value) => {
+                                    const id =
+                                        typeof value === 'number'
+                                            ? value
+                                            : Number(value);
+                                    const conn = connections.find(c => c.id === id);
+                                    return conn
+                                        ? (conn.name ??
+                                            conn.connection?.name ??
+                                            `#${id}`)
+                                        : '';
+                                }}
+                                required
+                            >
+                                {connections.map((c) => (
+                                    <MenuItem
+                                        key={c.id}
+                                        value={c.id}
+                                        sx={{
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            alignItems: 'flex-start',
+                                        }}
+                                    >
+                                        <Box
+                                            sx={{
                                                 display: 'flex',
-                                                flexDirection: 'column',
+                                                gap: 1,
+                                                alignItems: 'center',
                                             }}
                                         >
-                                            <span
-                                                style={{
-                                                    display: 'flex',
-                                                    gap: 10,
-                                                    alignItems: 'center',
-                                                }}
+                                            <span>
+                                                {c.name ??
+                                                    c.connection?.name ??
+                                                    `#${c.id}`}
+                                            </span>
+                                            <IconButton
+                                                size="small"
+                                                onClick={(e) => handleEditConn(e, c)}
+                                                title="Редактировать"
+                                                sx={{ color: 'var(--icon-primary)' }}
                                             >
+                                                <EditIcon />
+                                            </IconButton>
+                                            <IconButton
+                                                size="small"
+                                                onClick={(e) => handleDeleteConn(e, c.id)}
+                                                title="Удалить"
+                                                sx={{ color: 'var(--theme-error)' }}
+                                            >
+                                                <DeleteIcon />
+                                            </IconButton>
+                                        </Box>
+
+                                        <span className={styles.descriptionModal}>
+                                            {c.description || c.connection?.description ? (
                                                 <span>
-                                                    {c.name ??
-                                                        c.connection?.name ??
-                                                        `#${c.id}`}
+                                                    <strong>Описание:</strong>{' '}
+                                                    {c.description ?? c.connection?.description}
                                                 </span>
-                                                <IconButton
-                                                    size="small"
-                                                    onClick={(e) =>
-                                                        handleEditConn(e, c)
-                                                    }
-                                                    title="Редактировать"
-                                                >
-                                                    <EditIcon />
-                                                </IconButton>
-                                                <IconButton
-                                                    size="small"
-                                                    onClick={(e) =>
-                                                        handleDeleteConn(
-                                                            e,
-                                                            c.id,
-                                                        )
-                                                    }
-                                                    title="Удалить"
-                                                >
-                                                    <DeleteIcon />
-                                                </IconButton>
-                                            </span>
+                                            ) : null}
+                                            {c['conn_type'] && (
+                                                <span>
+                                                    &nbsp;<strong>Тип:</strong> {String(c['conn_type'])}
+                                                </span>
+                                            )}
+                                            {c['conn_str'] && (
+                                                <span>
+                                                    &nbsp;<strong>Строка подключения:</strong> {String(c['conn_str'])}
+                                                </span>
+                                            )}
+                                        </span>
+                                    </MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
 
-                                            <span
-                                                className={
-                                                    styles.descriptionModal
-                                                }
-                                            >
-                                                {c.description ||
-                                                c.connection?.description ? (
-                                                    <span>
-                                                        <strong>
-                                                            Описание:
-                                                        </strong>{' '}
-                                                        {c.description ??
-                                                            c.connection
-                                                                ?.description}
-                                                    </span>
-                                                ) : null}
-                                                {c['conn_type'] && (
-                                                    <span>
-                                                        &nbsp;
-                                                        <strong>Тип:</strong>{' '}
-                                                        {String(c['conn_type'])}
-                                                    </span>
-                                                )}
-                                                {c['conn_str'] && (
-                                                    <span>
-                                                        &nbsp;
-                                                        <strong>
-                                                            Строка
-                                                            подключения:
-                                                        </strong>{' '}
-                                                        {String(c['conn_str'])}
-                                                    </span>
-                                                )}
-                                            </span>
-                                        </MenuItem>
-                                    ))}
-                                </Select>
-                            </FormControl>
-
-                            {/* кнопка «добавить коннектор» */}
-                            <IconButton
-                                size="small"
-                                sx={{ alignSelf: 'flex-end', mt: -1.5 }}
-                                onClick={() => setShowConnForm(true)}
-                                title="Добавить подключение"
-                            >
-                                <AddIcon width={18} height={18} />
-                            </IconButton>
-
-                            <TextField
-                                label="Группа"
-                                name="group"
-                                size="small"
-                                fullWidth
-                                value={form.group}
-                                onChange={handle}
-                                required
-                            />
-
-                            <TextField
-                                label="Название"
-                                name="name"
-                                size="small"
-                                fullWidth
-                                value={form.name}
-                                onChange={handle}
-                                required
-                            />
-
-                            <TextField
-                                label="Описание"
-                                name="description"
-                                size="small"
-                                fullWidth
-                                multiline
-                                rows={3}
-                                value={form.description}
-                                onChange={handle}
-                                required
-                            />
-
-                            {error && (
-                                <span style={{ color: '#d33' }}>{error}</span>
-                            )}
-                        </Stack>
-                    </DialogContent>
-
-                    <DialogActions sx={{ pr: 3, pb: 2 }}>
-                        <Button onClick={onCancel}>Отмена</Button>
-                        <Button
-                            variant="contained"
-                            type="submit"
-                            disabled={
-                                loading ||
-                                !form.name.trim() ||
-                                form.connection_id === ''
-                            }
-                            startIcon={
-                                loading && <CircularProgress size={16} />
-                            }
+                        {/* кнопка «добавить коннектор» */}
+                        <IconButton
+                            size="small"
+                            sx={{
+                                alignSelf: 'flex-end',
+                                mt: -1.5,
+                                color: 'var(--icon-primary)',
+                                '&:hover': {
+                                    backgroundColor: 'var(--theme-hover)',
+                                },
+                            }}
+                            onClick={() => setShowConnForm(true)}
+                            title="Добавить подключение"
                         >
-                            {loading ? 'Создаю…' : 'Создать'}
-                        </Button>
-                    </DialogActions>
-                </form>
-            </Dialog>
-        </ThemeProvider>
+                            <AddIcon width={18} height={18} />
+                        </IconButton>
+
+                        <TextField
+                            label="Группа"
+                            name="group"
+                            size="small"
+                            fullWidth
+                            value={form.group}
+                            onChange={handle}
+                            required
+                            sx={textFieldSx}
+                        />
+
+                        <TextField
+                            label="Название"
+                            name="name"
+                            size="small"
+                            fullWidth
+                            value={form.name}
+                            onChange={handle}
+                            required
+                            sx={textFieldSx}
+                        />
+
+                        <TextField
+                            label="Описание"
+                            name="description"
+                            size="small"
+                            fullWidth
+                            multiline
+                            rows={3}
+                            value={form.description}
+                            onChange={handle}
+                            required
+                            sx={textFieldSx}
+                        />
+
+                        {error && (
+                            <Box sx={{ color: 'var(--theme-error)' }}>
+                                {error}
+                            </Box>
+                        )}
+                    </Stack>
+                </DialogContent>
+
+                <DialogActions sx={{ pr: 3, pb: 2 }}>
+                    <Button
+                        onClick={onCancel}
+                        sx={{ color: 'var(--theme-text-secondary)' }}
+                    >
+                        Отмена
+                    </Button>
+                    <Button
+                        variant="contained"
+                        type="submit"
+                        disabled={
+                            loading ||
+                            !form.name.trim() ||
+                            form.connection_id === ''
+                        }
+                        startIcon={loading && <CircularProgress size={16} />}
+                        sx={{
+                            backgroundColor: 'var(--button-primary-bg)',
+                            color: 'var(--button-primary-text)',
+                            '&:hover': {
+                                backgroundColor: 'var(--button-primary-hover)',
+                            },
+                            '&.Mui-disabled': {
+                                backgroundColor: 'var(--checkbox-disabled)',
+                            },
+                        }}
+                    >
+                        {loading ? 'Создаю…' : 'Создать'}
+                    </Button>
+                </DialogActions>
+            </form>
+        </Dialog>
     );
 };

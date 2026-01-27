@@ -1,6 +1,5 @@
 import React, { useCallback, useMemo } from 'react';
 import { WidgetColumn } from '@/shared/hooks/useWorkSpaces';
-import { createTheme, ThemeProvider } from '@mui/material';
 
 import { EditReferenceDialog } from '@/components/modals/modalWidget/EditReferenceDialog';
 import { AliasDialog } from '@/components/modals/modalWidget/AliasDialog';
@@ -24,23 +23,7 @@ import {
 } from '@/components/WidgetColumnsOfTable/WidgetColumnTable/hook/useComboboxCreate';
 
 import { ComboboxAddDialog } from "@/components/modals/modalCombobox/ComboboxAddDialog";
-import {useRefsDnd} from "@/components/WidgetColumnsOfTable/ hooks/useRefsDnd";
-
-/** ——— UI theme (для модалок) ——— */
-const dark = createTheme({
-    palette: { mode: 'dark', primary: { main: '#ffffff' } },
-    components: {
-        MuiOutlinedInput: {
-            styleOverrides: {
-                root: {
-                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#ffffff' }
-                }
-            }
-        },
-        MuiInputLabel: { styleOverrides: { root: { '&.Mui-focused': { color: '#ffffff' } } } },
-        MuiSelect: { styleOverrides: { icon: { color: '#ffffff' } } },
-    },
-});
+import { useRefsDnd } from "@/components/WidgetColumnsOfTable/ hooks/useRefsDnd";
 
 export const WidgetColumnsMainTable: React.FC<Props> = ({
                                                             widgetColumns,
@@ -129,10 +112,10 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
     });
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // ИСПРАВЛЕНО: Перемещение групп с переиндексацией
+    // Перемещение групп с переиндексацией
     // ═══════════════════════════════════════════════════════════════════════════
     const moveGroup = useCallback(async (wcId: number, dir: 'up' | 'down') => {
-        const list = [...orderedWc]; // копия отсортированного списка
+        const list = [...orderedWc];
         const currentIdx = list.findIndex((w) => w.id === wcId);
 
         if (currentIdx < 0) return;
@@ -141,20 +124,16 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
 
         if (targetIdx < 0 || targetIdx >= list.length) return;
 
-        // Меняем местами в массиве
         const temp = list[currentIdx];
         list[currentIdx] = list[targetIdx];
         list[targetIdx] = temp;
 
-        // КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: Переиндексируем ВСЕ группы последовательно (0, 1, 2, 3...)
-        // Это гарантирует что не будет дубликатов column_order
         const updates: Promise<any>[] = [];
 
         for (let i = 0; i < list.length; i++) {
             const wc = list[i];
-            const newOrder = i; // Новый порядок = индекс в массиве
+            const newOrder = i;
 
-            // Обновляем только если порядок изменился
             if (wc.column_order !== newOrder) {
                 logApi('moveGroup:reindex', { wcId: wc.id, oldOrder: wc.column_order, newOrder });
                 updates.push(callUpdateWidgetColumn(wc.id, { column_order: newOrder }));
@@ -163,7 +142,6 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
 
         if (updates.length > 0) {
             try {
-                // Выполняем последовательно чтобы избежать race condition
                 for (const update of updates) {
                     await update;
                 }
@@ -232,7 +210,9 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
     /** ——— Render ——— */
     return (
         <div style={{ padding: 5 }}>
-            <h3 style={{ margin: '24px 0 8px', textAlign: 'center' }}>Настройка формы</h3>
+            <h3 style={{ margin: '24px 0 8px', textAlign: 'center', color: 'var(--theme-text-primary)' }}>
+                Настройка формы
+            </h3>
 
             {orderedWc.map((wc, idx) => {
                 const refs = localRefs[wc.id] ?? [];
@@ -266,66 +246,65 @@ export const WidgetColumnsMainTable: React.FC<Props> = ({
                 );
             })}
 
-            <ThemeProvider theme={dark}>
-                <ComboboxItemDialog
-                    open={dlg.open}
-                    value={dlg.value}
-                    onChange={changeComboEditor}
-                    onClose={closeComboEditor}
-                    onSave={saveComboEditor}
-                    saving={dlg.saving}
-                />
+            {/* Диалоги теперь используют CSS переменные, ThemeProvider не нужен */}
+            <ComboboxItemDialog
+                open={dlg.open}
+                value={dlg.value}
+                onChange={changeComboEditor}
+                onClose={closeComboEditor}
+                onSave={saveComboEditor}
+                saving={dlg.saving}
+            />
 
-                <EditReferenceDialog
-                    value={edit}
-                    onChange={(patch) => setEdit(prev => ({ ...prev, ...patch }))}
-                    onClose={closeEdit}
-                    onSave={saveEdit}
-                />
+            <EditReferenceDialog
+                value={edit}
+                onChange={(patch) => setEdit(prev => ({ ...prev, ...patch }))}
+                onClose={closeEdit}
+                onSave={saveEdit}
+            />
 
-                <AliasDialog
-                    open={aliasDlg.open}
-                    value={aliasDlg.value}
-                    onChange={(v) => setAliasDlg(p => ({ ...p, value: v }))}
-                    onClose={closeAliasDialog}
-                    onSave={saveAlias}
-                />
+            <AliasDialog
+                open={aliasDlg.open}
+                value={aliasDlg.value}
+                onChange={(v) => setAliasDlg(p => ({ ...p, value: v }))}
+                onClose={closeAliasDialog}
+                onSave={saveAlias}
+            />
 
-                <FormPickerDialog
-                    open={formDlg.open}
-                    value={formDlg.value}
-                    options={formOptions}
-                    onOpen={() => {
-                        if (!formOptions.length) loadWidgetForms?.();
-                    }}
-                    onChange={(v) => setFormDlg(p => ({ ...p, value: v }))}
-                    onClear={() => setFormDlg(p => ({ ...p, value: null }))}
-                    onClose={closeFormDialog}
-                    onSave={saveFormDialog}
-                />
+            <FormPickerDialog
+                open={formDlg.open}
+                value={formDlg.value}
+                options={formOptions}
+                onOpen={() => {
+                    if (!formOptions.length) loadWidgetForms?.();
+                }}
+                onChange={(v) => setFormDlg(p => ({ ...p, value: v }))}
+                onClear={() => setFormDlg(p => ({ ...p, value: null }))}
+                onClose={closeFormDialog}
+                onSave={saveFormDialog}
+            />
 
-                <AddReferenceDialog
-                    value={addDlg}
-                    columnOptions={columnOptions}
-                    formOptions={formOptions}
-                    getColLabel={getColLabel}
-                    onOpenForms={() => {
-                        if (!formOptions.length) loadWidgetForms?.();
-                    }}
-                    onChange={(patch) => setAddDlg(prev => ({ ...prev, ...patch }))}
-                    onClose={closeAddDialog}
-                    onSave={saveAddDialog}
-                />
+            <AddReferenceDialog
+                value={addDlg}
+                columnOptions={columnOptions}
+                formOptions={formOptions}
+                getColLabel={getColLabel}
+                onOpenForms={() => {
+                    if (!formOptions.length) loadWidgetForms?.();
+                }}
+                onChange={(patch) => setAddDlg(prev => ({ ...prev, ...patch }))}
+                onClose={closeAddDialog}
+                onSave={saveAddDialog}
+            />
 
-                <ComboboxAddDialog
-                    open={dlgCreate.open}
-                    value={dlgCreate.value}
-                    onChange={changeComboCreate}
-                    onClose={closeComboCreate}
-                    onSave={saveComboCreate}
-                    saving={dlgCreate.saving}
-                />
-            </ThemeProvider>
+            <ComboboxAddDialog
+                open={dlgCreate.open}
+                value={dlgCreate.value}
+                onChange={changeComboCreate}
+                onClose={closeComboCreate}
+                onSave={saveComboCreate}
+                saving={dlgCreate.saving}
+            />
         </div>
     );
 };

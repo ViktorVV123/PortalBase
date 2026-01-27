@@ -2,12 +2,12 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
     Dialog, DialogTitle, DialogContent, DialogActions,
     Button, FormControl, InputLabel, Select, MenuItem, TextField,
-    FormHelperText, Checkbox, FormControlLabel, CircularProgress
+    FormHelperText, Checkbox, FormControlLabel, CircularProgress, Box
 } from '@mui/material';
 import { api } from '@/services/api';
 
 type ComboboxAddValue = {
-    table_id: number | null;                 // ← приходит из useComboboxCreate, руками не вводим
+    table_id: number | null;
     combobox_column_id: number | null;
     combobox_width: number;
     combobox_column_order: number;
@@ -28,6 +28,73 @@ type Props = {
 
 type ColumnOption = { id: number; name: string };
 
+// ═══════════════════════════════════════════════════════════
+// СТИЛИ ДЛЯ ДИАЛОГА — используем CSS переменные темы
+// ═══════════════════════════════════════════════════════════
+const dialogPaperSx = {
+    backgroundColor: 'var(--theme-background)',
+    color: 'var(--theme-text-primary)',
+    '& .MuiDialogTitle-root': {
+        backgroundColor: 'var(--theme-surface)',
+        color: 'var(--theme-text-primary)',
+        borderBottom: '1px solid var(--theme-border)',
+    },
+    '& .MuiDialogContent-root': {
+        backgroundColor: 'var(--theme-background)',
+        color: 'var(--theme-text-primary)',
+    },
+    '& .MuiDialogActions-root': {
+        backgroundColor: 'var(--theme-surface)',
+        borderTop: '1px solid var(--theme-border)',
+    },
+};
+
+const textFieldSx = {
+    '& .MuiOutlinedInput-root': {
+        color: 'var(--input-text)',
+        backgroundColor: 'var(--input-bg)',
+        '& .MuiOutlinedInput-notchedOutline': {
+            borderColor: 'var(--input-border)',
+        },
+        '&:hover .MuiOutlinedInput-notchedOutline': {
+            borderColor: 'var(--input-border-hover)',
+        },
+        '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+            borderColor: 'var(--input-border-focus)',
+        },
+    },
+    '& .MuiInputLabel-root': {
+        color: 'var(--theme-text-secondary)',
+        '&.Mui-focused': {
+            color: 'var(--theme-primary)',
+        },
+    },
+};
+
+const selectSx = {
+    color: 'var(--input-text)',
+    backgroundColor: 'var(--input-bg)',
+    '& .MuiOutlinedInput-notchedOutline': {
+        borderColor: 'var(--input-border)',
+    },
+    '&:hover .MuiOutlinedInput-notchedOutline': {
+        borderColor: 'var(--input-border-hover)',
+    },
+    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+        borderColor: 'var(--input-border-focus)',
+    },
+    '& .MuiSelect-icon': {
+        color: 'var(--icon-primary)',
+    },
+};
+
+const checkboxSx = {
+    color: 'var(--checkbox-unchecked)',
+    '&.Mui-checked': {
+        color: 'var(--checkbox-checked)',
+    },
+};
+
 export const ComboboxAddDialog: React.FC<Props> = ({
                                                        open, value, saving = false, onChange, onClose, onSave
                                                    }) => {
@@ -35,7 +102,6 @@ export const ComboboxAddDialog: React.FC<Props> = ({
     const [cols, setCols] = useState<ColumnOption[]>([]);
     const [error, setError] = useState<string | null>(null);
 
-    // Грузим только колонки конкретной таблицы формы
     useEffect(() => {
         let cancelled = false;
         const load = async () => {
@@ -72,18 +138,36 @@ export const ComboboxAddDialog: React.FC<Props> = ({
     }, [value.combobox_column_id, value.table_id, saving]);
 
     return (
-        <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
+        <Dialog
+            open={open}
+            onClose={onClose}
+            fullWidth
+            maxWidth="sm"
+            PaperProps={{ sx: dialogPaperSx }}
+        >
             <DialogTitle>Добавить элемент Combobox</DialogTitle>
             <DialogContent dividers>
-
-                <FormHelperText sx={{ mb: 1 }}>
+                <FormHelperText sx={{ mb: 1, color: 'var(--theme-text-secondary)' }}>
                     {Number.isFinite(value.table_id as number) && (value.table_id as number) > 0
                         ? `Колонки формы: таблица #${value.table_id}`
                         : 'Форма не выбрана — выбор колонок недоступен'}
                 </FormHelperText>
 
-                <FormControl fullWidth size="small" margin="dense" disabled={!Number.isFinite(value.table_id as number)}>
-                    <InputLabel id="combo-col-id-label">combobox_column_id</InputLabel>
+                <FormControl
+                    fullWidth
+                    size="small"
+                    margin="dense"
+                    disabled={!Number.isFinite(value.table_id as number)}
+                >
+                    <InputLabel
+                        id="combo-col-id-label"
+                        sx={{
+                            color: 'var(--theme-text-secondary)',
+                            '&.Mui-focused': { color: 'var(--theme-primary)' },
+                        }}
+                    >
+                        combobox_column_id
+                    </InputLabel>
                     <Select
                         labelId="combo-col-id-label"
                         label="combobox_column_id"
@@ -92,17 +176,14 @@ export const ComboboxAddDialog: React.FC<Props> = ({
                             const n = parseInt(String(e.target.value), 10);
                             onChange({ combobox_column_id: Number.isFinite(n) ? n : null });
                         }}
-                        MenuProps={{
-                            PaperProps: { sx: { bgcolor: '#0f0f0f', color: '#fff', maxHeight: 420 } },
-                            MenuListProps: { sx: { bgcolor: '#0f0f0f', color: '#fff' } },
-                        }}
+                        sx={selectSx}
                     >
                         {loadingCols ? (
                             <MenuItem disabled>
                                 <CircularProgress size={16} sx={{ mr: 1 }} /> Загрузка…
                             </MenuItem>
                         ) : error ? (
-                            <MenuItem disabled>{error}</MenuItem>
+                            <MenuItem disabled sx={{ color: 'var(--theme-error)' }}>{error}</MenuItem>
                         ) : (
                             cols.map(opt => (
                                 <MenuItem key={opt.id} value={opt.id}>
@@ -111,7 +192,7 @@ export const ComboboxAddDialog: React.FC<Props> = ({
                             ))
                         )}
                     </Select>
-                    <FormHelperText>
+                    <FormHelperText sx={{ color: 'var(--theme-text-muted)' }}>
                         Выберите колонку **из таблицы формы** (список формируется автоматически).
                     </FormHelperText>
                 </FormControl>
@@ -123,6 +204,7 @@ export const ComboboxAddDialog: React.FC<Props> = ({
                         size="small"
                         value={value.combobox_width}
                         onChange={e => onChange({ combobox_width: Math.max(1, Math.trunc(+e.target.value || 1)) })}
+                        sx={textFieldSx}
                     />
                 </FormControl>
 
@@ -133,6 +215,7 @@ export const ComboboxAddDialog: React.FC<Props> = ({
                         size="small"
                         value={value.combobox_column_order}
                         onChange={e => onChange({ combobox_column_order: Math.max(0, Math.trunc(+e.target.value || 0)) })}
+                        sx={textFieldSx}
                     />
                 </FormControl>
 
@@ -142,28 +225,67 @@ export const ComboboxAddDialog: React.FC<Props> = ({
                         size="small"
                         value={value.combobox_alias}
                         onChange={e => onChange({ combobox_alias: e.target.value })}
+                        sx={textFieldSx}
                     />
                 </FormControl>
 
-                <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginTop: 8 }}>
+                <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mt: 1 }}>
                     <FormControlLabel
-                        control={<Checkbox checked={!!value.is_primary} onChange={e => onChange({ is_primary: e.target.checked })} />}
-                        label="is_primary"
+                        control={
+                            <Checkbox
+                                checked={!!value.is_primary}
+                                onChange={e => onChange({ is_primary: e.target.checked })}
+                                sx={checkboxSx}
+                            />
+                        }
+                        label={<Box sx={{ color: 'var(--theme-text-primary)' }}>is_primary</Box>}
                     />
                     <FormControlLabel
-                        control={<Checkbox checked={!!value.is_show} onChange={e => onChange({ is_show: e.target.checked })} />}
-                        label="is_show"
+                        control={
+                            <Checkbox
+                                checked={!!value.is_show}
+                                onChange={e => onChange({ is_show: e.target.checked })}
+                                sx={checkboxSx}
+                            />
+                        }
+                        label={<Box sx={{ color: 'var(--theme-text-primary)' }}>is_show</Box>}
                     />
                     <FormControlLabel
-                        control={<Checkbox checked={!!value.is_show_hidden} onChange={e => onChange({ is_show_hidden: e.target.checked })} />}
-                        label="is_show_hidden"
+                        control={
+                            <Checkbox
+                                checked={!!value.is_show_hidden}
+                                onChange={e => onChange({ is_show_hidden: e.target.checked })}
+                                sx={checkboxSx}
+                            />
+                        }
+                        label={<Box sx={{ color: 'var(--theme-text-primary)' }}>is_show_hidden</Box>}
                     />
-                </div>
+                </Box>
             </DialogContent>
 
             <DialogActions>
-                <Button onClick={onClose} disabled={saving}>Отмена</Button>
-                <Button onClick={onSave} disabled={!canSave} variant="contained">
+                <Button
+                    onClick={onClose}
+                    disabled={saving}
+                    sx={{ color: 'var(--theme-text-secondary)' }}
+                >
+                    Отмена
+                </Button>
+                <Button
+                    onClick={onSave}
+                    disabled={!canSave}
+                    variant="contained"
+                    sx={{
+                        backgroundColor: 'var(--button-primary-bg)',
+                        color: 'var(--button-primary-text)',
+                        '&:hover': {
+                            backgroundColor: 'var(--button-primary-hover)',
+                        },
+                        '&.Mui-disabled': {
+                            backgroundColor: 'var(--checkbox-disabled)',
+                        },
+                    }}
+                >
                     {saving ? 'Сохранение…' : 'Сохранить'}
                 </Button>
             </DialogActions>

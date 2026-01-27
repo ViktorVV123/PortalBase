@@ -13,7 +13,11 @@ export const CenteredLoader: React.FC<Props> = ({ label = 'Загрузка…',
     return (
         <div className={fullScreen ? s.backdrop : s.container}>
             <div className={s.box}>
-                <CircularProgress />
+                <CircularProgress
+                    sx={{
+                        color: 'var(--theme-primary)',
+                    }}
+                />
                 {label && <span className={s.text}>{label}</span>}
             </div>
         </div>

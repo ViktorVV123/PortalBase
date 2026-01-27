@@ -1,66 +1,58 @@
 // src/components/Form/formTable/FormTable.module.scss
 // ФИНАЛЬНАЯ ВЕРСИЯ — flex-based layout без calc()
+// Поддержка светлой и тёмной темы
 
 // ═══════════════════════════════════════════════════════════
-// SCROLLBAR MIXIN
+// SCROLLBAR MIXIN — с поддержкой тем
 // ═══════════════════════════════════════════════════════════
 
-@mixin custom-scrollbar($thumb-color: rgba(255, 255, 255, 0.35), $track-color: rgba(60, 60, 60, 0.5)) {
+@mixin custom-scrollbar() {
   &::-webkit-scrollbar {
     width: 8px;
     height: 10px;
   }
 
   &::-webkit-scrollbar-thumb {
-    background: $thumb-color;
+    background: var(--scrollbar-thumb, rgba(255, 255, 255, 0.35));
     border-radius: 5px;
 
     &:hover {
-      background: rgba(255, 255, 255, 0.5);
+      background: var(--scrollbar-thumb-hover, rgba(255, 255, 255, 0.5));
     }
   }
 
   &::-webkit-scrollbar-track {
-    background: $track-color;
+    background: var(--scrollbar-track, rgba(60, 60, 60, 0.5));
     border-radius: 5px;
   }
 
   &::-webkit-scrollbar-corner {
-    background: $track-color;
+    background: var(--scrollbar-track, rgba(60, 60, 60, 0.5));
   }
 
   scrollbar-width: thin;
-  scrollbar-color: $thumb-color $track-color;
+  scrollbar-color: var(--scrollbar-thumb, rgba(255, 255, 255, 0.35)) var(--scrollbar-track, rgba(60, 60, 60, 0.5));
 }
 
 // ═══════════════════════════════════════════════════════════
 // ГЛАВНЫЙ КОНТЕЙНЕР
-// Использует flex: 1 вместо calc(100vh - ...)
 // ═══════════════════════════════════════════════════════════
 
 .formLayoutFullWidth {
-  // Занимает всё пространство от родителя
   flex: 1 1 auto;
-
-  // КРИТИЧНО: позволяет сжиматься!
   min-height: 0;
   min-width: 0;
-
-  // Ограничения
   max-height: 100%;
   max-width: 100%;
   width: 100%;
-
-  // Никакого скролла!
   overflow: hidden;
-
   display: flex;
   flex-direction: column;
-
   padding: 12px 16px;
-  padding-left: 70px; // Место для TreeDrawer
-
+  padding-left: 70px;
   box-sizing: border-box;
+  background: var(--theme-background, transparent);
+  transition: background-color 0.3s ease;
 }
 
 @media (max-width: 480px) {
@@ -76,12 +68,10 @@
 .rightPane {
   display: flex;
   flex-direction: column;
-
   flex: 1 1 auto;
   min-height: 0;
   min-width: 0;
   width: 100%;
-
   overflow: hidden;
   gap: 12px;
 }
@@ -104,14 +94,13 @@
   min-height: 150px;
   min-width: 0;
   width: 100%;
-
   display: flex;
   flex-direction: column;
   overflow: hidden;
-
-  background: rgba(30, 30, 30, 0.4);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--theme-surface, rgba(30, 30, 30, 0.4));
+  border: 1px solid var(--theme-border, rgba(255, 255, 255, 0.08));
   border-radius: 8px;
+  transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -123,10 +112,8 @@
   min-height: 0;
   min-width: 0;
   width: 100%;
-
   overflow: auto;
   overscroll-behavior: contain;
-
   @include custom-scrollbar();
 }
 
@@ -139,18 +126,13 @@
   min-height: 130px;
   max-height: 40vh;
   height: 25vh;
-
   min-width: 0;
   width: 100%;
-
   display: flex;
   flex-direction: column;
   overflow: hidden;
-
-/*  background: rgba(35, 35, 40, 0.5);
-  border: 1px solid rgba(255, 255, 255, 0.1);*/
   border-radius: 8px;
-  box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--theme-shadow-md, 0 -2px 12px rgba(0, 0, 0, 0.2));
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -170,7 +152,7 @@
 }
 
 // ═══════════════════════════════════════════════════════════
-// OTHER STYLES
+// FILTER INDICATOR
 // ═══════════════════════════════════════════════════════════
 
 .filterIndicator {
@@ -179,19 +161,16 @@
   gap: 6px;
   padding: 4px 12px;
   margin-left: 8px;
-
-  background: rgba(100, 150, 255, 0.12);
-  border: 1px solid rgba(100, 150, 255, 0.25);
+  background: var(--theme-selected, rgba(100, 150, 255, 0.12));
+  border: 1px solid var(--theme-focus, rgba(100, 150, 255, 0.25));
   border-radius: 16px;
-
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--theme-text-primary, rgba(255, 255, 255, 0.9));
   cursor: pointer;
   transition: all 0.2s ease;
 
   &:hover {
-    background: rgba(100, 150, 255, 0.2);
-    border-color: rgba(100, 150, 255, 0.4);
+    background: var(--theme-focus, rgba(100, 150, 255, 0.2));
   }
 
   svg {
@@ -204,7 +183,7 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #6496ff;
+  background: var(--theme-primary, #6496ff);
   animation: pulse 2s infinite;
 }
 
@@ -219,6 +198,10 @@
   }
 }
 
+// ═══════════════════════════════════════════════════════════
+// ICON BUTTON
+// ═══════════════════════════════════════════════════════════
+
 .iconBtn {
   background: none;
   border: 0;
@@ -229,13 +212,13 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: #e0e0e0;
+  color: var(--icon-primary, #e0e0e0);
   border-radius: 4px;
   transition: all 0.15s ease;
 
   &:hover {
-    color: #fff;
-    background: rgba(255, 255, 255, 0.1);
+    color: var(--theme-text-primary, #fff);
+    background: var(--theme-hover, rgba(255, 255, 255, 0.1));
   }
 }
 

@@ -2,35 +2,35 @@
 // Стили для WidgetColumnsOfTable — с вертикальным скроллом
 
 // ═══════════════════════════════════════════════════════════
-// SCROLLBAR MIXIN
+// SCROLLBAR MIXIN — используем CSS переменные
 // ═══════════════════════════════════════════════════════════
 
-@mixin custom-scrollbar($thumb-color: rgba(255, 255, 255, 0.3), $track-color: rgba(50, 50, 50, 0.4)) {
+@mixin custom-scrollbar {
   &::-webkit-scrollbar {
     width: 8px;
     height: 8px;
   }
 
   &::-webkit-scrollbar-thumb {
-    background: $thumb-color;
+    background: var(--scrollbar-thumb);
     border-radius: 4px;
 
     &:hover {
-      background: rgba(255, 255, 255, 0.45);
+      background: var(--scrollbar-thumb-hover);
     }
   }
 
   &::-webkit-scrollbar-track {
-    background: $track-color;
+    background: var(--scrollbar-track);
     border-radius: 4px;
   }
 
   &::-webkit-scrollbar-corner {
-    background: $track-color;
+    background: var(--scrollbar-track);
   }
 
   scrollbar-width: thin;
-  scrollbar-color: $thumb-color $track-color;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -49,6 +49,8 @@
   width: 100%;
 
   overflow: hidden;
+  background: var(--theme-background);
+  color: var(--theme-text-primary);
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -63,14 +65,14 @@
   flex-wrap: wrap;
   gap: 16px 24px;
 
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(30, 30, 30, 0.5);
+  border-bottom: 1px solid var(--theme-border);
+  background: var(--theme-surface);
 }
 
 .headerLink {
   cursor: pointer;
   text-decoration: underline;
-  color: #8ac7ff;
+  color: var(--theme-primary);
   display: flex;
   align-items: center;
   gap: 6px;
@@ -79,12 +81,13 @@
   transition: color 0.15s ease;
 
   &:hover {
-    color: #b8daff;
+    color: var(--theme-primary-hover);
   }
 
   svg {
     width: 16px;
     height: 16px;
+    color: var(--icon-primary);
   }
 }
 
@@ -96,14 +99,15 @@
   flex: 0 0 auto;
   padding: 12px 16px;
 
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(25, 25, 25, 0.4);
+  border-bottom: 1px solid var(--theme-border);
+  background: var(--theme-surface);
 }
 
 .previewLabel {
   opacity: 0.6;
   font-size: 12px;
   margin-bottom: 8px;
+  color: var(--theme-text-secondary);
 }
 
 .previewTable {
@@ -111,12 +115,12 @@
   border-collapse: collapse;
 
   th {
-    background: var(--header-color, #333);
-    color: #eee;
+    background: var(--header-color, var(--theme-surface-elevated));
+    color: var(--theme-text-primary);
     font-weight: 600;
     font-size: 13px;
     padding: 8px 10px;
-    border: 1px solid rgba(255, 255, 255, 0.15);
+    border: 1px solid var(--theme-border);
     white-space: nowrap;
   }
 }
@@ -135,6 +139,7 @@
   overscroll-behavior: contain;
 
   padding: 16px;
+  background: var(--theme-background);
 
   @include custom-scrollbar();
 }
@@ -148,6 +153,7 @@
   text-align: center;
   opacity: 0.6;
   font-size: 14px;
+  color: var(--theme-text-secondary);
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -159,5 +165,5 @@
   text-align: center;
   font-size: 18px;
   font-weight: 600;
-  color: #e0e0e0;
+  color: var(--theme-text-primary);
 }

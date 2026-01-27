@@ -6,7 +6,7 @@ import { ExtCol, getCanonicalType } from '@/components/Form/formTable/parts/Form
 import { fromInputValue, toInputValue } from '@/components/Form/formTable/parts/ToInputValue';
 import { MenuItem, Select, TextField, CircularProgress, Checkbox } from '@mui/material';
 import { isColumnRequired, isEmptyValue } from "@/shared/utils/requiredValidation/requiredValidation";
-import {TriStateCheckbox} from "@/shared/ui/TriStateCheckbox";
+import { TriStateCheckbox } from "@/shared/ui/TriStateCheckbox";
 
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -185,6 +185,106 @@ export function useComboOptions(
     return { loading, options, error, ready };
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// СТИЛИ — используем CSS переменные темы
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const errorSxBase = {
+    '& .MuiOutlinedInput-notchedOutline': {
+        borderColor: 'var(--theme-error) !important',
+        borderWidth: '2px !important',
+    },
+    '&:hover .MuiOutlinedInput-notchedOutline': {
+        borderColor: 'var(--theme-error) !important',
+    },
+    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+        borderColor: 'var(--theme-error) !important',
+    },
+};
+
+const selectSx = {
+    '& .MuiSelect-select': {
+        padding: '2px 6px',
+        minHeight: '32px',
+        display: 'flex',
+        alignItems: 'center',
+        overflow: 'hidden',
+        whiteSpace: 'nowrap',
+        textOverflow: 'ellipsis',
+        color: 'var(--input-text)',
+    },
+    '& .MuiOutlinedInput-notchedOutline': {
+        borderColor: 'var(--input-border)',
+    },
+    '&:hover .MuiOutlinedInput-notchedOutline': {
+        borderColor: 'var(--input-border-hover)',
+    },
+    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+        borderColor: 'var(--input-border-focus)',
+    },
+    '& .MuiSelect-icon': {
+        color: 'var(--icon-primary)',
+    },
+    backgroundColor: 'var(--input-bg)',
+    color: 'var(--input-text)',
+};
+
+const textFieldSx = {
+    '& .MuiInputBase-root': {
+        alignItems: 'stretch',
+        color: 'var(--input-text)',
+        backgroundColor: 'var(--input-bg)',
+    },
+    '& .MuiOutlinedInput-notchedOutline': {
+        borderColor: 'var(--input-border)',
+    },
+    '&:hover .MuiOutlinedInput-notchedOutline': {
+        borderColor: 'var(--input-border-hover)',
+    },
+    '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': {
+        borderColor: 'var(--input-border-focus)',
+    },
+    '& .MuiInputBase-input': {
+        color: 'var(--input-text)',
+    },
+    '& .MuiInputBase-inputMultiline': {
+        padding: '4px 6px',
+        lineHeight: 1.3,
+    },
+    '& textarea': {
+        whiteSpace: 'pre-wrap',
+        overflowWrap: 'anywhere',
+        wordBreak: 'break-word',
+    },
+    // Стили для date/time input — иконка календаря
+    '& input[type="date"], & input[type="time"], & input[type="datetime-local"]': {
+        color: 'var(--input-text)',
+        colorScheme: 'var(--color-scheme, dark)',
+        '&::-webkit-calendar-picker-indicator': {
+            filter: 'var(--calendar-icon-filter, invert(0.8))',
+            cursor: 'pointer',
+            opacity: 0.7,
+            '&:hover': {
+                opacity: 1,
+            },
+        },
+    },
+};
+
+const checkboxSx = {
+    color: 'var(--checkbox-unchecked)',
+    '&.Mui-checked': {
+        color: 'var(--checkbox-checked)',
+    },
+};
+
+const checkboxErrorSx = {
+    color: 'var(--theme-error)',
+    '&.Mui-checked': {
+        color: 'var(--theme-error)',
+    },
+};
+
 export type InputCellProps = {
     mode: 'add' | 'edit';
     col: ExtCol;
@@ -218,18 +318,7 @@ export const InputCell: React.FC<InputCellProps> = ({
     const hasError = showError && isRequired && isEmpty;
 
     // Стили для ошибки
-    const errorSx = hasError ? {
-        '& .MuiOutlinedInput-notchedOutline': {
-            borderColor: '#ef4444 !important',
-            borderWidth: '2px !important',
-        },
-        '&:hover .MuiOutlinedInput-notchedOutline': {
-            borderColor: '#ef4444 !important',
-        },
-        '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-            borderColor: '#ef4444 !important',
-        },
-    } : {};
+    const errorSx = hasError ? errorSxBase : {};
 
     if (readOnly || writeTcId == null) {
         return (
@@ -259,11 +348,11 @@ export const InputCell: React.FC<InputCellProps> = ({
                         justifyContent: 'center',
                         minHeight: 32,
                         gap: 8,
-                        color: 'rgba(255,255,255,0.6)',
+                        color: 'var(--theme-text-muted)',
                         fontSize: 12,
                     }}
                 >
-                    <CircularProgress size={16} color="inherit" />
+                    <CircularProgress size={16} sx={{ color: 'var(--theme-text-muted)' }} />
                     <span>Загрузка...</span>
                 </div>
             );
@@ -292,20 +381,33 @@ export const InputCell: React.FC<InputCellProps> = ({
                 }}
                 className={s.inpInCell}
                 sx={{
-                    '& .MuiSelect-select': {
-                        padding: '2px 6px',
-                        minHeight: '32px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        overflow: 'hidden',
-                        whiteSpace: 'nowrap',
-                        textOverflow: 'ellipsis',
-                    },
+                    ...selectSx,
                     ...errorSx,
+                }}
+                MenuProps={{
+                    PaperProps: {
+                        sx: {
+                            backgroundColor: 'var(--dropdown-bg)',
+                            color: 'var(--dropdown-text)',
+                            border: '1px solid var(--dropdown-border)',
+                            '& .MuiMenuItem-root': {
+                                color: 'var(--dropdown-text)',
+                                '&:hover': {
+                                    backgroundColor: 'var(--dropdown-hover)',
+                                },
+                                '&.Mui-selected': {
+                                    backgroundColor: 'var(--dropdown-hover)',
+                                    '&:hover': {
+                                        backgroundColor: 'var(--dropdown-hover)',
+                                    },
+                                },
+                            },
+                        },
+                    },
                 }}
             >
                 <MenuItem value="">
-                    <em>— не выбрано —</em>
+                    <em style={{ color: 'var(--theme-text-muted)' }}>— не выбрано —</em>
                 </MenuItem>
                 {effectiveOptions.map((o) => (
                     <MenuItem
@@ -314,7 +416,7 @@ export const InputCell: React.FC<InputCellProps> = ({
                         title={o.showHidden.join(' / ')}
                         sx={
                             !hasValueInOptions && o.id === currentValue
-                                ? { color: 'warning.main', fontStyle: 'italic' }
+                                ? { color: 'var(--theme-warning)', fontStyle: 'italic' }
                                 : undefined
                         }
                     >
@@ -350,7 +452,6 @@ export const InputCell: React.FC<InputCellProps> = ({
             <TriStateCheckbox
                 value={value}
                 onChange={(newState) => {
-                    // Передаём 'true', 'false' или 'null' как строку
                     onChange(newState);
                 }}
                 showError={hasError}
@@ -372,7 +473,7 @@ export const InputCell: React.FC<InputCellProps> = ({
                 size="small"
                 checked={checked}
                 onChange={(e) => onChange(e.target.checked ? 'true' : 'false')}
-                sx={hasError ? { color: '#ef4444' } : undefined}
+                sx={hasError ? checkboxErrorSx : checkboxSx}
             />
         );
     }
@@ -430,18 +531,7 @@ export const InputCell: React.FC<InputCellProps> = ({
             maxRows={isMultiline ? 6 : undefined}
             className={`${s.inpInCell} ${isDateLike ? s.dateTimeInput : ''}`}
             sx={{
-                '& .MuiInputBase-root': {
-                    alignItems: 'stretch',
-                },
-                '& .MuiInputBase-inputMultiline': {
-                    padding: '4px 6px',
-                    lineHeight: 1.3,
-                },
-                '& textarea': {
-                    whiteSpace: 'pre-wrap',
-                    overflowWrap: 'anywhere',
-                    wordBreak: 'break-word',
-                },
+                ...textFieldSx,
                 ...errorSx,
             }}
         />

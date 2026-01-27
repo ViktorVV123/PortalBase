@@ -1,6 +1,6 @@
 // src/components/Form/mainTable/FontSizeControl.tsx
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Slider, Popover, IconButton, Tooltip, Typography, Box } from '@mui/material';
 import TextFieldsIcon from '@mui/icons-material/TextFields';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
@@ -106,7 +106,6 @@ const STORAGE_KEY = 'main-table-font-size';
 // ═══════════════════════════════════════════════════════════
 
 function getDefaultPreset(): FontSizePreset {
-    // Проверяем localStorage
     try {
         const saved = localStorage.getItem(STORAGE_KEY);
         if (saved && PRESET_ORDER.includes(saved as FontSizePreset)) {
@@ -115,7 +114,7 @@ function getDefaultPreset(): FontSizePreset {
     } catch (e) {
         // localStorage недоступен
     }
-    return 'sm'; // Дефолт
+    return 'sm';
 }
 
 function savePreset(preset: FontSizePreset) {
@@ -146,7 +145,6 @@ function applyFontSizeToRoot(config: FontSizeConfig) {
 export function useFontSizeControl() {
     const [preset, setPreset] = useState<FontSizePreset>(getDefaultPreset);
 
-    // Применяем при монтировании и изменении
     useEffect(() => {
         applyFontSizeToRoot(FONT_SIZE_PRESETS[preset]);
     }, [preset]);
@@ -167,6 +165,62 @@ export function useFontSizeControl() {
         config: FONT_SIZE_PRESETS[preset],
     };
 }
+
+// ═══════════════════════════════════════════════════════════
+// СТИЛИ — используем CSS переменные темы
+// ═══════════════════════════════════════════════════════════
+
+const iconButtonSx = {
+    color: 'var(--theme-text-muted)',
+    '&:hover': {
+        color: 'var(--theme-text-primary)',
+        backgroundColor: 'var(--theme-hover)',
+    },
+};
+
+const iconButtonOpenSx = {
+    ...iconButtonSx,
+    color: 'var(--theme-primary)',
+};
+
+const popoverPaperSx = {
+    backgroundColor: 'var(--dropdown-bg)',
+    border: '1px solid var(--theme-border)',
+    borderRadius: '8px',
+    p: 2,
+    minWidth: 220,
+};
+
+const sliderSx = {
+    color: 'var(--theme-primary)',
+    '& .MuiSlider-mark': {
+        backgroundColor: 'var(--theme-text-muted)',
+        width: 4,
+        height: 4,
+        borderRadius: '50%',
+    },
+    '& .MuiSlider-markActive': {
+        backgroundColor: 'var(--theme-primary)',
+    },
+    '& .MuiSlider-markLabel': {
+        color: 'var(--theme-text-muted)',
+        fontSize: 11,
+        fontWeight: 500,
+        '&.MuiSlider-markLabelActive': {
+            color: 'var(--theme-text-primary)',
+        },
+    },
+    '& .MuiSlider-thumb': {
+        width: 16,
+        height: 16,
+        '&:hover, &.Mui-focusVisible': {
+            boxShadow: '0 0 0 8px var(--theme-focus)',
+        },
+    },
+    '& .MuiSlider-rail': {
+        backgroundColor: 'var(--theme-border)',
+    },
+};
 
 // ═══════════════════════════════════════════════════════════
 // КОМПОНЕНТ
@@ -212,13 +266,7 @@ export const FontSizeControl: React.FC<FontSizeControlProps> = ({ className }) =
                     onClick={handleOpen}
                     className={className}
                     size="small"
-                    sx={{
-                        color: open ? 'var(--link, #6db3f2)' : '#aaa',
-                        '&:hover': {
-                            color: '#fff',
-                            backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                        },
-                    }}
+                    sx={open ? iconButtonOpenSx : iconButtonSx}
                 >
                     <TextFieldsIcon sx={{ fontSize: 20 }} />
                 </IconButton>
@@ -238,13 +286,7 @@ export const FontSizeControl: React.FC<FontSizeControlProps> = ({ className }) =
                 }}
                 slotProps={{
                     paper: {
-                        sx: {
-                            backgroundColor: '#2a2a2a',
-                            border: '1px solid rgba(255, 255, 255, 0.15)',
-                            borderRadius: '8px',
-                            p: 2,
-                            minWidth: 220,
-                        },
+                        sx: popoverPaperSx,
                     },
                 }}
             >
@@ -258,7 +300,7 @@ export const FontSizeControl: React.FC<FontSizeControlProps> = ({ className }) =
                     }}>
                         <Typography
                             variant="subtitle2"
-                            sx={{ color: '#e0e0e0', fontWeight: 600 }}
+                            sx={{ color: 'var(--theme-text-primary)', fontWeight: 600 }}
                         >
                             Размер шрифта
                         </Typography>
@@ -267,11 +309,11 @@ export const FontSizeControl: React.FC<FontSizeControlProps> = ({ className }) =
                                 size="small"
                                 onClick={resetToDefault}
                                 sx={{
-                                    color: '#888',
+                                    color: 'var(--theme-text-muted)',
                                     padding: '4px',
                                     '&:hover': {
-                                        color: '#fff',
-                                        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                                        color: 'var(--theme-text-primary)',
+                                        backgroundColor: 'var(--theme-hover)',
                                     },
                                 }}
                             >
@@ -290,36 +332,7 @@ export const FontSizeControl: React.FC<FontSizeControlProps> = ({ className }) =
                             step={1}
                             marks={marks}
                             valueLabelDisplay="off"
-                            sx={{
-                                color: 'var(--link, #6db3f2)',
-                                '& .MuiSlider-mark': {
-                                    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-                                    width: 4,
-                                    height: 4,
-                                    borderRadius: '50%',
-                                },
-                                '& .MuiSlider-markActive': {
-                                    backgroundColor: 'var(--link, #6db3f2)',
-                                },
-                                '& .MuiSlider-markLabel': {
-                                    color: '#888',
-                                    fontSize: 11,
-                                    fontWeight: 500,
-                                    '&.MuiSlider-markLabelActive': {
-                                        color: '#fff',
-                                    },
-                                },
-                                '& .MuiSlider-thumb': {
-                                    width: 16,
-                                    height: 16,
-                                    '&:hover, &.Mui-focusVisible': {
-                                        boxShadow: '0 0 0 8px rgba(109, 179, 242, 0.16)',
-                                    },
-                                },
-                                '& .MuiSlider-rail': {
-                                    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-                                },
-                            }}
+                            sx={sliderSx}
                         />
                     </Box>
 
@@ -327,12 +340,12 @@ export const FontSizeControl: React.FC<FontSizeControlProps> = ({ className }) =
                     <Box sx={{
                         mt: 2,
                         pt: 2,
-                        borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+                        borderTop: '1px solid var(--theme-border)',
                         textAlign: 'center',
                     }}>
                         <Typography
                             sx={{
-                                color: '#aaa',
+                                color: 'var(--theme-text-muted)',
                                 fontSize: 10,
                                 textTransform: 'uppercase',
                                 letterSpacing: 0.5,
@@ -343,7 +356,7 @@ export const FontSizeControl: React.FC<FontSizeControlProps> = ({ className }) =
                         </Typography>
                         <Typography
                             sx={{
-                                color: '#e0e0e0',
+                                color: 'var(--theme-text-primary)',
                                 fontSize: FONT_SIZE_PRESETS[preset].fontSize,
                                 lineHeight: FONT_SIZE_PRESETS[preset].lineHeight,
                             }}

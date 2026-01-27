@@ -1,8 +1,11 @@
+// src/shared/ui/CenteredLoader/CenteredLoader.module.scss
+
 .container {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 200px; // чтобы лоадер был в середине блока SetOfTables
+  padding: 40px 20px;
+  min-height: 200px;
 }
 
 .backdrop {
@@ -11,22 +14,23 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.35); // лёгкое затемнение
-  z-index: 1300; // выше основного контента, но ниже модалок MUI (обычно 1300–1500)
+  background: var(--overlay-bg);
+  z-index: 9999;
 }
 
 .box {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
   padding: 24px 32px;
+  background: var(--theme-surface);
   border-radius: 12px;
-  background: #202020;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--theme-shadow-lg);
 }
 
 .text {
+  color: var(--theme-text-secondary);
   font-size: 14px;
-  color: #fff;
+  font-weight: 500;
 }

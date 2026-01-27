@@ -1,29 +1,70 @@
 /* ModalAddWidget.tsx */
-import {useState, ChangeEvent} from 'react';
+import { useState, ChangeEvent } from 'react';
 import {
     Dialog, DialogTitle, DialogContent, DialogActions,
-    TextField, Button, Stack, CircularProgress,
-    ThemeProvider,
+    TextField, Button, Stack, CircularProgress, Box,
 } from '@mui/material';
 
-import {api} from '@/services/api';
-import {DTable, Widget} from '@/shared/hooks/useWorkSpaces';
-import {dark} from "@/shared/themeUI/themeModal/ThemeModalUI";
+import { api } from '@/services/api';
+import { DTable, Widget } from '@/shared/hooks/useWorkSpaces';
 
 type Props = {
-       open: boolean;
-       table: DTable;
-       onSuccess: (widget: Widget) => void;   // ⬅︎ передаём объект виджета
-       onCancel : () => void;
-     };
+    open: boolean;
+    table: DTable;
+    onSuccess: (widget: Widget) => void;
+    onCancel: () => void;
+};
 
-export const ModalAddWidget = ({open, table, onSuccess, onCancel}: Props) => {
-    const [form, setForm] = useState({name: '', description: ''});
+// ═══════════════════════════════════════════════════════════
+// СТИЛИ ДЛЯ ДИАЛОГА — используем CSS переменные темы
+// ═══════════════════════════════════════════════════════════
+const dialogPaperSx = {
+    backgroundColor: 'var(--theme-background)',
+    color: 'var(--theme-text-primary)',
+    '& .MuiDialogTitle-root': {
+        backgroundColor: 'var(--theme-surface)',
+        color: 'var(--theme-text-primary)',
+        borderBottom: '1px solid var(--theme-border)',
+    },
+    '& .MuiDialogContent-root': {
+        backgroundColor: 'var(--theme-background)',
+        color: 'var(--theme-text-primary)',
+    },
+    '& .MuiDialogActions-root': {
+        backgroundColor: 'var(--theme-surface)',
+        borderTop: '1px solid var(--theme-border)',
+    },
+};
+
+const textFieldSx = {
+    '& .MuiOutlinedInput-root': {
+        color: 'var(--input-text)',
+        backgroundColor: 'var(--input-bg)',
+        '& .MuiOutlinedInput-notchedOutline': {
+            borderColor: 'var(--input-border)',
+        },
+        '&:hover .MuiOutlinedInput-notchedOutline': {
+            borderColor: 'var(--input-border-hover)',
+        },
+        '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+            borderColor: 'var(--input-border-focus)',
+        },
+    },
+    '& .MuiInputLabel-root': {
+        color: 'var(--theme-text-secondary)',
+        '&.Mui-focused': {
+            color: 'var(--theme-primary)',
+        },
+    },
+};
+
+export const ModalAddWidget = ({ open, table, onSuccess, onCancel }: Props) => {
+    const [form, setForm] = useState({ name: '', description: '' });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     const handle = (e: ChangeEvent<HTMLInputElement>) =>
-        setForm(prev => ({...prev, [e.target.name]: e.target.value}));
+        setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
 
     const submit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -36,11 +77,11 @@ export const ModalAddWidget = ({open, table, onSuccess, onCancel}: Props) => {
         setError(null);
         try {
             const { data } = await api.post<Widget>('/widgets/', {
-                   table_id   : table.id,
-                   name       : form.name,
-                   description: form.description,
-                 });
-             onSuccess(data);
+                table_id: table.id,
+                name: form.name,
+                description: form.description,
+            });
+            onSuccess(data);
         } catch {
             setError('Не удалось создать widget');
         } finally {
@@ -51,47 +92,72 @@ export const ModalAddWidget = ({open, table, onSuccess, onCancel}: Props) => {
     if (!open) return null;
 
     return (
-        <ThemeProvider theme={dark}>
-            <Dialog open={open} onClose={onCancel} fullWidth maxWidth="sm">
-                <DialogTitle>Новый widget в «{table.name}»</DialogTitle>
+        <Dialog
+            open={open}
+            onClose={onCancel}
+            fullWidth
+            maxWidth="sm"
+            PaperProps={{ sx: dialogPaperSx }}
+        >
+            <DialogTitle>Новый widget в «{table.name}»</DialogTitle>
 
-                <form onSubmit={submit}>
-                    <DialogContent dividers>
-                        <Stack spacing={2}>
-                            <TextField
-                                label="Название"
-                                name="name"
-                                size="small"
-                                fullWidth
-                                value={form.name}
-                                onChange={handle}
-                                required
-                            />
-                            <TextField
-                                label="Описание"
-                                name="description"
-                                size="small"
-                                fullWidth
-                                value={form.description}
-                                onChange={handle}
-                            />
-                            {error && <span style={{color: '#d33'}}>{error}</span>}
-                        </Stack>
-                    </DialogContent>
+            <form onSubmit={submit}>
+                <DialogContent dividers>
+                    <Stack spacing={2}>
+                        <TextField
+                            label="Название"
+                            name="name"
+                            size="small"
+                            fullWidth
+                            value={form.name}
+                            onChange={handle}
+                            required
+                            sx={textFieldSx}
+                        />
+                        <TextField
+                            label="Описание"
+                            name="description"
+                            size="small"
+                            fullWidth
+                            value={form.description}
+                            onChange={handle}
+                            sx={textFieldSx}
+                        />
+                        {error && (
+                            <Box sx={{ color: 'var(--theme-error)' }}>
+                                {error}
+                            </Box>
+                        )}
+                    </Stack>
+                </DialogContent>
 
-                    <DialogActions sx={{pr: 3, pb: 2}}>
-                        <Button onClick={onCancel}>Отмена</Button>
-                        <Button
-                            variant="contained"
-                            type="submit"
-                            disabled={loading || !form.name.trim()}
-                            startIcon={loading && <CircularProgress size={16}/>}
-                        >
-                            {loading ? 'Создаю…' : 'Создать'}
-                        </Button>
-                    </DialogActions>
-                </form>
-            </Dialog>
-        </ThemeProvider>
+                <DialogActions sx={{ pr: 3, pb: 2 }}>
+                    <Button
+                        onClick={onCancel}
+                        sx={{ color: 'var(--theme-text-secondary)' }}
+                    >
+                        Отмена
+                    </Button>
+                    <Button
+                        variant="contained"
+                        type="submit"
+                        disabled={loading || !form.name.trim()}
+                        startIcon={loading && <CircularProgress size={16} />}
+                        sx={{
+                            backgroundColor: 'var(--button-primary-bg)',
+                            color: 'var(--button-primary-text)',
+                            '&:hover': {
+                                backgroundColor: 'var(--button-primary-hover)',
+                            },
+                            '&.Mui-disabled': {
+                                backgroundColor: 'var(--checkbox-disabled)',
+                            },
+                        }}
+                    >
+                        {loading ? 'Создаю…' : 'Создать'}
+                    </Button>
+                </DialogActions>
+            </form>
+        </Dialog>
     );
 };
