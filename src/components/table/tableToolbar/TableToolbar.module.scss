@@ -1,3 +1,5 @@
+// src/components/Form/tableToolbar/TableToolbar.module.scss
+
 .root {
   position: sticky; /* как меню в Google-таблицах */
   top: 0;
@@ -12,11 +14,19 @@
 .bar {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 12px;
 }
 
 /* групка слева: иконки */
 .leftGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* групка справа: поиск + настройки */
+.rightGroup {
   display: inline-flex;
   align-items: center;
   gap: 8px;

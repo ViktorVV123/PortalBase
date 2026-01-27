@@ -291,21 +291,44 @@ export function useSubCrud({
         if (!pf.ok) return;
 
         // ═══════════════════════════════════════════════════════════
-        // 1. Инициализируем все поля дефолтными значениями
+        // 1. Инициализируем все поля дефолтными значениями (включая default из колонки)
         // ═══════════════════════════════════════════════════════════
         const init: Record<number, string> = {};
         subEditableTcIds.forEach((tcId) => {
             // Находим колонку для этого tcId
-            const col = subColumnsById.get(tcId);
-            const isTriStateCheckbox = (col as any)?.type === 'checkboxNull';
-            const isRegularCheckbox = (col as any)?.type === 'checkbox' || (col as any)?.type === 'bool';
+            const col = subColumnsById.get(tcId) as any;
+            const isTriStateCheckbox = col?.type === 'checkboxNull';
+            const isRegularCheckbox = col?.type === 'checkbox' || col?.type === 'bool';
+
+            // Проверяем наличие default значения в колонке
+            const defaultValue = col?.default;
+            const hasDefault = defaultValue != null && defaultValue !== '';
 
             if (isTriStateCheckbox) {
-                init[tcId] = 'null'; // Tri-state по умолчанию null
+                // Tri-state: если есть default — используем его, иначе null
+                if (hasDefault) {
+                    const normalized = String(defaultValue).toLowerCase();
+                    if (normalized === 'true' || normalized === '1' || normalized === 't') {
+                        init[tcId] = 'true';
+                    } else if (normalized === 'false' || normalized === '0' || normalized === 'f') {
+                        init[tcId] = 'false';
+                    } else {
+                        init[tcId] = 'null';
+                    }
+                } else {
+                    init[tcId] = 'null';
+                }
             } else if (isRegularCheckbox) {
-                init[tcId] = 'false';
+                // Обычный checkbox: если есть default — используем его, иначе false
+                if (hasDefault) {
+                    const normalized = String(defaultValue).toLowerCase();
+                    init[tcId] = (normalized === 'true' || normalized === '1' || normalized === 't') ? 'true' : 'false';
+                } else {
+                    init[tcId] = 'false';
+                }
             } else {
-                init[tcId] = '';
+                // Остальные типы: используем default если есть
+                init[tcId] = hasDefault ? String(defaultValue) : '';
             }
         });
 

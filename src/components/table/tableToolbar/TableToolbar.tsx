@@ -1,9 +1,11 @@
-import React, {useMemo, useState} from 'react';
+// src/components/Form/tableToolbar/TableToolbar.tsx
+
+import React, { useMemo, useState } from 'react';
 import * as cls from './TableToolbar.module.scss';
-import {ButtonForm} from '@/shared/buttonForm/ButtonForm';
-import {SearchBox} from '@/components/search/SearchBox';
+import { ButtonForm } from '@/shared/buttonForm/ButtonForm';
+import { SearchBox } from '@/components/search/SearchBox';
 import FilterOffIcon from '@/assets/image/FilterOffIcon.svg';
-import AddIcon from "@mui/icons-material/Add";
+import FontSizeControl from "@/shared/ui/FontSizeControl";
 
 
 type Props = {
@@ -27,18 +29,14 @@ type Props = {
     // опционально
     collapsedWidth?: number; // px
     expandedWidth?: number;  // px
-    cancelAddSub: any
-    startAddSub: any
-    isAddingSub: any
-    submitAddSub: any
-    savingSub: any
+    cancelAddSub: any;
+    startAddSub: any;
+    isAddingSub: any;
+    submitAddSub: any;
+    savingSub: any;
     showSubActions: boolean;
     showMainActions?: boolean;
-
-
-
 };
-
 
 export const TableToolbar = ({
                                  isAdding,
@@ -61,7 +59,6 @@ export const TableToolbar = ({
                                  collapsedWidth = 170,
                                  expandedWidth = 380,
                                  showMainActions = true,
-
                              }: Props) => {
     const [focused, setFocused] = useState(false);
     const expanded = focused || !!value;
@@ -74,13 +71,13 @@ export const TableToolbar = ({
     return (
         <div className={cls.root}>
             <div className={cls.bar}>
+                {/* Левая группа */}
                 <div className={cls.leftGroup}>
-
                     <button className={cls.iconBtn} onClick={onResetFilters} title="Сбросить фильтры">
-                        <FilterOffIcon/>
+                        <FilterOffIcon />
                     </button>
 
-                    <div className={cls.divider}/>
+                    <div className={cls.divider} />
 
                     {showMainActions && (
                         <>
@@ -94,11 +91,11 @@ export const TableToolbar = ({
                                 cancelAdd={cancelAdd}
                                 buttonClassName={cls.iconBtn}
                             />
-                            <div className={cls.divider}/>
+                            <div className={cls.divider} />
                         </>
                     )}
 
-                   {/* {showSubActions && (
+                    {/* {showSubActions && (
                         <>
                             <ButtonForm
                                 showSubActions={showSubActions}
@@ -111,33 +108,41 @@ export const TableToolbar = ({
                                 selectedFormId={selectedFormId}
                                 buttonClassName={cls.iconBtn}
                             />
-                            <div className={cls.divider}/>
+                            <div className={cls.divider} />
                         </>
-                    )}*/}
+                    )} */}
                 </div>
 
+                {/* Правая группа */}
+                <div className={cls.rightGroup}>
+                    {showSearch && (
+                        <div
+                            className={cls.searchWrap}
+                            data-expanded={expanded ? '1' : '0'}
+                            style={searchStyleVars as React.CSSProperties}
+                        >
+                            <SearchBox
+                                value={value}
+                                onChange={onChange}
+                                placeholder="Поиск…"
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Escape') onChange('');
+                                }}
+                                autoFocus={false}
+                                // @ts-ignore
+                                onFocus={() => setFocused(true)}
+                                // @ts-ignore
+                                onBlur={() => setFocused(false)}
+                            />
+                        </div>
+                    )}
 
-                {showSearch && (
-                    <div
-                        className={cls.searchWrap}
-                        data-expanded={expanded ? '1' : '0'}
-                        style={searchStyleVars as React.CSSProperties}
-                    >
-                        <SearchBox
-                            value={value}
-                            onChange={onChange}
-                            placeholder="Поиск…"
-                            onKeyDown={(e) => {
-                                if (e.key === 'Escape') onChange('');
-                            }}
-                            autoFocus={false}
-                            // @ts-ignore
-                            onFocus={() => setFocused(true)}
-                            // @ts-ignore
-                            onBlur={() => setFocused(false)}
-                        />
-                    </div>
-                )}
+                    {/* Разделитель перед настройками */}
+                    <div className={cls.divider} />
+
+                    {/* Контрол размера шрифта */}
+                    <FontSizeControl className={cls.iconBtn} />
+                </div>
             </div>
         </div>
     );
