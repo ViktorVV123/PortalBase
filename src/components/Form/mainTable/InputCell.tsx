@@ -7,7 +7,7 @@ import { fromInputValue, toInputValue } from '@/components/Form/formTable/parts/
 import { MenuItem, Select, TextField, CircularProgress, Checkbox } from '@mui/material';
 import { isColumnRequired, isEmptyValue } from "@/shared/utils/requiredValidation/requiredValidation";
 import { TriStateCheckbox } from "@/shared/ui/TriStateCheckbox";
-import { comboCache, type ComboOption } from '@/shared/utils/comboCache';
+import { comboCache, ComboOption } from '@/shared/utils/comboCache';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // DEBUG
@@ -498,8 +498,11 @@ export const InputCell: React.FC<InputCellProps> = ({
         };
     }
 
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Multiline для текстовых полей (и add, и edit)
+    // Позволяет видеть весь текст без горизонтальной прокрутки
+    // ═══════════════════════════════════════════════════════════════════════════
     const isMultiline =
-        mode === 'edit' &&
         !isDateLike &&
         !isTriStateCheckbox &&
         !isRegularCheckbox;
