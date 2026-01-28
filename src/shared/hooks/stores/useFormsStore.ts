@@ -134,7 +134,7 @@ export function useFormsStore(): UseFormsStoreReturn {
         formsStatusRef.current = 'loading';
 
         try {
-            const { data } = await api.get<WidgetForm[]>('/forms/');
+            const { data } = await api.get<WidgetForm[]>('/forms');
             normalizeForms(data);
             formsStatusRef.current = 'loaded';
         } catch (e: any) {
@@ -153,7 +153,7 @@ export function useFormsStore(): UseFormsStoreReturn {
      * Принудительная перезагрузка форм
      */
     const reloadWidgetForms = useCallback(async () => {
-        const { data } = await api.get<WidgetForm[]>('/forms/');
+        const { data } = await api.get<WidgetForm[]>('/forms');
         normalizeForms(data);
     }, [normalizeForms]);
 
@@ -165,7 +165,7 @@ export function useFormsStore(): UseFormsStoreReturn {
     ): Promise<WidgetForm> => {
         const body: AddFormRequest = 'form' in payload ? payload : { form: payload };
 
-        const { data } = await api.post<WidgetForm>('/forms/', body);
+        const { data } = await api.post<WidgetForm>('/forms', body);
 
         // Обновляем кеш
         setFormsByWidget(prev => ({
@@ -187,16 +187,7 @@ export function useFormsStore(): UseFormsStoreReturn {
      * Удаление формы
      */
     const deleteForm = useCallback(async (formId: number) => {
-        try {
-            await api.delete(`/forms/${formId}`);
-        } catch (err: any) {
-            if (err?.response?.status === 404) {
-                await api.delete(`/forms/${formId}/`);
-            } else {
-                throw err;
-            }
-        }
-
+        await api.delete(`/forms/${formId}`);
         await reloadWidgetForms();
     }, [reloadWidgetForms]);
 

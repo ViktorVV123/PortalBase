@@ -45,7 +45,7 @@ export function useConnectionsStore(): UseConnectionsStoreReturn {
         setLoading(true);
 
         try {
-            const { data } = await api.get<Connection[]>('/connections/');
+            const { data } = await api.get<Connection[]>('/connections');
             setConnections(data.slice().sort((a, b) => a.id - b.id));
             setError(null);
             statusRef.current = 'loaded';

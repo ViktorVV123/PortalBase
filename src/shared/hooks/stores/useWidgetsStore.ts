@@ -240,7 +240,7 @@ export function useWidgetsStore(): UseWidgetsStoreReturn {
         visible?: boolean;
         type?: string;
     }): Promise<WidgetColumn> => {
-        const { data } = await api.post<WidgetColumn>('/widgets/columns/', payload);
+        const { data } = await api.post<WidgetColumn>('/widgets/columns', payload);
 
         setWidgetColumns(prev => [...prev, data].sort((a, b) => a.id - b.id));
 

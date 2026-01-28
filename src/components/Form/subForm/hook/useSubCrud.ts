@@ -1,13 +1,11 @@
 // src/components/Form/subForm/hook/useSubCrud.ts
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState, useRef, useEffect } from 'react';
 import { api } from '@/services/api';
 import type { SubDisplay, FormDisplay } from '@/shared/hooks/useWorkSpaces';
 import type { ExtCol } from '@/components/Form/formTable/parts/FormatByDatatype';
 import {
     validateAddDraft,
-    getRequiredColumns,
-    isEmptyValue,
 } from '@/shared/utils/requiredValidation/requiredValidation';
 
 export type UseSubCrudDeps = {
@@ -17,7 +15,6 @@ export type UseSubCrudDeps = {
     loadSubDisplay: (formId: number, subOrder: number, primary?: Record<string, unknown>) => void;
     lastPrimary: Record<string, unknown>;
     subDisplay: SubDisplay | null;
-    // Данные MainTable для автозаполнения
     mainFormDisplay?: FormDisplay | null;
     mainSelectedRowIdx?: number | null;
 };
@@ -28,39 +25,20 @@ export type UseSubCrudResult = {
     draftSub: Record<number, string>;
     setDraftSub: React.Dispatch<React.SetStateAction<Record<number, string>>>;
     savingSub: boolean;
-
     startAddSub: () => Promise<void>;
     cancelAddSub: () => void;
     submitAddSub: () => Promise<void>;
-
     subEditableTcIds: number[];
-
-    // Валидация
     showSubValidationErrors: boolean;
     setShowSubValidationErrors: React.Dispatch<React.SetStateAction<boolean>>;
     subValidationMissingFields: string[];
     setSubValidationMissingFields: React.Dispatch<React.SetStateAction<string[]>>;
     resetSubValidation: () => void;
-
-    // NEW: Автозаполненные поля (для визуальной индикации)
     autoFilledFields: Set<number>;
     clearAutoFilledField: (tcId: number) => void;
 };
 
-// ═══════════════════════════════════════════════════════════
-// УТИЛИТЫ
-// ═══════════════════════════════════════════════════════════
-
-const isSyntheticComboboxId = (tcId: number): boolean => {
-    return tcId < -1_000_000 + 1;
-};
-
-const getWriteTcId = (col: any): number | null => {
-    if (col.type === 'combobox') {
-        return col.__write_tc_id ?? null;
-    }
-    return col.table_column_id ?? null;
-};
+const isSyntheticComboboxId = (tcId: number): boolean => tcId < -1_000_000 + 1;
 
 export function useSubCrud({
                                formIdForSub,
@@ -75,24 +53,27 @@ export function useSubCrud({
     const [isAddingSub, setIsAddingSub] = useState(false);
     const [draftSub, setDraftSub] = useState<Record<number, string>>({});
     const [savingSub, setSavingSub] = useState(false);
-
-    // ═══════════════════════════════════════════════════════════
-    // Состояние валидации для Sub
-    // ═══════════════════════════════════════════════════════════
     const [showSubValidationErrors, setShowSubValidationErrors] = useState(false);
     const [subValidationMissingFields, setSubValidationMissingFields] = useState<string[]>([]);
+    const [autoFilledFields, setAutoFilledFields] = useState<Set<number>>(new Set());
 
     // ═══════════════════════════════════════════════════════════
-    // NEW: Автозаполненные поля (write_tc_id)
+    // Защита от setState после unmount
     // ═══════════════════════════════════════════════════════════
-    const [autoFilledFields, setAutoFilledFields] = useState<Set<number>>(new Set());
+    const unmountedRef = useRef(false);
+
+    useEffect(() => {
+        unmountedRef.current = false;
+        return () => {
+            unmountedRef.current = true;
+        };
+    }, []);
 
     const resetSubValidation = useCallback(() => {
         setShowSubValidationErrors(false);
         setSubValidationMissingFields([]);
     }, []);
 
-    // Очистить индикацию автозаполнения для конкретного поля (когда пользователь его изменит)
     const clearAutoFilledField = useCallback((tcId: number) => {
         setAutoFilledFields((prev) => {
             if (!prev.has(tcId)) return prev;
@@ -102,163 +83,84 @@ export function useSubCrud({
         });
     }, []);
 
-    // ═══════════════════════════════════════════════════════════
-    // COMPUTED
-    // ═══════════════════════════════════════════════════════════
-
     const subColumnsById = useMemo(() => {
         const map = new Map<number, SubDisplay['columns'][number]>();
-        const cols = subDisplay?.columns ?? [];
-        for (const c of cols) {
-            if (c.table_column_id != null) {
-                map.set(c.table_column_id as number, c);
-            }
-        }
+        (subDisplay?.columns ?? []).forEach((c) => {
+            if (c.table_column_id != null) map.set(c.table_column_id as number, c);
+        });
         return map;
     }, [subDisplay?.columns]);
 
-    const subColumnsAsExtCol = useMemo(() => {
-        return (subDisplay?.columns ?? []) as ExtCol[];
-    }, [subDisplay?.columns]);
+    const subColumnsAsExtCol = useMemo(() => (subDisplay?.columns ?? []) as ExtCol[], [subDisplay?.columns]);
 
     const subEditableTcIds = useMemo(() => {
-        const cols = subDisplay?.columns ?? [];
         const ids: number[] = [];
         const seen = new Set<number>();
-
-        for (const c of cols) {
+        for (const c of subDisplay?.columns ?? []) {
             const col = c as any;
-
-            // ═══════════════════════════════════════════════════════════
-            // ИСПРАВЛЕНО: Пропускаем колонки rls — они виртуальные и не существуют в БД
-            // ═══════════════════════════════════════════════════════════
-            if (col.type === 'rls') continue;
-
-            if (col.primary || col.increment || col.readonly) continue;
-
-            let writeTcId: number | null = null;
-
-            if (col.type === 'combobox') {
-                writeTcId = col.__write_tc_id ?? col.table_column_id ?? null;
-                if (writeTcId != null && isSyntheticComboboxId(writeTcId)) {
-                    writeTcId = col.__write_tc_id ?? null;
-                }
-            } else {
-                writeTcId = col.table_column_id ?? null;
-            }
-
+            if (col.type === 'rls' || col.primary || col.increment || col.readonly) continue;
+            let writeTcId = col.type === 'combobox'
+                ? (col.__write_tc_id ?? col.table_column_id ?? null)
+                : (col.table_column_id ?? null);
+            if (writeTcId != null && isSyntheticComboboxId(writeTcId)) writeTcId = col.__write_tc_id ?? null;
             if (writeTcId != null && !isSyntheticComboboxId(writeTcId) && !seen.has(writeTcId)) {
                 seen.add(writeTcId);
                 ids.push(writeTcId);
             }
         }
-
         return ids;
     }, [subDisplay?.columns]);
 
-    // ═══════════════════════════════════════════════════════════
-    // ХЕЛПЕР: Построить маппинг table_column_name → value из MainTable row
-    // ═══════════════════════════════════════════════════════════
     const buildMainRowValuesMap = useCallback((): Map<string, string> => {
         const map = new Map<string, string>();
-
-        if (!mainFormDisplay || mainSelectedRowIdx == null) {
-            return map;
-        }
-
+        if (!mainFormDisplay || mainSelectedRowIdx == null) return map;
         const row = mainFormDisplay.data?.[mainSelectedRowIdx];
         if (!row) return map;
-
         const mainColumns = mainFormDisplay.columns ?? [];
-
-        // Строим индекс значений для MainTable
         const mainValueIndex = new Map<string, number>();
         mainColumns.forEach((col, idx) => {
-            const syntheticTcId =
-                col.type === 'combobox' && col.combobox_column_id != null && col.table_column_id != null
-                    ? -1_000_000 - Number(col.combobox_column_id)
-                    : col.table_column_id ?? -1;
+            const syntheticTcId = col.type === 'combobox' && col.combobox_column_id != null && col.table_column_id != null
+                ? -1_000_000 - Number(col.combobox_column_id)
+                : col.table_column_id ?? -1;
             mainValueIndex.set(`${col.widget_column_id}:${syntheticTcId}`, idx);
         });
-
-        // Собираем значения по table_column_name
         mainColumns.forEach((col) => {
             const tableColumnName = (col as any).table_column_name;
             if (!tableColumnName) return;
-
-            const writeTcId = col.type === 'combobox'
-                ? ((col as any).__write_tc_id ?? col.table_column_id)
-                : col.table_column_id;
-
-            if (writeTcId == null) return;
-
             if (col.type === 'combobox') {
                 const pkValue = lastPrimary[tableColumnName];
-                if (pkValue != null) {
-                    map.set(tableColumnName, String(pkValue));
-                }
+                if (pkValue != null) map.set(tableColumnName, String(pkValue));
             } else {
-                const syntheticTcId =
-                    col.type === 'combobox' && col.combobox_column_id != null && col.table_column_id != null
-                        ? -1_000_000 - Number(col.combobox_column_id)
-                        : col.table_column_id ?? -1;
-
-                const key = `${col.widget_column_id}:${syntheticTcId}`;
-                const idx = mainValueIndex.get(key);
-
+                const syntheticTcId = col.type === 'combobox' && col.combobox_column_id != null && col.table_column_id != null
+                    ? -1_000_000 - Number(col.combobox_column_id)
+                    : col.table_column_id ?? -1;
+                const idx = mainValueIndex.get(`${col.widget_column_id}:${syntheticTcId}`);
                 if (idx != null) {
                     const val = row.values[idx];
-                    if (val != null && val !== '') {
-                        map.set(tableColumnName, String(val));
-                    }
+                    if (val != null && val !== '') map.set(tableColumnName, String(val));
                 }
             }
         });
-
-        // Также добавляем все primary_keys (они часто содержат FK)
         Object.entries(lastPrimary).forEach(([key, value]) => {
-            if (value != null && !map.has(key)) {
-                map.set(key, String(value));
-            }
+            if (value != null && !map.has(key)) map.set(key, String(value));
         });
-
         return map;
     }, [mainFormDisplay, mainSelectedRowIdx, lastPrimary]);
 
-    // ═══════════════════════════════════════════════════════════
-    // ХЕЛПЕР: Маппинг Sub колонок по table_column_name → write_tc_id
-    // ═══════════════════════════════════════════════════════════
     const buildSubColumnNameToWriteIdMap = useCallback((): Map<string, number> => {
         const map = new Map<string, number>();
-        const cols = subDisplay?.columns ?? [];
-
-        for (const c of cols) {
+        for (const c of subDisplay?.columns ?? []) {
             const col = c as any;
             const tableColumnName = col.table_column_name;
             if (!tableColumnName) continue;
-
-            let writeTcId: number | null = null;
-
-            if (col.type === 'combobox') {
-                writeTcId = col.__write_tc_id ?? col.table_column_id ?? null;
-                if (writeTcId != null && isSyntheticComboboxId(writeTcId)) {
-                    writeTcId = col.__write_tc_id ?? null;
-                }
-            } else {
-                writeTcId = col.table_column_id ?? null;
-            }
-
-            if (writeTcId != null && !isSyntheticComboboxId(writeTcId)) {
-                map.set(tableColumnName, writeTcId);
-            }
+            let writeTcId = col.type === 'combobox'
+                ? (col.__write_tc_id ?? col.table_column_id ?? null)
+                : (col.table_column_id ?? null);
+            if (writeTcId != null && isSyntheticComboboxId(writeTcId)) writeTcId = col.__write_tc_id ?? null;
+            if (writeTcId != null && !isSyntheticComboboxId(writeTcId)) map.set(tableColumnName, writeTcId);
         }
-
         return map;
     }, [subDisplay?.columns]);
-
-    // ═══════════════════════════════════════════════════════════
-    // PREFLIGHT
-    // ═══════════════════════════════════════════════════════════
 
     const preflightInsertSub = useCallback(async (): Promise<{ ok: boolean }> => {
         if (!currentWidgetId) return { ok: false };
@@ -266,7 +168,7 @@ export function useSubCrud({
             const { data: widget } = await api.get(`/widgets/${currentWidgetId}`);
             const { data: table } = await api.get(`/tables/${widget.table_id}`);
             if (!table?.insert_query?.trim()) {
-                alert('Для таблицы саб-виджета не настроен INSERT QUERY. Задайте его в метаданных таблицы.');
+                alert('Для таблицы саб-виджета не настроен INSERT QUERY.');
                 return { ok: false };
             }
         } catch (e) {
@@ -275,113 +177,53 @@ export function useSubCrud({
         return { ok: true };
     }, [currentWidgetId]);
 
-    // ═══════════════════════════════════════════════════════════
-    // START ADD
-    // ═══════════════════════════════════════════════════════════
-
     const startAddSub = useCallback(async () => {
         if (!formIdForSub || !currentWidgetId) return;
-
         if (!lastPrimary || Object.keys(lastPrimary).length === 0) {
-            alert('Сначала выберите строку в основной таблице, чтобы добавить связанную запись в саб-таблицу.');
+            alert('Сначала выберите строку в основной таблице.');
             return;
         }
-
         const pf = await preflightInsertSub();
         if (!pf.ok) return;
 
-        // ═══════════════════════════════════════════════════════════
-        // 1. Инициализируем все поля дефолтными значениями (включая default из колонки)
-        // ═══════════════════════════════════════════════════════════
         const init: Record<number, string> = {};
         subEditableTcIds.forEach((tcId) => {
-            // Находим колонку для этого tcId
             const col = subColumnsById.get(tcId) as any;
-            const isTriStateCheckbox = col?.type === 'checkboxNull';
-            const isRegularCheckbox = col?.type === 'checkbox' || col?.type === 'bool';
-
-            // Проверяем наличие default значения в колонке
+            const isTriState = col?.type === 'checkboxNull';
+            const isCheckbox = col?.type === 'checkbox' || col?.type === 'bool';
             const defaultValue = col?.default;
             const hasDefault = defaultValue != null && defaultValue !== '';
-
-            if (isTriStateCheckbox) {
-                // Tri-state: если есть default — используем его, иначе null
+            if (isTriState) {
                 if (hasDefault) {
-                    const normalized = String(defaultValue).toLowerCase();
-                    if (normalized === 'true' || normalized === '1' || normalized === 't') {
-                        init[tcId] = 'true';
-                    } else if (normalized === 'false' || normalized === '0' || normalized === 'f') {
-                        init[tcId] = 'false';
-                    } else {
-                        init[tcId] = 'null';
-                    }
-                } else {
-                    init[tcId] = 'null';
-                }
-            } else if (isRegularCheckbox) {
-                // Обычный checkbox: если есть default — используем его, иначе false
+                    const n = String(defaultValue).toLowerCase();
+                    init[tcId] = (n === 'true' || n === '1' || n === 't') ? 'true' : (n === 'false' || n === '0' || n === 'f') ? 'false' : 'null';
+                } else init[tcId] = 'null';
+            } else if (isCheckbox) {
                 if (hasDefault) {
-                    const normalized = String(defaultValue).toLowerCase();
-                    init[tcId] = (normalized === 'true' || normalized === '1' || normalized === 't') ? 'true' : 'false';
-                } else {
-                    init[tcId] = 'false';
-                }
+                    const n = String(defaultValue).toLowerCase();
+                    init[tcId] = (n === 'true' || n === '1' || n === 't') ? 'true' : 'false';
+                } else init[tcId] = 'false';
             } else {
-                // Остальные типы: используем default если есть
                 init[tcId] = hasDefault ? String(defaultValue) : '';
             }
         });
 
-        // ═══════════════════════════════════════════════════════════
-        // 2. Автозаполнение из MainTable row + отслеживание
-        // ═══════════════════════════════════════════════════════════
         const mainRowValues = buildMainRowValuesMap();
         const subColumnNameToWriteId = buildSubColumnNameToWriteIdMap();
-        const newAutoFilledFields = new Set<number>();
-
-        if (mainRowValues.size > 0) {
-            console.debug('[useSubCrud] startAddSub → applying MainTable values to Sub draft', {
-                mainRowValues: Object.fromEntries(mainRowValues),
-                subColumnNameToWriteId: Object.fromEntries(subColumnNameToWriteId),
-            });
-
-            mainRowValues.forEach((value, columnName) => {
-                const writeTcId = subColumnNameToWriteId.get(columnName);
-
-                if (writeTcId != null && subEditableTcIds.includes(writeTcId)) {
-                    init[writeTcId] = value;
-                    newAutoFilledFields.add(writeTcId); // Помечаем как автозаполненное
-
-                    console.debug('[useSubCrud] startAddSub → auto-filled from MainTable', {
-                        columnName,
-                        writeTcId,
-                        value,
-                    });
-                }
-            });
-        }
-
-        console.debug('[useSubCrud] startAddSub → final init draft:', init);
-        console.debug('[useSubCrud] startAddSub → autoFilledFields:', Array.from(newAutoFilledFields));
+        const newAutoFilled = new Set<number>();
+        mainRowValues.forEach((value, columnName) => {
+            const writeTcId = subColumnNameToWriteId.get(columnName);
+            if (writeTcId != null && subEditableTcIds.includes(writeTcId)) {
+                init[writeTcId] = value;
+                newAutoFilled.add(writeTcId);
+            }
+        });
 
         setDraftSub(init);
-        setAutoFilledFields(newAutoFilledFields);
+        setAutoFilledFields(newAutoFilled);
         setIsAddingSub(true);
         resetSubValidation();
-    }, [
-        formIdForSub,
-        currentWidgetId,
-        lastPrimary,
-        preflightInsertSub,
-        subEditableTcIds,
-        resetSubValidation,
-        buildMainRowValuesMap,
-        buildSubColumnNameToWriteIdMap,
-    ]);
-
-    // ═══════════════════════════════════════════════════════════
-    // CANCEL ADD
-    // ═══════════════════════════════════════════════════════════
+    }, [formIdForSub, currentWidgetId, lastPrimary, preflightInsertSub, subEditableTcIds, subColumnsById, resetSubValidation, buildMainRowValuesMap, buildSubColumnNameToWriteIdMap]);
 
     const cancelAddSub = useCallback(() => {
         setIsAddingSub(false);
@@ -390,164 +232,89 @@ export function useSubCrud({
         resetSubValidation();
     }, [resetSubValidation]);
 
-    // ═══════════════════════════════════════════════════════════
-    // SUBMIT ADD
-    // ═══════════════════════════════════════════════════════════
-
     const submitAddSub = useCallback(async () => {
+        if (unmountedRef.current) return;
         if (!formIdForSub || !currentWidgetId) return;
-
         if (!lastPrimary || Object.keys(lastPrimary).length === 0) {
             alert('Сначала выберите строку в основной таблице.');
             return;
         }
-
-        // ═══════════════════════════════════════════════════════════
-        // ВАЛИДАЦИЯ REQUIRED ПОЛЕЙ
-        // ═══════════════════════════════════════════════════════════
         const validation = validateAddDraft(draftSub, subColumnsAsExtCol);
-
         if (!validation.isValid) {
-            console.warn('[useSubCrud] VALIDATION FAILED — показываем ошибки');
             setShowSubValidationErrors(true);
             setSubValidationMissingFields(validation.missingFields);
             return;
         }
-
         const pf = await preflightInsertSub();
         if (!pf.ok) return;
+
+        if (unmountedRef.current) return;
 
         setSavingSub(true);
         try {
             const values = Object.entries(draftSub)
                 .filter(([tcIdStr]) => {
                     const tcId = Number(tcIdStr);
-                    // Фильтруем синтетические ID
                     if (isSyntheticComboboxId(tcId)) return false;
-
-                    // ═══════════════════════════════════════════════════════════
-                    // ИСПРАВЛЕНО: Фильтруем колонки типа rls — они виртуальные
-                    // ═══════════════════════════════════════════════════════════
                     const col = subColumnsById.get(tcId);
                     if ((col as any)?.type === 'rls') return false;
-
                     return true;
                 })
                 .map(([tcIdStr, value]) => {
                     const tcId = Number(tcIdStr);
                     const col = subColumnsById.get(tcId);
-
-                    const isTriStateCheckbox = (col as any)?.type === 'checkboxNull';
-                    const isRegularCheckbox =
-                        (col as any)?.type === 'checkbox' ||
-                        (col as any)?.type === 'bool';
-
+                    const isTriState = (col as any)?.type === 'checkboxNull';
+                    const isCheckbox = (col as any)?.type === 'checkbox' || (col as any)?.type === 'bool';
                     const s = value == null ? '' : String(value).trim();
-
                     let final: string | null;
-                    if (isTriStateCheckbox) {
-                        // TRISTATE: может быть null
-                        const normalized = s.toLowerCase();
-                        if (normalized === 'null' || normalized === '') {
-                            final = null;
-                        } else if (normalized === 'true' || normalized === '1' || normalized === 't' || normalized === 'yes' || normalized === 'да') {
-                            final = 'true';
-                        } else {
-                            final = 'false';
-                        }
-                    } else if (isRegularCheckbox) {
-                        // Обычный checkbox: только true/false
-                        const normalized = s.toLowerCase();
-                        if (normalized === 'true' || normalized === '1' || normalized === 't' || normalized === 'yes' || normalized === 'да') {
-                            final = 'true';
-                        } else {
-                            final = 'false';
-                        }
+                    if (isTriState) {
+                        const n = s.toLowerCase();
+                        final = (n === 'null' || n === '') ? null : (n === 'true' || n === '1' || n === 't' || n === 'yes' || n === 'да') ? 'true' : 'false';
+                    } else if (isCheckbox) {
+                        const n = s.toLowerCase();
+                        final = (n === 'true' || n === '1' || n === 't' || n === 'yes' || n === 'да') ? 'true' : 'false';
                     } else {
                         final = s === '' ? null : s;
                     }
-
-                    return {
-                        table_column_id: tcId,
-                        value: final,
-                    };
+                    return { table_column_id: tcId, value: final };
                 });
 
             const body = {
-                pk: {
-                    primary_keys: Object.fromEntries(
-                        Object.entries(lastPrimary).map(([k, v]) => [k, String(v)])
-                    ),
-                },
+                pk: { primary_keys: Object.fromEntries(Object.entries(lastPrimary).map(([k, v]) => [k, String(v)])) },
                 values,
             };
-
-            console.debug('[useSubCrud] submitAddSub → body:', body);
-
             const url = `/data/${formIdForSub}/${currentWidgetId}`;
+
             try {
                 await api.post(url, body);
             } catch (err: any) {
+                if (unmountedRef.current) return;
                 const status = err?.response?.status;
                 const detail = err?.response?.data?.detail ?? err?.response?.data ?? err?.message;
-
-                if (status === 403) {
-                    alert('У вас не хватает прав на добавление новой записи');
-                    return;
-                }
-
-                if (status === 404 && String(detail).includes('Insert query not found')) {
-                    alert('Для саб-формы не настроен INSERT QUERY. Задайте его и повторите.');
-                    return;
-                }
-                if (status === 404) {
-                    await api.post(`${url}/`, body);
-                } else {
-                    throw err;
-                }
+                if (status === 403) { alert('У вас не хватает прав на добавление новой записи'); return; }
+                if (status === 404 && String(detail).includes('Insert query not found')) { alert('Для саб-формы не настроен INSERT QUERY.'); return; }
+                throw err;
             }
 
-            if (currentOrder != null) {
-                loadSubDisplay(formIdForSub, currentOrder, lastPrimary);
-            }
+            if (unmountedRef.current) return;
+
+            if (currentOrder != null) loadSubDisplay(formIdForSub, currentOrder, lastPrimary);
             setIsAddingSub(false);
             setDraftSub({});
             setAutoFilledFields(new Set());
             resetSubValidation();
         } finally {
-            setSavingSub(false);
+            if (!unmountedRef.current) {
+                setSavingSub(false);
+            }
         }
-    }, [
-        formIdForSub,
-        currentWidgetId,
-        lastPrimary,
-        draftSub,
-        currentOrder,
-        preflightInsertSub,
-        loadSubDisplay,
-        subColumnsById,
-        subColumnsAsExtCol,
-        resetSubValidation,
-    ]);
+    }, [formIdForSub, currentWidgetId, lastPrimary, draftSub, currentOrder, preflightInsertSub, loadSubDisplay, subColumnsById, subColumnsAsExtCol, resetSubValidation]);
 
     return {
-        isAddingSub,
-        setIsAddingSub,
-        draftSub,
-        setDraftSub,
-        savingSub,
-        startAddSub,
-        cancelAddSub,
-        submitAddSub,
-        subEditableTcIds,
-        // Валидация
-        showSubValidationErrors,
-        setShowSubValidationErrors,
-        subValidationMissingFields,
-        setSubValidationMissingFields,
-        resetSubValidation,
-        // NEW: Автозаполненные поля
-        autoFilledFields,
-        clearAutoFilledField,
+        isAddingSub, setIsAddingSub, draftSub, setDraftSub, savingSub,
+        startAddSub, cancelAddSub, submitAddSub, subEditableTcIds,
+        showSubValidationErrors, setShowSubValidationErrors,
+        subValidationMissingFields, setSubValidationMissingFields, resetSubValidation,
+        autoFilledFields, clearAutoFilledField,
     };
 }

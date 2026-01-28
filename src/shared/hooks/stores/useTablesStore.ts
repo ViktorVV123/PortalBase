@@ -224,7 +224,7 @@ export function useTablesStore(): UseTablesStoreReturn {
         tableId: number,
         data: Partial<Column>
     ): Promise<Column> => {
-        const { data: newColumn } = await api.post<Column>('/tables/columns/', {
+        const { data: newColumn } = await api.post<Column>('/tables/columns', {
             table_id: tableId,
             ...data,
         });

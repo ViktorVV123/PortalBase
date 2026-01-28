@@ -7,7 +7,7 @@ import { fromInputValue, toInputValue } from '@/components/Form/formTable/parts/
 import { MenuItem, Select, TextField, CircularProgress, Checkbox } from '@mui/material';
 import { isColumnRequired, isEmptyValue } from "@/shared/utils/requiredValidation/requiredValidation";
 import { TriStateCheckbox } from "@/shared/ui/TriStateCheckbox";
-
+import { comboCache, type ComboOption } from '@/shared/utils/comboCache';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // DEBUG
@@ -35,17 +35,8 @@ type ComboResp = {
     }>;
 };
 
-export type ComboOption = {
-    id: string;
-    show: string[];
-    showHidden: string[];
-};
-
-/** общий кеш для combobox-опций */
-const comboCache = new Map<string, { options: ComboOption[]; columns: ComboColumnMeta[] }>();
-
-const makeComboKey = (widgetColumnId: number, writeTcId: number) =>
-    `${widgetColumnId}:${writeTcId}`;
+// Re-export для обратной совместимости
+export type { ComboOption };
 
 const isNumericLike = (dt: unknown): boolean =>
     typeof dt === 'string' &&
@@ -80,17 +71,27 @@ export const normalizeValueForColumn = (
     return trimmed.replace(/,/g, '.');
 };
 
+/**
+ * Загружает combobox опции с кэшированием
+ * - Проверяет LRU кэш с TTL
+ * - Сохраняет в localStorage между сессиями
+ */
 export async function loadComboOptionsOnce(
     widgetColumnId: number,
     writeTcId: number,
 ): Promise<ComboOption[]> {
-    const key = makeComboKey(widgetColumnId, writeTcId);
+    const key = comboCache.makeKey(widgetColumnId, writeTcId);
 
-    const cached = comboCache.get(key);
+    // Проверяем кэш (с учётом TTL)
+    const cached = comboCache.getOptions(widgetColumnId, writeTcId);
     if (cached) {
-        return cached.options;
+        logCombo('cache:hit', { key, optionsCount: cached.length });
+        return cached;
     }
 
+    logCombo('cache:miss', { key });
+
+    // Загружаем с бэкенда
     const { data } = await api.get<ComboResp>(`/display/combobox/${widgetColumnId}/${writeTcId}`);
 
     const opts: ComboOption[] = data.data.map((row) => ({
@@ -99,17 +100,27 @@ export async function loadComboOptionsOnce(
         showHidden: (row.show_hidden ?? []).map(String),
     }));
 
-    comboCache.set(key, { options: opts, columns: data.columns });
+    // Сохраняем в кэш
+    comboCache.set(key, opts, data.columns);
+
+    logCombo('cache:set', { key, optionsCount: opts.length });
 
     return opts;
 }
 
+/**
+ * Очищает кэш combobox
+ * @param widgetColumnId - если указан вместе с writeTcId, очищает конкретный combobox
+ * @param writeTcId - если указан вместе с widgetColumnId, очищает конкретный combobox
+ * Если оба не указаны — очищает весь кэш
+ */
 export function clearComboCache(widgetColumnId?: number, writeTcId?: number) {
     if (widgetColumnId != null && writeTcId != null) {
-        const key = makeComboKey(widgetColumnId, writeTcId);
-        comboCache.delete(key);
+        comboCache.invalidate(widgetColumnId, writeTcId);
+        logCombo('cache:invalidate', { widgetColumnId, writeTcId });
     } else {
         comboCache.clear();
+        logCombo('cache:clear', {});
     }
 }
 
@@ -144,17 +155,10 @@ export function useComboOptions(
             setError(null);
 
             try {
-                const key = makeComboKey(widgetColumnId, writeTcId);
-
-                if (reloadToken === 0) {
-                    const cached = comboCache.get(key);
-                    if (cached) {
-                        setOptions(cached.options);
-                        setReady(true);
-                        return;
-                    }
-                } else {
-                    comboCache.delete(key);
+                // Если reloadToken > 0 — принудительно инвалидируем кэш
+                if (reloadToken > 0) {
+                    comboCache.invalidate(widgetColumnId, writeTcId);
+                    logCombo('cache:forced-invalidate', { widgetColumnId, writeTcId, reloadToken });
                 }
 
                 const opts = await loadComboOptionsOnce(widgetColumnId, writeTcId);
@@ -256,7 +260,6 @@ const textFieldSx = {
         overflowWrap: 'anywhere',
         wordBreak: 'break-word',
     },
-    // Стили для date/time input — иконка календаря
     '& input[type="date"], & input[type="time"], & input[type="datetime-local"]': {
         color: 'var(--input-text)',
         colorScheme: 'var(--color-scheme, dark)',
@@ -293,11 +296,9 @@ export type InputCellProps = {
     readOnly: boolean;
     placeholder: string;
     comboReloadToken?: number;
-    /** NEW: Показывать ошибку валидации (красная рамка) */
     showError?: boolean;
 };
 
-/** Универсальный инпут для Main/Sub: текст, combobox, date/time/timestamp(+tz), checkbox */
 export const InputCell: React.FC<InputCellProps> = ({
                                                         mode,
                                                         col,
@@ -310,14 +311,10 @@ export const InputCell: React.FC<InputCellProps> = ({
                                                     }) => {
     const writeTcId = (col.__write_tc_id ?? col.table_column_id) ?? null;
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // Определяем обязательность и пустоту
-    // ═══════════════════════════════════════════════════════════════════════════
     const isRequired = isColumnRequired(col);
     const isEmpty = isEmptyValue(value);
     const hasError = showError && isRequired && isEmpty;
 
-    // Стили для ошибки
     const errorSx = hasError ? errorSxBase : {};
 
     if (readOnly || writeTcId == null) {
@@ -439,11 +436,6 @@ export const InputCell: React.FC<InputCellProps> = ({
                     ? 'datetime-local'
                     : undefined;
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // CHECKBOX — два варианта:
-    // - checkboxNull: трёхпозиционный (false → true → null)
-    // - checkbox/bool: обычный двухпозиционный (false ↔ true)
-    // ═══════════════════════════════════════════════════════════════════════════
     const isTriStateCheckbox = col.type === 'checkboxNull';
     const isRegularCheckbox = col.type === 'checkbox' || col.type === 'bool';
 

@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback } from 'react';
+import { useRef, useState, useCallback, useEffect } from 'react';
 import debounce from 'lodash/debounce';
 import type { DebouncedFunc } from 'lodash';
 
@@ -26,14 +26,39 @@ export function useRefsDnd({
                            }: Args) {
     const [drag, setDrag] = useState<DragData | null>(null);
 
-    // ⬇️ НОВОЕ: Флаг что sync уже выполняется
+    // Флаг что sync уже выполняется
     const isSyncingRef = useRef(false);
-    // ⬇️ НОВОЕ: Флаг что нужен повторный sync
+    // Флаг что нужен повторный sync
     const pendingSyncRef = useRef(false);
+    // Флаг что компонент размонтирован (для предотвращения setState после unmount)
+    const unmountedRef = useRef(false);
+
+    // Ref для debounced функции
+    const queueSyncRef = useRef<DebouncedFunc<() => Promise<void>> | null>(null);
+
+    // ═══════════════════════════════════════════════════════════
+    // CLEANUP: отменяем debounce и помечаем unmount
+    // ═══════════════════════════════════════════════════════════
+    useEffect(() => {
+        unmountedRef.current = false;
+
+        return () => {
+            unmountedRef.current = true;
+            // Отменяем pending debounce при unmount
+            queueSyncRef.current?.cancel();
+            logApi('CLEANUP:unmount', { debounce: 'cancelled' });
+        };
+    }, []);
 
     // Основная функция синхронизации
     const doSync = useCallback(async () => {
-        // ⬇️ НОВОЕ: Защита от параллельного выполнения
+        // Защита от выполнения после unmount
+        if (unmountedRef.current) {
+            logApi('SYNC:skip', { reason: 'unmounted' });
+            return;
+        }
+
+        // Защита от параллельного выполнения
         if (isSyncingRef.current) {
             pendingSyncRef.current = true;
             logApi('SYNC:deferred', { reason: 'already syncing' });
@@ -49,14 +74,18 @@ export function useRefsDnd({
 
             // 1) ADD (новые / кросс-перенос) — ПОСЛЕДОВАТЕЛЬНО
             for (const wcIdStr of Object.keys(state)) {
+                // Проверяем unmount перед каждым запросом
+                if (unmountedRef.current) break;
+
                 const wcId = Number(wcIdStr);
                 const list = state[wcId] ?? [];
-                // ⬇️ ИСПРАВЛЕНО: добавили filter(Boolean) для защиты от undefined
                 const nextIds = list.map(r => r.table_column?.id).filter(Boolean) as number[];
                 const prevIds = snapshot[wcId] ?? [];
                 const added = nextIds.filter(id => !prevIds.includes(id));
 
                 for (const id of added) {
+                    if (unmountedRef.current) break;
+
                     const toIdx = nextIds.indexOf(id);
                     const refObj = list[toIdx];
                     if (!refObj) continue;
@@ -72,6 +101,9 @@ export function useRefsDnd({
                     }
                 }
             }
+
+            // Проверяем unmount перед REORDER
+            if (unmountedRef.current) return;
 
             // 2) REORDER — batch по 3 запроса
             const reorderTasks: Array<() => Promise<void>> = [];
@@ -92,6 +124,9 @@ export function useRefsDnd({
                         if (!row) continue;
 
                         reorderTasks.push(async () => {
+                            // Проверяем unmount внутри batch task
+                            if (unmountedRef.current) return;
+
                             try {
                                 await callUpdateReference(wcId, id, toFullPatch(row, newIdx));
                             } catch (e) {
@@ -102,11 +137,16 @@ export function useRefsDnd({
                 }
             }
 
-            // ⬇️ НОВОЕ: Выполняем REORDER batch по 3 (не все сразу!)
+            // Выполняем REORDER batch по 3 (не все сразу!)
             for (let i = 0; i < reorderTasks.length; i += 3) {
+                if (unmountedRef.current) break;
+
                 const batch = reorderTasks.slice(i, i + 3);
                 await Promise.all(batch.map(fn => fn()));
             }
+
+            // Проверяем unmount перед обновлением snapshot
+            if (unmountedRef.current) return;
 
             // 3) Обновить снапшот
             const nextSnap: Record<number, number[]> = {};
@@ -122,8 +162,8 @@ export function useRefsDnd({
         } finally {
             isSyncingRef.current = false;
 
-            // ⬇️ НОВОЕ: Если за время sync пришли изменения — запускаем ещё раз
-            if (pendingSyncRef.current) {
+            // Если за время sync пришли изменения — запускаем ещё раз (если не unmounted)
+            if (pendingSyncRef.current && !unmountedRef.current) {
                 pendingSyncRef.current = false;
                 logApi('SYNC:retry', {});
                 setTimeout(doSync, 50);
@@ -131,14 +171,13 @@ export function useRefsDnd({
         }
     }, [localRefsRef, snapshotRef, callUpdateReference, createReference]);
 
-    // ⬇️ ИЗМЕНЕНО: debounce 350ms вместо 250ms
-    const queueSyncRef = useRef<DebouncedFunc<() => Promise<void>> | null>(null);
+    // Инициализируем debounced функцию
     if (!queueSyncRef.current) {
         queueSyncRef.current = debounce(doSync, 350);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // DnD handlers (почти без изменений)
+    // DnD handlers
     // ─────────────────────────────────────────────────────────────────────────
 
     const onDragStart = (srcWcId: number, fromIdx: number, tableColumnId: number) => (e: React.DragEvent) => {
@@ -158,6 +197,9 @@ export function useRefsDnd({
     };
 
     const applyCrossReorder = async (d: DragData, target: { dstWcId: number; toIdx: number }) => {
+        // Защита от выполнения после unmount
+        if (unmountedRef.current) return;
+
         const { srcWcId, fromIdx } = d;
         const { dstWcId, toIdx } = target;
 
@@ -170,7 +212,7 @@ export function useRefsDnd({
                 const [rm] = next.splice(fromIdx, 1);
                 if (!rm) return prev;
 
-                // ⬇️ ИСПРАВЛЕНО: корректируем toIdx
+                // Корректируем toIdx
                 const adjustedToIdx = fromIdx < toIdx ? toIdx - 1 : toIdx;
                 const safeIdx = Math.max(0, Math.min(adjustedToIdx, next.length));
                 next.splice(safeIdx, 0, rm);
@@ -214,8 +256,10 @@ export function useRefsDnd({
             });
         }
 
-        // Запускаем sync (debounced)
-        queueSyncRef.current?.();
+        // Запускаем sync (debounced) — только если не unmounted
+        if (!unmountedRef.current) {
+            queueSyncRef.current?.();
+        }
     };
 
     const onDropRow = (dstWcId: number, toIdx: number) => async (e: React.DragEvent) => {
@@ -237,8 +281,6 @@ export function useRefsDnd({
         } finally {
             try { e.dataTransfer.clearData(); } catch { /* ignore */ }
             setDrag(null);
-            // ❌ УБРАЛИ: queueSyncRef.current?.flush();
-            // flush() вызывал sync ДО того как React обновил state
         }
     };
 
@@ -261,7 +303,6 @@ export function useRefsDnd({
 
         try { e.dataTransfer.clearData(); } catch { /* ignore */ }
         setDrag(null);
-        // ❌ УБРАЛИ: queueSyncRef.current?.flush();
     };
 
     return {

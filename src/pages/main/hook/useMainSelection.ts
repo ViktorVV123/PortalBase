@@ -51,8 +51,12 @@ export function useMainSelection({
 
     const handleSelectForm = useCallback(
         (formId: number) => {
+            // ═══════════════════════════════════════════════════════════
+            // ИСПРАВЛЕНИЕ: Сбрасываем widget при смене формы
+            // Это предотвращает рассинхронизацию widget_id и form_id
+            // ═══════════════════════════════════════════════════════════
+            setSelectedWidget(null);
             setSelectedFormId(formId);
-            // 👇 здесь уже прямой вызов /display/{formId}/main
             loadFormDisplay(formId);
         },
         [loadFormDisplay]
@@ -70,23 +74,44 @@ export function useMainSelection({
      */
     const openForm = useCallback(
         async (widgetId: number, formId: number) => {
-            // 1) Пытаемся выбрать таблицу/виджет — но это не обязательно
+            // ═══════════════════════════════════════════════════════════
+            // ИСПРАВЛЕНИЕ: Сначала сбрасываем состояние, потом загружаем
+            // Это гарантирует что старые данные не останутся при ошибке
+            // ═══════════════════════════════════════════════════════════
+            setSelectedWidget(null);
+            setSelectedFormId(null);
+
+            // 1) Пытаемся загрузить widget/table
+            let loadedWidget: Widget | null = null;
+            let loadedTable: DTable | null = null;
+
             try {
                 const { widget, table } = await fetchWidgetAndTable(widgetId);
-                handleSelectTable(table);
-                handleSelectWidget(widget);
+                loadedWidget = widget;
+                loadedTable = table;
             } catch (e) {
                 console.warn(
                     '[useMainSelection.openForm] Не удалось загрузить widget/table, продолжаем только с form:',
                     { widgetId, formId, e }
                 );
-                // здесь ничего не делаем — просто идём дальше к форме
             }
 
-            // 2) В любом случае — выбираем форму и грузим данные
-            handleSelectForm(formId);
+            // 2) Если загрузили — устанавливаем table и widget
+            if (loadedTable) {
+                loadColumns(loadedTable);
+                loadWidgetsForTable(loadedTable.id);
+            }
 
-            // 3) Дерево фильтров для этой формы
+            if (loadedWidget) {
+                setSelectedWidget(loadedWidget);
+                loadColumnsWidget(loadedWidget.id);
+            }
+
+            // 3) В любом случае — устанавливаем форму и загружаем данные
+            setSelectedFormId(formId);
+            loadFormDisplay(formId);
+
+            // 4) Дерево фильтров для этой формы
             try {
                 await loadFormTree(formId);
             } catch (e) {
@@ -96,7 +121,7 @@ export function useMainSelection({
                 });
             }
         },
-        [fetchWidgetAndTable, handleSelectForm, handleSelectTable, handleSelectWidget, loadFormTree]
+        [fetchWidgetAndTable, loadColumns, loadWidgetsForTable, loadColumnsWidget, loadFormDisplay, loadFormTree]
     );
 
     return {

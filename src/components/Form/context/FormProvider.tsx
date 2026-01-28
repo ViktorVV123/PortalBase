@@ -19,6 +19,7 @@ import { useSubNav } from '@/components/Form/subForm/hook/useSubNav';
 import { useFormSearch } from '@/components/search/hook/useFormSearch';
 import { useMainCrud } from '@/components/Form/mainTable/hook/useMainCrud';
 import { useSubCrud } from '@/components/Form/subForm/hook/useSubCrud';
+import { useTableMeta } from '@/components/Form/mainTable/hook/useTableMeta';
 import { api } from '@/services/api';
 
 // ─────────────────────────────────────────────────────────────
@@ -27,28 +28,20 @@ import { api } from '@/services/api';
 
 export type FormProviderProps = {
     children: React.ReactNode;
-
-    // Конфигурация
     selectedFormId: number | null;
     selectedWidget: Widget | null;
     formsById: Record<number, WidgetForm>;
     formsByWidget: Record<number, WidgetForm>;
     columns: Column[];
-
-    // Данные (управляются снаружи или внутри)
     formDisplay: FormDisplay | null;
     setFormDisplay: (v: FormDisplay | null) => void;
     subDisplay: SubDisplay | null;
     setSubDisplay: (v: SubDisplay | null) => void;
     formTrees: Record<number, FormTreeColumn[]>;
-
-    // Загрузка
     formLoading: boolean;
     formError: string | null;
     subLoading: boolean;
     subError: string | null;
-
-    // Внешние actions
     loadSubDisplay: (formId: number, subOrder: number, primary?: Record<string, unknown>) => void;
     loadFilteredFormDisplay: (formId: number, filter: { table_column_id: number; value: string | number }) => Promise<void>;
     loadFormTree: (formId: number) => Promise<void>;
@@ -101,6 +94,21 @@ export const FormProvider: React.FC<FormProviderProps> = ({
     } = useHeaderPlan(formDisplay);
 
     // ═══════════════════════════════════════════════════════════
+    // TABLE META CACHE (загружается один раз при смене формы)
+    // Устраняет N+1 запросы в preflight проверках
+    // ═══════════════════════════════════════════════════════════
+
+    const mainWidgetId = useMemo(() => {
+        return (formDisplay as any)?.main_widget_id ?? (formDisplay as any)?.widget_id ?? null;
+    }, [formDisplay]);
+
+    const { tableMetaCache } = useTableMeta({
+        selectedWidget,
+        selectedFormId,
+        mainWidgetId,
+    });
+
+    // ═══════════════════════════════════════════════════════════
     // TREE DRAWER STATE
     // ═══════════════════════════════════════════════════════════
 
@@ -108,25 +116,15 @@ export const FormProvider: React.FC<FormProviderProps> = ({
     const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
     const [childrenCache, setChildrenCache] = useState<Record<string, FormTreeColumn[]>>({});
 
-    const openTreeDrawer = useCallback(() => {
-        setIsTreeOpen(true);
-    }, []);
-
-    const closeTreeDrawer = useCallback(() => {
-        setIsTreeOpen(false);
-    }, []);
-
-    const toggleTreeDrawer = useCallback(() => {
-        setIsTreeOpen((prev) => !prev);
-    }, []);
-
+    const openTreeDrawer = useCallback(() => setIsTreeOpen(true), []);
+    const closeTreeDrawer = useCallback(() => setIsTreeOpen(false), []);
+    const toggleTreeDrawer = useCallback(() => setIsTreeOpen((prev) => !prev), []);
     const resetTreeDrawer = useCallback(() => {
         setIsTreeOpen(false);
         setExpandedKeys(new Set());
         setChildrenCache({});
     }, []);
 
-    // Закрываем drawer при смене формы
     useEffect(() => {
         resetTreeDrawer();
     }, [selectedFormId, resetTreeDrawer]);
@@ -136,12 +134,9 @@ export const FormProvider: React.FC<FormProviderProps> = ({
     // ═══════════════════════════════════════════════════════════
 
     const {
-        activeFilters,
-        setActiveFilters,
-        nestedTrees,
-        setNestedTrees,
-        activeExpandedKey,
-        setActiveExpandedKey,
+        activeFilters, setActiveFilters,
+        nestedTrees, setNestedTrees,
+        activeExpandedKey, setActiveExpandedKey,
         resetFiltersHard,
     } = useFiltersTree(selectedFormId, setFormDisplay);
 
@@ -160,28 +155,16 @@ export const FormProvider: React.FC<FormProviderProps> = ({
     // ═══════════════════════════════════════════════════════════
 
     const availableOrders = useMemo(
-        () =>
-            (currentForm?.sub_widgets ?? [])
-                .map((sw) => sw.widget_order)
-                .sort((a, b) => a - b),
+        () => (currentForm?.sub_widgets ?? []).map((sw) => sw.widget_order).sort((a, b) => a - b),
         [currentForm]
     );
 
     const {
-        lastPrimary,
-        setLastPrimary,
-        selectedKey,
-        setSelectedKey,
-        activeSubOrder,
-        setActiveSubOrder,
-        pkToKey,
-        handleRowClick,
-        handleTabClick,
-    } = useSubNav({
-        formIdForSub: selectedFormId,
-        availableOrders,
-        loadSubDisplay,
-    });
+        lastPrimary, setLastPrimary,
+        selectedKey, setSelectedKey,
+        activeSubOrder, setActiveSubOrder,
+        pkToKey, handleRowClick, handleTabClick,
+    } = useSubNav({ formIdForSub: selectedFormId, availableOrders, loadSubDisplay });
 
     // ═══════════════════════════════════════════════════════════
     // SEARCH
@@ -210,7 +193,7 @@ export const FormProvider: React.FC<FormProviderProps> = ({
     }, [selectedFormId, currentForm, loadFormTree]);
 
     // ═══════════════════════════════════════════════════════════
-    // MAIN CRUD
+    // MAIN CRUD (с tableMetaCache — без лишних API запросов)
     // ═══════════════════════════════════════════════════════════
 
     const mainCrud = useMainCrud({
@@ -231,6 +214,7 @@ export const FormProvider: React.FC<FormProviderProps> = ({
         setLastPrimary,
         setSelectedKey,
         stylesColumnMeta,
+        tableMetaCache, // ← Кэш метаданных таблицы
         resetFilters: async () => {
             await resetFiltersHard();
             await reloadTree();
@@ -262,7 +246,6 @@ export const FormProvider: React.FC<FormProviderProps> = ({
         subDisplay,
     });
 
-    // Sub editing (отдельно, т.к. useSubCrud не содержит edit)
     const [subEditingRowIdx, setSubEditingRowIdx] = useState<number | null>(null);
     const [subEditDraft, setSubEditDraft] = useState<Record<number, string>>({});
     const [subEditSaving, setSubEditSaving] = useState(false);
@@ -284,7 +267,6 @@ export const FormProvider: React.FC<FormProviderProps> = ({
 
     const openDrill = useCallback((formId: number | null, meta?: DrillOpenMeta) => {
         if (!formId) return;
-
         setDrill({
             open: true,
             formId,
@@ -296,10 +278,7 @@ export const FormProvider: React.FC<FormProviderProps> = ({
     }, []);
 
     const closeDrill = useCallback(() => {
-        setDrill((prev) => ({
-            ...prev,
-            open: false,
-        }));
+        setDrill((prev) => ({ ...prev, open: false }));
     }, []);
 
     const triggerComboReload = useCallback(() => {
@@ -312,12 +291,10 @@ export const FormProvider: React.FC<FormProviderProps> = ({
 
     const resetFilters = useCallback(async () => {
         if (!selectedFormId) return;
-
         setSelectedKey(null);
         setLastPrimary({});
         setSubDisplay(null);
         setActiveSubOrder(availableOrders[0] ?? 0);
-
         try {
             await resetFiltersHard();
             await reloadTree();
@@ -325,17 +302,7 @@ export const FormProvider: React.FC<FormProviderProps> = ({
         } catch (e) {
             console.warn('Ошибка при сбросе фильтров:', e);
         }
-    }, [
-        selectedFormId,
-        availableOrders,
-        setSubDisplay,
-        resetFiltersHard,
-        reloadTree,
-        resetTreeDrawer,
-        setSelectedKey,
-        setLastPrimary,
-        setActiveSubOrder,
-    ]);
+    }, [selectedFormId, availableOrders, setSubDisplay, resetFiltersHard, reloadTree, resetTreeDrawer, setSelectedKey, setLastPrimary, setActiveSubOrder]);
 
     // ═══════════════════════════════════════════════════════════
     // TREE DRAWER STATE OBJECT
@@ -351,241 +318,99 @@ export const FormProvider: React.FC<FormProviderProps> = ({
     // CONTEXT VALUE
     // ═══════════════════════════════════════════════════════════
 
-    const value = useMemo<FormContextValue>(
-        () => ({
-            // Config
-            config: {
-                selectedFormId,
-                selectedWidget,
-                currentForm,
-                formsById,
-                formsByWidget,
-            },
-
-            // Data
-            data: {
-                formDisplay,
-                subDisplay,
-                formTrees,
-                columns,
-            },
-            setFormDisplay,
-            setSubDisplay,
-
-            // Header Plan
-            headerPlan: {
-                headerPlan,
-                flatColumnsInRenderOrder,
-                valueIndexByKey,
-                isColReadOnly,
-                stylesColumnMeta,
-            },
-
-            // Loading
-            loading: {
-                formLoading,
-                formError,
-                subLoading,
-                subError,
-            },
-
-            // Selection
-            selection: {
-                selectedKey,
-                lastPrimary,
-                activeSubOrder,
-            },
-            setSelectedKey,
-            setLastPrimary,
-            setActiveSubOrder,
-            pkToKey,
-
-            // Main CRUD
-            mainAdding: {
-                isAdding: mainCrud.isAdding,
-                draft: mainCrud.draft,
-                saving: mainCrud.saving,
-            },
-            mainEditing: {
-                editingRowIdx: mainCrud.editingRowIdx,
-                editDraft: mainCrud.editDraft,
-                editSaving: mainCrud.editSaving,
-                editStylesDraft: mainCrud.editStylesDraft,
-            },
-            deletingRowIdx: mainCrud.deletingRowIdx,
-            startAdd: mainCrud.startAdd,
-            cancelAdd: mainCrud.cancelAdd,
-            submitAdd: mainCrud.submitAdd,
-            startEdit: mainCrud.startEdit,
-            cancelEdit: mainCrud.cancelEdit,
-            submitEdit: mainCrud.submitEdit,
-            deleteRow: mainCrud.deleteRow,
-            setDraft: mainCrud.setDraft,
-            setEditDraft: mainCrud.setEditDraft,
-            setEditStylesDraft: mainCrud.setEditStylesDraft,
-
-            // Валидация Main required полей
-            showValidationErrors: mainCrud.showValidationErrors,
-            setShowValidationErrors: mainCrud.setShowValidationErrors,
-            validationMissingFields: mainCrud.validationMissingFields,
-            setValidationMissingFields: mainCrud.setValidationMissingFields,
-            resetValidation: mainCrud.resetValidation,
-
-            // Sub CRUD
-            subAdding: {
-                isAddingSub: subCrud.isAddingSub,
-                draftSub: subCrud.draftSub,
-                savingSub: subCrud.savingSub,
-            },
-            subEditing: {
-                editingRowIdx: subEditingRowIdx,
-                editDraft: subEditDraft,
-                editSaving: subEditSaving,
-            },
-            startAddSub: subCrud.startAddSub,
-            cancelAddSub: subCrud.cancelAddSub,
-            submitAddSub: subCrud.submitAddSub,
-            setDraftSub: subCrud.setDraftSub,
-            setSubEditDraft: setSubEditDraft,
-            setSubEditingRowIdx: setSubEditingRowIdx,
-
-            // Валидация Sub required полей
-            showSubValidationErrors: subCrud.showSubValidationErrors,
-            setShowSubValidationErrors: subCrud.setShowSubValidationErrors,
-            subValidationMissingFields: subCrud.subValidationMissingFields,
-            setSubValidationMissingFields: subCrud.setSubValidationMissingFields,
-            resetSubValidation: subCrud.resetSubValidation,
-
-            // Drill
-            drill,
-            openDrill,
-            closeDrill,
-
-            // Tree Drawer
-            treeDrawer: treeDrawerState,
-            openTreeDrawer,
-            closeTreeDrawer,
-            toggleTreeDrawer,
-            resetTreeDrawer,
-            setExpandedKeys,
-            setChildrenCache,
-
-            // Filters
-            filters: {
-                activeFilters,
-                nestedTrees,
-                activeExpandedKey,
-            },
-            setActiveFilters,
-            setNestedTrees,
-            setActiveExpandedKey,
-            resetFilters,
-            handleTreeValueClick,
-            handleNestedValueClick,
-
-            // Search
-            search: {
-                showSearch,
-                q,
-                setQ,
-                filteredRows,
-            },
-
-            // Utils
-            loadSubDisplay,
-            loadFilteredFormDisplay,
-            reloadTree,
-
-            // Combobox reload
-            comboReloadToken,
-            triggerComboReload,
-        }),
-        [
-            selectedFormId,
-            selectedWidget,
-            currentForm,
-            formsById,
-            formsByWidget,
-            formDisplay,
-            subDisplay,
-            formTrees,
-            columns,
-            setFormDisplay,
-            setSubDisplay,
-            headerPlan,
-            flatColumnsInRenderOrder,
-            valueIndexByKey,
-            isColReadOnly,
-            stylesColumnMeta,
-            formLoading,
-            formError,
-            subLoading,
-            subError,
-            selectedKey,
-            lastPrimary,
-            activeSubOrder,
-            setSelectedKey,
-            setLastPrimary,
-            setActiveSubOrder,
-            pkToKey,
-            mainCrud,
-            subCrud,
-            subEditingRowIdx,
-            subEditDraft,
-            subEditSaving,
-            drill,
-            openDrill,
-            closeDrill,
-            treeDrawerState,
-            openTreeDrawer,
-            closeTreeDrawer,
-            toggleTreeDrawer,
-            resetTreeDrawer,
-            setExpandedKeys,
-            setChildrenCache,
-            activeFilters,
-            nestedTrees,
-            activeExpandedKey,
-            setActiveFilters,
-            setNestedTrees,
-            setActiveExpandedKey,
-            resetFilters,
-            handleTreeValueClick,
-            handleNestedValueClick,
-            showSearch,
-            q,
-            setQ,
-            filteredRows,
-            loadSubDisplay,
-            loadFilteredFormDisplay,
-            reloadTree,
-            comboReloadToken,
-            triggerComboReload,
-        ]
-    );
+    const value = useMemo<FormContextValue>(() => ({
+        config: { selectedFormId, selectedWidget, currentForm, formsById, formsByWidget },
+        data: { formDisplay, subDisplay, formTrees, columns },
+        setFormDisplay,
+        setSubDisplay,
+        headerPlan: { headerPlan, flatColumnsInRenderOrder, valueIndexByKey, isColReadOnly, stylesColumnMeta },
+        loading: { formLoading, formError, subLoading, subError },
+        selection: { selectedKey, lastPrimary, activeSubOrder },
+        setSelectedKey,
+        setLastPrimary,
+        setActiveSubOrder,
+        pkToKey,
+        mainAdding: { isAdding: mainCrud.isAdding, draft: mainCrud.draft, saving: mainCrud.saving },
+        mainEditing: { editingRowIdx: mainCrud.editingRowIdx, editDraft: mainCrud.editDraft, editSaving: mainCrud.editSaving, editStylesDraft: mainCrud.editStylesDraft },
+        deletingRowIdx: mainCrud.deletingRowIdx,
+        startAdd: mainCrud.startAdd,
+        cancelAdd: mainCrud.cancelAdd,
+        submitAdd: mainCrud.submitAdd,
+        startEdit: mainCrud.startEdit,
+        cancelEdit: mainCrud.cancelEdit,
+        submitEdit: mainCrud.submitEdit,
+        deleteRow: mainCrud.deleteRow,
+        setDraft: mainCrud.setDraft,
+        setEditDraft: mainCrud.setEditDraft,
+        setEditStylesDraft: mainCrud.setEditStylesDraft,
+        showValidationErrors: mainCrud.showValidationErrors,
+        setShowValidationErrors: mainCrud.setShowValidationErrors,
+        validationMissingFields: mainCrud.validationMissingFields,
+        setValidationMissingFields: mainCrud.setValidationMissingFields,
+        resetValidation: mainCrud.resetValidation,
+        subAdding: { isAddingSub: subCrud.isAddingSub, draftSub: subCrud.draftSub, savingSub: subCrud.savingSub },
+        subEditing: { editingRowIdx: subEditingRowIdx, editDraft: subEditDraft, editSaving: subEditSaving },
+        startAddSub: subCrud.startAddSub,
+        cancelAddSub: subCrud.cancelAddSub,
+        submitAddSub: subCrud.submitAddSub,
+        setDraftSub: subCrud.setDraftSub,
+        setSubEditDraft: setSubEditDraft,
+        setSubEditingRowIdx: setSubEditingRowIdx,
+        showSubValidationErrors: subCrud.showSubValidationErrors,
+        setShowSubValidationErrors: subCrud.setShowSubValidationErrors,
+        subValidationMissingFields: subCrud.subValidationMissingFields,
+        setSubValidationMissingFields: subCrud.setSubValidationMissingFields,
+        resetSubValidation: subCrud.resetSubValidation,
+        drill,
+        openDrill,
+        closeDrill,
+        treeDrawer: treeDrawerState,
+        openTreeDrawer,
+        closeTreeDrawer,
+        toggleTreeDrawer,
+        resetTreeDrawer,
+        setExpandedKeys,
+        setChildrenCache,
+        filters: { activeFilters, nestedTrees, activeExpandedKey },
+        setActiveFilters,
+        setNestedTrees,
+        setActiveExpandedKey,
+        resetFilters,
+        handleTreeValueClick,
+        handleNestedValueClick,
+        search: { showSearch, q, setQ, filteredRows },
+        loadSubDisplay,
+        loadFilteredFormDisplay,
+        reloadTree,
+        comboReloadToken,
+        triggerComboReload,
+    }), [
+        selectedFormId, selectedWidget, currentForm, formsById, formsByWidget,
+        formDisplay, subDisplay, formTrees, columns, setFormDisplay, setSubDisplay,
+        headerPlan, flatColumnsInRenderOrder, valueIndexByKey, isColReadOnly, stylesColumnMeta,
+        formLoading, formError, subLoading, subError,
+        selectedKey, lastPrimary, activeSubOrder, setSelectedKey, setLastPrimary, setActiveSubOrder, pkToKey,
+        mainCrud, subCrud, subEditingRowIdx, subEditDraft, subEditSaving,
+        drill, openDrill, closeDrill, treeDrawerState,
+        openTreeDrawer, closeTreeDrawer, toggleTreeDrawer, resetTreeDrawer, setExpandedKeys, setChildrenCache,
+        activeFilters, nestedTrees, activeExpandedKey, setActiveFilters, setNestedTrees, setActiveExpandedKey,
+        resetFilters, handleTreeValueClick, handleNestedValueClick,
+        showSearch, q, setQ, filteredRows, loadSubDisplay, loadFilteredFormDisplay, reloadTree,
+        comboReloadToken, triggerComboReload,
+    ]);
 
     // ═══════════════════════════════════════════════════════════
     // СБРОС ПРИ СМЕНЕ ФОРМЫ
     // ═══════════════════════════════════════════════════════════
 
     useEffect(() => {
-        // Сбрасываем выбор строки
         setSelectedKey(null);
         setLastPrimary({});
-
-        // Сбрасываем sub display
         setSubDisplay(null);
-
-        // Сбрасываем sub editing
         setSubEditingRowIdx(null);
         setSubEditDraft({});
         setSubEditSaving(false);
-
-        // Сбрасываем активный order на первый доступный
-        const firstOrder =
-            (currentForm?.sub_widgets ?? [])
-                .map((sw) => sw.widget_order)
-                .sort((a, b) => a - b)[0] ?? 0;
+        const firstOrder = (currentForm?.sub_widgets ?? []).map((sw) => sw.widget_order).sort((a, b) => a - b)[0] ?? 0;
         setActiveSubOrder(firstOrder);
     }, [selectedFormId]);
 

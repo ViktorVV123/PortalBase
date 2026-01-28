@@ -30,10 +30,14 @@ export type HeaderPlanResult = {
 };
 
 export function useHeaderPlan(formDisplay: FormDisplay | null): HeaderPlanResult {
-    const columns = (formDisplay?.columns ?? []) as ExtCol[];
+    // ═══════════════════════════════════════════════════════════
+    // ОПТИМИЗАЦИЯ: Используем formDisplay?.columns напрямую в зависимостях
+    // Это предотвращает пересоздание useMemo при каждом рендере
+    // ═══════════════════════════════════════════════════════════
 
     // 1) сортировка
     const ordered = useMemo(() => {
+        const columns = (formDisplay?.columns ?? []) as ExtCol[];
         return [...columns].sort((a, b) => {
             const colA = a.column_order ?? 0;
             const colB = b.column_order ?? 0;
@@ -45,7 +49,7 @@ export function useHeaderPlan(formDisplay: FormDisplay | null): HeaderPlanResult
             const comboB = b.combobox_column_order ?? 0;
             return comboA - comboB;
         });
-    }, [columns]);
+    }, [formDisplay?.columns]);
 
     // 2) нормализация combobox
     const normalized = useMemo<ExtCol[]>(() => {
@@ -96,11 +100,12 @@ export function useHeaderPlan(formDisplay: FormDisplay | null): HeaderPlanResult
         return ref || '—';
     };
 
-    // 5) индекс для values (нужен ДО stylesColumnMeta)
+    // 5) индекс для values
     const valueIndexByKey = useMemo(() => {
+        const columns = (formDisplay?.columns ?? []) as ExtCol[];
         const map = new Map<string, number>();
         for (let i = 0; i < columns.length; i++) {
-            const c = columns[i] as ExtCol;
+            const c = columns[i];
             const syntheticTcId =
                 c.type === 'combobox' && c.combobox_column_id != null && c.table_column_id != null
                     ? -1_000_000 - Number(c.combobox_column_id)
@@ -108,10 +113,12 @@ export function useHeaderPlan(formDisplay: FormDisplay | null): HeaderPlanResult
             map.set(`${c.widget_column_id}:${syntheticTcId}`, i);
         }
         return map;
-    }, [columns]);
+    }, [formDisplay?.columns]);
 
     // 6) мета для колонки стилей
     const stylesColumnMeta = useMemo<StylesColumnMeta | null>(() => {
+        const columns = (formDisplay?.columns ?? []) as ExtCol[];
+
         // Находим колонку styles в ОРИГИНАЛЬНОМ массиве columns
         const stylesCol = columns.find(c => c.type === 'styles');
 
@@ -122,12 +129,8 @@ export function useHeaderPlan(formDisplay: FormDisplay | null): HeaderPlanResult
         const stylesColIndex = columns.indexOf(stylesCol);
 
         // Маппинг table_column_name → column_name (для чтения)
-        // Стили в JSON хранятся по table_column_name (например "description")
-        // А нам нужно применить к колонке с column_name (например "Комментарий")
         const tableColumnNameMap = new Map<string, string>();
-
         // Маппинг column_name → table_column_name (для записи)
-        // При сохранении нужно конвертировать обратно
         const columnNameToTableColumnName = new Map<string, string>();
 
         columns.forEach((c) => {
@@ -145,7 +148,7 @@ export function useHeaderPlan(formDisplay: FormDisplay | null): HeaderPlanResult
             columnNameToTableColumnName,
             readonly: !!stylesCol.readonly,
         };
-    }, [columns]);
+    }, [formDisplay?.columns]);
 
     // 7) фильтруем styles из рендера
     const normalizedWithoutStyles = useMemo(() => {
@@ -168,13 +171,15 @@ export function useHeaderPlan(formDisplay: FormDisplay | null): HeaderPlanResult
             .sort((a, b) => (byWc[a.id].order ?? 0) - (byWc[b.id].order ?? 0));
     }, [normalizedWithoutStyles]);
 
-    // 9) readonly-логика
-    const isColReadOnly = (c: ExtCol) => {
-        if (c.visible === false) return true;
-        if (c.type === 'combobox') return !c.__is_primary_combo_input;
-        if (c.table_column_id == null) return true;
-        return !!c.readonly;
-    };
+    // 9) readonly-логика (стабильная функция — не зависит от рендера)
+    const isColReadOnly = useMemo(() => {
+        return (c: ExtCol) => {
+            if (c.visible === false) return true;
+            if (c.type === 'combobox') return !c.__is_primary_combo_input;
+            if (c.table_column_id == null) return true;
+            return !!c.readonly;
+        };
+    }, []);
 
     // 10) RETURN
     return {

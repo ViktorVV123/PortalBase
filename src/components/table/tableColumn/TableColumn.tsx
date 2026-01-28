@@ -125,7 +125,7 @@ export const TableColumn: React.FC<TableColumnProps> = ({
         setSavingNew(true);
         try {
             const body = cleanNewPayload(newCol);
-            const { data } = await api.post<Column>('/tables/columns/', body);
+            const { data } = await api.post<Column>('/tables/columns', body);
             onCreated?.(data);
             cancelAdd();
         } catch (e) {
@@ -226,13 +226,13 @@ export const TableColumn: React.FC<TableColumnProps> = ({
         <div>
             <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
                 <TableListView columns={columns}
-                    startAdd={startAdd}
-                    isAdding={isAdding}
-                    cancelAdd={cancelAdd}
-                    savingNew={savingNew}
-                    publishTable={publishTable}
-                    selectedTable={selectedTable}
-                    updateTableMeta={updateTableMeta}
+                               startAdd={startAdd}
+                               isAdding={isAdding}
+                               cancelAdd={cancelAdd}
+                               savingNew={savingNew}
+                               publishTable={publishTable}
+                               selectedTable={selectedTable}
+                               updateTableMeta={updateTableMeta}
                 />
             </div>
 

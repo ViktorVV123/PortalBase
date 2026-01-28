@@ -5,8 +5,6 @@ import {ModalEditTableMeta} from "@/components/modals/modalEditTableMeta/ModalEd
 import Editicon from "@/assets/image/EditIcon.svg";
 import * as s from "@/components/setOfTables/SetOfTables.module.scss";
 import AddIcon from "@mui/icons-material/AddBox";
-import SaveIcon from "@mui/icons-material/Save";
-import CancelIcon from "@mui/icons-material/Cancel";
 
 type Props = {
     selectedTable: DTable | null;
@@ -45,16 +43,16 @@ export const TableListView: React.FC<Props> = ({selectedTable, updateTableMeta,p
                 onClick={() => setOpenMetaModal(true)}
                 variant="h6"
                 gutterBottom
-
                 sx={{
                     display: 'inline-flex',
                     cursor: 'pointer',
                     textDecoration: 'underline',
-                    color: '#8ac7ff',
+                    color: 'var(--link-color)',
                     alignItems: 'center',
                     gap: 1,
-
-
+                    '&:hover': {
+                        color: 'var(--link-hover)',
+                    },
                 }}
             >
                 Метаданные таблицы
@@ -63,40 +61,49 @@ export const TableListView: React.FC<Props> = ({selectedTable, updateTableMeta,p
 
 
             {!isAdding ? (
-                <AddIcon onClick={startAdd}/>
+                <AddIcon
+                    onClick={startAdd}
+                    sx={{
+                        color: 'var(--icon-primary)',
+                        cursor: 'pointer',
+                        '&:hover': {
+                            color: 'var(--theme-primary)',
+                        },
+                    }}
+                />
             ) : (
-               ''
+                ''
             )}
 
-            {selectedTable.published === true ? ( <span>
-
-                       Опубликована:&nbsp; ✔
+            {selectedTable.published === true ? (
+                <span style={{ color: 'var(--theme-success)' }}>
+                    Опубликована:&nbsp; ✔
                 </span>
-
-            ) : <Button
-                size="small"
-                variant="outlined"
-                sx={{
-                    ml: 2,
-                    borderColor: '#8f8e8e',
-                    backgroundColor: '#3e3e3e',
-                    color: '#fff',
-                    '&:hover': {
-                        backgroundColor: '#444',
-                        borderColor: '#666',
-                    },
-                }}
-                onClick={handlePublish}
-
-            >
-                Опубликовать
-            </Button>  }
+            ) : (
+                <Button
+                    size="small"
+                    variant="outlined"
+                    sx={{
+                        ml: 2,
+                        borderColor: 'var(--button-secondary-border)',
+                        backgroundColor: 'var(--theme-surface)',
+                        color: 'var(--theme-text-primary)',
+                        '&:hover': {
+                            backgroundColor: 'var(--theme-hover)',
+                            borderColor: 'var(--input-border-hover)',
+                        },
+                    }}
+                    onClick={handlePublish}
+                >
+                    Опубликовать
+                </Button>
+            )}
 
             {openMetaModal && (
                 <ModalEditTableMeta
                     open={openMetaModal}
                     table={selectedTable}
-                    columns={columns}  // ← ПЕРЕДАТЬ
+                    columns={columns}
                     onClose={() => setOpenMetaModal(false)}
                     onSave={handleSave}
                 />
