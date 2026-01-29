@@ -16,8 +16,9 @@ import LockIcon from '@/assets/image/LockIcon.svg';
 import * as s from "@/components/setOfTables/SetOfTables.module.scss";
 import * as cls from "@/components/table/tableToolbar/TableToolbar.module.scss";
 import { ButtonForm } from "@/shared/buttonForm/ButtonForm";
-// Импорт функций валидации
 import { isColumnRequired, isEmptyValue } from '@/shared/utils/requiredValidation/requiredValidation';
+import { isSameComboGroup, getWriteTcIdForComboGroup } from '@/shared/utils/comboGroupUtils';
+import { formatCellValue } from '@/shared/utils/cellFormat';
 
 type SubformProps = {
     subDisplay: SubDisplay | null;
@@ -43,7 +44,6 @@ type SubformProps = {
     draftSub: Record<number, string>;
     setDraftSub: React.Dispatch<React.SetStateAction<Record<number, string>>>;
 
-    /** 🔗 открытие DrillDialog / других форм, как в MainTable */
     onOpenDrill?: (
         fid?: number | null,
         meta?: {
@@ -54,7 +54,6 @@ type SubformProps = {
         },
     ) => void;
 
-
     submitAdd?: any;
     saving?: any;
     selectedWidget?: any;
@@ -63,32 +62,23 @@ type SubformProps = {
     startAdd?: any;
     cancelAdd?: any;
 
-    /** Показывать ошибки валидации */
     showValidationErrors?: boolean;
-    /** Сеттер для showValidationErrors */
     setShowValidationErrors?: React.Dispatch<React.SetStateAction<boolean>>;
-    /** Сеттер для списка незаполненных полей */
     setValidationMissingFields?: React.Dispatch<React.SetStateAction<string[]>>;
-    /** Сброс валидации */
     resetValidation?: () => void;
 };
 
 const SYNTHETIC_MIN = -1_000_000;
 const isSyntheticComboboxId = (tcId: number): boolean => tcId <= SYNTHETIC_MIN;
 
-/** Реальный table_column_id, который нужно ОТПРАВЛЯТЬ на бэк */
 const getWriteTcId = (col: ExtCol): number | null => {
     if (col.type === 'combobox') {
         const w = (col as any).__write_tc_id;
         if (typeof w === 'number') return w;
-
-        // фолбэк: если table_column_id вдруг уже реальный (не синтетика)
         const tc = col.table_column_id;
         if (typeof tc === 'number' && !isSyntheticComboboxId(tc)) return tc;
-
         return null;
     }
-
     return typeof col.table_column_id === 'number' ? col.table_column_id : null;
 };
 
@@ -96,9 +86,36 @@ function isRlsLockedValue(val: unknown): boolean {
     if (val == null) return false;
     if (typeof val === 'boolean') return val;
     if (typeof val === 'number') return val !== 0;
-
     const s = String(val).trim().toLowerCase();
     return s === '1' || s === 'true' || s === 'да' || s === 'yes' || s === 't';
+}
+
+// ═══════════════════════════════════════════════════════════
+// Выбирает "primary" колонку из combobox группы
+// ═══════════════════════════════════════════════════════════
+function pickPrimaryCombo(group: ExtCol[]): ExtCol {
+    return group.find((c) => (c as any).__is_primary_combo_input) ?? group[0];
+}
+
+// ═══════════════════════════════════════════════════════════
+// Получает отображаемое значение для колонки
+// ═══════════════════════════════════════════════════════════
+function getShown(
+    valueIndexByKey: Map<string, number>,
+    values: unknown[],
+    col: ExtCol
+): string {
+    const syntheticTcId =
+        col.type === 'combobox' && col.combobox_column_id != null && col.table_column_id != null
+            ? SYNTHETIC_MIN - Number(col.combobox_column_id)
+            : col.table_column_id ?? -1;
+
+    const key = `${col.widget_column_id}:${syntheticTcId}`;
+    const idx = valueIndexByKey.get(key);
+    if (idx == null) return '';
+
+    const val = values[idx];
+    return val == null ? '' : String(val).trim();
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -177,7 +194,6 @@ const EditCellWithDrill: React.FC<EditCellWithDrillProps> = ({
                 showError={showError}
             />
 
-            {/* Кнопка drill для combobox — открыть справочник */}
             {hasDrill && (
                 <Tooltip title="Открыть справочник" arrow>
                     <IconButton
@@ -195,9 +211,7 @@ const EditCellWithDrill: React.FC<EditCellWithDrillProps> = ({
                             ml: 0.5,
                             p: 0.5,
                             color: 'var(--link, #66b0ff)',
-                            '&:hover': {
-                                backgroundColor: 'rgba(102, 176, 255, 0.1)',
-                            },
+                            '&:hover': { backgroundColor: 'rgba(102, 176, 255, 0.1)' },
                         }}
                     >
                         <OpenInNewIcon sx={{ fontSize: 16 }} />
@@ -266,20 +280,16 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
         currentOrder,
         subHeaderGroups,
         handleTabClick,
-
         editingRowIdx,
         setEditingRowIdx,
         editDraft,
         setEditDraft,
         editSaving,
         setEditSaving,
-
         isAddingSub,
         setIsAddingSub,
         draftSub,
         setDraftSub,
-
-        // Передаём функции валидации в хук
         showSubValidationErrors: showValidationErrors,
         setShowSubValidationErrors: setShowValidationErrors,
         setSubValidationMissingFields: setValidationMissingFields,
@@ -304,13 +314,13 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
         return { col: col as ExtCol, idx };
     }, [flatColumnsInRenderOrder, valueIndexByKey]);
 
-    // ✅ колонки, которые реально показываем
+    // ✅ колонки без rls
     const renderCols = React.useMemo(
         () => flatColumnsInRenderOrder.filter((c) => (c as ExtCol).type !== 'rls'),
         [flatColumnsInRenderOrder],
     );
 
-    // ✅ headerPlan без rls (иначе шапка покажет check)
+    // ✅ headerPlan без rls
     const renderHeaderPlan = React.useMemo(() => {
         return (headerPlan ?? [])
             .map((g) => {
@@ -327,10 +337,272 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
             .filter(Boolean) as typeof headerPlan;
     }, [headerPlan]);
 
+    // ═══════════════════════════════════════════════════════════
+    // RENDER CELLS с группировкой combobox (как в MainTable)
+    // ═══════════════════════════════════════════════════════════
+
+    const renderAddRowCells = () => {
+        const cells: React.ReactNode[] = [];
+        const cols = renderCols as ExtCol[];
+        let i = 0;
+
+        while (i < cols.length) {
+            const col = cols[i];
+
+            // Combobox-группа?
+            if (col.type === 'combobox') {
+                let j = i + 1;
+                while (j < cols.length && isSameComboGroup(col, cols[j])) j += 1;
+                const group = cols.slice(i, j);
+                const span = group.length;
+                const primary = pickPrimaryCombo(group);
+                const writeTcId = getWriteTcIdForComboGroup(group);
+
+                const value = writeTcId == null ? '' : (draftSub[writeTcId] ?? '');
+                const isReq = isColumnRequired(primary);
+                const isEmpty = isEmptyValue(value);
+                const hasError = showValidationErrors && isReq && isEmpty;
+
+                cells.push(
+                    <td
+                        key={`sub-add-combo-${primary.widget_column_id}:${writeTcId ?? 'null'}`}
+                        colSpan={span}
+                        className={sub.editCell}
+                    >
+                        <EditCellWithDrill
+                            col={primary}
+                            writeTcId={writeTcId}
+                            value={value}
+                            onChange={(v) => {
+                                if (writeTcId != null) setDraftSub((prev) => ({ ...prev, [writeTcId]: v }));
+                            }}
+                            placeholder={isReq ? `${primary.placeholder ?? primary.column_name} *` : (primary.placeholder ?? primary.column_name)}
+                            comboReloadToken={comboReloadToken}
+                            showError={hasError}
+                            onOpenDrill={onOpenDrill}
+                            rowPrimaryKeys={undefined}
+                            mode="add"
+                        />
+                    </td>
+                );
+                i = j;
+                continue;
+            }
+
+            // Обычная колонка
+            const writeTcId = getWriteTcId(col);
+            const value = writeTcId == null ? '' : (draftSub[writeTcId] ?? '');
+            const isReq = isColumnRequired(col);
+            const isEmpty = isEmptyValue(value);
+            const hasError = showValidationErrors && isReq && isEmpty;
+
+            cells.push(
+                <td
+                    key={`sub-add-${col.widget_column_id}:${col.table_column_id}`}
+                    className={sub.editCell}
+                >
+                    <EditCellWithDrill
+                        col={col}
+                        writeTcId={writeTcId}
+                        value={value}
+                        onChange={(v) => {
+                            if (writeTcId != null) setDraftSub((prev) => ({ ...prev, [writeTcId]: v }));
+                        }}
+                        placeholder={isReq ? `${col.placeholder ?? col.column_name} *` : (col.placeholder ?? col.column_name)}
+                        comboReloadToken={comboReloadToken}
+                        showError={hasError}
+                        onOpenDrill={onOpenDrill}
+                        rowPrimaryKeys={undefined}
+                        mode="add"
+                    />
+                </td>
+            );
+            i += 1;
+        }
+
+        return cells;
+    };
+
+    const renderDataRowCells = (row: SubDisplay['data'][number], rowIdx: number, isEditingRow: boolean) => {
+        const cells: React.ReactNode[] = [];
+        const cols = renderCols as ExtCol[];
+        let i = 0;
+
+        while (i < cols.length) {
+            const col = cols[i];
+
+            // ───── Combobox-группа ─────
+            if (col.type === 'combobox') {
+                let j = i + 1;
+                while (j < cols.length && isSameComboGroup(col, cols[j])) j += 1;
+                const group = cols.slice(i, j);
+                const span = group.length;
+                const primary = pickPrimaryCombo(group);
+                const writeTcId = getWriteTcIdForComboGroup(group);
+
+                if (isEditingRow) {
+                    const value = writeTcId == null ? '' : (editDraft[writeTcId] ?? '');
+                    const isReq = isColumnRequired(primary);
+                    const isEmpty = isEmptyValue(value);
+                    const hasError = showValidationErrors && isReq && isEmpty;
+
+                    cells.push(
+                        <td
+                            key={`sub-edit-combo-r${rowIdx}-${primary.widget_column_id}:${writeTcId}`}
+                            colSpan={span}
+                            className={sub.editCell}
+                        >
+                            <EditCellWithDrill
+                                col={primary}
+                                writeTcId={writeTcId}
+                                value={value}
+                                onChange={(v) => {
+                                    if (writeTcId != null) setEditDraft((prev) => ({ ...prev, [writeTcId]: v }));
+                                }}
+                                placeholder={isReq ? `${primary.placeholder ?? primary.column_name} *` : (primary.placeholder ?? primary.column_name)}
+                                comboReloadToken={comboReloadToken}
+                                showError={hasError}
+                                onOpenDrill={onOpenDrill}
+                                rowPrimaryKeys={row.primary_keys as Record<string, unknown>}
+                                mode="edit"
+                            />
+                        </td>
+                    );
+                } else {
+                    // View mode — показываем объединённые значения из всех колонок группы
+                    const shownParts = group
+                        .map((gcol) => getShown(valueIndexByKey, row.values, gcol))
+                        .filter(Boolean);
+                    const display = shownParts.length
+                        ? shownParts.map(formatCellValue).join(' · ')
+                        : '—';
+                    const clickable = primary.form_id != null && !!onOpenDrill;
+
+                    cells.push(
+                        <td
+                            key={`sub-view-combo-r${rowIdx}-${primary.widget_column_id}:${writeTcId}`}
+                            colSpan={span}
+                        >
+                            {clickable ? (
+                                <button
+                                    type="button"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onOpenDrill?.(primary.form_id!, {
+                                            originColumnType: 'combobox',
+                                            primary: row.primary_keys as Record<string, unknown>,
+                                            openedFromEdit: false,
+                                            targetWriteTcId: writeTcId ?? undefined,
+                                        });
+                                    }}
+                                    className={sub.linkButton}
+                                    title={`Открыть форму #${primary.form_id}`}
+                                >
+                                    <span className={sub.ellipsis}>{display}</span>
+                                </button>
+                            ) : (
+                                <span className={sub.ellipsis}>{display}</span>
+                            )}
+                        </td>
+                    );
+                }
+
+                i = j;
+                continue;
+            }
+
+            // ───── Обычная колонка ─────
+            const syntheticTcId =
+                col.type === 'combobox' && col.combobox_column_id != null && col.table_column_id != null
+                    ? -1_000_000 - Number(col.combobox_column_id)
+                    : col.table_column_id ?? -1;
+
+            const key = `${col.widget_column_id}:${syntheticTcId}`;
+            const idx = valueIndexByKey.get(key);
+            const val = idx != null ? row.values[idx] : '';
+
+            if (isEditingRow) {
+                const writeTcId = getWriteTcId(col);
+                const value = writeTcId == null ? '' : (editDraft[writeTcId] ?? '');
+                const isReq = isColumnRequired(col);
+                const isEmpty = isEmptyValue(value);
+                const hasError = showValidationErrors && isReq && isEmpty;
+
+                cells.push(
+                    <td
+                        key={`sub-edit-r${rowIdx}-wc${col.widget_column_id}-tc${col.table_column_id}`}
+                        className={sub.editCell}
+                    >
+                        <EditCellWithDrill
+                            col={col}
+                            writeTcId={writeTcId}
+                            value={value}
+                            onChange={(v) => {
+                                if (writeTcId != null) setEditDraft((prev) => ({ ...prev, [writeTcId]: v }));
+                            }}
+                            placeholder={isReq ? `${col.placeholder ?? col.column_name} *` : (col.placeholder ?? col.column_name)}
+                            comboReloadToken={comboReloadToken}
+                            showError={hasError}
+                            onOpenDrill={onOpenDrill}
+                            rowPrimaryKeys={row.primary_keys as Record<string, unknown>}
+                            mode="edit"
+                        />
+                    </td>
+                );
+            } else {
+                const isCheckboxCol = col.type === 'checkbox' || col.type === 'bool';
+                const toBool = (v: unknown): boolean => isRlsLockedValue(v);
+                const clickable = !!onOpenDrill && col.form_id != null;
+                const raw = val == null ? '' : String(val);
+                const display = formatByDatatype(raw, col);
+
+                cells.push(
+                    <td key={`sub-r${rowIdx}-wc${col.widget_column_id}-tc${col.table_column_id}`}>
+                        {isCheckboxCol ? (
+                            <Checkbox
+                                size="small"
+                                checked={toBool(val)}
+                                readOnly
+                                disabled
+                                sx={{
+                                    color: 'rgba(255, 255, 255, 0.4)',
+                                    '&.Mui-checked': { color: 'rgba(255, 255, 255, 0.9)' },
+                                    '&.Mui-disabled': { color: 'rgba(255, 255, 255, 0.7)' },
+                                }}
+                            />
+                        ) : clickable ? (
+                            <button
+                                type="button"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onOpenDrill?.(col.form_id!, {
+                                        originColumnType: col.type === 'combobox' ? 'combobox' : null,
+                                        primary: row.primary_keys as Record<string, unknown>,
+                                        openedFromEdit: false,
+                                        targetWriteTcId: getWriteTcId(col) ?? undefined,
+                                    });
+                                }}
+                                className={sub.linkButton}
+                                title={`Открыть форму #${col.form_id}`}
+                            >
+                                <span className={sub.ellipsis}>{display}</span>
+                            </button>
+                        ) : (
+                            <span className={sub.ellipsis}>{display}</span>
+                        )}
+                    </td>
+                );
+            }
+
+            i += 1;
+        }
+
+        return cells;
+    };
+
     return (
         <div className={sub.root}>
             <div style={{ display: 'flex' }}>
-
                 {hasTabs && tabs && (
                     <ul className={sub.tabs}>
                         {tabs.map((sw) => {
@@ -340,11 +612,9 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                                     <button
                                         className={isActive ? sub.tabActive : sub.tab}
                                         onClick={() => {
-                                            // ✅ закрываем режимы редактирования/добавления при смене вкладки
                                             if (editingRowIdx != null) cancelEdit();
                                             if (isAddingSub) cancelAdd?.();
                                             setShowSubHeaders(false);
-
                                             handleTabClick(sw.widget_order);
                                         }}
                                     >
@@ -365,9 +635,7 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                         />
                     </ul>
                 )}
-
             </div>
-
 
             {subLoading ? (
                 <p>Загрузка sub-виджета…</p>
@@ -379,11 +647,9 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                 </p>
             ) : !subDisplay ? null : (
                 <div className={sub.tableScroll}>
-
                     <table className={sub.tbl}>
                         <thead>
                         <tr>
-                            {/* Используем HeaderCell с required меткой */}
                             {renderHeaderPlan.map((g) => (
                                 <HeaderCell
                                     key={`sub-g-top-${g.id}`}
@@ -415,8 +681,8 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                                     while (labels.length < g.cols.length) labels.push('—');
 
                                     const nodes: React.ReactNode[] = [];
-
                                     let i = 0;
+
                                     while (i < g.cols.length) {
                                         const label = labels[i] ?? '—';
                                         const col = g.cols[i] as ExtCol;
@@ -426,16 +692,13 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                                             span += 1;
                                         }
 
-                                        // Проверяем required для подзаголовка
                                         const isReq = isColumnRequired(col);
 
                                         nodes.push(
                                             <th key={`g-sub-${g.id}-${i}`} colSpan={span}>
                                                 <span className={s.ellipsis}>
                                                     {label}
-                                                    {isReq && (
-                                                        <span className={sub.requiredMark}>*</span>
-                                                    )}
+                                                    {isReq && <span className={sub.requiredMark}>*</span>}
                                                 </span>
                                             </th>
                                         );
@@ -454,153 +717,23 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                         {/* строка добавления в саб */}
                         {isAddingSub && (
                             <tr className={sub.addRow}>
-                                {renderCols.map((col) => {
-                                    const writeTcId = getWriteTcId(col as ExtCol);
-
-                                    // Проверка на required и пустоту
-                                    const isReq = isColumnRequired(col as ExtCol);
-                                    const value = writeTcId == null ? '' : (draftSub[writeTcId] ?? '');
-                                    const isEmpty = isEmptyValue(value);
-                                    const hasError = showValidationErrors && isReq && isEmpty;
-
-                                    return (
-                                        <td
-                                            key={`sub-add-wc${col.widget_column_id}-tc${col.table_column_id}`}
-                                            className={sub.editCell}
-                                        >
-                                            <EditCellWithDrill
-                                                col={col as ExtCol}
-                                                writeTcId={writeTcId}
-                                                value={value}
-                                                onChange={(v) =>
-                                                    setDraftSub((prev) => ({
-                                                        ...prev,
-                                                        [writeTcId!]: v,
-                                                    }))
-                                                }
-                                                placeholder={isReq ? `${col.placeholder ?? col.column_name} *` : (col.placeholder ?? col.column_name)}
-                                                comboReloadToken={comboReloadToken}
-                                                showError={hasError}
-                                                onOpenDrill={onOpenDrill}
-                                                rowPrimaryKeys={undefined} // При добавлении нет primary keys
-                                                mode="add"
-                                            />
-                                        </td>
-                                    );
-                                })}
+                                {renderAddRowCells()}
                                 <td className={sub.actionsCell} />
                             </tr>
                         )}
 
                         {subDisplay.data.map((row, rowIdx) => {
                             const isEditingRow = editingRowIdx === rowIdx;
-
-                            // ✅ RLS-lock для строки
                             const rlsVal = rlsMeta ? row.values[rlsMeta.idx] : null;
                             const isRowLocked = rlsMeta ? isRlsLockedValue(rlsVal) : false;
 
                             return (
                                 <tr key={rowIdx}>
-                                    {renderCols.map((col) => {
-                                        const syntheticTcId =
-                                            col.type === 'combobox' &&
-                                            col.combobox_column_id != null &&
-                                            col.table_column_id != null
-                                                ? -1_000_000 - Number(col.combobox_column_id)
-                                                : col.table_column_id ?? -1;
+                                    {renderDataRowCells(row, rowIdx, isEditingRow)}
 
-                                        const key = `${col.widget_column_id}:${syntheticTcId}`;
-                                        const idx = valueIndexByKey.get(key);
-                                        const val = idx != null ? row.values[idx] : '';
-
-                                        if (isEditingRow) {
-                                            const writeTcId = getWriteTcId(col as ExtCol);
-
-                                            // Проверка на required и пустоту для редактирования
-                                            const isReq = isColumnRequired(col as ExtCol);
-                                            const value = writeTcId == null ? '' : (editDraft[writeTcId] ?? '');
-                                            const isEmpty = isEmptyValue(value);
-                                            const hasError = showValidationErrors && isReq && isEmpty;
-
-                                            return (
-                                                <td
-                                                    key={`sub-edit-r${rowIdx}-wc${col.widget_column_id}-tc${col.table_column_id}`}
-                                                    className={sub.editCell}
-                                                >
-                                                    <EditCellWithDrill
-                                                        col={col as ExtCol}
-                                                        writeTcId={writeTcId}
-                                                        value={value}
-                                                        onChange={(v) =>
-                                                            setEditDraft((prev) => ({
-                                                                ...prev,
-                                                                [writeTcId!]: v,
-                                                            }))
-                                                        }
-                                                        placeholder={isReq ? `${col.placeholder ?? col.column_name} *` : (col.placeholder ?? col.column_name)}
-                                                        comboReloadToken={comboReloadToken}
-                                                        showError={hasError}
-                                                        onOpenDrill={onOpenDrill}
-                                                        rowPrimaryKeys={row.primary_keys as Record<string, unknown>}
-                                                        mode="edit"
-                                                    />
-                                                </td>
-                                            );
-                                        }
-
-                                        const isCheckboxCol =
-                                            (col as ExtCol).type === 'checkbox' || (col as ExtCol).type === 'bool';
-
-                                        const toBool = (v: unknown): boolean => isRlsLockedValue(v);
-
-                                        const clickable = !!onOpenDrill && col.form_id != null;
-
-                                        const raw = val == null ? '' : String(val);
-                                        const display = formatByDatatype(raw, col as ExtCol);
-
-                                        return (
-                                            <td key={`sub-r${rowIdx}-wc${col.widget_column_id}-tc${col.table_column_id}`}>
-                                                {isCheckboxCol ? (
-                                                    <Checkbox
-                                                        size="small"
-                                                        checked={toBool(val)}
-                                                        readOnly
-                                                        disabled
-                                                        sx={{
-                                                            color: 'rgba(255, 255, 255, 0.4)',
-                                                            '&.Mui-checked': { color: 'rgba(255, 255, 255, 0.9)' },
-                                                            '&.Mui-disabled': { color: 'rgba(255, 255, 255, 0.7)' },
-                                                        }}
-                                                    />
-                                                ) : clickable ? (
-                                                    <button
-                                                        type="button"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            onOpenDrill?.(col.form_id!, {
-                                                                originColumnType: col.type === 'combobox' ? 'combobox' : null,
-                                                                primary: row.primary_keys as Record<string, unknown>,
-                                                                openedFromEdit: false,
-                                                                targetWriteTcId: getWriteTcId(col as ExtCol) ?? undefined,
-                                                            });
-                                                        }}
-                                                        className={sub.linkButton}
-                                                        title={`Открыть форму #${col.form_id}`}
-                                                    >
-                                                        <span className={sub.ellipsis}>{display}</span>
-                                                    </button>
-                                                ) : (
-                                                    <span className={sub.ellipsis}>{display}</span>
-                                                )}
-                                            </td>
-                                        );
-                                    })}
-
-                                    {/* ✅ actions */}
                                     <td className={sub.actionsCell}>
                                         {isEditingRow ? (
                                             <>
-                                                {/* если строка вдруг залочена — не даём сохранить */}
                                                 {!isRowLocked && (
                                                     <button
                                                         className={sub.okBtn}
@@ -656,8 +789,7 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                                                 </button>
 
                                                 {isRowLocked && (
-                                                    <span className={sub.lockSlot}
-                                                          title="Строка защищена политикой RLS">
+                                                    <span className={sub.lockSlot} title="Строка защищена политикой RLS">
                                                         <LockIcon className={sub.actionIcon} />
                                                     </span>
                                                 )}

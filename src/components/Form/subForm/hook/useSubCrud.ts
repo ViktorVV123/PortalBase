@@ -7,6 +7,11 @@ import type { ExtCol } from '@/components/Form/formTable/parts/FormatByDatatype'
 import {
     validateAddDraft,
 } from '@/shared/utils/requiredValidation/requiredValidation';
+import {
+    isSameComboGroup,
+    getWriteTcIdForComboGroup,
+    normalizeCheckboxValue,
+} from '@/shared/utils/comboGroupUtils';
 
 export type UseSubCrudDeps = {
     formIdForSub: number | null;
@@ -93,21 +98,52 @@ export function useSubCrud({
 
     const subColumnsAsExtCol = useMemo(() => (subDisplay?.columns ?? []) as ExtCol[], [subDisplay?.columns]);
 
+    // ═══════════════════════════════════════════════════════════
+    // ИСПРАВЛЕНО: Группируем combobox колонки как в MainTable
+    // ═══════════════════════════════════════════════════════════
     const subEditableTcIds = useMemo(() => {
         const ids: number[] = [];
         const seen = new Set<number>();
-        for (const c of subDisplay?.columns ?? []) {
+        const columns = (subDisplay?.columns ?? []) as ExtCol[];
+
+        for (let i = 0; i < columns.length; ) {
+            const c = columns[i];
             const col = c as any;
-            if (col.type === 'rls' || col.primary || col.increment || col.readonly) continue;
-            let writeTcId = col.type === 'combobox'
-                ? (col.__write_tc_id ?? col.table_column_id ?? null)
-                : (col.table_column_id ?? null);
+
+            // Пропускаем системные колонки
+            if (col.type === 'rls' || col.primary || col.increment || col.readonly) {
+                i++;
+                continue;
+            }
+
+            if (col.type === 'combobox') {
+                // Собираем группу combobox с одинаковым widget_column_id + write_tc_id
+                let j = i + 1;
+                while (j < columns.length && isSameComboGroup(c, columns[j])) j++;
+
+                const group = columns.slice(i, j);
+                const writeTcId = getWriteTcIdForComboGroup(group);
+
+                if (writeTcId != null && !isSyntheticComboboxId(writeTcId) && !seen.has(writeTcId)) {
+                    seen.add(writeTcId);
+                    ids.push(writeTcId);
+                }
+
+                i = j;
+                continue;
+            }
+
+            // Обычная колонка
+            let writeTcId = col.__write_tc_id ?? col.table_column_id ?? null;
             if (writeTcId != null && isSyntheticComboboxId(writeTcId)) writeTcId = col.__write_tc_id ?? null;
             if (writeTcId != null && !isSyntheticComboboxId(writeTcId) && !seen.has(writeTcId)) {
                 seen.add(writeTcId);
                 ids.push(writeTcId);
             }
+
+            i++;
         }
+
         return ids;
     }, [subDisplay?.columns]);
 

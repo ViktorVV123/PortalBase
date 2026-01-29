@@ -281,7 +281,17 @@ export const ModalEditForm: React.FC<Props> = ({
         (async () => {
             setListsLoading(true);
             try {
-                const widgetsRes = await api.get<Widget[]>('/widgets');
+                // ═══════════════════════════════════════════════════════════
+                // ИСПРАВЛЕНИЕ: Загружаем виджеты только для workspace формы
+                // ═══════════════════════════════════════════════════════════
+                const workspaceId = form.workspace?.id;
+
+                let widgetsUrl = '/widgets';
+                if (workspaceId) {
+                    widgetsUrl = `/widgets?workspace_id=${workspaceId}&published=true`;
+                }
+
+                const widgetsRes = await api.get<Widget[]>(widgetsUrl);
                 const widgets = widgetsRes.data.sort((a, b) => a.id - b.id);
 
                 const mainW = widgets.find(w => w.id === form.main_widget_id);
@@ -304,7 +314,7 @@ export const ModalEditForm: React.FC<Props> = ({
         })();
 
         return () => { cancelled = true; };
-    }, [open, form.main_widget_id]);
+    }, [open, form.main_widget_id, form.workspace?.id]);
 
     useEffect(() => {
         if (subList.length === 0) {
