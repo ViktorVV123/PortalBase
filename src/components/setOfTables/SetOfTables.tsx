@@ -13,6 +13,7 @@ import type {
     WidgetColumn,
     WidgetForm,
     ReferenceItem,
+    PaginationState,
 } from '@/shared/hooks/useWorkSpaces';
 
 import { FormTable } from '@/components/Form/formTable/FormTable';
@@ -98,6 +99,20 @@ type FormProps = {
     setFormDisplay: (value: FormDisplay | null) => void;
 };
 
+/** Пропсы для пагинации (с infinite scroll) */
+type PaginationProps = {
+    pagination: PaginationState;
+    goToPage: (
+        formId: number,
+        page: number,
+        filters?: Array<{ table_column_id: number; value: string | number }>
+    ) => Promise<void>;
+    loadMoreRows: (
+        formId: number,
+        filters?: Array<{ table_column_id: number; value: string | number }>
+    ) => Promise<void>;
+};
+
 /** Пропсы для работы с sub-виджетом */
 type SubProps = {
     loadSubDisplay: (
@@ -121,7 +136,7 @@ type CommonProps = {
 };
 
 /** Полный тип пропсов */
-type Props = TableProps & WidgetProps & ReferenceProps & FormProps & SubProps & CommonProps;
+type Props = TableProps & WidgetProps & ReferenceProps & FormProps & PaginationProps & SubProps & CommonProps;
 
 // ─────────────────────────────────────────────────────────────
 // КОМПОНЕНТ
@@ -167,6 +182,11 @@ export const SetOfTables: React.FC<Props> = (props) => {
         loadFilteredFormDisplay,
         setFormDisplay,
 
+        // Pagination (с infinite scroll)
+        pagination,
+        goToPage,
+        loadMoreRows,
+
         // Sub
         loadSubDisplay,
         subDisplay,
@@ -204,7 +224,7 @@ export const SetOfTables: React.FC<Props> = (props) => {
             ════════════════════════════════════════════════════ */}
             {selectedFormId && (
                 <>
-                    {formLoading ? (
+                    {formLoading && !formDisplay ? (
                         <div className={s.loaderArea}>
                             <CenteredLoader label="Загружаем форму…" />
                         </div>
@@ -225,6 +245,10 @@ export const SetOfTables: React.FC<Props> = (props) => {
                             setSubDisplay={setSubDisplay}
                             loadSubDisplay={loadSubDisplay}
                             formDisplay={formDisplay}
+                            // Pagination (с infinite scroll)
+                            pagination={pagination}
+                            goToPage={goToPage}
+                            loadMoreRows={loadMoreRows}
                         />
                     ) : null}
                 </>

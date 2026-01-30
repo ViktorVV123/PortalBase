@@ -1,6 +1,7 @@
 // src/components/Form/mainTable/MainTable.module.scss
 // ФИНАЛЬНАЯ ВЕРСИЯ — таблица с горизонтальным скроллом
 // ОБНОВЛЕНО: Полная поддержка светлой и тёмной темы
+// ОБНОВЛЕНО: Уменьшена ширина колонки actions
 
 @use '@/assets/styles/fluid-type' as *;
 
@@ -285,7 +286,6 @@ $input-border-focus: var(--input-border-focus);
   font-size: var(--tbl-input-font-size);
   color: var(--input-text);
   background: $input-bg;
-  // ✅ УЛУЧШЕНО: Более заметная граница
   border: 1px solid $input-border;
   border-radius: 4px;
   text-align: center;
@@ -298,7 +298,6 @@ $input-border-focus: var(--input-border-focus);
   &:focus {
     outline: none;
     border-color: $input-border-focus;
-    // ✅ Добавляем тень для лучшей видимости фокуса
     box-shadow: 0 0 0 2px var(--theme-focus);
   }
 }
@@ -323,7 +322,6 @@ $input-border-focus: var(--input-border-focus);
   flex: 1;
   min-width: 0;
 
-  // ✅ Улучшаем стили для Select в светлой теме
   :global(.MuiOutlinedInput-notchedOutline) {
     border-color: $input-border;
   }
@@ -336,7 +334,6 @@ $input-border-focus: var(--input-border-focus);
     border-color: $input-border-focus;
   }
 
-  // ✅ КЛЮЧЕВОЕ: Цвет текста в Select
   :global(.MuiSelect-select),
   :global(.MuiNativeSelect-select) {
     color: var(--input-text);
@@ -347,7 +344,6 @@ $input-border-focus: var(--input-border-focus);
     background: $input-bg;
   }
 
-  // Иконка стрелки
   :global(.MuiSelect-icon),
   :global(.MuiNativeSelect-icon) {
     color: var(--icon-primary);
@@ -434,7 +430,6 @@ $input-border-focus: var(--input-border-focus);
     font-size: var(--tbl-input-font-size);
   }
 
-  // ✅ Улучшаем стили для DatePicker
   :global(.MuiOutlinedInput-notchedOutline) {
     border-color: $input-border;
   }
@@ -449,16 +444,17 @@ $input-border-focus: var(--input-border-focus);
 }
 
 // ═══════════════════════════════════════════════════════════
-// ACTIONS COLUMN
+// ACTIONS COLUMN — КОМПАКТНАЯ ВЕРСИЯ
 // ═══════════════════════════════════════════════════════════
 
 .actionsCell {
-  padding: 3px 6px !important;
+  padding: 2px 3px !important;
   text-align: center;
   white-space: nowrap;
-  width: 70px;
-  min-width: 56px;
-  max-width: 90px;
+  // ✅ УМЕНЬШЕНО: было 70px/56px/90px
+  width: 52px;
+  min-width: 44px;
+  max-width: 60px;
   background: inherit;
 }
 
@@ -466,21 +462,22 @@ $input-border-focus: var(--input-border-focus);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 2px;
+  gap: 1px;
 }
 
 .actionsBtn {
   background: none;
   border: 0;
-  padding: 3px;
-  width: 22px;
-  height: 22px;
+  // ✅ УМЕНЬШЕНО
+  padding: 2px;
+  width: 18px;
+  height: 18px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   color: var(--icon-primary);
-  border-radius: 4px;
+  border-radius: 3px;
   transition: all 0.15s ease;
 
   &:hover {
@@ -489,9 +486,9 @@ $input-border-focus: var(--input-border-focus);
   }
 
   @media (min-width: 1921px) {
-    padding: 4px;
-    width: 26px;
-    height: 26px;
+    padding: 3px;
+    width: 22px;
+    height: 22px;
   }
 }
 
@@ -502,18 +499,20 @@ $input-border-focus: var(--input-border-focus);
 }
 
 .actionIcon {
-  width: 14px;
-  height: 14px;
+  // ✅ УМЕНЬШЕНО: было 14px
+  width: 12px;
+  height: 12px;
   color: inherit;
 
   @media (min-width: 1921px) {
-    width: 16px;
-    height: 16px;
+    width: 14px;
+    height: 14px;
   }
 }
 
 .lockSlot {
-  width: 18px;
+  // ✅ УМЕНЬШЕНО: было 18px
+  width: 14px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -521,7 +520,7 @@ $input-border-focus: var(--input-border-focus);
   opacity: 0.6;
 
   @media (min-width: 1921px) {
-    width: 20px;
+    width: 16px;
   }
 }
 
@@ -533,22 +532,23 @@ $input-border-focus: var(--input-border-focus);
 .cancelBtn {
   background: none;
   border: 0;
-  width: 22px;
-  height: 22px;
+  // ✅ УМЕНЬШЕНО
+  width: 18px;
+  height: 18px;
   padding: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
+  font-size: 12px;
   line-height: 1;
   cursor: pointer;
-  border-radius: 4px;
+  border-radius: 3px;
   transition: all 0.15s ease;
 
   @media (min-width: 1921px) {
-    width: 26px;
-    height: 26px;
-    font-size: 16px;
+    width: 22px;
+    height: 22px;
+    font-size: 14px;
   }
 
   &:disabled {
@@ -582,13 +582,13 @@ $input-border-focus: var(--input-border-focus);
 .toggleBtn {
   background: none;
   border: 0;
-  padding: 3px;
+  padding: 2px;
   cursor: pointer;
   color: var(--icon-primary);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 4px;
+  border-radius: 3px;
   transition: all 0.15s ease;
 
   &:hover {
@@ -597,12 +597,12 @@ $input-border-focus: var(--input-border-focus);
   }
 
   svg {
-    width: 18px;
-    height: 18px;
+    width: 16px;
+    height: 16px;
 
     @media (min-width: 1921px) {
-      width: 22px;
-      height: 22px;
+      width: 20px;
+      height: 20px;
     }
   }
 }
@@ -655,4 +655,129 @@ $input-border-focus: var(--input-border-focus);
   &:hover td {
     background: rgba(74, 222, 128, 0.08);
   }
+}
+
+/* src/components/Form/mainTable/MainTableAnimations.module.scss */
+
+/* Анимация появления новых строк при infinite scroll */
+@keyframes fadeInRow {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInRow {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Класс для новых строк */
+.newRow {
+  animation: fadeInRow 0.3s ease-out forwards;
+}
+
+/* Скелетон для загрузки */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeletonRow {
+  td {
+    position: relative;
+    overflow: hidden;
+
+    &::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(
+                      90deg,
+                      rgba(255, 255, 255, 0) 0%,
+                      rgba(255, 255, 255, 0.05) 50%,
+                      rgba(255, 255, 255, 0) 100%
+      );
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+    }
+  }
+}
+
+/* Индикатор загрузки внизу */
+.loadMoreContainer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: linear-gradient(
+                  to bottom,
+                  rgba(30, 30, 30, 0.3),
+                  rgba(30, 30, 30, 0.8)
+  );
+  backdrop-filter: blur(4px);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  min-height: 56px;
+  gap: 12px;
+}
+
+.loadMoreSpinner {
+  color: var(--theme-primary, #90caf9);
+}
+
+.loadMoreText {
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* Пульсирующие точки */
+.dots {
+  display: flex;
+  gap: 4px;
+
+  span {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background-color: rgba(144, 202, 249, 0.5);
+    animation: pulse 1.4s ease-in-out infinite;
+
+    &:nth-child(1) { animation-delay: 0s; }
+    &:nth-child(2) { animation-delay: 0.2s; }
+    &:nth-child(3) { animation-delay: 0.4s; }
+  }
+}
+
+@keyframes pulse {
+  0%, 80%, 100% {
+    opacity: 0.3;
+    transform: scale(0.8);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Плавный переход для всей таблицы */
+.smoothTransition {
+  transition: height 0.3s ease-out;
 }

@@ -81,6 +81,11 @@ export const Main = () => {
         loadFilteredFormDisplay,
         setFormDisplay,
 
+        // Pagination (с infinite scroll)
+        pagination,
+        goToPage,
+        loadMoreRows,
+
         // Sub Display
         subDisplay,
         subLoading,
@@ -182,9 +187,6 @@ export const Main = () => {
         formsListByWidget,
         loadConnections,
         connections,
-        // ═══════════════════════════════════════════════════════════════════════════
-        // НОВОЕ: Передаём callback для отслеживания состояния меню
-        // ═══════════════════════════════════════════════════════════════════════════
         onMenuOpenChange: setTopMenuOpen,
     };
 
@@ -231,6 +233,11 @@ export const Main = () => {
         loadFilteredFormDisplay,
         setFormDisplay,
 
+        // Pagination (с infinite scroll)
+        pagination,
+        goToPage,
+        loadMoreRows,
+
         // Sub
         loadSubDisplay,
         subDisplay,
@@ -259,18 +266,14 @@ export const Main = () => {
     // RENDER
     // ═══════════════════════════════════════════════════════════
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // ИСПРАВЛЕНО: Не показываем глобальный лоадер когда открыто верхнее меню
-    // ═══════════════════════════════════════════════════════════════════════════
     const showGlobalLoader = loading
         && !selectedTable
         && !selection.selectedWidget
         && !selection.selectedFormId
-        && !topMenuOpen;  // ← НОВОЕ: не показываем когда меню открыто
+        && !topMenuOpen;
 
     return (
         <div className={styles.layout}>
-            {/* Глобальный лоадер */}
             {showGlobalLoader && (
                 <CenteredLoader fullScreen label="Загружаем рабочее пространство…" />
             )}

@@ -81,7 +81,7 @@ export interface WidgetForm {
     main_widget_id: number;
     name: string;
     search_bar: boolean;
-    group:string;
+    group: string;
     description: string | null;
     path?: string | null;
     form_id: number;
@@ -90,7 +90,7 @@ export interface WidgetForm {
         sub_widget_id: number;
         form_id: number;
         where_conditional: string | null;
-        delete_sub_query:string
+        delete_sub_query: string;
     }[];
     tree_fields: {
         column_order: number;
@@ -125,26 +125,6 @@ export interface Connection {
         description?: string;
     };
 }
-
-
-/*export type ConnectionURL = {
-    drivername: string;
-    username: string;
-    password?: string;                 // сервер пароль не возвращает (маска), делаем опц.
-    host: string;
-    port: number;
-    database: string;
-    query: Record<string, any>;
-};
-
-export type Connection = {
-    id: number;
-    name: string;
-    description: string | null;
-    conn_type: string;                 // "sqlalchemy" и т.п.
-    conn_str?: string | null;          // может быть на GET списка
-    url?: ConnectionURL;               // ← опционально, чтобы не падать, когда его нет
-};*/
 
 // ─────────────────────────────────────────────────────────────
 // Form Display типы
@@ -184,6 +164,9 @@ export interface FormRow {
 export interface DisplayedWidget {
     name: string;
     description: string | null;
+    /** Общее количество строк (для пагинации) */
+    total?: number;
+    page:number
 }
 
 export interface FormDisplay {
@@ -229,7 +212,7 @@ export type FormTreeColumn = {
     name: string;
     sort: string | null;
     values: (string | number | null)[];
-    display_values?: (string | number | null)[]; // ← ДОБАВИТЬ
+    display_values?: (string | number | null)[];
 };
 
 // ─────────────────────────────────────────────────────────────

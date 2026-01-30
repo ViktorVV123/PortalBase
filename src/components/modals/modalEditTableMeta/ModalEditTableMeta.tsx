@@ -1,9 +1,10 @@
 // components/modals/ModalEditTableMeta.tsx
 import {
     Dialog, DialogTitle, DialogContent, DialogActions,
-    TextField, Button, Stack, Tooltip, Box
+    TextField, Button, Stack, Tooltip, Box, Typography
 } from '@mui/material';
 import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import { useEffect, useMemo, useState } from 'react';
 import { DTable, Column } from "@/shared/hooks/useWorkSpaces";
 import { generateTableSql, extractTableNameFromSelect } from '@/shared/utils/generateTableSql';
@@ -60,6 +61,16 @@ const textFieldSx = {
         },
     },
 };
+
+// ═══════════════════════════════════════════════════════════
+// СИСТЕМНЫЕ ПЕРЕМЕННЫЕ
+// ═══════════════════════════════════════════════════════════
+const SYSTEM_VARIABLES = [
+    {
+        name: '@sysfv-groups',
+        description: 'Группы текущего пользователя (для RLS фильтрации)',
+    },
+];
 
 export const ModalEditTableMeta = ({ open, table, columns, onClose, onSave }: Props) => {
     const [draft, setDraft] = useState<Partial<DTable>>(table);
@@ -210,6 +221,69 @@ export const ModalEditTableMeta = ({ open, table, columns, onClose, onSave }: Pr
                         onChange={e => handleChange('delete_query', e.target.value)}
                         sx={textFieldSx}
                     />
+
+                    {/* ═══════════════════════════════════════════════════════════
+                        ПОДСКАЗКА: Системные переменные
+                    ═══════════════════════════════════════════════════════════ */}
+                    <Box
+                        sx={{
+                            mt: 2,
+                            p: 1.5,
+                            borderRadius: 1,
+                            backgroundColor: 'var(--theme-surface)',
+                            border: '1px solid var(--theme-border)',
+                        }}
+                    >
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.75 }}>
+                            <InfoOutlinedIcon
+                                sx={{
+                                    fontSize: 16,
+                                    color: 'var(--theme-primary)',
+                                    opacity: 0.8,
+                                }}
+                            />
+                            <Typography
+                                variant="caption"
+                                sx={{
+                                    fontWeight: 600,
+                                    color: 'var(--theme-text-secondary)',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.5px',
+                                    fontSize: '10px',
+                                }}
+                            >
+                                Системные переменные
+                            </Typography>
+                        </Box>
+
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
+                            {SYSTEM_VARIABLES.map((v) => (
+                                <Tooltip key={v.name} title={v.description} arrow placement="top">
+                                    <Box
+                                        component="code"
+                                        sx={{
+                                            px: 1,
+                                            py: 0.5,
+                                            borderRadius: 0.5,
+                                            backgroundColor: 'var(--theme-hover)',
+                                            color: 'var(--theme-primary)',
+                                            fontSize: '12px',
+                                            fontFamily: 'monospace',
+                                            cursor: 'help',
+                                            border: '1px solid var(--theme-border)',
+                                            transition: 'all 0.15s ease',
+                                            '&:hover': {
+                                                backgroundColor: 'var(--theme-selected)',
+                                                borderColor: 'var(--theme-primary)',
+                                            },
+                                        }}
+                                    >
+                                        {v.name}
+                                    </Box>
+                                </Tooltip>
+                            ))}
+                        </Box>
+                    </Box>
                 </Stack>
             </DialogContent>
 

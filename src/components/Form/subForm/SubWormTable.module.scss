@@ -1,6 +1,7 @@
 // src/components/Form/subForm/SubWormTable.module.scss
 // ФИНАЛЬНАЯ ВЕРСИЯ — SubTable с собственным горизонтальным скроллом
 // Полная поддержка светлой и тёмной темы
+// ОБНОВЛЕНО: Уменьшена ширина колонки actions
 
 @use '@/assets/styles/fluid-type' as *;
 
@@ -281,7 +282,7 @@ $input-border-focus: var(--input-border-focus);
 }
 
 // ═══════════════════════════════════════════════════════════
-// INPUT IN CELL — УЛУЧШЕНО ДЛЯ СВЕТЛОЙ ТЕМЫ
+// INPUT IN CELL
 // ═══════════════════════════════════════════════════════════
 
 .inpInCell {
@@ -310,7 +311,6 @@ $input-border-focus: var(--input-border-focus);
     color: var(--input-text);
   }
 
-  // Иконка стрелки в Select
   :global(.MuiSelect-icon),
   :global(.MuiNativeSelect-icon) {
     color: var(--icon-primary);
@@ -340,7 +340,6 @@ $input-border-focus: var(--input-border-focus);
   font-size: 12px;
   color: var(--input-text);
   background: $input-bg;
-  // ✅ УЛУЧШЕНО: Более заметная граница
   border: 1px solid $input-border;
   border-radius: 4px;
   text-align: center;
@@ -353,7 +352,6 @@ $input-border-focus: var(--input-border-focus);
   &:focus {
     outline: none;
     border-color: $input-border-focus;
-    // ✅ Добавляем тень для лучшей видимости фокуса
     box-shadow: 0 0 0 2px var(--theme-focus);
   }
 }
@@ -378,7 +376,6 @@ $input-border-focus: var(--input-border-focus);
   flex: 1;
   min-width: 0;
 
-  // ✅ Улучшаем стили для Select в светлой теме
   :global(.MuiOutlinedInput-notchedOutline) {
     border-color: $input-border;
   }
@@ -391,7 +388,6 @@ $input-border-focus: var(--input-border-focus);
     border-color: $input-border-focus;
   }
 
-  // ✅ КЛЮЧЕВОЕ: Цвет текста в Select
   :global(.MuiSelect-select),
   :global(.MuiNativeSelect-select) {
     color: var(--input-text);
@@ -402,7 +398,6 @@ $input-border-focus: var(--input-border-focus);
     background: $input-bg;
   }
 
-  // Иконка стрелки
   :global(.MuiSelect-icon),
   :global(.MuiNativeSelect-icon) {
     color: var(--icon-primary);
@@ -489,7 +484,6 @@ $input-border-focus: var(--input-border-focus);
     color: var(--input-text);
   }
 
-  // ✅ Улучшаем стили для DatePicker
   :global(.MuiOutlinedInput-notchedOutline) {
     border-color: $input-border;
   }
@@ -504,46 +498,49 @@ $input-border-focus: var(--input-border-focus);
 }
 
 // ═══════════════════════════════════════════════════════════
-// ACTIONS COLUMN
+// ACTIONS COLUMN — КОМПАКТНАЯ ВЕРСИЯ
 // ═══════════════════════════════════════════════════════════
 
 .actionsHeadCell {
-  padding: 4px 6px !important;
+  padding: 3px 4px !important;
   text-align: center;
   white-space: nowrap;
-  width: 70px;
-  min-width: 50px;
-  max-width: 90px;
+  // ✅ УМЕНЬШЕНО: было 70px/50px/90px
+  width: 52px;
+  min-width: 44px;
+  max-width: 60px;
 }
 
 .actionsCell {
-  padding: 4px 6px !important;
+  padding: 2px 3px !important;
   text-align: center;
   white-space: nowrap;
-  width: 70px;
-  min-width: 50px;
-  max-width: 90px;
+  // ✅ УМЕНЬШЕНО: было 70px/50px/90px
+  width: 52px;
+  min-width: 44px;
+  max-width: 60px;
 }
 
 .actionsRow {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 3px;
+  gap: 1px;
 }
 
 .actionsBtn {
   background: none;
   border: 0;
-  padding: 3px;
-  width: 24px;
-  height: 24px;
+  // ✅ УМЕНЬШЕНО
+  padding: 2px;
+  width: 18px;
+  height: 18px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   color: var(--icon-primary);
-  border-radius: 4px;
+  border-radius: 3px;
   transition: all 0.15s;
 
   &:hover {
@@ -559,13 +556,15 @@ $input-border-focus: var(--input-border-focus);
 }
 
 .actionIcon {
-  width: 14px;
-  height: 14px;
+  // ✅ УМЕНЬШЕНО: было 14px
+  width: 12px;
+  height: 12px;
   color: inherit;
 }
 
 .lockSlot {
-  width: 18px;
+  // ✅ УМЕНЬШЕНО: было 18px
+  width: 14px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -580,15 +579,16 @@ $input-border-focus: var(--input-border-focus);
 .iconBtn {
   background: none;
   border: 0;
-  padding: 3px;
-  width: 24px;
-  height: 24px;
+  // ✅ УМЕНЬШЕНО
+  padding: 2px;
+  width: 18px;
+  height: 18px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   color: var(--icon-primary);
-  border-radius: 4px;
+  border-radius: 3px;
   transition: all 0.15s;
 
   &:hover {
@@ -611,16 +611,17 @@ $input-border-focus: var(--input-border-focus);
 .cancelBtn {
   background: none;
   border: 0;
-  width: 24px;
-  height: 24px;
+  // ✅ УМЕНЬШЕНО
+  width: 18px;
+  height: 18px;
   padding: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
+  font-size: 12px;
   line-height: 1;
   cursor: pointer;
-  border-radius: 4px;
+  border-radius: 3px;
   transition: all 0.15s;
 
   &:disabled {
@@ -654,13 +655,13 @@ $input-border-focus: var(--input-border-focus);
 .toggleBtn {
   background: none;
   border: 0;
-  padding: 3px;
+  padding: 2px;
   cursor: pointer;
   color: var(--icon-primary);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 4px;
+  border-radius: 3px;
   transition: all 0.15s;
 
   &:hover {

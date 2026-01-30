@@ -29,6 +29,7 @@ export const MainTableWithContext: React.FC<Props> = ({
         mainEditing,
         deletingRowIdx,
         pkToKey,
+        loading,
         // Actions
         startEdit,
         cancelEdit,

@@ -262,7 +262,8 @@ export const MainTable: React.FC<Props> = (p) => {
                             style={colStyles[idx]}
                         />
                     ))}
-                    <col style={{ width: '70px', minWidth: '56px', maxWidth: '80px' }} />
+                    {/* ✅ УМЕНЬШЕНО: было 70px/56px/80px */}
+                    <col style={{ width: '52px', minWidth: '44px', maxWidth: '60px' }} />
                 </colgroup>
 
                 <thead>

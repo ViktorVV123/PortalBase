@@ -48,6 +48,10 @@ export type {
     AddFormRequest,
 } from './stores/types';
 
+// Re-export pagination types and constants
+export { MAIN_TABLE_PAGE_SIZE } from './stores/useFormsStore';
+export type { PaginationState } from './stores/useFormsStore';
+
 export const useWorkSpaces = () => {
     // ─────────────────────────────────────────────────────────────
     // Инициализируем все доменные хуки
@@ -188,6 +192,13 @@ export const useWorkSpaces = () => {
         loadFormDisplay: formsStore.loadFormDisplay,
         loadFilteredFormDisplay: formsStore.loadFilteredFormDisplay,
         setFormDisplay: formsStore.setFormDisplay,
+
+        // ═══════════════════════════════════════════════════════════
+        // PAGINATION (с infinite scroll)
+        // ═══════════════════════════════════════════════════════════
+        pagination: formsStore.pagination,
+        goToPage: formsStore.goToPage,
+        loadMoreRows: formsStore.loadMoreRows,
 
         // ═══════════════════════════════════════════════════════════
         // SUB DISPLAY

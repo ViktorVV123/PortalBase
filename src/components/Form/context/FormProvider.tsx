@@ -1,8 +1,7 @@
 // src/components/Form/context/FormProvider.tsx
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { FormContext, FormContextValue, DrillState, DrillOpenMeta, TreeDrawerState } from './FormContext';
-
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import {FormContext, FormContextValue, DrillState, DrillOpenMeta, TreeDrawerState} from './FormContext';
 import type {
     FormDisplay,
     SubDisplay,
@@ -10,21 +9,18 @@ import type {
     Widget,
     FormTreeColumn,
     Column,
+    PaginationState
 } from '@/shared/hooks/useWorkSpaces';
-
-import { useHeaderPlan } from '@/components/Form/formTable/hooks/useHeaderPlan';
-import { useFiltersTree } from '@/components/Form/formTable/hooks/useFiltersTree';
-import { useTreeHandlers } from '@/components/Form/treeForm/hooks/useTreeHandlers';
-import { useSubNav } from '@/components/Form/subForm/hook/useSubNav';
-import { useFormSearch } from '@/components/search/hook/useFormSearch';
-import { useMainCrud } from '@/components/Form/mainTable/hook/useMainCrud';
-import { useSubCrud } from '@/components/Form/subForm/hook/useSubCrud';
-import { useTableMeta } from '@/components/Form/mainTable/hook/useTableMeta';
-import { api } from '@/services/api';
-
-// ─────────────────────────────────────────────────────────────
-// PROPS
-// ─────────────────────────────────────────────────────────────
+import {MAIN_TABLE_PAGE_SIZE} from '@/shared/hooks/useWorkSpaces';
+import {useHeaderPlan} from '@/components/Form/formTable/hooks/useHeaderPlan';
+import {useFiltersTree} from '@/components/Form/formTable/hooks/useFiltersTree';
+import {useTreeHandlers} from '@/components/Form/treeForm/hooks/useTreeHandlers';
+import {useSubNav} from '@/components/Form/subForm/hook/useSubNav';
+import {useFormSearch} from '@/components/search/hook/useFormSearch';
+import {useMainCrud} from '@/components/Form/mainTable/hook/useMainCrud';
+import {useSubCrud} from '@/components/Form/subForm/hook/useSubCrud';
+import {useTableMeta} from '@/components/Form/mainTable/hook/useTableMeta';
+import {api} from '@/services/api';
 
 export type FormProviderProps = {
     children: React.ReactNode;
@@ -43,13 +39,21 @@ export type FormProviderProps = {
     subLoading: boolean;
     subError: string | null;
     loadSubDisplay: (formId: number, subOrder: number, primary?: Record<string, unknown>) => void;
-    loadFilteredFormDisplay: (formId: number, filter: { table_column_id: number; value: string | number }) => Promise<void>;
+    loadFilteredFormDisplay: (formId: number, filter: {
+        table_column_id: number;
+        value: string | number
+    }) => Promise<void>;
     loadFormTree: (formId: number) => Promise<void>;
+    pagination: PaginationState;
+    goToPage: (formId: number, page: number, filters?: Array<{
+        table_column_id: number;
+        value: string | number
+    }>) => Promise<void>;
+    loadMoreRows: (formId: number, filters?: Array<{
+        table_column_id: number;
+        value: string | number
+    }>) => Promise<void>;
 };
-
-// ─────────────────────────────────────────────────────────────
-// PROVIDER
-// ─────────────────────────────────────────────────────────────
 
 export const FormProvider: React.FC<FormProviderProps> = ({
                                                               children,
@@ -70,47 +74,26 @@ export const FormProvider: React.FC<FormProviderProps> = ({
                                                               loadSubDisplay,
                                                               loadFilteredFormDisplay,
                                                               loadFormTree,
+                                                              pagination,
+                                                              goToPage: goToPageExternal,
+                                                              loadMoreRows: loadMoreRowsExternal,
                                                           }) => {
-    // ═══════════════════════════════════════════════════════════
-    // CURRENT FORM
-    // ═══════════════════════════════════════════════════════════
-
     const currentForm = useMemo<WidgetForm | null>(() => {
         if (selectedFormId != null) return formsById[selectedFormId] ?? null;
         if (selectedWidget) return formsByWidget[selectedWidget.id] ?? null;
         return null;
     }, [selectedFormId, selectedWidget, formsById, formsByWidget]);
 
-    // ═══════════════════════════════════════════════════════════
-    // HEADER PLAN
-    // ═══════════════════════════════════════════════════════════
-
     const {
         headerPlan,
         flatColumnsInRenderOrder,
         valueIndexByKey,
         isColReadOnly,
-        stylesColumnMeta,
+        stylesColumnMeta
     } = useHeaderPlan(formDisplay);
 
-    // ═══════════════════════════════════════════════════════════
-    // TABLE META CACHE (загружается один раз при смене формы)
-    // Устраняет N+1 запросы в preflight проверках
-    // ═══════════════════════════════════════════════════════════
-
-    const mainWidgetId = useMemo(() => {
-        return (formDisplay as any)?.main_widget_id ?? (formDisplay as any)?.widget_id ?? null;
-    }, [formDisplay]);
-
-    const { tableMetaCache } = useTableMeta({
-        selectedWidget,
-        selectedFormId,
-        mainWidgetId,
-    });
-
-    // ═══════════════════════════════════════════════════════════
-    // TREE DRAWER STATE
-    // ═══════════════════════════════════════════════════════════
+    const mainWidgetId = useMemo(() => (formDisplay as any)?.main_widget_id ?? (formDisplay as any)?.widget_id ?? null, [formDisplay]);
+    const {tableMetaCache} = useTableMeta({selectedWidget, selectedFormId, mainWidgetId});
 
     const [isTreeOpen, setIsTreeOpen] = useState(false);
     const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
@@ -118,7 +101,7 @@ export const FormProvider: React.FC<FormProviderProps> = ({
 
     const openTreeDrawer = useCallback(() => setIsTreeOpen(true), []);
     const closeTreeDrawer = useCallback(() => setIsTreeOpen(false), []);
-    const toggleTreeDrawer = useCallback(() => setIsTreeOpen((prev) => !prev), []);
+    const toggleTreeDrawer = useCallback(() => setIsTreeOpen(p => !p), []);
     const resetTreeDrawer = useCallback(() => {
         setIsTreeOpen(false);
         setExpandedKeys(new Set());
@@ -129,130 +112,96 @@ export const FormProvider: React.FC<FormProviderProps> = ({
         resetTreeDrawer();
     }, [selectedFormId, resetTreeDrawer]);
 
-    // ═══════════════════════════════════════════════════════════
-    // FILTERS / TREE
-    // ═══════════════════════════════════════════════════════════
-
     const {
-        activeFilters, setActiveFilters,
-        nestedTrees, setNestedTrees,
-        activeExpandedKey, setActiveExpandedKey,
-        resetFiltersHard,
+        activeFilters,
+        setActiveFilters,
+        nestedTrees,
+        setNestedTrees,
+        activeExpandedKey,
+        setActiveExpandedKey,
+        resetFiltersHard
     } = useFiltersTree(selectedFormId, setFormDisplay);
-
-    const { handleNestedValueClick, handleTreeValueClick } = useTreeHandlers({
+    const {handleNestedValueClick, handleTreeValueClick} = useTreeHandlers({
         selectedFormId,
         activeFilters,
         setActiveFilters,
         setNestedTrees,
         setActiveExpandedKey,
         setFormDisplay,
-        setSubDisplay,
+        setSubDisplay
     });
 
-    // ═══════════════════════════════════════════════════════════
-    // SUB NAVIGATION
-    // ═══════════════════════════════════════════════════════════
-
-    const availableOrders = useMemo(
-        () => (currentForm?.sub_widgets ?? []).map((sw) => sw.widget_order).sort((a, b) => a - b),
-        [currentForm]
-    );
+    const availableOrders = useMemo(() => (currentForm?.sub_widgets ?? []).map(sw => sw.widget_order).sort((a, b) => a - b), [currentForm]);
+    const {
+        lastPrimary,
+        setLastPrimary,
+        selectedKey,
+        setSelectedKey,
+        activeSubOrder,
+        setActiveSubOrder,
+        pkToKey,
+        handleRowClick,
+        handleTabClick
+    } = useSubNav({formIdForSub: selectedFormId, availableOrders, loadSubDisplay});
 
     const {
-        lastPrimary, setLastPrimary,
-        selectedKey, setSelectedKey,
-        activeSubOrder, setActiveSubOrder,
-        pkToKey, handleRowClick, handleTabClick,
-    } = useSubNav({ formIdForSub: selectedFormId, availableOrders, loadSubDisplay });
-
-    // ═══════════════════════════════════════════════════════════
-    // SEARCH
-    // ═══════════════════════════════════════════════════════════
-
-    const { showSearch, q, setQ, filteredRows } = useFormSearch(
-        formDisplay!,
-        flatColumnsInRenderOrder,
-        valueIndexByKey,
-        currentForm?.search_bar,
-        { debounceMs: 250 }
-    );
-
-    // ═══════════════════════════════════════════════════════════
-    // RELOAD TREE
-    // ═══════════════════════════════════════════════════════════
+        showSearch,
+        q,
+        setQ,
+        filteredRows
+    } = useFormSearch(formDisplay!, flatColumnsInRenderOrder, valueIndexByKey, currentForm?.search_bar, {debounceMs: 250});
 
     const reloadTree = useCallback(async () => {
         const fid = selectedFormId ?? currentForm?.form_id ?? null;
-        if (!fid) return;
-        try {
+        if (fid) try {
             await loadFormTree(fid);
-        } catch (e) {
-            console.warn('Не удалось обновить дерево:', e);
+        } catch {
         }
     }, [selectedFormId, currentForm, loadFormTree]);
 
-    // ═══════════════════════════════════════════════════════════
-    // MAIN CRUD (с tableMetaCache — без лишних API запросов)
-    // ═══════════════════════════════════════════════════════════
+    // Pagination handlers
+    const goToPage = useCallback(async (page: number) => {
+        if (!selectedFormId) return;
+        await goToPageExternal(selectedFormId, page, activeFilters);
+    }, [selectedFormId, goToPageExternal, activeFilters]);
+
+    const loadMoreRows = useCallback(async () => {
+        if (!selectedFormId) return;
+        await loadMoreRowsExternal(selectedFormId, activeFilters);
+    }, [selectedFormId, loadMoreRowsExternal, activeFilters]);
 
     const mainCrud = useMainCrud({
-        formDisplay: formDisplay!,
-        selectedWidget,
-        selectedFormId,
-        formsByWidget,
-        formsById,
-        activeFilters,
-        setFormDisplay,
-        reloadTree,
-        isColReadOnly,
-        flatColumnsInRenderOrder,
-        valueIndexByKey,
-        setSubDisplay,
-        pkToKey,
-        lastPrimary,
-        setLastPrimary,
-        setSelectedKey,
-        stylesColumnMeta,
-        tableMetaCache, // ← Кэш метаданных таблицы
+        formDisplay: formDisplay!, selectedWidget, selectedFormId, formsByWidget, formsById, activeFilters,
+        setFormDisplay, reloadTree, isColReadOnly, flatColumnsInRenderOrder, valueIndexByKey, setSubDisplay,
+        pkToKey, lastPrimary, setLastPrimary, setSelectedKey, stylesColumnMeta, tableMetaCache,
         resetFilters: async () => {
             await resetFiltersHard();
             await reloadTree();
         },
-        setActiveFilters,
-        onResetTreeDrawer: resetTreeDrawer,
+        setActiveFilters, onResetTreeDrawer: resetTreeDrawer,
     });
-
-    // ═══════════════════════════════════════════════════════════
-    // SUB CRUD
-    // ═══════════════════════════════════════════════════════════
 
     const subWidgetIdByOrder = useMemo(() => {
         const map: Record<number, number> = {};
-        currentForm?.sub_widgets?.forEach((sw) => {
+        currentForm?.sub_widgets?.forEach(sw => {
             map[sw.widget_order] = sw.sub_widget_id;
         });
         return map;
     }, [currentForm]);
 
     const currentWidgetId = activeSubOrder != null ? subWidgetIdByOrder[activeSubOrder] : undefined;
-
     const subCrud = useSubCrud({
         formIdForSub: selectedFormId,
         currentWidgetId,
         currentOrder: activeSubOrder,
         loadSubDisplay,
         lastPrimary,
-        subDisplay,
+        subDisplay
     });
 
     const [subEditingRowIdx, setSubEditingRowIdx] = useState<number | null>(null);
     const [subEditDraft, setSubEditDraft] = useState<Record<number, string>>({});
     const [subEditSaving, setSubEditSaving] = useState(false);
-
-    // ═══════════════════════════════════════════════════════════
-    // DRILL DIALOG
-    // ═══════════════════════════════════════════════════════════
 
     const [drill, setDrill] = useState<DrillState>({
         open: false,
@@ -260,9 +209,8 @@ export const FormProvider: React.FC<FormProviderProps> = ({
         comboboxMode: false,
         disableNestedDrill: false,
         initialPrimary: undefined,
-        targetWriteTcId: null,
+        targetWriteTcId: null
     });
-
     const [comboReloadToken, setComboReloadToken] = useState(0);
 
     const openDrill = useCallback((formId: number | null, meta?: DrillOpenMeta) => {
@@ -273,21 +221,11 @@ export const FormProvider: React.FC<FormProviderProps> = ({
             comboboxMode: meta?.originColumnType === 'combobox',
             disableNestedDrill: !!meta?.openedFromEdit,
             initialPrimary: meta?.primary,
-            targetWriteTcId: meta?.targetWriteTcId ?? null,
+            targetWriteTcId: meta?.targetWriteTcId ?? null
         });
     }, []);
-
-    const closeDrill = useCallback(() => {
-        setDrill((prev) => ({ ...prev, open: false }));
-    }, []);
-
-    const triggerComboReload = useCallback(() => {
-        setComboReloadToken((v) => v + 1);
-    }, []);
-
-    // ═══════════════════════════════════════════════════════════
-    // RESET FILTERS
-    // ═══════════════════════════════════════════════════════════
+    const closeDrill = useCallback(() => setDrill(p => ({...p, open: false})), []);
+    const triggerComboReload = useCallback(() => setComboReloadToken(v => v + 1), []);
 
     const resetFilters = useCallback(async () => {
         if (!selectedFormId) return;
@@ -299,39 +237,38 @@ export const FormProvider: React.FC<FormProviderProps> = ({
             await resetFiltersHard();
             await reloadTree();
             resetTreeDrawer();
-        } catch (e) {
-            console.warn('Ошибка при сбросе фильтров:', e);
+        } catch {
         }
     }, [selectedFormId, availableOrders, setSubDisplay, resetFiltersHard, reloadTree, resetTreeDrawer, setSelectedKey, setLastPrimary, setActiveSubOrder]);
-
-    // ═══════════════════════════════════════════════════════════
-    // TREE DRAWER STATE OBJECT
-    // ═══════════════════════════════════════════════════════════
 
     const treeDrawerState = useMemo<TreeDrawerState>(() => ({
         isOpen: isTreeOpen,
         expandedKeys,
-        childrenCache,
+        childrenCache
     }), [isTreeOpen, expandedKeys, childrenCache]);
 
-    // ═══════════════════════════════════════════════════════════
-    // CONTEXT VALUE
-    // ═══════════════════════════════════════════════════════════
-
     const value = useMemo<FormContextValue>(() => ({
-        config: { selectedFormId, selectedWidget, currentForm, formsById, formsByWidget },
-        data: { formDisplay, subDisplay, formTrees, columns },
+        config: {selectedFormId, selectedWidget, currentForm, formsById, formsByWidget},
+        data: {formDisplay, subDisplay, formTrees, columns},
         setFormDisplay,
         setSubDisplay,
-        headerPlan: { headerPlan, flatColumnsInRenderOrder, valueIndexByKey, isColReadOnly, stylesColumnMeta },
-        loading: { formLoading, formError, subLoading, subError },
-        selection: { selectedKey, lastPrimary, activeSubOrder },
+        headerPlan: {headerPlan, flatColumnsInRenderOrder, valueIndexByKey, isColReadOnly, stylesColumnMeta},
+        loading: {formLoading, formError, subLoading, subError},
+        pagination,
+        goToPage,
+        loadMoreRows,
+        selection: {selectedKey, lastPrimary, activeSubOrder},
         setSelectedKey,
         setLastPrimary,
         setActiveSubOrder,
         pkToKey,
-        mainAdding: { isAdding: mainCrud.isAdding, draft: mainCrud.draft, saving: mainCrud.saving },
-        mainEditing: { editingRowIdx: mainCrud.editingRowIdx, editDraft: mainCrud.editDraft, editSaving: mainCrud.editSaving, editStylesDraft: mainCrud.editStylesDraft },
+        mainAdding: {isAdding: mainCrud.isAdding, draft: mainCrud.draft, saving: mainCrud.saving},
+        mainEditing: {
+            editingRowIdx: mainCrud.editingRowIdx,
+            editDraft: mainCrud.editDraft,
+            editSaving: mainCrud.editSaving,
+            editStylesDraft: mainCrud.editStylesDraft
+        },
         deletingRowIdx: mainCrud.deletingRowIdx,
         startAdd: mainCrud.startAdd,
         cancelAdd: mainCrud.cancelAdd,
@@ -348,14 +285,14 @@ export const FormProvider: React.FC<FormProviderProps> = ({
         validationMissingFields: mainCrud.validationMissingFields,
         setValidationMissingFields: mainCrud.setValidationMissingFields,
         resetValidation: mainCrud.resetValidation,
-        subAdding: { isAddingSub: subCrud.isAddingSub, draftSub: subCrud.draftSub, savingSub: subCrud.savingSub },
-        subEditing: { editingRowIdx: subEditingRowIdx, editDraft: subEditDraft, editSaving: subEditSaving },
+        subAdding: {isAddingSub: subCrud.isAddingSub, draftSub: subCrud.draftSub, savingSub: subCrud.savingSub},
+        subEditing: {editingRowIdx: subEditingRowIdx, editDraft: subEditDraft, editSaving: subEditSaving},
         startAddSub: subCrud.startAddSub,
         cancelAddSub: subCrud.cancelAddSub,
         submitAddSub: subCrud.submitAddSub,
         setDraftSub: subCrud.setDraftSub,
-        setSubEditDraft: setSubEditDraft,
-        setSubEditingRowIdx: setSubEditingRowIdx,
+        setSubEditDraft,
+        setSubEditingRowIdx,
         showSubValidationErrors: subCrud.showSubValidationErrors,
         setShowSubValidationErrors: subCrud.setShowSubValidationErrors,
         subValidationMissingFields: subCrud.subValidationMissingFields,
@@ -371,37 +308,29 @@ export const FormProvider: React.FC<FormProviderProps> = ({
         resetTreeDrawer,
         setExpandedKeys,
         setChildrenCache,
-        filters: { activeFilters, nestedTrees, activeExpandedKey },
+        filters: {activeFilters, nestedTrees, activeExpandedKey},
         setActiveFilters,
         setNestedTrees,
         setActiveExpandedKey,
         resetFilters,
         handleTreeValueClick,
         handleNestedValueClick,
-        search: { showSearch, q, setQ, filteredRows },
+        search: {showSearch, q, setQ, filteredRows},
         loadSubDisplay,
         loadFilteredFormDisplay,
         reloadTree,
         comboReloadToken,
         triggerComboReload,
     }), [
-        selectedFormId, selectedWidget, currentForm, formsById, formsByWidget,
-        formDisplay, subDisplay, formTrees, columns, setFormDisplay, setSubDisplay,
-        headerPlan, flatColumnsInRenderOrder, valueIndexByKey, isColReadOnly, stylesColumnMeta,
-        formLoading, formError, subLoading, subError,
+        selectedFormId, selectedWidget, currentForm, formsById, formsByWidget, formDisplay, subDisplay, formTrees, columns, setFormDisplay, setSubDisplay,
+        headerPlan, flatColumnsInRenderOrder, valueIndexByKey, isColReadOnly, stylesColumnMeta, formLoading, formError, subLoading, subError,
+        pagination, goToPage, loadMoreRows,
         selectedKey, lastPrimary, activeSubOrder, setSelectedKey, setLastPrimary, setActiveSubOrder, pkToKey,
         mainCrud, subCrud, subEditingRowIdx, subEditDraft, subEditSaving,
-        drill, openDrill, closeDrill, treeDrawerState,
-        openTreeDrawer, closeTreeDrawer, toggleTreeDrawer, resetTreeDrawer, setExpandedKeys, setChildrenCache,
+        drill, openDrill, closeDrill, treeDrawerState, openTreeDrawer, closeTreeDrawer, toggleTreeDrawer, resetTreeDrawer, setExpandedKeys, setChildrenCache,
         activeFilters, nestedTrees, activeExpandedKey, setActiveFilters, setNestedTrees, setActiveExpandedKey,
-        resetFilters, handleTreeValueClick, handleNestedValueClick,
-        showSearch, q, setQ, filteredRows, loadSubDisplay, loadFilteredFormDisplay, reloadTree,
-        comboReloadToken, triggerComboReload,
+        resetFilters, handleTreeValueClick, handleNestedValueClick, showSearch, q, setQ, filteredRows, loadSubDisplay, loadFilteredFormDisplay, reloadTree, comboReloadToken, triggerComboReload,
     ]);
-
-    // ═══════════════════════════════════════════════════════════
-    // СБРОС ПРИ СМЕНЕ ФОРМЫ
-    // ═══════════════════════════════════════════════════════════
 
     useEffect(() => {
         setSelectedKey(null);
@@ -410,7 +339,7 @@ export const FormProvider: React.FC<FormProviderProps> = ({
         setSubEditingRowIdx(null);
         setSubEditDraft({});
         setSubEditSaving(false);
-        const firstOrder = (currentForm?.sub_widgets ?? []).map((sw) => sw.widget_order).sort((a, b) => a - b)[0] ?? 0;
+        const firstOrder = (currentForm?.sub_widgets ?? []).map(sw => sw.widget_order).sort((a, b) => a - b)[0] ?? 0;
         setActiveSubOrder(firstOrder);
     }, [selectedFormId]);
 

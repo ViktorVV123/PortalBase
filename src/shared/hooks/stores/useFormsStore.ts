@@ -1,5 +1,3 @@
-// forms
-
 // src/shared/hooks/stores/useFormsStore.ts
 
 import { useCallback, useRef, useState } from 'react';
@@ -14,6 +12,22 @@ import type {
     LoadStatus,
 } from './types';
 
+// ═══════════════════════════════════════════════════════════
+// КОНСТАНТЫ ПАГИНАЦИИ
+// ═══════════════════════════════════════════════════════════
+export const MAIN_TABLE_PAGE_SIZE = 80;
+
+// ═══════════════════════════════════════════════════════════
+// ТИПЫ ПАГИНАЦИИ
+// ═══════════════════════════════════════════════════════════
+export type PaginationState = {
+    currentPage: number;
+    totalRows: number;
+    pageSize: number;
+    hasMore: boolean;
+    isLoadingMore: boolean;
+};
+
 export interface UseFormsStoreReturn {
     // State
     formsByWidget: Record<number, WidgetForm>;
@@ -22,6 +36,9 @@ export interface UseFormsStoreReturn {
     formDisplay: FormDisplay | null;
     formTrees: Record<number, FormTreeColumn[]>;
     subDisplay: SubDisplay | null;
+
+    // Pagination state
+    pagination: PaginationState;
 
     // Loading states
     formLoading: boolean;
@@ -37,13 +54,27 @@ export interface UseFormsStoreReturn {
     deleteSubWidgetFromForm: (formId: number, subWidgetId: number) => Promise<void>;
     deleteTreeFieldFromForm: (formId: number, tableColumnId: number) => Promise<void>;
 
-    // Form Display Actions
-    loadFormDisplay: (formId: number) => Promise<void>;
+    // Form Display Actions (с пагинацией)
+    loadFormDisplay: (formId: number, page?: number) => Promise<void>;
     loadFilteredFormDisplay: (
         formId: number,
-        filter: { table_column_id: number; value: string | number }
+        filter: { table_column_id: number; value: string | number },
+        page?: number
     ) => Promise<void>;
     setFormDisplay: (value: FormDisplay | null) => void;
+
+    // Pagination Actions
+    goToPage: (
+        formId: number,
+        page: number,
+        filters?: Array<{ table_column_id: number; value: string | number }>
+    ) => Promise<void>;
+
+    // Infinite Scroll Actions
+    loadMoreRows: (
+        formId: number,
+        filters?: Array<{ table_column_id: number; value: string | number }>
+    ) => Promise<void>;
 
     // Sub Display Actions
     loadSubDisplay: (
@@ -62,34 +93,35 @@ export function useFormsStore(): UseFormsStoreReturn {
     // STATE
     // ─────────────────────────────────────────────────────────────
 
-    // Форма-списки
     const [formsByWidget, setFormsByWidget] = useState<Record<number, WidgetForm>>({});
     const [formsById, setFormsById] = useState<Record<number, WidgetForm>>({});
     const [formsListByWidget, setFormsListByWidget] = useState<Record<number, WidgetForm[]>>({});
 
-    // Form display
     const [formDisplay, setFormDisplay] = useState<FormDisplay | null>(null);
     const [formLoading, setFormLoading] = useState(false);
     const [formError, setFormError] = useState<string | null>(null);
 
-    // Sub display
+    const [pagination, setPagination] = useState<PaginationState>({
+        currentPage: 1,
+        totalRows: 0,
+        pageSize: MAIN_TABLE_PAGE_SIZE,
+        hasMore: false,
+        isLoadingMore: false,
+    });
+
     const [subDisplay, setSubDisplay] = useState<SubDisplay | null>(null);
     const [subLoading, setSubLoading] = useState(false);
     const [subError, setSubError] = useState<string | null>(null);
 
-    // Tree
     const [formTrees, setFormTrees] = useState<Record<number, FormTreeColumn[]>>({});
 
-    // Status ref
     const formsStatusRef = useRef<LoadStatus>('idle');
+    const loadedRowsCountRef = useRef(0);
 
     // ─────────────────────────────────────────────────────────────
     // HELPERS
     // ─────────────────────────────────────────────────────────────
 
-    /**
-     * Нормализация форм в разные структуры
-     */
     const normalizeForms = useCallback((data: WidgetForm[]) => {
         const byWidget: Record<number, WidgetForm> = {};
         const byId: Record<number, WidgetForm> = {};
@@ -104,7 +136,6 @@ export function useFormsStore(): UseFormsStoreReturn {
             byId[f.form_id] = normalized;
             (listByWidget[f.main_widget_id] ??= []).push(normalized);
 
-            // «Дефолт» форма для совместимости (первая встреченная)
             if (!byWidget[f.main_widget_id]) {
                 byWidget[f.main_widget_id] = normalized;
             }
@@ -115,13 +146,30 @@ export function useFormsStore(): UseFormsStoreReturn {
         setFormsListByWidget(listByWidget);
     }, []);
 
+    /**
+     * Обновление состояния пагинации из ответа API
+     * ВАЖНО: displayed_widget.total — это количество СТРАНИЦ, не строк!
+     */
+    const updatePaginationFromResponse = useCallback((data: FormDisplay, page: number, loadedRowsCount: number) => {
+        const totalPages = data.displayed_widget?.total ?? 1;
+        const currentPage = data.displayed_widget?.page ?? page;
+        const hasMore = currentPage < totalPages;
+
+        loadedRowsCountRef.current = loadedRowsCount;
+
+        setPagination({
+            currentPage,
+            totalRows: totalPages * MAIN_TABLE_PAGE_SIZE,
+            pageSize: MAIN_TABLE_PAGE_SIZE,
+            hasMore,
+            isLoadingMore: false,
+        });
+    }, []);
+
     // ─────────────────────────────────────────────────────────────
     // FORM LIST ACTIONS
     // ─────────────────────────────────────────────────────────────
 
-    /**
-     * Загрузка всех форм
-     */
     const loadWidgetForms = useCallback(async () => {
         if (
             formsStatusRef.current === 'loading' ||
@@ -149,17 +197,11 @@ export function useFormsStore(): UseFormsStoreReturn {
         }
     }, [normalizeForms]);
 
-    /**
-     * Принудительная перезагрузка форм
-     */
     const reloadWidgetForms = useCallback(async () => {
         const { data } = await api.get<WidgetForm[]>('/forms');
         normalizeForms(data);
     }, [normalizeForms]);
 
-    /**
-     * Создание формы
-     */
     const addForm = useCallback(async (
         payload: NewFormPayload | AddFormRequest
     ): Promise<WidgetForm> => {
@@ -167,7 +209,6 @@ export function useFormsStore(): UseFormsStoreReturn {
 
         const { data } = await api.post<WidgetForm>('/forms', body);
 
-        // Обновляем кеш
         setFormsByWidget(prev => ({
             ...prev,
             [data.main_widget_id]: {
@@ -183,17 +224,11 @@ export function useFormsStore(): UseFormsStoreReturn {
         return data;
     }, [reloadWidgetForms]);
 
-    /**
-     * Удаление формы
-     */
     const deleteForm = useCallback(async (formId: number) => {
         await api.delete(`/forms/${formId}`);
         await reloadWidgetForms();
     }, [reloadWidgetForms]);
 
-    /**
-     * Удаление sub-widget из формы
-     */
     const deleteSubWidgetFromForm = useCallback(async (
         formId: number,
         subWidgetId: number
@@ -201,9 +236,6 @@ export function useFormsStore(): UseFormsStoreReturn {
         await api.delete(`/forms/${formId}/sub/${subWidgetId}`);
     }, []);
 
-    /**
-     * Удаление tree field из формы
-     */
     const deleteTreeFieldFromForm = useCallback(async (
         formId: number,
         tableColumnId: number
@@ -212,19 +244,25 @@ export function useFormsStore(): UseFormsStoreReturn {
     }, []);
 
     // ─────────────────────────────────────────────────────────────
-    // FORM DISPLAY ACTIONS
+    // FORM DISPLAY ACTIONS (с пагинацией)
     // ─────────────────────────────────────────────────────────────
 
-    /**
-     * Загрузка display формы
-     */
-    const loadFormDisplay = useCallback(async (formId: number) => {
+    const loadFormDisplay = useCallback(async (formId: number, page: number = 1) => {
         setFormLoading(true);
         setFormError(null);
 
         try {
-            const { data } = await api.post<FormDisplay>(`/display/${formId}/main`);
+            const params = new URLSearchParams({
+                limit: String(MAIN_TABLE_PAGE_SIZE),
+                page: String(page),
+            });
+
+            const { data } = await api.post<FormDisplay>(
+                `/display/${formId}/main?${params}`
+            );
+
             setFormDisplay(data);
+            updatePaginationFromResponse(data, page, data.data?.length ?? 0);
         } catch (e: any) {
             const status = e?.response?.status;
 
@@ -237,36 +275,139 @@ export function useFormsStore(): UseFormsStoreReturn {
             }
 
             setFormDisplay(null);
+            setPagination({
+                currentPage: 1,
+                totalRows: 0,
+                pageSize: MAIN_TABLE_PAGE_SIZE,
+                hasMore: false,
+                isLoadingMore: false,
+            });
         } finally {
             setFormLoading(false);
         }
-    }, []);
+    }, [updatePaginationFromResponse]);
 
-    /**
-     * Загрузка отфильтрованного display
-     */
     const loadFilteredFormDisplay = useCallback(async (
         formId: number,
-        filter: { table_column_id: number; value: string | number }
+        filter: { table_column_id: number; value: string | number },
+        page: number = 1
     ) => {
         try {
+            const params = new URLSearchParams({
+                limit: String(MAIN_TABLE_PAGE_SIZE),
+                page: String(page),
+            });
+
             const { data } = await api.post<FormDisplay>(
-                `/display/${formId}/main`,
+                `/display/${formId}/main?${params}`,
                 [filter]
             );
+
             setFormDisplay(data);
+            updatePaginationFromResponse(data, page, data.data?.length ?? 0);
         } catch (e) {
             console.warn('Ошибка при загрузке данных формы с фильтром:', e);
         }
-    }, []);
+    }, [updatePaginationFromResponse]);
+
+    const goToPage = useCallback(async (
+        formId: number,
+        page: number,
+        filters?: Array<{ table_column_id: number; value: string | number }>
+    ) => {
+        setFormLoading(true);
+
+        try {
+            const params = new URLSearchParams({
+                limit: String(MAIN_TABLE_PAGE_SIZE),
+                page: String(page),
+            });
+
+            const body = filters?.length
+                ? filters.map(f => ({ ...f, value: String(f.value) }))
+                : [];
+
+            const { data } = await api.post<FormDisplay>(
+                `/display/${formId}/main?${params}`,
+                body
+            );
+
+            setFormDisplay(data);
+            updatePaginationFromResponse(data, page, data.data?.length ?? 0);
+        } catch (e) {
+            console.warn('Ошибка при переходе на страницу:', e);
+        } finally {
+            setFormLoading(false);
+        }
+    }, [updatePaginationFromResponse]);
+
+    /**
+     * Загрузка следующей страницы (ДОБАВЛЯЕТ строки к существующим)
+     * Для infinite scroll
+     */
+    const loadMoreRows = useCallback(async (
+        formId: number,
+        filters?: Array<{ table_column_id: number; value: string | number }>
+    ) => {
+        if (pagination.isLoadingMore || !pagination.hasMore) {
+            return;
+        }
+
+        const nextPage = pagination.currentPage + 1;
+
+        setPagination(prev => ({ ...prev, isLoadingMore: true }));
+
+        try {
+            const params = new URLSearchParams({
+                limit: String(MAIN_TABLE_PAGE_SIZE),
+                page: String(nextPage),
+            });
+
+            const body = filters?.length
+                ? filters.map(f => ({ ...f, value: String(f.value) }))
+                : [];
+
+            const { data } = await api.post<FormDisplay>(
+                `/display/${formId}/main?${params}`,
+                body
+            );
+
+            // Добавляем новые строки к существующим
+            setFormDisplay(prev => {
+                if (!prev) return data;
+
+                return {
+                    ...prev,
+                    data: [...prev.data, ...data.data],
+                    displayed_widget: data.displayed_widget ?? prev.displayed_widget,
+                };
+            });
+
+            // ВАЖНО: total — это количество СТРАНИЦ, не строк!
+            const totalPages = data.displayed_widget?.total ?? 1;
+            const currentPage = data.displayed_widget?.page ?? nextPage;
+            const hasMore = currentPage < totalPages;
+
+            const newLoadedCount = loadedRowsCountRef.current + data.data.length;
+            loadedRowsCountRef.current = newLoadedCount;
+
+            setPagination({
+                currentPage,
+                totalRows: totalPages * MAIN_TABLE_PAGE_SIZE,
+                pageSize: MAIN_TABLE_PAGE_SIZE,
+                hasMore,
+                isLoadingMore: false,
+            });
+        } catch (e) {
+            console.warn('Ошибка при загрузке дополнительных строк:', e);
+            setPagination(prev => ({ ...prev, isLoadingMore: false }));
+        }
+    }, [pagination]);
 
     // ─────────────────────────────────────────────────────────────
     // SUB DISPLAY ACTIONS
     // ─────────────────────────────────────────────────────────────
 
-    /**
-     * Загрузка sub display
-     */
     const loadSubDisplay = useCallback(async (
         formId: number,
         subOrder: number,
@@ -322,9 +463,6 @@ export function useFormsStore(): UseFormsStoreReturn {
     // TREE ACTIONS
     // ─────────────────────────────────────────────────────────────
 
-    /**
-     * Загрузка дерева формы
-     */
     const loadFormTree = useCallback(async (formId: number): Promise<void> => {
         try {
             const { data } = await api.post<FormTreeColumn[] | FormTreeColumn>(
@@ -341,43 +479,34 @@ export function useFormsStore(): UseFormsStoreReturn {
             } else if (status !== 404) {
                 console.warn('Не удалось загрузить дерево фильтров');
             }
-            // 404 считаем «дерево не настроено» — это норма
         }
     }, []);
 
     return {
-        // State
         formsByWidget,
         formsById,
         formsListByWidget,
         formDisplay,
         formTrees,
         subDisplay,
-
-        // Loading states
+        pagination,
         formLoading,
         formError,
         subLoading,
         subError,
-
-        // Form List Actions
         loadWidgetForms,
         reloadWidgetForms,
         addForm,
         deleteForm,
         deleteSubWidgetFromForm,
         deleteTreeFieldFromForm,
-
-        // Form Display Actions
         loadFormDisplay,
         loadFilteredFormDisplay,
         setFormDisplay,
-
-        // Sub Display Actions
+        goToPage,
+        loadMoreRows,
         loadSubDisplay,
         setSubDisplay,
-
-        // Tree Actions
         loadFormTree,
     };
 }
