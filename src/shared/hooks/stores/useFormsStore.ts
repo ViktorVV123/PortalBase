@@ -118,6 +118,9 @@ export function useFormsStore(): UseFormsStoreReturn {
     const formsStatusRef = useRef<LoadStatus>('idle');
     const loadedRowsCountRef = useRef(0);
 
+    // Храним ID текущей загруженной формы для проверки при смене
+    const currentFormIdRef = useRef<number | null>(null);
+
     // ─────────────────────────────────────────────────────────────
     // HELPERS
     // ─────────────────────────────────────────────────────────────
@@ -144,6 +147,20 @@ export function useFormsStore(): UseFormsStoreReturn {
         setFormsByWidget(byWidget);
         setFormsById(byId);
         setFormsListByWidget(listByWidget);
+    }, []);
+
+    /**
+     * Сброс состояния пагинации
+     */
+    const resetPagination = useCallback(() => {
+        loadedRowsCountRef.current = 0;
+        setPagination({
+            currentPage: 1,
+            totalRows: 0,
+            pageSize: MAIN_TABLE_PAGE_SIZE,
+            hasMore: false,
+            isLoadingMore: false,
+        });
     }, []);
 
     /**
@@ -248,6 +265,16 @@ export function useFormsStore(): UseFormsStoreReturn {
     // ─────────────────────────────────────────────────────────────
 
     const loadFormDisplay = useCallback(async (formId: number, page: number = 1) => {
+        // ═══════════════════════════════════════════════════════════
+        // ИСПРАВЛЕНИЕ: Сбрасываем данные при смене формы
+        // ═══════════════════════════════════════════════════════════
+        if (currentFormIdRef.current !== formId) {
+            // Новая форма — очищаем старые данные сразу
+            setFormDisplay(null);
+            resetPagination();
+            currentFormIdRef.current = formId;
+        }
+
         setFormLoading(true);
         setFormError(null);
 
@@ -275,23 +302,20 @@ export function useFormsStore(): UseFormsStoreReturn {
             }
 
             setFormDisplay(null);
-            setPagination({
-                currentPage: 1,
-                totalRows: 0,
-                pageSize: MAIN_TABLE_PAGE_SIZE,
-                hasMore: false,
-                isLoadingMore: false,
-            });
+            resetPagination();
         } finally {
             setFormLoading(false);
         }
-    }, [updatePaginationFromResponse]);
+    }, [updatePaginationFromResponse, resetPagination]);
 
     const loadFilteredFormDisplay = useCallback(async (
         formId: number,
         filter: { table_column_id: number; value: string | number },
         page: number = 1
     ) => {
+        // При фильтрации тоже сбрасываем пагинацию
+        resetPagination();
+
         try {
             const params = new URLSearchParams({
                 limit: String(MAIN_TABLE_PAGE_SIZE),
@@ -308,7 +332,7 @@ export function useFormsStore(): UseFormsStoreReturn {
         } catch (e) {
             console.warn('Ошибка при загрузке данных формы с фильтром:', e);
         }
-    }, [updatePaginationFromResponse]);
+    }, [updatePaginationFromResponse, resetPagination]);
 
     const goToPage = useCallback(async (
         formId: number,
@@ -349,6 +373,11 @@ export function useFormsStore(): UseFormsStoreReturn {
         formId: number,
         filters?: Array<{ table_column_id: number; value: string | number }>
     ) => {
+        // Проверяем что это та же форма
+        if (currentFormIdRef.current !== formId) {
+            return;
+        }
+
         if (pagination.isLoadingMore || !pagination.hasMore) {
             return;
         }
@@ -371,6 +400,11 @@ export function useFormsStore(): UseFormsStoreReturn {
                 `/display/${formId}/main?${params}`,
                 body
             );
+
+            // Проверяем ещё раз что форма не сменилась пока грузили
+            if (currentFormIdRef.current !== formId) {
+                return;
+            }
 
             // Добавляем новые строки к существующим
             setFormDisplay(prev => {
