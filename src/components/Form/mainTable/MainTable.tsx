@@ -167,7 +167,6 @@ const GroupHeaderCell: React.FC<GroupHeaderCellProps> = ({
     return (
         <th
             colSpan={colSpan}
-            className={s.groupHeaderCell}
             style={{ width: `${groupWidth}px` }}
         >
             <span className={s.ellipsis}>
@@ -437,7 +436,7 @@ export const MainTable: React.FC<Props> = (p) => {
                             }}
                         />
                     ))}
-                    <col style={{ width: '52px', minWidth: '44px', maxWidth: '60px' }} />
+                    <col className={s.actionsCol} />
                 </colgroup>
 
                 <thead>
@@ -453,7 +452,7 @@ export const MainTable: React.FC<Props> = (p) => {
                             onStartGroupResize={(e) => handleStartGroupResize(e, groupIndex, g.cols)}
                         />
                     ))}
-                    <th className={s.actionsCell}>
+                    <th className={s.actionsCell} >
                         <button
                             type="button"
                             className={s.toggleBtn}

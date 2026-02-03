@@ -474,34 +474,78 @@ $input-border-focus: var(--input-border-focus);
 }
 
 // ═══════════════════════════════════════════════════════════
-// ACTIONS COLUMN — КОМПАКТНАЯ ВЕРСИЯ
+// ACTIONS COLUMN — ЖЁСТКО ФИКСИРОВАННАЯ ШИРИНА
 // ═══════════════════════════════════════════════════════════
 
 .actionsCell {
   padding: 2px 3px !important;
   text-align: center;
   white-space: nowrap;
-  // ✅ УМЕНЬШЕНО: было 70px/56px/90px
-  width: 52px;
-  min-width: 44px;
-  max-width: 60px;
   background: inherit;
+  box-sizing: border-box;
+
+  // Жёстко фиксированная ширина — НЕ должна меняться
+  width: 52px !important;
+  min-width: 52px !important;
+  max-width: 52px !important;
+
+  // 2K (1921px+)
+  @media (min-width: 1921px) {
+    width: 60px !important;
+    min-width: 60px !important;
+    max-width: 60px !important;
+  }
+
+  // 4K (2561px+)
+  @media (min-width: 2561px) {
+    width: 68px !important;
+    min-width: 68px !important;
+    max-width: 68px !important;
+  }
+}
+
+// Ячейка заголовка группы — НЕ меняем position, sticky уже работает
+.groupHeaderCell {
+  // position остаётся sticky от родителя
+  // sticky элемент сам создаёт контекст позиционирования для absolute children
+}
+
+// Стиль для <col> в colgroup — фиксированная ширина actions колонки
+// Колонка Actions в colgroup — фиксированная ширина
+.actionsCol {
+  width: 52px !important;
+  min-width: 52px !important;
+  max-width: 52px !important;
+
+  @media (min-width: 1921px) {
+    width: 60px !important;
+    min-width: 60px !important;
+    max-width: 60px !important;
+  }
+
+  @media (min-width: 2561px) {
+    width: 68px !important;
+    min-width: 68px !important;
+    max-width: 68px !important;
+  }
 }
 
 .actionsRow {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 1px;
+  gap: 2px;
+  width: 100%;
 }
+
 
 .actionsBtn {
   background: none;
   border: 0;
-  // ✅ УМЕНЬШЕНО
   padding: 2px;
   width: 18px;
   height: 18px;
+  flex-shrink: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -520,6 +564,12 @@ $input-border-focus: var(--input-border-focus);
     width: 22px;
     height: 22px;
   }
+
+  @media (min-width: 2561px) {
+    padding: 4px;
+    width: 26px;
+    height: 26px;
+  }
 }
 
 .actionsBtnDisabled {
@@ -529,20 +579,25 @@ $input-border-focus: var(--input-border-focus);
 }
 
 .actionIcon {
-  // ✅ УМЕНЬШЕНО: было 14px
   width: 12px;
   height: 12px;
+  flex-shrink: 0;
   color: inherit;
 
   @media (min-width: 1921px) {
     width: 14px;
     height: 14px;
   }
+
+  @media (min-width: 2561px) {
+    width: 16px;
+    height: 16px;
+  }
 }
 
 .lockSlot {
-  // ✅ УМЕНЬШЕНО: было 18px
   width: 14px;
+  flex-shrink: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -550,7 +605,11 @@ $input-border-focus: var(--input-border-focus);
   opacity: 0.6;
 
   @media (min-width: 1921px) {
-    width: 16px;
+    width: 18px;
+  }
+
+  @media (min-width: 2561px) {
+    width: 22px;
   }
 }
 

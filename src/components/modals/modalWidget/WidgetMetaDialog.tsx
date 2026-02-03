@@ -168,32 +168,32 @@ export const WidgetMetaDialog: React.FC<Props> = ({
                             sx={textFieldSx}
                         />
 
-                        <FormControlLabel
-                            label={
-                                <Stack direction="row" spacing={1} alignItems="center">
-                                    <Box component="span" sx={{ color: 'var(--theme-text-primary)' }}>
-                                        Опубликован
-                                    </Box>
-                                    <Chip
-                                        size="small"
-                                        label={form.published ? 'Да' : 'Нет'}
-                                        color={form.published ? 'success' : 'default'}
-                                        variant="outlined"
-                                        sx={{
-                                            borderColor: form.published ? 'var(--theme-success)' : 'var(--theme-border)',
-                                            color: form.published ? 'var(--theme-success)' : 'var(--theme-text-secondary)',
-                                        }}
-                                    />
-                                </Stack>
-                            }
-                            control={
-                                <Switch
-                                    checked={!!form.published}
-                                    onChange={(e) => setForm(v => ({ ...v, published: e.target.checked }))}
-                                    sx={switchSx}
-                                />
-                            }
-                        />
+                        {/*<FormControlLabel*/}
+                        {/*    label={*/}
+                        {/*        <Stack direction="row" spacing={1} alignItems="center">*/}
+                        {/*            <Box component="span" sx={{ color: 'var(--theme-text-primary)' }}>*/}
+                        {/*                Опубликован*/}
+                        {/*            </Box>*/}
+                        {/*            <Chip*/}
+                        {/*                size="small"*/}
+                        {/*                label={form.published ? 'Да' : 'Нет'}*/}
+                        {/*                color={form.published ? 'success' : 'default'}*/}
+                        {/*                variant="outlined"*/}
+                        {/*                sx={{*/}
+                        {/*                    borderColor: form.published ? 'var(--theme-success)' : 'var(--theme-border)',*/}
+                        {/*                    color: form.published ? 'var(--theme-success)' : 'var(--theme-text-secondary)',*/}
+                        {/*                }}*/}
+                        {/*            />*/}
+                        {/*        </Stack>*/}
+                        {/*    }*/}
+                        {/*    control={*/}
+                        {/*        <Switch*/}
+                        {/*            checked={!!form.published}*/}
+                        {/*            onChange={(e) => setForm(v => ({ ...v, published: e.target.checked }))}*/}
+                        {/*            sx={switchSx}*/}
+                        {/*        />*/}
+                        {/*    }*/}
+                        {/*/>*/}
                     </Stack>
                 </DialogContent>
                 <DialogActions sx={{ pr: 3, pb: 2, gap: 1 }}>

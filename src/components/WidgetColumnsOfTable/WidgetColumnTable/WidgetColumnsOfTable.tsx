@@ -2,7 +2,6 @@
 
 import React, { useCallback, useEffect, useState, useMemo } from 'react';
 import * as s from './WidgetColumnOfTable.module.scss';
-import * as tblStyles from '@/components/setOfTables/SetOfTables.module.scss';
 import {
     Column,
     Widget,
@@ -10,7 +9,7 @@ import {
     WidgetForm,
 } from '@/shared/hooks/useWorkSpaces';
 import { TableColumn } from '@/components/table/tableColumn/TableColumn';
-import { Box, Modal } from '@mui/material';
+import { Box, Modal, Switch, Chip, Stack, Tooltip } from '@mui/material';
 import { WidgetColumnsMainTable } from '@/components/WidgetColumnsOfTable/WidgetColumnsMainTable';
 import EditIcon from '@/assets/image/EditIcon.svg';
 import { WidgetMetaDialog } from '@/components/modals/modalWidget/WidgetMetaDialog';
@@ -91,6 +90,22 @@ const modalStyle = {
     color: 'var(--theme-text-primary)',
 };
 
+// Стили для Switch
+const switchSx = {
+    '& .MuiSwitch-switchBase': {
+        color: 'var(--theme-text-secondary)',
+        '&.Mui-checked': {
+            color: 'var(--theme-success)',
+        },
+        '&.Mui-checked + .MuiSwitch-track': {
+            backgroundColor: 'var(--theme-success)',
+        },
+    },
+    '& .MuiSwitch-track': {
+        backgroundColor: 'var(--theme-border)',
+    },
+};
+
 export const WidgetColumnsOfTable: React.FC<Props> = ({
                                                           deleteColumnWidget,
                                                           widgetColumns,
@@ -117,6 +132,7 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                                                       }) => {
     const [addOpen, setAddOpen] = useState(false);
     const [loadingRefs, setLoadingRefs] = useState(false);
+    const [publishedUpdating, setPublishedUpdating] = useState(false);
 
     // ─────────────────────────────────────────────────────────────────────────
     // Загрузка references ПОСЛЕДОВАТЕЛЬНО
@@ -175,22 +191,39 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
     const [modalOpen, setModalOpen] = useState(false);
     const [widgetModalOpen, setWidgetModalOpen] = useState(false);
 
-    const [widgetMeta, setWidgetMeta] = useState<Partial<Widget>>({
-        name: selectedWidget?.name ?? '',
-        description: selectedWidget?.description ?? '',
-        table_id: selectedWidget?.table_id ?? 0,
-        published: selectedWidget?.published ?? false,
-    });
+    // ─────────────────────────────────────────────────────────────────────────
+    // Быстрое переключение published
+    // ─────────────────────────────────────────────────────────────────────────
+    const handlePublishedToggle = useCallback(async (checked: boolean) => {
+        if (!selectedWidget) return;
 
-    useEffect(() => {
-        if (!selectedWidget || !widgetModalOpen) return;
-        setWidgetMeta({
-            name: selectedWidget.name ?? '',
-            description: selectedWidget.description ?? '',
-            table_id: selectedWidget.table_id ?? 0,
-            published: selectedWidget.published ?? false,
-        });
-    }, [selectedWidget, widgetModalOpen]);
+        setPublishedUpdating(true);
+        try {
+            // Используем отдельный endpoint для publish (как в WidgetMetaDialog)
+            const { api } = await import('@/services/api');
+            await api.patch(`/widgets/${selectedWidget.id}/publish`, { published: checked });
+
+            // Обновляем selectedWidget
+            setSelectedWidget(prev => prev ? { ...prev, published: checked } : prev);
+
+            // Обновляем widgetsByTable
+            setWidgetsByTable(prev => {
+                const tableId = selectedWidget.table_id;
+                if (!tableId || !prev[tableId]) return prev;
+
+                return {
+                    ...prev,
+                    [tableId]: prev[tableId].map(w =>
+                        w.id === selectedWidget.id ? { ...w, published: checked } : w
+                    ),
+                };
+            });
+        } catch (e) {
+            console.error('[WidgetColumnsOfTable] Failed to update published:', e);
+        } finally {
+            setPublishedUpdating(false);
+        }
+    }, [selectedWidget, setSelectedWidget, setWidgetsByTable]);
 
     // ─────────────────────────────────────────────────────────────────────────
     // Удаление reference
@@ -272,6 +305,43 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                 HEADER — фиксированный блок с ссылками
             ═══════════════════════════════════════════════════════════ */}
             <div className={s.header}>
+                {/* Переключатель Published */}
+                <Tooltip
+                    title={selectedWidget?.published ? 'Форма опубликована' : 'Форма не опубликована'}
+                    arrow
+                >
+                    <Stack
+                        direction="row"
+                        spacing={1}
+                        alignItems="center"
+                        className={s.publishedToggle}
+                    >
+                        <Switch
+                            size="small"
+                            checked={!!selectedWidget?.published}
+                            onChange={(e) => handlePublishedToggle(e.target.checked)}
+                            disabled={publishedUpdating || !selectedWidget}
+                            sx={switchSx}
+                        />
+                        <Chip
+                            size="small"
+                            label={selectedWidget?.published ? 'Опубликован' : 'Черновик'}
+                            color={selectedWidget?.published ? 'success' : 'default'}
+                            variant="outlined"
+                            sx={{
+                                borderColor: selectedWidget?.published
+                                    ? 'var(--theme-success)'
+                                    : 'var(--theme-border)',
+                                color: selectedWidget?.published
+                                    ? 'var(--theme-success)'
+                                    : 'var(--theme-text-secondary)',
+                                fontSize: '11px',
+                                height: '22px',
+                            }}
+                        />
+                    </Stack>
+                </Tooltip>
+
                 <span className={s.headerLink} onClick={() => setModalOpen(true)}>
                     Посмотреть таблицу
                     <EditIcon />

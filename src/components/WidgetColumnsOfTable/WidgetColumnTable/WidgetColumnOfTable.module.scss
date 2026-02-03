@@ -167,3 +167,16 @@
   font-weight: 600;
   color: var(--theme-text-primary);
 }
+
+/* Добавь эти стили в WidgetColumnOfTable.module.scss */
+
+.publishedToggle {
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: background-color 0.15s ease;
+
+  &:hover {
+    background: var(--theme-hover);
+  }
+}
