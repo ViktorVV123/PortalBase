@@ -51,6 +51,7 @@ export const MainTableWithContext: React.FC<Props> = ({
     const { headerPlan, flatColumnsInRenderOrder, valueIndexByKey, isColReadOnly, stylesColumnMeta } = hp;
     const { filteredRows } = search;
     const { selectedKey, activeSubOrder } = selection;
+    const { selectedFormId } = config;
 
     // ═══════════════════════════════════════════════════════════
     // LOCAL STATE FOR SUB HEADERS TOGGLE
@@ -110,6 +111,7 @@ export const MainTableWithContext: React.FC<Props> = ({
     return (
         <>
             <MainTable
+                formId={selectedFormId}
                 headerPlan={headerPlan as any}
                 showSubHeaders={showSubHeaders}
                 onToggleSubHeaders={() => setShowSubHeaders((v) => !v)}

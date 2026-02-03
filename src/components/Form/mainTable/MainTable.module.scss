@@ -39,6 +39,9 @@ $input-border-focus: var(--input-border-focus);
   --tbl-input-padding: 4px 6px;
   --tbl-line-height: 1.25;
 
+  // Масштаб ширины колонок (JS будет пересчитывать)
+  --col-scale: 1;
+
   @media (min-width: 1921px) {
     --main-head-row-1: 40px;
     --tbl-font-size: 13px;
@@ -49,6 +52,7 @@ $input-border-focus: var(--input-border-focus);
     --tbl-input-font-size: 13px;
     --tbl-input-padding: 6px 8px;
     --tbl-line-height: 1.35;
+    --col-scale: 1.25;
   }
 
   @media (min-width: 2561px) {
@@ -61,6 +65,11 @@ $input-border-focus: var(--input-border-focus);
     --tbl-input-font-size: 14px;
     --tbl-input-padding: 6px 10px;
     --tbl-line-height: 1.4;
+    --col-scale: 1.5;
+  }
+
+  @media (min-width: 3200px) {
+    --col-scale: 1.75;
   }
 }
 
@@ -122,22 +131,31 @@ $input-border-focus: var(--input-border-focus);
 .tbl thead tr:nth-child(1) th {
   position: sticky;
   top: 0;
-  z-index: 10;
+  z-index: 11;
   min-height: 32px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  border-bottom: 1px solid var(--table-border);
+  background: $header-bg;
+
+  // Перенос текста в верхних заголовках
+  .ellipsis {
+    white-space: normal !important;
+    word-break: break-word;
+    overflow: visible;
+    text-overflow: clip;
+  }
 }
 
 .tbl thead tr:nth-child(2) th {
-  position: sticky;
-  top: var(--main-head-row-1);
-  z-index: 9;
   font-weight: 500;
   font-size: var(--tbl-subheader-font-size);
-  background: var(--table-header-bg);
+  background: $header-bg;
+  border-bottom: 1px solid var(--table-border);
 
+  // Перенос текста в подзаголовках
   .ellipsis {
-    white-space: normal;
+    white-space: normal !important;
     word-break: break-word;
+    overflow: visible;
     text-overflow: clip;
   }
 }
@@ -613,6 +631,115 @@ $input-border-focus: var(--input-border-focus);
 
 .checkboxCell {
   padding: 2px !important;
+  text-align: center;
+
+  :global(.MuiCheckbox-root) {
+    padding: 2px;
+  }
+
+  :global(.MuiSvgIcon-root) {
+    width: 18px;
+    height: 18px;
+
+    @media (min-width: 1921px) {
+      width: 20px;
+      height: 20px;
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// COLUMN RESIZE (как в Excel)
+// ═══════════════════════════════════════════════════════════
+
+// Состояние таблицы во время ресайза
+.tableResizing {
+  cursor: col-resize !important;
+  user-select: none !important;
+
+  th, td {
+    cursor: col-resize !important;
+  }
+}
+
+// Колонка в процессе ресайза
+.resizingCol {
+  background: var(--theme-selected) !important;
+}
+
+// Ручка ресайза колонки
+.resizeHandle {
+  position: absolute;
+  top: 0;
+  right: -2px;
+  width: 5px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 20;
+
+  // Линия-индикатор
+  &::after {
+    content: '';
+    position: absolute;
+    top: 25%;
+    right: 2px;
+    width: 2px;
+    height: 50%;
+    background: transparent;
+    border-radius: 1px;
+    transition: background 0.15s ease, height 0.15s ease;
+  }
+
+  // При наведении — показываем синюю линию
+  &:hover::after {
+    background: var(--theme-primary, #64b5f6);
+    height: 70%;
+    top: 15%;
+  }
+
+  // Активное состояние
+  &:active::after {
+    background: var(--theme-primary, #42a5f5);
+    height: 90%;
+    top: 5%;
+  }
+}
+
+// Кнопка сброса ширин колонок
+.resetWidthsBtn {
+  background: none;
+  border: 0;
+  padding: 2px 4px;
+  cursor: pointer;
+  color: var(--icon-primary);
+  font-size: 12px;
+  line-height: 1;
+  border-radius: 3px;
+  opacity: 0.5;
+  transition: all 0.15s ease;
+
+  &:hover {
+    opacity: 1;
+    color: var(--theme-text-primary);
+    background: var(--theme-hover);
+  }
+}
+
+// Группа кнопок в заголовке (сброс + toggle)
+.headerActionsGroup {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+
+// Ячейка заголовка с возможностью ресайза
+.resizableHeader {
+  position: relative;
+
+  // Убираем стандартный padding справа чтобы handle был ближе к краю
+  padding-right: 8px !important;
 }
 
 // ═══════════════════════════════════════════════════════════

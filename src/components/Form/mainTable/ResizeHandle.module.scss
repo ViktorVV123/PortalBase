@@ -1,0 +1,45 @@
+// src/components/Form/mainTable/ResizeHandle.module.scss
+
+.resizeHandle {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  width: 7px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 20;
+
+  // Визуальный индикатор при наведении
+  &::after {
+    content: '';
+    position: absolute;
+    top: 20%;
+    right: 3px;
+    width: 2px;
+    height: 60%;
+    background: transparent;
+    border-radius: 1px;
+    transition: background 0.15s ease;
+  }
+
+  &:hover::after {
+    background: var(--theme-primary, #90caf9);
+  }
+
+  // Активное состояние (во время drag)
+  &:active::after {
+    background: var(--theme-primary, #90caf9);
+    height: 80%;
+    top: 10%;
+  }
+}
+
+// Состояние ресайза на всей таблице
+.tableResizing {
+  cursor: col-resize !important;
+  user-select: none !important;
+
+  * {
+    cursor: col-resize !important;
+  }
+}
