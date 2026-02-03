@@ -143,6 +143,18 @@ $input-border-focus: var(--input-border-focus);
     overflow: visible;
     text-overflow: clip;
   }
+
+  // Resize handle внутри sticky элемента работает корректно
+  // т.к. sticky создаёт stacking context
+  .resizeHandle {
+    z-index: 25;
+  }
+}
+
+// Ячейка заголовка группы — НЕ меняем position, sticky уже работает
+.groupHeaderCell {
+  // position остаётся sticky от родителя
+  // sticky элемент сам создаёт контекст позиционирования для absolute children
 }
 
 .tbl thead tr:nth-child(2) th {

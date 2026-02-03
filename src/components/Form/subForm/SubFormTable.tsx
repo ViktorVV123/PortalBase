@@ -19,6 +19,52 @@ import { ButtonForm } from "@/shared/buttonForm/ButtonForm";
 import { isColumnRequired, isEmptyValue } from '@/shared/utils/requiredValidation/requiredValidation';
 import { isSameComboGroup, getWriteTcIdForComboGroup } from '@/shared/utils/comboGroupUtils';
 import { formatCellValue } from '@/shared/utils/cellFormat';
+import { useColumnResize, makeColKey } from '@/shared/hooks/useColumnResize';
+
+// ═══════════════════════════════════════════════════════════
+// ШИРИНА КОЛОНОК — ДЕФОЛТНЫЕ ЗНАЧЕНИЯ
+// ═══════════════════════════════════════════════════════════
+
+const isCheckboxColumn = (col: ExtCol): boolean => {
+    const type = (col.type ?? '').toLowerCase();
+    const dt = ((col as any).datatype ?? '').toLowerCase();
+    return (
+        type === 'checkbox' ||
+        type === 'bool' ||
+        type === 'boolean' ||
+        type === 'checkboxnull' ||
+        dt === 'boolean' ||
+        dt === 'bool'
+    );
+};
+
+const getDefaultColWidth = (col: ExtCol): number => {
+    const dt = ((col as any).datatype ?? '').toLowerCase();
+    const type = (col.type ?? '').toLowerCase();
+
+    if (isCheckboxColumn(col)) return 50;
+    if (type === 'rls') return 50;
+    if (type === 'combobox') return 150;
+
+    if (/int|numeric|number|float|double|real|money|decimal/.test(dt)) {
+        return 90;
+    }
+
+    if (dt === 'date' || type === 'date') return 110;
+    if (dt === 'time' || dt === 'timetz' || type === 'time') return 90;
+
+    if (dt.includes('timestamp') || dt.includes('datetime') || type.includes('timestamp')) {
+        return 170;
+    }
+
+    return 200;
+};
+
+const getMinColWidth = (col: ExtCol): number => {
+    if (isCheckboxColumn(col)) return 30;
+    if ((col.type ?? '').toLowerCase() === 'rls') return 30;
+    return 30;
+};
 
 type SubformProps = {
     subDisplay: SubDisplay | null;
@@ -90,16 +136,10 @@ function isRlsLockedValue(val: unknown): boolean {
     return s === '1' || s === 'true' || s === 'да' || s === 'yes' || s === 't';
 }
 
-// ═══════════════════════════════════════════════════════════
-// Выбирает "primary" колонку из combobox группы
-// ═══════════════════════════════════════════════════════════
 function pickPrimaryCombo(group: ExtCol[]): ExtCol {
     return group.find((c) => (c as any).__is_primary_combo_input) ?? group[0];
 }
 
-// ═══════════════════════════════════════════════════════════
-// Получает отображаемое значение для колонки
-// ═══════════════════════════════════════════════════════════
 function getShown(
     valueIndexByKey: Map<string, number>,
     values: unknown[],
@@ -119,20 +159,34 @@ function getShown(
 }
 
 // ═══════════════════════════════════════════════════════════
-// Компонент заголовка с required меткой
+// КОМПОНЕНТ: Заголовок группы с resize
 // ═══════════════════════════════════════════════════════════
 
-type HeaderCellProps = {
+type GroupHeaderCellProps = {
     title: string;
     cols: ExtCol[];
     colSpan: number;
+    groupWidth: number;
+    onStartGroupResize: (e: React.MouseEvent) => void;
 };
 
-const HeaderCell: React.FC<HeaderCellProps> = ({ title, cols, colSpan }) => {
+const GroupHeaderCell: React.FC<GroupHeaderCellProps> = ({
+                                                             title,
+                                                             cols,
+                                                             colSpan,
+                                                             groupWidth,
+                                                             onStartGroupResize,
+                                                         }) => {
     const hasRequired = cols.some(c => isColumnRequired(c));
 
     return (
-        <th colSpan={colSpan}>
+        <th
+            colSpan={colSpan}
+            style={{
+                position: 'relative',
+                width: `${groupWidth}px`,
+            }}
+        >
             <span className={sub.ellipsis}>
                 {title}
                 {hasRequired && (
@@ -141,12 +195,89 @@ const HeaderCell: React.FC<HeaderCellProps> = ({ title, cols, colSpan }) => {
                     </Tooltip>
                 )}
             </span>
+            <div
+                className={sub.resizeHandle}
+                onMouseDown={onStartGroupResize}
+                title="Потяните для изменения ширины группы"
+            />
         </th>
     );
 };
 
 // ═══════════════════════════════════════════════════════════
-// Компонент ячейки редактирования с кнопкой drill для combobox
+// КОМПОНЕНТ: Подзаголовок с resize
+// ═══════════════════════════════════════════════════════════
+
+type SubHeaderCellProps = {
+    col: ExtCol;
+    colKey: string;
+    label: string;
+    width: number;
+    defaultWidth: number;
+    colSpan: number;
+    isRequired: boolean;
+    onStartResize: (colKey: string, startX: number, startWidth: number) => void;
+    onResetWidth: (colKey: string, defaultWidth: number) => void;
+    onResetAllWidths: () => void;
+    isResizing: boolean;
+};
+
+const SubHeaderCell: React.FC<SubHeaderCellProps> = ({
+                                                         col,
+                                                         colKey,
+                                                         label,
+                                                         width,
+                                                         defaultWidth,
+                                                         colSpan,
+                                                         isRequired,
+                                                         onStartResize,
+                                                         onResetWidth,
+                                                         onResetAllWidths,
+                                                         isResizing,
+                                                     }) => {
+    const handleMouseDown = (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onStartResize(colKey, e.clientX, width);
+    };
+
+    const handleDoubleClick = (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.ctrlKey || e.metaKey) {
+            onResetAllWidths();
+        } else {
+            onResetWidth(colKey, defaultWidth);
+        }
+    };
+
+    return (
+        <th
+            colSpan={colSpan}
+            style={{
+                width: `${width}px`,
+                minWidth: `${getMinColWidth(col)}px`,
+                maxWidth: '800px',
+                position: 'relative',
+            }}
+            className={`${sub.resizableHeader} ${isResizing ? sub.resizingCol : ''}`}
+        >
+            <span className={sub.ellipsis}>
+                {label}
+                {isRequired && <span className={sub.requiredMark}>*</span>}
+            </span>
+            <div
+                className={sub.resizeHandle}
+                onMouseDown={handleMouseDown}
+                onDoubleClick={handleDoubleClick}
+                title="Потяните для изменения • 2×клик сброс • Ctrl+2×клик сбросить все"
+            />
+        </th>
+    );
+};
+
+// ═══════════════════════════════════════════════════════════
+// КОМПОНЕНТ: Ячейка редактирования с drill
 // ═══════════════════════════════════════════════════════════
 
 type EditCellWithDrillProps = {
@@ -258,6 +389,32 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
         resetValidation,
     } = props;
 
+    // ═══════════════════════════════════════════════════════════
+    // COLUMN RESIZE HOOK — ключ включает currentOrder для разных табов
+    // ═══════════════════════════════════════════════════════════
+
+    const storageFormId = formId != null && currentOrder != null
+        ? formId * 1000 + currentOrder  // Уникальный ключ для каждого sub-таба
+        : formId;
+
+    const {
+        getWidth,
+        setWidth,
+        startResize,
+        resizing,
+        resetWidths,
+    } = useColumnResize(storageFormId);
+
+    // Ref для группового ресайза
+    const groupResizeRef = React.useRef<{
+        groupCols: ExtCol[];
+        startX: number;
+        startWidths: number[];
+        totalStartWidth: number;
+    } | null>(null);
+
+    const [isGroupResizing, setIsGroupResizing] = React.useState(false);
+
     const {
         deletingRowIdx,
         showSubHeaders,
@@ -314,13 +471,11 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
         return { col: col as ExtCol, idx };
     }, [flatColumnsInRenderOrder, valueIndexByKey]);
 
-    // ✅ колонки без rls
     const renderCols = React.useMemo(
         () => flatColumnsInRenderOrder.filter((c) => (c as ExtCol).type !== 'rls'),
         [flatColumnsInRenderOrder],
     );
 
-    // ✅ headerPlan без rls
     const renderHeaderPlan = React.useMemo(() => {
         return (headerPlan ?? [])
             .map((g) => {
@@ -338,7 +493,111 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
     }, [headerPlan]);
 
     // ═══════════════════════════════════════════════════════════
-    // RENDER CELLS с группировкой combobox (как в MainTable)
+    // ВЫЧИСЛЯЕМ ШИРИНЫ КОЛОНОК
+    // ═══════════════════════════════════════════════════════════
+
+    const colWidths = React.useMemo(() => {
+        return (renderCols as ExtCol[]).map((col) => {
+            const colKey = makeColKey(col.widget_column_id, col.table_column_id ?? null);
+            const defaultWidth = getDefaultColWidth(col);
+            return getWidth(colKey, defaultWidth);
+        });
+    }, [renderCols, getWidth]);
+
+    // Ширины групп
+    const groupWidths = React.useMemo(() => {
+        const widths: number[] = [];
+        let colIndex = 0;
+
+        renderHeaderPlan.forEach((g) => {
+            let groupWidth = 0;
+            for (let i = 0; i < g.cols.length; i++) {
+                groupWidth += colWidths[colIndex] ?? 100;
+                colIndex++;
+            }
+            widths.push(groupWidth);
+        });
+
+        return widths;
+    }, [renderHeaderPlan, colWidths]);
+
+    // Сброс одной колонки
+    const handleResetWidth = React.useCallback((colKey: string, defaultWidth: number) => {
+        setWidth(colKey, defaultWidth);
+    }, [setWidth]);
+
+    // ═══════════════════════════════════════════════════════════
+    // GROUP RESIZE HANDLERS
+    // ═══════════════════════════════════════════════════════════
+
+    const handleStartGroupResize = React.useCallback((
+        e: React.MouseEvent,
+        groupIndex: number,
+        groupCols: ExtCol[]
+    ) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        let startColIndex = 0;
+        for (let i = 0; i < groupIndex; i++) {
+            startColIndex += renderHeaderPlan[i].cols.length;
+        }
+
+        const startWidths = groupCols.map((_, i) => colWidths[startColIndex + i] ?? 100);
+        const totalStartWidth = startWidths.reduce((sum, w) => sum + w, 0);
+
+        groupResizeRef.current = {
+            groupCols,
+            startX: e.clientX,
+            startWidths,
+            totalStartWidth,
+        };
+
+        setIsGroupResizing(true);
+        document.body.style.cursor = 'col-resize';
+        document.body.style.userSelect = 'none';
+    }, [renderHeaderPlan, colWidths]);
+
+    React.useEffect(() => {
+        const handleMouseMove = (e: MouseEvent) => {
+            if (!groupResizeRef.current) return;
+
+            const { groupCols, startX, startWidths, totalStartWidth } = groupResizeRef.current;
+            const delta = e.clientX - startX;
+            const minTotalWidth = groupCols.length * 30;
+            const newTotalWidth = Math.max(minTotalWidth, totalStartWidth + delta);
+            const ratio = newTotalWidth / totalStartWidth;
+
+            groupCols.forEach((col, i) => {
+                const colKey = makeColKey(col.widget_column_id, col.table_column_id ?? null);
+                const newWidth = Math.max(30, Math.round(startWidths[i] * ratio));
+                setWidth(colKey, newWidth);
+            });
+        };
+
+        const handleMouseUp = () => {
+            if (!groupResizeRef.current) return;
+
+            groupResizeRef.current = null;
+            setIsGroupResizing(false);
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+        };
+
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
+
+        return () => {
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', handleMouseUp);
+        };
+    }, [setWidth]);
+
+    const isAnyResizing = resizing.isResizing || isGroupResizing;
+    const tableClassName = `${sub.tbl} ${isAnyResizing ? sub.tableResizing : ''}`;
+
+    // ═══════════════════════════════════════════════════════════
+    // RENDER CELLS
     // ═══════════════════════════════════════════════════════════
 
     const renderAddRowCells = () => {
@@ -349,7 +608,6 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
         while (i < cols.length) {
             const col = cols[i];
 
-            // Combobox-группа?
             if (col.type === 'combobox') {
                 let j = i + 1;
                 while (j < cols.length && isSameComboGroup(col, cols[j])) j += 1;
@@ -389,7 +647,6 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                 continue;
             }
 
-            // Обычная колонка
             const writeTcId = getWriteTcId(col);
             const value = writeTcId == null ? '' : (draftSub[writeTcId] ?? '');
             const isReq = isColumnRequired(col);
@@ -431,7 +688,6 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
         while (i < cols.length) {
             const col = cols[i];
 
-            // ───── Combobox-группа ─────
             if (col.type === 'combobox') {
                 let j = i + 1;
                 while (j < cols.length && isSameComboGroup(col, cols[j])) j += 1;
@@ -469,7 +725,6 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                         </td>
                     );
                 } else {
-                    // View mode — показываем объединённые значения из всех колонок группы
                     const shownParts = group
                         .map((gcol) => getShown(valueIndexByKey, row.values, gcol))
                         .filter(Boolean);
@@ -511,7 +766,6 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                 continue;
             }
 
-            // ───── Обычная колонка ─────
             const syntheticTcId =
                 col.type === 'combobox' && col.combobox_column_id != null && col.table_column_id != null
                     ? -1_000_000 - Number(col.combobox_column_id)
@@ -647,15 +901,30 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                 </p>
             ) : !subDisplay ? null : (
                 <div className={sub.tableScroll}>
-                    <table className={sub.tbl}>
+                    <table className={tableClassName}>
+                        <colgroup>
+                            {(renderCols as ExtCol[]).map((col, idx) => (
+                                <col
+                                    key={`col-${col.widget_column_id}-${col.table_column_id ?? 'null'}`}
+                                    style={{
+                                        width: `${colWidths[idx]}px`,
+                                        minWidth: `${getMinColWidth(col)}px`,
+                                    }}
+                                />
+                            ))}
+                            <col style={{ width: '52px', minWidth: '44px', maxWidth: '60px' }} />
+                        </colgroup>
+
                         <thead>
                         <tr>
-                            {renderHeaderPlan.map((g) => (
-                                <HeaderCell
+                            {renderHeaderPlan.map((g, groupIndex) => (
+                                <GroupHeaderCell
                                     key={`sub-g-top-${g.id}`}
                                     title={g.title}
                                     cols={g.cols as ExtCol[]}
                                     colSpan={g.cols.length || 1}
+                                    groupWidth={groupWidths[groupIndex] ?? 100}
+                                    onStartGroupResize={(e) => handleStartGroupResize(e, groupIndex, g.cols as ExtCol[])}
                                 />
                             ))}
                             <th className={sub.actionsHeadCell}>
@@ -676,45 +945,50 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
 
                         {showSubHeaders && (
                             <tr>
-                                {renderHeaderPlan.flatMap((g) => {
-                                    const labels = (g.labels ?? []).slice(0, g.cols.length);
-                                    while (labels.length < g.cols.length) labels.push('—');
-
+                                {(() => {
                                     const nodes: React.ReactNode[] = [];
-                                    let i = 0;
+                                    let colIndex = 0;
 
-                                    while (i < g.cols.length) {
-                                        const label = labels[i] ?? '—';
-                                        const col = g.cols[i] as ExtCol;
+                                    renderHeaderPlan.forEach((g) => {
+                                        const labels = (g.labels ?? []).slice(0, g.cols.length);
+                                        while (labels.length < g.cols.length) labels.push('—');
 
-                                        let span = 1;
-                                        while (i + span < g.cols.length && (labels[i + span] ?? '—') === label) {
-                                            span += 1;
-                                        }
+                                        (g.cols as ExtCol[]).forEach((col, i) => {
+                                            const label = labels[i] ?? '—';
+                                            const isReq = isColumnRequired(col);
+                                            const colKey = makeColKey(col.widget_column_id, col.table_column_id ?? null);
+                                            const width = colWidths[colIndex];
+                                            const defaultWidth = getDefaultColWidth(col);
 
-                                        const isReq = isColumnRequired(col);
+                                            nodes.push(
+                                                <SubHeaderCell
+                                                    key={`g-sub-${g.id}-${i}`}
+                                                    col={col}
+                                                    colKey={colKey}
+                                                    label={label}
+                                                    width={width}
+                                                    defaultWidth={defaultWidth}
+                                                    colSpan={1}
+                                                    isRequired={isReq}
+                                                    onStartResize={startResize}
+                                                    onResetWidth={handleResetWidth}
+                                                    onResetAllWidths={resetWidths}
+                                                    isResizing={resizing.colKey === colKey}
+                                                />
+                                            );
 
-                                        nodes.push(
-                                            <th key={`g-sub-${g.id}-${i}`} colSpan={span}>
-                                                <span className={s.ellipsis}>
-                                                    {label}
-                                                    {isReq && <span className={sub.requiredMark}>*</span>}
-                                                </span>
-                                            </th>
-                                        );
-
-                                        i += span;
-                                    }
+                                            colIndex++;
+                                        });
+                                    });
 
                                     return nodes;
-                                })}
-                                <th className={s.actionsCell} />
+                                })()}
+                                <th className={sub.actionsHeadCell} />
                             </tr>
                         )}
                         </thead>
 
                         <tbody>
-                        {/* строка добавления в саб */}
                         {isAddingSub && (
                             <tr className={sub.addRow}>
                                 {renderAddRowCells()}

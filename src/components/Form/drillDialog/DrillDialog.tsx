@@ -663,6 +663,7 @@ export const DrillDialog: React.FC<Props> = ({
                             />
 
                             <MainTable
+                                formId={currentFormId}
                                 headerPlan={headerPlan as any}
                                 showSubHeaders={effectiveComboboxMode && hasSubWidgets ? showSubHeaders : false}
                                 onToggleSubHeaders={() =>

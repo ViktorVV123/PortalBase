@@ -167,10 +167,8 @@ const GroupHeaderCell: React.FC<GroupHeaderCellProps> = ({
     return (
         <th
             colSpan={colSpan}
-            style={{
-                position: 'relative',
-                width: `${groupWidth}px`,
-            }}
+            className={s.groupHeaderCell}
+            style={{ width: `${groupWidth}px` }}
         >
             <span className={s.ellipsis}>
                 {title}
@@ -203,7 +201,7 @@ type HeaderPlanGroup = {
 type RowView = { row: FormDisplay['data'][number]; idx: number };
 
 type Props = {
-    formId?: number | null;
+    formId: number | null;
 
     headerPlan: HeaderPlanGroup[];
     showSubHeaders: boolean;
