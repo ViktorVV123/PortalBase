@@ -39,21 +39,25 @@ type Props = {
     loadFilteredFormDisplay: (formId: number, filter: {
         table_column_id: number;
         value: string | number;
-    }) => Promise<void>;
+    }, page?: number, searchPattern?: string) => Promise<void>;
     setFormDisplay: (value: FormDisplay | null) => void;
     setSubDisplay: (value: SubDisplay | null) => void;
     headerGroups?: HeaderModelItem[];
     formsById: Record<number, WidgetForm>;
     pagination: PaginationState;
-    goToPage: (formId: number, page: number, filters?: Array<{ table_column_id: number; value: string | number }>) => Promise<void>;
-    loadMoreRows: (formId: number, filters?: Array<{ table_column_id: number; value: string | number }>) => Promise<void>;
+    goToPage: (formId: number, page: number, filters?: Array<{ table_column_id: number; value: string | number }>, searchPattern?: string) => Promise<void>;
+    loadMoreRows: (formId: number, filters?: Array<{ table_column_id: number; value: string | number }>, searchPattern?: string) => Promise<void>;
+    // ═══════════════════════════════════════════════════════════
+    // НОВОЕ: loadFormDisplay для серверного поиска
+    // ═══════════════════════════════════════════════════════════
+    loadFormDisplay: (formId: number, page?: number, searchPattern?: string) => Promise<void>;
 };
 
 export const FormTable: React.FC<Props> = (props) => {
     const {
         formDisplay, selectedWidget, selectedFormId, subDisplay, subLoading, subError,
         formsByWidget, loadSubDisplay, formTrees, setFormDisplay, setSubDisplay, formsById,
-        loadFilteredFormDisplay, pagination, goToPage, loadMoreRows,
+        loadFilteredFormDisplay, pagination, goToPage, loadMoreRows, loadFormDisplay,
     } = props;
 
     const [liveTree, setLiveTree] = useState<FormTreeColumn[] | null>(null);
@@ -109,6 +113,7 @@ export const FormTable: React.FC<Props> = (props) => {
                 loadSubDisplay={loadSubDisplay}
                 loadFilteredFormDisplay={loadFilteredFormDisplay}
                 loadFormTree={loadFormTree}
+                loadFormDisplay={loadFormDisplay}
                 pagination={pagination}
                 goToPage={goToPage}
                 loadMoreRows={loadMoreRows}

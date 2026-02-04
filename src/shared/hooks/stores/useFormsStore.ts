@@ -54,12 +54,13 @@ export interface UseFormsStoreReturn {
     deleteSubWidgetFromForm: (formId: number, subWidgetId: number) => Promise<void>;
     deleteTreeFieldFromForm: (formId: number, tableColumnId: number) => Promise<void>;
 
-    // Form Display Actions (с пагинацией)
-    loadFormDisplay: (formId: number, page?: number) => Promise<void>;
+    // Form Display Actions (с пагинацией и поиском)
+    loadFormDisplay: (formId: number, page?: number, searchPattern?: string) => Promise<void>;
     loadFilteredFormDisplay: (
         formId: number,
         filter: { table_column_id: number; value: string | number },
-        page?: number
+        page?: number,
+        searchPattern?: string
     ) => Promise<void>;
     setFormDisplay: (value: FormDisplay | null) => void;
 
@@ -67,13 +68,15 @@ export interface UseFormsStoreReturn {
     goToPage: (
         formId: number,
         page: number,
-        filters?: Array<{ table_column_id: number; value: string | number }>
+        filters?: Array<{ table_column_id: number; value: string | number }>,
+        searchPattern?: string
     ) => Promise<void>;
 
     // Infinite Scroll Actions
     loadMoreRows: (
         formId: number,
-        filters?: Array<{ table_column_id: number; value: string | number }>
+        filters?: Array<{ table_column_id: number; value: string | number }>,
+        searchPattern?: string
     ) => Promise<void>;
 
     // Sub Display Actions
@@ -121,6 +124,9 @@ export function useFormsStore(): UseFormsStoreReturn {
     // Храним ID текущей загруженной формы для проверки при смене
     const currentFormIdRef = useRef<number | null>(null);
 
+    // Храним текущий search_pattern для использования в loadMoreRows
+    const currentSearchPatternRef = useRef<string>('');
+
     // ─────────────────────────────────────────────────────────────
     // HELPERS
     // ─────────────────────────────────────────────────────────────
@@ -161,6 +167,26 @@ export function useFormsStore(): UseFormsStoreReturn {
             hasMore: false,
             isLoadingMore: false,
         });
+    }, []);
+
+    /**
+     * Построение URL параметров с учётом пагинации и поиска
+     */
+    const buildQueryParams = useCallback((
+        page: number,
+        searchPattern?: string
+    ): URLSearchParams => {
+        const params = new URLSearchParams({
+            limit: String(MAIN_TABLE_PAGE_SIZE),
+            page: String(page),
+        });
+
+        // Добавляем search_pattern если есть
+        if (searchPattern && searchPattern.trim()) {
+            params.set('search_pattern', searchPattern.trim());
+        }
+
+        return params;
     }, []);
 
     /**
@@ -261,10 +287,14 @@ export function useFormsStore(): UseFormsStoreReturn {
     }, []);
 
     // ─────────────────────────────────────────────────────────────
-    // FORM DISPLAY ACTIONS (с пагинацией)
+    // FORM DISPLAY ACTIONS (с пагинацией и поиском)
     // ─────────────────────────────────────────────────────────────
 
-    const loadFormDisplay = useCallback(async (formId: number, page: number = 1) => {
+    const loadFormDisplay = useCallback(async (
+        formId: number,
+        page: number = 1,
+        searchPattern?: string
+    ) => {
         // ═══════════════════════════════════════════════════════════
         // ИСПРАВЛЕНИЕ: Сбрасываем данные при смене формы
         // ═══════════════════════════════════════════════════════════
@@ -275,14 +305,14 @@ export function useFormsStore(): UseFormsStoreReturn {
             currentFormIdRef.current = formId;
         }
 
+        // Сохраняем текущий search_pattern
+        currentSearchPatternRef.current = searchPattern ?? '';
+
         setFormLoading(true);
         setFormError(null);
 
         try {
-            const params = new URLSearchParams({
-                limit: String(MAIN_TABLE_PAGE_SIZE),
-                page: String(page),
-            });
+            const params = buildQueryParams(page, searchPattern);
 
             const { data } = await api.post<FormDisplay>(
                 `/display/${formId}/main?${params}`
@@ -306,21 +336,22 @@ export function useFormsStore(): UseFormsStoreReturn {
         } finally {
             setFormLoading(false);
         }
-    }, [updatePaginationFromResponse, resetPagination]);
+    }, [updatePaginationFromResponse, resetPagination, buildQueryParams]);
 
     const loadFilteredFormDisplay = useCallback(async (
         formId: number,
         filter: { table_column_id: number; value: string | number },
-        page: number = 1
+        page: number = 1,
+        searchPattern?: string
     ) => {
         // При фильтрации тоже сбрасываем пагинацию
         resetPagination();
 
+        // Сохраняем текущий search_pattern
+        currentSearchPatternRef.current = searchPattern ?? '';
+
         try {
-            const params = new URLSearchParams({
-                limit: String(MAIN_TABLE_PAGE_SIZE),
-                page: String(page),
-            });
+            const params = buildQueryParams(page, searchPattern);
 
             const { data } = await api.post<FormDisplay>(
                 `/display/${formId}/main?${params}`,
@@ -332,20 +363,21 @@ export function useFormsStore(): UseFormsStoreReturn {
         } catch (e) {
             console.warn('Ошибка при загрузке данных формы с фильтром:', e);
         }
-    }, [updatePaginationFromResponse, resetPagination]);
+    }, [updatePaginationFromResponse, resetPagination, buildQueryParams]);
 
     const goToPage = useCallback(async (
         formId: number,
         page: number,
-        filters?: Array<{ table_column_id: number; value: string | number }>
+        filters?: Array<{ table_column_id: number; value: string | number }>,
+        searchPattern?: string
     ) => {
         setFormLoading(true);
 
+        // Сохраняем текущий search_pattern
+        currentSearchPatternRef.current = searchPattern ?? '';
+
         try {
-            const params = new URLSearchParams({
-                limit: String(MAIN_TABLE_PAGE_SIZE),
-                page: String(page),
-            });
+            const params = buildQueryParams(page, searchPattern);
 
             const body = filters?.length
                 ? filters.map(f => ({ ...f, value: String(f.value) }))
@@ -363,7 +395,7 @@ export function useFormsStore(): UseFormsStoreReturn {
         } finally {
             setFormLoading(false);
         }
-    }, [updatePaginationFromResponse]);
+    }, [updatePaginationFromResponse, buildQueryParams]);
 
     /**
      * Загрузка следующей страницы (ДОБАВЛЯЕТ строки к существующим)
@@ -371,7 +403,8 @@ export function useFormsStore(): UseFormsStoreReturn {
      */
     const loadMoreRows = useCallback(async (
         formId: number,
-        filters?: Array<{ table_column_id: number; value: string | number }>
+        filters?: Array<{ table_column_id: number; value: string | number }>,
+        searchPattern?: string
     ) => {
         // Проверяем что это та же форма
         if (currentFormIdRef.current !== formId) {
@@ -384,13 +417,13 @@ export function useFormsStore(): UseFormsStoreReturn {
 
         const nextPage = pagination.currentPage + 1;
 
+        // Используем переданный searchPattern или сохранённый
+        const effectiveSearchPattern = searchPattern ?? currentSearchPatternRef.current;
+
         setPagination(prev => ({ ...prev, isLoadingMore: true }));
 
         try {
-            const params = new URLSearchParams({
-                limit: String(MAIN_TABLE_PAGE_SIZE),
-                page: String(nextPage),
-            });
+            const params = buildQueryParams(nextPage, effectiveSearchPattern);
 
             const body = filters?.length
                 ? filters.map(f => ({ ...f, value: String(f.value) }))
@@ -436,7 +469,7 @@ export function useFormsStore(): UseFormsStoreReturn {
             console.warn('Ошибка при загрузке дополнительных строк:', e);
             setPagination(prev => ({ ...prev, isLoadingMore: false }));
         }
-    }, [pagination]);
+    }, [pagination, buildQueryParams]);
 
     // ─────────────────────────────────────────────────────────────
     // SUB DISPLAY ACTIONS

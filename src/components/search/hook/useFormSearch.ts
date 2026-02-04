@@ -1,6 +1,6 @@
 // src/components/Form/hooks/useFormSearch.ts
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FormDisplay } from '@/shared/hooks/useWorkSpaces';
 import { useDebounced } from '@/shared/hooks/useDebounced';
 
@@ -11,28 +11,7 @@ type Options = {
 type FormRow = FormDisplay['data'][number];
 export type RowView = { row: FormRow; idx: number };
 
-/** Нормализация текста для поиска */
-const normalize = (s: string): string =>
-    s.toLowerCase().replace(/ё/g, 'е').trim();
-
-/** Преобразование значения ячейки в текст */
-const cellToText = (v: unknown): string => {
-    if (v === null || v === undefined) return '';
-    if (Array.isArray(v)) return v.map((x) => (x == null ? '' : String(x))).join(' ');
-    return String(v);
-};
-
-/** Ключ для поиска индекса значения */
-function getValueKey(col: any): string {
-    const syntheticTcId =
-        col?.type === 'combobox' &&
-        col?.combobox_column_id != null &&
-        col?.table_column_id != null
-            ? -1_000_000 - Number(col.combobox_column_id)
-            : (col?.table_column_id ?? -1);
-
-    return `${col?.widget_column_id}:${syntheticTcId}`;
-}
+type ServerSearchCallback = (searchPattern: string) => Promise<void>;
 
 export function useFormSearch(
     formDisplay: FormDisplay,
@@ -40,69 +19,65 @@ export function useFormSearch(
     valueIndexByKey: Map<string, number>,
     searchBarEnabled: boolean | undefined | null,
     opts: Options = {},
+    // ═══════════════════════════════════════════════════════════
+    // НОВЫЙ ПАРАМЕТР: callback для серверного поиска
+    // ═══════════════════════════════════════════════════════════
+    onServerSearch?: ServerSearchCallback,
 ) {
-    const { debounceMs = 250 } = opts;
+    const { debounceMs = 350 } = opts; // Увеличил debounce для серверного поиска
 
     const [q, setQ] = useState('');
     const debouncedQuery = useDebounced(q, debounceMs);
+
+    // Флаг для отслеживания первого рендера (не делаем запрос при монтировании)
+    const isFirstRender = useRef(true);
+
+    // Предыдущее значение debouncedQuery для сравнения
+    const prevDebouncedQuery = useRef(debouncedQuery);
 
     // Сброс при отключении поиска
     useEffect(() => {
         if (!searchBarEnabled && q) setQ('');
     }, [searchBarEnabled, q]);
 
-    const queryNormalized = useMemo(() => normalize(debouncedQuery), [debouncedQuery]);
+    // ═══════════════════════════════════════════════════════════
+    // СЕРВЕРНЫЙ ПОИСК: вызываем callback при изменении запроса
+    // ═══════════════════════════════════════════════════════════
+    useEffect(() => {
+        // Пропускаем первый рендер
+        if (isFirstRender.current) {
+            isFirstRender.current = false;
+            prevDebouncedQuery.current = debouncedQuery;
+            return;
+        }
 
-    // Базовые строки с индексами
-    const baseRows: RowView[] = useMemo(() => {
+        // Пропускаем если значение не изменилось
+        if (prevDebouncedQuery.current === debouncedQuery) {
+            return;
+        }
+
+        prevDebouncedQuery.current = debouncedQuery;
+
+        // Если есть callback для серверного поиска — вызываем его
+        if (onServerSearch && searchBarEnabled) {
+            onServerSearch(debouncedQuery);
+        }
+    }, [debouncedQuery, onServerSearch, searchBarEnabled]);
+
+    // Базовые строки с индексами (без фильтрации — данные уже отфильтрованы сервером)
+    const filteredRows: RowView[] = useMemo(() => {
         const data = formDisplay?.data ?? [];
         return data
             .map((row, idx) => ({ row, idx }))
             .filter(({ row }) => row && (row as any).primary_keys != null);
     }, [formDisplay]);
 
-    // Индексы колонок для поиска
-    const columnIndices = useMemo(() => {
-        return (flatColumnsInRenderOrder ?? [])
-            .map((c) => valueIndexByKey.get(getValueKey(c)))
-            .filter((v): v is number => typeof v === 'number');
-    }, [flatColumnsInRenderOrder, valueIndexByKey]);
-
-    // Фильтрация
-    const filteredRows: RowView[] = useMemo(() => {
-        // Если поиск отключён или запрос пустой — возвращаем все
-        if (!searchBarEnabled || !queryNormalized) {
-            return baseRows;
-        }
-
-        // Если нет колонок для поиска — возвращаем все
-        if (!columnIndices.length) {
-            return baseRows;
-        }
-
-        return baseRows.filter(({ row }) => {
-            const values = (row as any).values ?? [];
-
-            for (const idx of columnIndices) {
-                const cellValue = values[idx];
-                if (cellValue === null || cellValue === undefined) continue;
-
-                const text = normalize(cellToText(cellValue));
-
-                // Поиск подстроки (contains) — работает и для "21" в "2021"
-                if (text.includes(queryNormalized)) {
-                    return true;
-                }
-            }
-
-            return false;
-        });
-    }, [searchBarEnabled, queryNormalized, baseRows, columnIndices]);
-
     return {
         showSearch: !!searchBarEnabled,
         q,
         setQ,
         filteredRows,
+        // Экспортируем debouncedQuery для использования в loadMoreRows
+        searchPattern: debouncedQuery,
     };
 }

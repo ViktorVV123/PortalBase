@@ -232,6 +232,10 @@ export const Main = () => {
         formTrees,
         loadFilteredFormDisplay,
         setFormDisplay,
+        // ═══════════════════════════════════════════════════════════
+        // НОВОЕ: loadFormDisplay для серверного поиска
+        // ═══════════════════════════════════════════════════════════
+        loadFormDisplay,
 
         // Pagination (с infinite scroll)
         pagination,

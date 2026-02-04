@@ -94,9 +94,15 @@ type FormProps = {
     formTrees: Record<number, FormTreeColumn[]>;
     loadFilteredFormDisplay: (
         formId: number,
-        filter: { table_column_id: number; value: string | number }
+        filter: { table_column_id: number; value: string | number },
+        page?: number,
+        searchPattern?: string
     ) => Promise<void>;
     setFormDisplay: (value: FormDisplay | null) => void;
+    // ═══════════════════════════════════════════════════════════
+    // НОВОЕ: loadFormDisplay для серверного поиска
+    // ═══════════════════════════════════════════════════════════
+    loadFormDisplay: (formId: number, page?: number, searchPattern?: string) => Promise<void>;
 };
 
 /** Пропсы для пагинации (с infinite scroll) */
@@ -105,11 +111,13 @@ type PaginationProps = {
     goToPage: (
         formId: number,
         page: number,
-        filters?: Array<{ table_column_id: number; value: string | number }>
+        filters?: Array<{ table_column_id: number; value: string | number }>,
+        searchPattern?: string
     ) => Promise<void>;
     loadMoreRows: (
         formId: number,
-        filters?: Array<{ table_column_id: number; value: string | number }>
+        filters?: Array<{ table_column_id: number; value: string | number }>,
+        searchPattern?: string
     ) => Promise<void>;
 };
 
@@ -181,6 +189,7 @@ export const SetOfTables: React.FC<Props> = (props) => {
         formTrees,
         loadFilteredFormDisplay,
         setFormDisplay,
+        loadFormDisplay,
 
         // Pagination (с infinite scroll)
         pagination,
@@ -245,6 +254,7 @@ export const SetOfTables: React.FC<Props> = (props) => {
                             setSubDisplay={setSubDisplay}
                             loadSubDisplay={loadSubDisplay}
                             formDisplay={formDisplay}
+                            loadFormDisplay={loadFormDisplay}
                             // Pagination (с infinite scroll)
                             pagination={pagination}
                             goToPage={goToPage}

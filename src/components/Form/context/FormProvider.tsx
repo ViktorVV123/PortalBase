@@ -42,17 +42,21 @@ export type FormProviderProps = {
     loadFilteredFormDisplay: (formId: number, filter: {
         table_column_id: number;
         value: string | number
-    }) => Promise<void>;
+    }, page?: number, searchPattern?: string) => Promise<void>;
     loadFormTree: (formId: number) => Promise<void>;
+    // ═══════════════════════════════════════════════════════════
+    // ОБНОВЛЕНО: loadFormDisplay теперь принимает searchPattern
+    // ═══════════════════════════════════════════════════════════
+    loadFormDisplay: (formId: number, page?: number, searchPattern?: string) => Promise<void>;
     pagination: PaginationState;
     goToPage: (formId: number, page: number, filters?: Array<{
         table_column_id: number;
         value: string | number
-    }>) => Promise<void>;
+    }>, searchPattern?: string) => Promise<void>;
     loadMoreRows: (formId: number, filters?: Array<{
         table_column_id: number;
         value: string | number
-    }>) => Promise<void>;
+    }>, searchPattern?: string) => Promise<void>;
 };
 
 export const FormProvider: React.FC<FormProviderProps> = ({
@@ -74,6 +78,7 @@ export const FormProvider: React.FC<FormProviderProps> = ({
                                                               loadSubDisplay,
                                                               loadFilteredFormDisplay,
                                                               loadFormTree,
+                                                              loadFormDisplay,
                                                               pagination,
                                                               goToPage: goToPageExternal,
                                                               loadMoreRows: loadMoreRowsExternal,
@@ -144,12 +149,35 @@ export const FormProvider: React.FC<FormProviderProps> = ({
         handleTabClick
     } = useSubNav({formIdForSub: selectedFormId, availableOrders, loadSubDisplay});
 
+    // ═══════════════════════════════════════════════════════════
+    // СЕРВЕРНЫЙ ПОИСК: callback для вызова API при изменении запроса
+    // ═══════════════════════════════════════════════════════════
+    const handleServerSearch = useCallback(async (searchPattern: string) => {
+        if (!selectedFormId) return;
+
+        // Сбрасываем выделение при новом поиске
+        setSelectedKey(null);
+        setLastPrimary({});
+        setSubDisplay(null);
+
+        // Загружаем данные с search_pattern (страница 1)
+        await loadFormDisplay(selectedFormId, 1, searchPattern);
+    }, [selectedFormId, loadFormDisplay, setSelectedKey, setLastPrimary, setSubDisplay]);
+
     const {
         showSearch,
         q,
         setQ,
-        filteredRows
-    } = useFormSearch(formDisplay!, flatColumnsInRenderOrder, valueIndexByKey, currentForm?.search_bar, {debounceMs: 250});
+        filteredRows,
+        searchPattern, // Текущий debounced поисковый запрос
+    } = useFormSearch(
+        formDisplay!,
+        flatColumnsInRenderOrder,
+        valueIndexByKey,
+        currentForm?.search_bar,
+        { debounceMs: 350 },
+        handleServerSearch // Передаём callback для серверного поиска
+    );
 
     const reloadTree = useCallback(async () => {
         const fid = selectedFormId ?? currentForm?.form_id ?? null;
@@ -159,16 +187,18 @@ export const FormProvider: React.FC<FormProviderProps> = ({
         }
     }, [selectedFormId, currentForm, loadFormTree]);
 
-    // Pagination handlers
+    // ═══════════════════════════════════════════════════════════
+    // PAGINATION: теперь передаём searchPattern
+    // ═══════════════════════════════════════════════════════════
     const goToPage = useCallback(async (page: number) => {
         if (!selectedFormId) return;
-        await goToPageExternal(selectedFormId, page, activeFilters);
-    }, [selectedFormId, goToPageExternal, activeFilters]);
+        await goToPageExternal(selectedFormId, page, activeFilters, searchPattern);
+    }, [selectedFormId, goToPageExternal, activeFilters, searchPattern]);
 
     const loadMoreRows = useCallback(async () => {
         if (!selectedFormId) return;
-        await loadMoreRowsExternal(selectedFormId, activeFilters);
-    }, [selectedFormId, loadMoreRowsExternal, activeFilters]);
+        await loadMoreRowsExternal(selectedFormId, activeFilters, searchPattern);
+    }, [selectedFormId, loadMoreRowsExternal, activeFilters, searchPattern]);
 
     const mainCrud = useMainCrud({
         formDisplay: formDisplay!, selectedWidget, selectedFormId, formsByWidget, formsById, activeFilters,
@@ -227,19 +257,23 @@ export const FormProvider: React.FC<FormProviderProps> = ({
     const closeDrill = useCallback(() => setDrill(p => ({...p, open: false})), []);
     const triggerComboReload = useCallback(() => setComboReloadToken(v => v + 1), []);
 
+    // ═══════════════════════════════════════════════════════════
+    // RESET FILTERS: сбрасываем также поисковый запрос
+    // ═══════════════════════════════════════════════════════════
     const resetFilters = useCallback(async () => {
         if (!selectedFormId) return;
         setSelectedKey(null);
         setLastPrimary({});
         setSubDisplay(null);
         setActiveSubOrder(availableOrders[0] ?? 0);
+        setQ(''); // Сбрасываем поисковый запрос
         try {
             await resetFiltersHard();
             await reloadTree();
             resetTreeDrawer();
         } catch {
         }
-    }, [selectedFormId, availableOrders, setSubDisplay, resetFiltersHard, reloadTree, resetTreeDrawer, setSelectedKey, setLastPrimary, setActiveSubOrder]);
+    }, [selectedFormId, availableOrders, setSubDisplay, resetFiltersHard, reloadTree, resetTreeDrawer, setSelectedKey, setLastPrimary, setActiveSubOrder, setQ]);
 
     const treeDrawerState = useMemo<TreeDrawerState>(() => ({
         isOpen: isTreeOpen,
@@ -339,6 +373,7 @@ export const FormProvider: React.FC<FormProviderProps> = ({
         setSubEditingRowIdx(null);
         setSubEditDraft({});
         setSubEditSaving(false);
+        setQ(''); // Сбрасываем поиск при смене формы
         const firstOrder = (currentForm?.sub_widgets ?? []).map(sw => sw.widget_order).sort((a, b) => a - b)[0] ?? 0;
         setActiveSubOrder(firstOrder);
     }, [selectedFormId]);
