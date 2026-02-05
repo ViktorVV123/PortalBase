@@ -183,7 +183,6 @@ const GroupHeaderCell: React.FC<GroupHeaderCellProps> = ({
         <th
             colSpan={colSpan}
             style={{
-                position: 'relative',
                 width: `${groupWidth}px`,
             }}
         >
@@ -258,7 +257,6 @@ const SubHeaderCell: React.FC<SubHeaderCellProps> = ({
                 width: `${width}px`,
                 minWidth: `${getMinColWidth(col)}px`,
                 maxWidth: '800px',
-                position: 'relative',
             }}
             className={`${sub.resizableHeader} ${isResizing ? sub.resizingCol : ''}`}
         >

@@ -139,6 +139,8 @@ $input-border-focus: var(--input-border-focus);
 }
 
 .tbl thead tr:nth-child(2) th {
+  position: sticky;
+  z-index: 10;
   font-weight: 500;
   font-size: 11px;
   background: $header-bg;
@@ -187,7 +189,8 @@ $input-border-focus: var(--input-border-focus);
 }
 
 .resizableHeader {
-  position: relative;
+  // НЕ ставим position: relative — sticky на th создаёт stacking context
+  // и resize handle с position: absolute работает корректно внутри sticky
   padding-right: 8px;
 }
 

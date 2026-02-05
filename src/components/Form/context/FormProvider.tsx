@@ -39,10 +39,10 @@ export type FormProviderProps = {
     subLoading: boolean;
     subError: string | null;
     loadSubDisplay: (formId: number, subOrder: number, primary?: Record<string, unknown>) => void;
-    loadFilteredFormDisplay: (formId: number, filter: {
+    loadFilteredFormDisplay: (formId: number, filters: {
         table_column_id: number;
         value: string | number
-    }, page?: number, searchPattern?: string) => Promise<void>;
+    } | Array<{ table_column_id: number; value: string | number }>, page?: number, searchPattern?: string) => Promise<void>;
     loadFormTree: (formId: number) => Promise<void>;
     // ═══════════════════════════════════════════════════════════
     // ОБНОВЛЕНО: loadFormDisplay теперь принимает searchPattern
@@ -151,6 +151,7 @@ export const FormProvider: React.FC<FormProviderProps> = ({
 
     // ═══════════════════════════════════════════════════════════
     // СЕРВЕРНЫЙ ПОИСК: callback для вызова API при изменении запроса
+    // Учитывает активные фильтры дерева!
     // ═══════════════════════════════════════════════════════════
     const handleServerSearch = useCallback(async (searchPattern: string) => {
         if (!selectedFormId) return;
@@ -160,9 +161,18 @@ export const FormProvider: React.FC<FormProviderProps> = ({
         setLastPrimary({});
         setSubDisplay(null);
 
-        // Загружаем данные с search_pattern (страница 1)
-        await loadFormDisplay(selectedFormId, 1, searchPattern);
-    }, [selectedFormId, loadFormDisplay, setSelectedKey, setLastPrimary, setSubDisplay]);
+        // Если есть активные фильтры дерева — передаём их все
+        if (activeFilters.length > 0) {
+            await loadFilteredFormDisplay(
+                selectedFormId,
+                activeFilters, // Передаём весь массив фильтров
+                1,
+                searchPattern
+            );
+        } else {
+            await loadFormDisplay(selectedFormId, 1, searchPattern);
+        }
+    }, [selectedFormId, loadFormDisplay, loadFilteredFormDisplay, activeFilters, setSelectedKey, setLastPrimary, setSubDisplay]);
 
     const {
         showSearch,
@@ -178,6 +188,26 @@ export const FormProvider: React.FC<FormProviderProps> = ({
         { debounceMs: 350 },
         handleServerSearch // Передаём callback для серверного поиска
     );
+
+    // ═══════════════════════════════════════════════════════════
+    // Сбрасываем поиск при изменении фильтров дерева
+    // ═══════════════════════════════════════════════════════════
+    const prevFiltersRef = React.useRef<string | null>(null);
+    useEffect(() => {
+        const filtersKey = activeFilters.map(f => `${f.table_column_id}:${f.value}`).join('|');
+
+        // Первый рендер — просто запоминаем, не сбрасываем
+        if (prevFiltersRef.current === null) {
+            prevFiltersRef.current = filtersKey;
+            return;
+        }
+
+        // Сбрасываем если фильтры изменились
+        if (prevFiltersRef.current !== filtersKey) {
+            setQ('');
+            prevFiltersRef.current = filtersKey;
+        }
+    }, [activeFilters, setQ]);
 
     const reloadTree = useCallback(async () => {
         const fid = selectedFormId ?? currentForm?.form_id ?? null;

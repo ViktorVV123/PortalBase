@@ -58,7 +58,7 @@ export interface UseFormsStoreReturn {
     loadFormDisplay: (formId: number, page?: number, searchPattern?: string) => Promise<void>;
     loadFilteredFormDisplay: (
         formId: number,
-        filter: { table_column_id: number; value: string | number },
+        filters: { table_column_id: number; value: string | number } | Array<{ table_column_id: number; value: string | number }>,
         page?: number,
         searchPattern?: string
     ) => Promise<void>;
@@ -340,7 +340,7 @@ export function useFormsStore(): UseFormsStoreReturn {
 
     const loadFilteredFormDisplay = useCallback(async (
         formId: number,
-        filter: { table_column_id: number; value: string | number },
+        filters: { table_column_id: number; value: string | number } | Array<{ table_column_id: number; value: string | number }>,
         page: number = 1,
         searchPattern?: string
     ) => {
@@ -350,12 +350,15 @@ export function useFormsStore(): UseFormsStoreReturn {
         // Сохраняем текущий search_pattern
         currentSearchPatternRef.current = searchPattern ?? '';
 
+        // Нормализуем фильтры в массив
+        const filtersArray = Array.isArray(filters) ? filters : [filters];
+
         try {
             const params = buildQueryParams(page, searchPattern);
 
             const { data } = await api.post<FormDisplay>(
                 `/display/${formId}/main?${params}`,
-                [filter]
+                filtersArray.map(f => ({ ...f, value: String(f.value) }))
             );
 
             setFormDisplay(data);

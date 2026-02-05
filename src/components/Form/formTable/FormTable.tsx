@@ -36,10 +36,10 @@ type Props = {
     subLoading: boolean;
     subError: string | null;
     formTrees: Record<number, FormTreeColumn[]>;
-    loadFilteredFormDisplay: (formId: number, filter: {
+    loadFilteredFormDisplay: (formId: number, filters: {
         table_column_id: number;
         value: string | number;
-    }, page?: number, searchPattern?: string) => Promise<void>;
+    } | Array<{ table_column_id: number; value: string | number }>, page?: number, searchPattern?: string) => Promise<void>;
     setFormDisplay: (value: FormDisplay | null) => void;
     setSubDisplay: (value: SubDisplay | null) => void;
     headerGroups?: HeaderModelItem[];

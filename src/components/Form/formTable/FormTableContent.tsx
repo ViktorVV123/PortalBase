@@ -170,6 +170,87 @@ export const FormTableContent: React.FC<Props> = ({ liveTree, setLiveTree, curre
         } catch {}
     }, [selectedFormId, setFormDisplay, ctx]);
 
+    // ═══════════════════════════════════════════════════════════
+    // SUB PANE VERTICAL RESIZE
+    // ═══════════════════════════════════════════════════════════
+
+    const SUB_MIN_HEIGHT = 80;
+    const SUB_MAX_RATIO = 0.75;
+    const SUB_STORAGE_KEY = 'sub-pane-height';
+
+    const [subHeight, setSubHeight] = useState<number>(() => {
+        try {
+            const saved = localStorage.getItem(SUB_STORAGE_KEY);
+            if (saved) {
+                const h = parseInt(saved, 10);
+                // При чтении — только проверяем минимум, максимум ограничим при drag
+                if (!isNaN(h) && h >= SUB_MIN_HEIGHT) {
+                    return Math.min(h, window.innerHeight * SUB_MAX_RATIO);
+                }
+            }
+        } catch {}
+        return Math.round(window.innerHeight * 0.25);
+    });
+
+    const subResizeRef = useRef<{
+        startY: number;
+        startHeight: number;
+    } | null>(null);
+
+    const subHeightRef = useRef(subHeight);
+    subHeightRef.current = subHeight;
+
+    const [isSubResizing, setIsSubResizing] = useState(false);
+
+    const handleSubResizeStart = useCallback((e: React.MouseEvent) => {
+        e.preventDefault();
+        subResizeRef.current = {
+            startY: e.clientY,
+            startHeight: subHeight,
+        };
+        setIsSubResizing(true);
+        document.body.style.cursor = 'row-resize';
+        document.body.style.userSelect = 'none';
+    }, [subHeight]);
+
+    useEffect(() => {
+        const handleMouseMove = (e: MouseEvent) => {
+            if (!subResizeRef.current) return;
+            const { startY, startHeight } = subResizeRef.current;
+            const delta = startY - e.clientY;
+            const maxHeight = window.innerHeight * SUB_MAX_RATIO;
+            const newHeight = Math.max(SUB_MIN_HEIGHT, Math.min(maxHeight, startHeight + delta));
+            setSubHeight(newHeight);
+        };
+
+        const handleMouseUp = () => {
+            if (!subResizeRef.current) return;
+            subResizeRef.current = null;
+            setIsSubResizing(false);
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+
+            try {
+                localStorage.setItem(SUB_STORAGE_KEY, String(Math.round(subHeightRef.current)));
+            } catch {}
+        };
+
+        if (isSubResizing) {
+            document.addEventListener('mousemove', handleMouseMove);
+            document.addEventListener('mouseup', handleMouseUp);
+        }
+
+        return () => {
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', handleMouseUp);
+        };
+    }, [isSubResizing]);
+
+    const handleSubResizeDoubleClick = useCallback(() => {
+        setSubHeight(Math.round(window.innerHeight * 0.25));
+        try { localStorage.removeItem(SUB_STORAGE_KEY); } catch {}
+    }, []);
+
     return (
         <>
             <TreeDrawer
@@ -215,15 +296,27 @@ export const FormTableContent: React.FC<Props> = ({ liveTree, setLiveTree, curre
                         </div>
                     </div>
 
-                    {/* SUB TABLE */}
+                    {/* SUB TABLE с resize handle */}
                     {shouldShowSubSection && (
-                        <div className={s.subPane}>
-                            <SubFormWithContext
-                                onOpenDrill={handleOpenDrill} comboReloadToken={comboReloadToken}
-                                cancelAdd={cancelAddSub!} startAdd={startAddSub!} submitAdd={submitAddSub!}
-                                saving={subAdding.savingSub} selectedWidget={selectedWidget} buttonClassName={s.iconBtn}
+                        <>
+                            {/* Drag handle — тянем вверх/вниз */}
+                            <div
+                                className={`${s.subResizeHandle} ${isSubResizing ? s.subResizeHandleActive : ''}`}
+                                onMouseDown={handleSubResizeStart}
+                                onDoubleClick={handleSubResizeDoubleClick}
+                                title="Потяните для изменения высоты • 2×клик сброс"
                             />
-                        </div>
+                            <div
+                                className={s.subPane}
+                                style={{ height: `${subHeight}px` }}
+                            >
+                                <SubFormWithContext
+                                    onOpenDrill={handleOpenDrill} comboReloadToken={comboReloadToken}
+                                    cancelAdd={cancelAddSub!} startAdd={startAddSub!} submitAdd={submitAddSub!}
+                                    saving={subAdding.savingSub} selectedWidget={selectedWidget} buttonClassName={s.iconBtn}
+                                />
+                            </div>
+                        </>
                     )}
                 </section>
             </div>

@@ -94,7 +94,7 @@ type FormProps = {
     formTrees: Record<number, FormTreeColumn[]>;
     loadFilteredFormDisplay: (
         formId: number,
-        filter: { table_column_id: number; value: string | number },
+        filters: { table_column_id: number; value: string | number } | Array<{ table_column_id: number; value: string | number }>,
         page?: number,
         searchPattern?: string
     ) => Promise<void>;
