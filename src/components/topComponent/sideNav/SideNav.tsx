@@ -13,6 +13,8 @@ interface Props {
     openForm: (widgetId: number, formId: number) => void;
     /** Текст рядом с иконкой (например "Формы") */
     label?: string;
+    /** Если true — показываем все папки, включая скрытые */
+    isAdmin?: boolean;
 }
 
 type TreeNode = {
@@ -22,13 +24,79 @@ type TreeNode = {
     form?: WidgetForm; // есть только у листьев
 };
 
+const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+
+/**
+ * Рекурсивно сортирует дерево:
+ * 1) Папки (children > 0, нет form) — наверх, по алфавиту
+ * 2) Формы (leaf, есть form) — вниз, по алфавиту
+ */
+const sortTree = (nodes: TreeNode[]): TreeNode[] => {
+    return [...nodes]
+        .sort((a, b) => {
+            const aIsFolder = !!a.children && a.children.length > 0 && !a.form;
+            const bIsFolder = !!b.children && b.children.length > 0 && !b.form;
+
+            // Папки вверх
+            if (aIsFolder && !bIsFolder) return -1;
+            if (!aIsFolder && bIsFolder) return 1;
+
+            // Внутри одного типа — по алфавиту
+            return collator.compare(a.label, b.label);
+        })
+        .map((node) => {
+            if (node.children && node.children.length > 0) {
+                return { ...node, children: sortTree(node.children) };
+            }
+            return node;
+        });
+};
+
+/**
+ * Папки, которые видят только админы.
+ * Сравнение регистронезависимое.
+ */
+const ADMIN_ONLY_FOLDERS = new Set(['технические']);
+
+/**
+ * Проверяет, содержит ли path сегмент из ADMIN_ONLY_FOLDERS
+ */
+const hasAdminOnlySegment = (path: string | null | undefined): boolean => {
+    if (!path || !path.trim()) return false;
+    return path
+        .split('/')
+        .map((s) => s.trim().toLowerCase())
+        .some((seg) => ADMIN_ONLY_FOLDERS.has(seg));
+};
+
+/**
+ * Рекурсивно удаляет пустые папки (у которых нет ни форм, ни непустых подпапок)
+ */
+const pruneEmptyFolders = (nodes: TreeNode[]): TreeNode[] => {
+    return nodes
+        .map((node) => {
+            if (node.form) return node; // лист — оставляем
+            if (!node.children) return null; // пустая папка без детей
+            const pruned = pruneEmptyFolders(node.children);
+            if (pruned.length === 0) return null; // все дети были удалены
+            return { ...node, children: pruned };
+        })
+        .filter(Boolean) as TreeNode[];
+};
+
 /**
  * Дерево:
  * 1) Всегда корень – workspace.name (отдельная папка).
  * 2) Если path есть → внутри workspace создаём подпапки по сегментам path.
  * 3) Если path пуст → внутри workspace сразу листья с form.name.
+ * 4) Если !isAdmin — формы с admin-only сегментами в path скрываются.
  */
-const buildTreeFromForms = (forms: WidgetForm[]): TreeNode[] => {
+const buildTreeFromForms = (forms: WidgetForm[], isAdmin = false): TreeNode[] => {
+    // Фильтруем формы для обычных пользователей
+    const visibleForms = isAdmin
+        ? forms
+        : forms.filter((f) => !hasAdminOnlySegment(f.path));
+
     const roots: TreeNode[] = [];
 
     const findOrCreateNode = (list: TreeNode[], key: string, label: string): TreeNode => {
@@ -41,7 +109,7 @@ const buildTreeFromForms = (forms: WidgetForm[]): TreeNode[] => {
         return node;
     };
 
-    for (const f of forms) {
+    for (const f of visibleForms) {
         const workspaceLabel = f.workspace?.name ?? 'Без workspace';
         const workspaceIdOrName = f.workspace?.id ?? workspaceLabel;
 
@@ -93,7 +161,8 @@ const buildTreeFromForms = (forms: WidgetForm[]): TreeNode[] => {
         }
     }
 
-    return roots;
+    // Удаляем пустые папки (если формы были отфильтрованы) и сортируем
+    return sortTree(pruneEmptyFolders(roots));
 };
 
 type TreeProps = {
@@ -171,11 +240,11 @@ const Tree: React.FC<TreeProps> = ({ nodes, expanded, toggleNode, onLeafClick })
     );
 };
 
-export const SideNav: React.FC<Props> = ({ open, toggle, forms, openForm, label }) => {
+export const SideNav: React.FC<Props> = ({ open, toggle, forms, openForm, label, isAdmin = false }) => {
     const wrapRef = useRef<HTMLDivElement | null>(null);
     const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
-    const tree = useMemo(() => buildTreeFromForms(forms), [forms]);
+    const tree = useMemo(() => buildTreeFromForms(forms, isAdmin), [forms, isAdmin]);
 
     // сбрасываем раскрытие при закрытии меню
     useEffect(() => {

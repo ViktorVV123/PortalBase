@@ -17,8 +17,7 @@ import { WidgetsMenu } from '@/components/topComponent/widgetsMenu/WidgetsMenu';
 import { FormsMenu } from '@/components/topComponent/formsMenu/FormsMenu';
 import { ModalEditConnection } from "@/components/modals/modalEditConnection/ModalEditConnection";
 import { Connection } from "@/shared/hooks/stores";
-import ThemeToggle from "@/shared/ui/ThemeToggle/ThemeToggle";
-
+import { ThemeToggle } from '@/shared/ui/ThemeToggle/ThemeToggle';
 
 
 type Props = {
@@ -230,6 +229,7 @@ export const TopComponent: React.FC<Props> = (props) => {
                     forms={Object.values(formsById)}
                     openForm={openFormWithPreload}
                     label="Формы"
+                    isAdmin={isAdmin === true}
                 />
 
                 {state.open && (
