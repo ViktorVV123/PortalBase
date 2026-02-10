@@ -10,7 +10,7 @@ import {
     validateEditDraft,
 } from '@/shared/utils/requiredValidation/requiredValidation';
 
-const DEBUG_MAINCRUD = false; // Выключено для production
+const DEBUG_MAINCRUD = true; // ← ВКЛЮЧЕНО для отладки
 const log = (label: string, payload?: unknown) => {
     if (!DEBUG_MAINCRUD) return;
     console.groupCollapsed(`[CRUD] ${label}`);
@@ -319,6 +319,15 @@ export function useMainCrud({
         const pf = await preflightInsert();
         if (!pf.ok) return;
 
+        // ═══════════════════════════════════════════════════════════
+        // DEBUG: Логируем activeFilters чтобы понять откуда берётся значение
+        // ═══════════════════════════════════════════════════════════
+        log('startAdd called', {
+            activeFilters,
+            selectedFormId,
+            flatColumnsCount: flatColumnsInRenderOrder.length,
+        });
+
         setIsAdding(true);
         setEditingRowIdx(null);
         setEditStylesDraft({});
@@ -354,20 +363,32 @@ export function useMainCrud({
             i++;
         }
 
+        // ═══════════════════════════════════════════════════════════
+        // АВТОЗАПОЛНЕНИЕ из activeFilters (фильтры дерева)
+        // ═══════════════════════════════════════════════════════════
         if (activeFilters.length > 0) {
+            log('Applying activeFilters to draft', activeFilters);
+
             const tableColumnToWriteId = buildTableColumnToWriteIdMap();
             for (const filter of activeFilters) {
                 const writeTcId = tableColumnToWriteId.get(filter.table_column_id);
                 if (writeTcId != null) {
+                    log('Auto-filling field', {
+                        table_column_id: filter.table_column_id,
+                        writeTcId,
+                        value: filter.value,
+                    });
                     init[writeTcId] = String(filter.value);
                     newAutoFilledFields.add(writeTcId);
                 }
             }
         }
 
+        log('Final init draft', init);
+
         setDraft(init);
         setAutoFilledFields(newAutoFilledFields);
-    }, [preflightInsert, flatColumnsInRenderOrder, resetValidation, activeFilters, buildTableColumnToWriteIdMap]);
+    }, [preflightInsert, flatColumnsInRenderOrder, resetValidation, activeFilters, selectedFormId, buildTableColumnToWriteIdMap]);
 
     const cancelAdd = useCallback(() => {
         setIsAdding(false);

@@ -94,11 +94,31 @@ export async function loadComboOptionsOnce(
     // Загружаем с бэкенда
     const { data } = await api.get<ComboResp>(`/display/combobox/${widgetColumnId}/${writeTcId}`);
 
-    const opts: ComboOption[] = data.data.map((row) => ({
-        id: String(row.primary?.[0] ?? ''),
-        show: (row.show ?? []).map(String),
-        showHidden: (row.show_hidden ?? []).map(String),
-    }));
+    const opts: ComboOption[] = data.data.map((row) => {
+        // primary может быть:
+        // - массивом: [2] → берём primary[0]
+        // - числом/строкой: 2 → берём напрямую
+        // - null/undefined → fallback на show[0]
+        const rawPrimary = row.primary;
+        let primaryId: string | number | null | undefined;
+
+        if (Array.isArray(rawPrimary)) {
+            primaryId = rawPrimary[0];
+        } else {
+            primaryId = rawPrimary;
+        }
+
+        const showFirst = row.show?.[0];
+        const id = primaryId != null && primaryId !== ''
+            ? String(primaryId)
+            : (showFirst != null ? String(showFirst) : '');
+
+        return {
+            id,
+            show: (row.show ?? []).map(String),
+            showHidden: (row.show_hidden ?? []).map(String),
+        };
+    });
 
     // Сохраняем в кэш
     comboCache.set(key, opts, data.columns);
