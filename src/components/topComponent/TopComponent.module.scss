@@ -21,6 +21,11 @@
   overflow: hidden;
   text-overflow: ellipsis;
   flex-shrink: 0;
+  transition: opacity 0.15s ease;
+
+  &:hover {
+    opacity: 0.8;
+  }
 }
 
 .menuWrapper {

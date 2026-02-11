@@ -62,6 +62,10 @@ type Props = {
 
     // Callback для уведомления родителя об открытии/закрытии меню
     onMenuOpenChange?: (isOpen: boolean) => void;
+    // Callback при изменении избранного
+    onFavouriteToggle?: (formId: number, isFavourite: boolean) => void;
+    // Callback для возврата на главную (к FavouritesList)
+    onGoHome?: () => void;
 };
 
 /**
@@ -118,6 +122,8 @@ export const TopComponent: React.FC<Props> = (props) => {
         setTblHover,
         loadConnections,
         onMenuOpenChange,
+        onFavouriteToggle,
+        onGoHome,
     } = props;
 
     const [editModalOpen, setEditModalOpen] = useState(false);
@@ -207,7 +213,14 @@ export const TopComponent: React.FC<Props> = (props) => {
 
     return (
         <div className={s.bar}>
-            <div className={s.logo}>Портал ввода данных</div>
+            <div
+                className={s.logo}
+                onClick={onGoHome}
+                style={{ cursor: onGoHome ? 'pointer' : 'default' }}
+                title="На главную"
+            >
+                Портал ввода данных
+            </div>
 
             <div className={s.menuWrapper} ref={state.menuRef}>
                 {showWorkspacesButton && (
@@ -230,6 +243,7 @@ export const TopComponent: React.FC<Props> = (props) => {
                     openForm={openFormWithPreload}
                     label="Формы"
                     isAdmin={isAdmin === true}
+                    onFavouriteToggle={onFavouriteToggle}
                 />
 
                 {state.open && (

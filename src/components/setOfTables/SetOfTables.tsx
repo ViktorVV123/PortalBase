@@ -24,6 +24,7 @@ import {
 } from '@/components/WidgetColumnsOfTable/WidgetColumnTable/WidgetColumnsOfTable';
 import { useHeaderPreviewFromWc } from '@/components/WidgetColumnsOfTable/WidgetColumnTable/hook/useHeaderPreviewFromWc';
 import { CenteredLoader } from '@/shared/ui/CenteredLoader';
+import { FavouritesList } from '@/components/favourites/FavouritesList';
 
 // ─────────────────────────────────────────────────────────────
 // ТИПЫ ПРОПСОВ (сгруппированы для читаемости)
@@ -141,6 +142,10 @@ type CommonProps = {
     loading: boolean;
     error: string | null;
     loadWidgetForms: () => Promise<void> | void;
+    /** Callback для открытия формы из FavouritesList */
+    onOpenForm?: (widgetId: number, formId: number) => void;
+    /** Callback при изменении избранного */
+    onFavouriteToggle?: (formId: number, isFavourite: boolean) => void;
 };
 
 /** Полный тип пропсов */
@@ -205,6 +210,8 @@ export const SetOfTables: React.FC<Props> = (props) => {
 
         // Common
         loadWidgetForms,
+        onOpenForm,
+        onFavouriteToggle,
     } = props;
 
     // ═══════════════════════════════════════════════════════════
@@ -226,8 +233,22 @@ export const SetOfTables: React.FC<Props> = (props) => {
     // RENDER
     // ═══════════════════════════════════════════════════════════
 
+    // Показываем FavouritesList только если ничего не выбрано
+    const showFavourites = !selectedFormId && !selectedWidget && !selectedTable;
+
     return (
         <div className={s.wrapper}>
+            {/* ════════════════════════════════════════════════════
+                PRIORITY 0: FAVOURITES (когда ничего не выбрано)
+            ════════════════════════════════════════════════════ */}
+            {showFavourites && onOpenForm && (
+                <FavouritesList
+                    formsById={formsById}
+                    onOpenForm={onOpenForm}
+                    onFavouriteToggle={onFavouriteToggle}
+                />
+            )}
+
             {/* ════════════════════════════════════════════════════
                 PRIORITY 1: FORM
             ════════════════════════════════════════════════════ */}
@@ -307,25 +328,17 @@ export const SetOfTables: React.FC<Props> = (props) => {
             {/* ════════════════════════════════════════════════════
                 PRIORITY 3: TABLE COLUMNS
             ════════════════════════════════════════════════════ */}
-            {!selectedFormId && !selectedWidget && (
-                <>
-                    {columns.length === 0 ? (
-                        <p>Выберите форму</p>
-                    ) : (
-                        selectedTable && (
-                            <TableColumn
-                                publishTable={publishTable}
-                                selectedTable={selectedTable}
-                                updateTableMeta={updateTableMeta}
-                                columns={columns}
-                                tableId={selectedTable.id}
-                                deleteColumnTable={deleteColumnTable}
-                                updateTableColumn={updateTableColumn}
-                                onCreated={() => selectedTable && loadColumns(selectedTable)}
-                            />
-                        )
-                    )}
-                </>
+            {!selectedFormId && !selectedWidget && selectedTable && (
+                <TableColumn
+                    publishTable={publishTable}
+                    selectedTable={selectedTable}
+                    updateTableMeta={updateTableMeta}
+                    columns={columns}
+                    tableId={selectedTable.id}
+                    deleteColumnTable={deleteColumnTable}
+                    updateTableColumn={updateTableColumn}
+                    onCreated={() => selectedTable && loadColumns(selectedTable)}
+                />
             )}
         </div>
     );

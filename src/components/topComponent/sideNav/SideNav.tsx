@@ -1,10 +1,13 @@
 // components/sideNav/SideNav.tsx
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as s from './SideNav.module.scss';
 
 import MenuIcon from '@/assets/image/FormaIcon1.svg';
 import FormaIcon from '@/assets/image/FormaIcon1.svg';
+import StarIcon from '@mui/icons-material/Star';
+import StarBorderIcon from '@mui/icons-material/StarBorder';
 import { WidgetForm } from '@/shared/hooks/useWorkSpaces';
+import { api } from '@/services/api';
 
 interface Props {
     open: boolean;
@@ -15,6 +18,8 @@ interface Props {
     label?: string;
     /** Если true — показываем все папки, включая скрытые */
     isAdmin?: boolean;
+    /** Callback для обновления списка форм после toggle favourite */
+    onFavouriteToggle?: (formId: number, isFavourite: boolean) => void;
 }
 
 type TreeNode = {
@@ -170,9 +175,18 @@ type TreeProps = {
     expanded: Set<string>;
     toggleNode: (key: string) => void;
     onLeafClick: (form: WidgetForm) => void;
+    onToggleFavourite: (form: WidgetForm, e: React.MouseEvent) => void;
+    togglingFavourites: Set<number>;
 };
 
-const Tree: React.FC<TreeProps> = ({ nodes, expanded, toggleNode, onLeafClick }) => {
+const Tree: React.FC<TreeProps> = ({
+                                       nodes,
+                                       expanded,
+                                       toggleNode,
+                                       onLeafClick,
+                                       onToggleFavourite,
+                                       togglingFavourites,
+                                   }) => {
     if (!nodes.length) return null;
 
     return (
@@ -200,6 +214,9 @@ const Tree: React.FC<TreeProps> = ({ nodes, expanded, toggleNode, onLeafClick })
                         } / ${node.form.name}`
                         : undefined;
 
+                const isFavourite = isLeaf && node.form?.is_favourite;
+                const isToggling = isLeaf && node.form && togglingFavourites.has(node.form.form_id);
+
                 return (
                     <li key={node.key}>
                         <div
@@ -213,10 +230,28 @@ const Tree: React.FC<TreeProps> = ({ nodes, expanded, toggleNode, onLeafClick })
                             )}
 
                             {isLeaf && node.form ? (
-                                // ЛИСТ: показываем только form.name (обрезка по CSS)
-                                <span className={s.formName} title={leafTitle}>
-                                    {node.form.name}
-                                </span>
+                                // ЛИСТ: показываем form.name + звёздочку
+                                <>
+                                    <span className={s.formName} title={leafTitle}>
+                                        {node.form.name}
+                                    </span>
+                                    <span
+                                        className={`${s.favouriteStar} ${isToggling ? s.toggling : ''}`}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (!isToggling && node.form) {
+                                                onToggleFavourite(node.form, e);
+                                            }
+                                        }}
+                                        title={isFavourite ? 'Убрать из избранного' : 'Добавить в избранное'}
+                                    >
+                                        {isFavourite ? (
+                                            <StarIcon className={s.starFilled} />
+                                        ) : (
+                                            <StarBorderIcon className={s.starEmpty} />
+                                        )}
+                                    </span>
+                                </>
                             ) : (
                                 // ПАПКА: workspace.name или сегмент path
                                 <span className={s.treeLabel} title={node.label}>
@@ -231,6 +266,8 @@ const Tree: React.FC<TreeProps> = ({ nodes, expanded, toggleNode, onLeafClick })
                                 expanded={expanded}
                                 toggleNode={toggleNode}
                                 onLeafClick={onLeafClick}
+                                onToggleFavourite={onToggleFavourite}
+                                togglingFavourites={togglingFavourites}
                             />
                         )}
                     </li>
@@ -240,11 +277,34 @@ const Tree: React.FC<TreeProps> = ({ nodes, expanded, toggleNode, onLeafClick })
     );
 };
 
-export const SideNav: React.FC<Props> = ({ open, toggle, forms, openForm, label, isAdmin = false }) => {
+export const SideNav: React.FC<Props> = ({
+                                             open,
+                                             toggle,
+                                             forms,
+                                             openForm,
+                                             label,
+                                             isAdmin = false,
+                                             onFavouriteToggle,
+                                         }) => {
     const wrapRef = useRef<HTMLDivElement | null>(null);
     const [expanded, setExpanded] = useState<Set<string>>(new Set());
+    const [togglingFavourites, setTogglingFavourites] = useState<Set<number>>(new Set());
 
-    const tree = useMemo(() => buildTreeFromForms(forms, isAdmin), [forms, isAdmin]);
+    // Локальное состояние для optimistic updates
+    const [localFavourites, setLocalFavourites] = useState<Map<number, boolean>>(new Map());
+
+    // Формы с учётом локальных изменений
+    const formsWithLocalState = useMemo(() => {
+        return forms.map(f => {
+            const localState = localFavourites.get(f.form_id);
+            if (localState !== undefined) {
+                return { ...f, is_favourite: localState };
+            }
+            return f;
+        });
+    }, [forms, localFavourites]);
+
+    const tree = useMemo(() => buildTreeFromForms(formsWithLocalState, isAdmin), [formsWithLocalState, isAdmin]);
 
     // сбрасываем раскрытие при закрытии меню
     useEffect(() => {
@@ -252,6 +312,11 @@ export const SideNav: React.FC<Props> = ({ open, toggle, forms, openForm, label,
             setExpanded(new Set());
         }
     }, [open]);
+
+    // Сбрасываем локальное состояние когда forms обновляется извне
+    useEffect(() => {
+        setLocalFavourites(new Map());
+    }, [forms]);
 
     // закрытие по клику вне и по Escape
     useEffect(() => {
@@ -296,6 +361,46 @@ export const SideNav: React.FC<Props> = ({ open, toggle, forms, openForm, label,
         toggle();
     };
 
+    const handleToggleFavourite = useCallback(async (form: WidgetForm, e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const formId = form.form_id;
+        const currentState = localFavourites.get(formId) ?? form.is_favourite;
+        const newState = !currentState;
+
+        // Optimistic update
+        setLocalFavourites(prev => new Map(prev).set(formId, newState));
+        setTogglingFavourites(prev => new Set(prev).add(formId));
+
+        try {
+            if (newState) {
+                // Добавляем в избранное — POST
+                await api.post(`/favourites/${formId}`);
+            } else {
+                // Удаляем из избранного — DELETE
+                await api.delete(`/favourites/${formId}`);
+            }
+
+            // Уведомляем родителя
+            onFavouriteToggle?.(formId, newState);
+        } catch (error) {
+            console.error('[SideNav] Failed to toggle favourite:', error);
+            // Откатываем optimistic update
+            setLocalFavourites(prev => {
+                const next = new Map(prev);
+                next.delete(formId);
+                return next;
+            });
+        } finally {
+            setTogglingFavourites(prev => {
+                const next = new Set(prev);
+                next.delete(formId);
+                return next;
+            });
+        }
+    }, [localFavourites, onFavouriteToggle]);
+
     // Если есть label — показываем текст рядом с иконкой
     const hasLabel = !!label;
 
@@ -324,6 +429,8 @@ export const SideNav: React.FC<Props> = ({ open, toggle, forms, openForm, label,
                         expanded={expanded}
                         toggleNode={toggleNode}
                         onLeafClick={handleLeafClick}
+                        onToggleFavourite={handleToggleFavourite}
+                        togglingFavourites={togglingFavourites}
                     />
                 </div>
             )}

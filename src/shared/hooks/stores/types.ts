@@ -85,6 +85,7 @@ export interface WidgetForm {
     description: string | null;
     path?: string | null;
     form_id: number;
+    is_favourite:boolean
     sub_widgets: {
         widget_order: number;
         sub_widget_id: number;

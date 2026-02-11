@@ -89,6 +89,9 @@ export interface UseFormsStoreReturn {
 
     // Tree Actions
     loadFormTree: (formId: number) => Promise<void>;
+
+    // Favourite Actions
+    updateFormFavourite: (formId: number, isFavourite: boolean) => void;
 }
 
 export function useFormsStore(): UseFormsStoreReturn {
@@ -552,6 +555,47 @@ export function useFormsStore(): UseFormsStoreReturn {
         }
     }, []);
 
+    // ─────────────────────────────────────────────────────────────
+    // FAVOURITE ACTIONS
+    // ─────────────────────────────────────────────────────────────
+
+    const updateFormFavourite = useCallback((formId: number, isFavourite: boolean) => {
+        // Обновляем formsById
+        setFormsById(prev => {
+            const form = prev[formId];
+            if (!form) return prev;
+            return {
+                ...prev,
+                [formId]: { ...form, is_favourite: isFavourite },
+            };
+        });
+
+        // Обновляем formsByWidget
+        setFormsByWidget(prev => {
+            const updated = { ...prev };
+            for (const [widgetId, form] of Object.entries(updated)) {
+                if (form.form_id === formId) {
+                    updated[Number(widgetId)] = { ...form, is_favourite: isFavourite };
+                }
+            }
+            return updated;
+        });
+
+        // Обновляем formsListByWidget
+        setFormsListByWidget(prev => {
+            const updated = { ...prev };
+            for (const [widgetId, forms] of Object.entries(updated)) {
+                const idx = forms.findIndex(f => f.form_id === formId);
+                if (idx !== -1) {
+                    const newForms = [...forms];
+                    newForms[idx] = { ...newForms[idx], is_favourite: isFavourite };
+                    updated[Number(widgetId)] = newForms;
+                }
+            }
+            return updated;
+        });
+    }, []);
+
     return {
         formsByWidget,
         formsById,
@@ -578,5 +622,6 @@ export function useFormsStore(): UseFormsStoreReturn {
         loadSubDisplay,
         setSubDisplay,
         loadFormTree,
+        updateFormFavourite,
     };
 }

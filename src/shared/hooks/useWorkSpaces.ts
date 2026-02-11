@@ -216,6 +216,11 @@ export const useWorkSpaces = () => {
         loadFormTree: formsStore.loadFormTree,
 
         // ═══════════════════════════════════════════════════════════
+        // FORM FAVOURITES
+        // ═══════════════════════════════════════════════════════════
+        updateFormFavourite: formsStore.updateFormFavourite,
+
+        // ═══════════════════════════════════════════════════════════
         // CONNECTIONS
         // ═══════════════════════════════════════════════════════════
         connections: connectionsStore.connections,

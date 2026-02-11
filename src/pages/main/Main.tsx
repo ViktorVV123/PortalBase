@@ -97,6 +97,9 @@ export const Main = () => {
         formTrees,
         loadFormTree,
 
+        // Form Favourites
+        updateFormFavourite,
+
         // Connections
         connections,
         loadConnections,
@@ -188,6 +191,13 @@ export const Main = () => {
         loadConnections,
         connections,
         onMenuOpenChange: setTopMenuOpen,
+        onFavouriteToggle: updateFormFavourite,
+        onGoHome: () => {
+            // Сбрасываем все selections — вернёмся к FavouritesList
+            selection.clearFormSelection();
+            selection.setSelectedWidget(null);
+            // selectedTable сбросится автоматически через handleClearWidget или можно добавить отдельно
+        },
     };
 
     const setOfTablesProps = {
@@ -255,6 +265,19 @@ export const Main = () => {
         loading,
         error,
         loadWidgetForms,
+
+        // ═══════════════════════════════════════════════════════════
+        // НОВОЕ: Callback для открытия формы из FavouritesList
+        // ═══════════════════════════════════════════════════════════
+        onOpenForm: async (widgetId: number, formId: number) => {
+            selection.handleSelectForm(formId);
+            try {
+                await loadFormTree(formId);
+            } catch (e: any) {
+                console.warn('[Main] onOpenForm: ошибка загрузки дерева формы', e?.response?.status ?? e);
+            }
+        },
+        onFavouriteToggle: updateFormFavourite,
     };
 
     const modalHostProps = {

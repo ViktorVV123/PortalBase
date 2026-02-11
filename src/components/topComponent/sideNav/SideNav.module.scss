@@ -168,13 +168,75 @@
 }
 
 .formName {
-  flex: 0 1 550px;
-  max-width: 590px;
+  flex: 1 1 auto;
   min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   color: var(--link-color, #66b0ff);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Звёздочка избранного
+// ═══════════════════════════════════════════════════════════════════════════
+
+.favouriteStar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+  padding: 2px 4px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  opacity: 0.4;
+
+  &:hover {
+    opacity: 1;
+    background: var(--menu-hover, rgba(255, 255, 255, 0.1));
+  }
+
+  &.toggling {
+    opacity: 0.3;
+    pointer-events: none;
+  }
+
+  svg {
+    width: 18px;
+    height: 18px;
+  }
+}
+
+.starFilled {
+  color: #ffc107; // Золотой цвет для заполненной звезды
+}
+
+.starEmpty {
+  color: var(--menu-muted, #9aa4af);
+}
+
+// Показываем звёздочку только при hover на строке (кроме уже избранных)
+.leafItem {
+  .favouriteStar {
+    opacity: 0;
+  }
+
+  .favouriteStar:has(.starFilled) {
+    opacity: 1;
+  }
+
+  &:hover .favouriteStar {
+    opacity: 0.6;
+
+    &:hover {
+      opacity: 1;
+    }
+
+    &:has(.starFilled) {
+      opacity: 1;
+    }
+  }
 }
 
 .itemBtn {
@@ -194,4 +256,70 @@
   &:hover {
     background-color: var(--menu-hover, rgba(255, 255, 255, 0.06));
   }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Звёздочка избранного
+// ═══════════════════════════════════════════════════════════════════════════
+
+.favouriteStar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+  padding: 2px 4px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  opacity: 0;
+
+  &:hover {
+    opacity: 1 !important;
+    background: var(--menu-hover, rgba(255, 255, 255, 0.1));
+  }
+
+  &.toggling {
+    opacity: 0.3 !important;
+    pointer-events: none;
+  }
+
+  svg {
+    width: 18px;
+    height: 18px;
+  }
+}
+
+.starFilled {
+  color: #ffc107;
+}
+
+.starEmpty {
+  color: var(--menu-muted, #9aa4af);
+}
+
+// Показываем заполненную звёздочку всегда, пустую — только при hover
+.leafItem {
+  .favouriteStar {
+    opacity: 0;
+  }
+
+  // Заполненная звезда всегда видна
+  .starFilled {
+    opacity: 1;
+  }
+
+  // При hover показываем звезду
+  &:hover .favouriteStar {
+    opacity: 0.6;
+
+    &:hover {
+      opacity: 1;
+    }
+  }
+}
+
+// Если звезда заполнена — всегда показываем
+.favouriteStar:has(.starFilled) {
+  opacity: 1;
 }
