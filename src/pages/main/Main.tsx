@@ -31,6 +31,7 @@ export const Main = () => {
         tablesByWs,
         loadTables,
         selectedTable,
+        setSelectedTable,
         deleteTable,
         updateTableMeta,
         publishTable,
@@ -196,7 +197,7 @@ export const Main = () => {
             // Сбрасываем все selections — вернёмся к FavouritesList
             selection.clearFormSelection();
             selection.setSelectedWidget(null);
-            // selectedTable сбросится автоматически через handleClearWidget или можно добавить отдельно
+            setSelectedTable(null);
         },
     };
 

@@ -133,6 +133,7 @@ export const useWorkSpaces = () => {
         updateTableMeta: tablesStore.updateTableMeta,
         publishTable: tablesStore.publishTable,
         selectedTable: tablesStore.selectedTable,
+        setSelectedTable: tablesStore.setSelectedTable,
 
         // ═══════════════════════════════════════════════════════════
         // COLUMNS (table)
