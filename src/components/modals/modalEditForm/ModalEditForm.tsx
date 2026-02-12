@@ -356,11 +356,30 @@ export const ModalEditForm: React.FC<Props> = ({
         try {
             const patch: Record<string, unknown> = {};
 
+            // Нормализуем пустые строки в null
+            const normalizeEmpty = (val: string | null | undefined): string | null => {
+                const trimmed = (val ?? '').trim();
+                return trimmed === '' ? null : trimmed;
+            };
+
             if (mainWidgetId !== form.main_widget_id) patch.main_widget_id = mainWidgetId;
             if (mainName !== form.name) patch.name = mainName;
-            if (mainGroup !== form.group) patch.group = mainGroup;
-            if ((mainDesc || null) !== (form.description ?? null)) patch.description = mainDesc || null;
-            if ((mainPath || null) !== (form.path ?? null)) patch.path = mainPath || null;
+
+            // Группа: пустая строка → null
+            const normalizedGroup = normalizeEmpty(mainGroup);
+            const originalGroup = normalizeEmpty(form.group);
+            if (normalizedGroup !== originalGroup) patch.group = normalizedGroup;
+
+            // Описание: пустая строка → null
+            const normalizedDesc = normalizeEmpty(mainDesc);
+            const originalDesc = normalizeEmpty(form.description);
+            if (normalizedDesc !== originalDesc) patch.description = normalizedDesc;
+
+            // Путь: пустая строка → null
+            const normalizedPath = normalizeEmpty(mainPath);
+            const originalPath = normalizeEmpty(form.path);
+            if (normalizedPath !== originalPath) patch.path = normalizedPath;
+
             if (Boolean(form.search_bar) !== mainSearchBar) patch.search_bar = mainSearchBar;
 
             if (Object.keys(patch).length > 0) {

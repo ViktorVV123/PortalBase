@@ -3,7 +3,6 @@ import {Column, DTable} from "@/shared/hooks/useWorkSpaces";
 import {Button, Typography} from "@mui/material";
 import {ModalEditTableMeta} from "@/components/modals/modalEditTableMeta/ModalEditTableMeta";
 import Editicon from "@/assets/image/EditIcon.svg";
-import * as s from "@/components/setOfTables/SetOfTables.module.scss";
 import AddIcon from "@mui/icons-material/AddBox";
 
 type Props = {
@@ -37,67 +36,89 @@ export const TableListView: React.FC<Props> = ({selectedTable, updateTableMeta,p
     };
 
     return (
-        <div style={{marginTop: '24px', display: 'flex', alignItems: 'center', gap:15}}>
-
-            <Typography
-                onClick={() => setOpenMetaModal(true)}
-                variant="h6"
-                gutterBottom
-                sx={{
-                    display: 'inline-flex',
-                    cursor: 'pointer',
-                    textDecoration: 'underline',
-                    color: 'var(--link-color)',
-                    alignItems: 'center',
-                    gap: 1,
-                    '&:hover': {
-                        color: 'var(--link-hover)',
-                    },
-                }}
-            >
-                Метаданные таблицы
-                <Editicon/>
-            </Typography>
-
-
-            {!isAdding ? (
-                <AddIcon
-                    onClick={startAdd}
+        <div style={{marginTop: '24px', display: 'flex', flexDirection: 'column', gap: 12}}>
+            {/* ═══════════════════════════════════════════════════════════
+                Название таблицы
+            ═══════════════════════════════════════════════════════════ */}
+            <div>
+                <Typography
+                    variant="h5"
                     sx={{
-                        color: 'var(--icon-primary)',
-                        cursor: 'pointer',
-                        '&:hover': {
-                            color: 'var(--theme-primary)',
-                        },
-                    }}
-                />
-            ) : (
-                ''
-            )}
-
-            {selectedTable.published === true ? (
-                <span style={{ color: 'var(--theme-success)' }}>
-                    Опубликована:&nbsp; ✔
-                </span>
-            ) : (
-                <Button
-                    size="small"
-                    variant="outlined"
-                    sx={{
-                        ml: 2,
-                        borderColor: 'var(--button-secondary-border)',
-                        backgroundColor: 'var(--theme-surface)',
+                        fontWeight: 600,
                         color: 'var(--theme-text-primary)',
+                        marginBottom: '4px',
+                    }}
+                    title={selectedTable.name}
+                >
+                    {selectedTable.name}
+                </Typography>
+
+            </div>
+
+            {/* ═══════════════════════════════════════════════════════════
+                Панель действий
+            ═══════════════════════════════════════════════════════════ */}
+            <div style={{display: 'flex', alignItems: 'center', gap: 15}}>
+                <Typography
+                    onClick={() => setOpenMetaModal(true)}
+                    variant="body2"
+                    sx={{
+                        display: 'inline-flex',
+                        cursor: 'pointer',
+                        textDecoration: 'underline',
+                        color: 'var(--link-color)',
+                        alignItems: 'center',
+                        gap: 1,
+                        fontSize: '14px',
+                        margin: 0,
                         '&:hover': {
-                            backgroundColor: 'var(--theme-hover)',
-                            borderColor: 'var(--input-border-hover)',
+                            color: 'var(--link-hover)',
                         },
                     }}
-                    onClick={handlePublish}
                 >
-                    Опубликовать
-                </Button>
-            )}
+                    Метаданные таблицы
+                    <Editicon/>
+                </Typography>
+
+
+                {!isAdding ? (
+                    <AddIcon
+                        onClick={startAdd}
+                        titleAccess="Добавить столбец"
+                        sx={{
+                            color: 'var(--icon-primary)',
+                            cursor: 'pointer',
+                            '&:hover': {
+                                color: 'var(--theme-primary)',
+                            },
+                        }}
+                    />
+                ) : null}
+
+                {selectedTable.published === true ? (
+                    <span style={{ color: 'var(--theme-success)', fontSize: '14px' }}>
+                        Опубликована ✔
+                    </span>
+                ) : (
+                    <Button
+                        size="small"
+                        variant="outlined"
+                        sx={{
+                            borderColor: 'var(--button-secondary-border)',
+                            backgroundColor: 'var(--theme-surface)',
+                            color: 'var(--theme-text-primary)',
+                            fontSize: '12px',
+                            '&:hover': {
+                                backgroundColor: 'var(--theme-hover)',
+                                borderColor: 'var(--input-border-hover)',
+                            },
+                        }}
+                        onClick={handlePublish}
+                    >
+                        Опубликовать
+                    </Button>
+                )}
+            </div>
 
             {openMetaModal && (
                 <ModalEditTableMeta

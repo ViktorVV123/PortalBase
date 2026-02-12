@@ -297,10 +297,25 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
     }, [widgetColumns, referencesMap]);
 
     // ─────────────────────────────────────────────────────────────────────────
+    // Название формы для текущего виджета
+    // ─────────────────────────────────────────────────────────────────────────
+    const currentFormName = useMemo(() => {
+        if (!selectedWidget) return null;
+        // Ищем форму по main_widget_id
+        const form = Object.values(formsById).find(f => f.main_widget_id === selectedWidget.id);
+        return form?.name ?? null;
+    }, [selectedWidget, formsById]);
+
+    // ─────────────────────────────────────────────────────────────────────────
     // RENDER
     // ─────────────────────────────────────────────────────────────────────────
     return (
         <div className={s.root}>
+            {/* ═══════════════════════════════════════════════════════════
+                TITLE — название виджета и формы
+            ═══════════════════════════════════════════════════════════ */}
+
+
             {/* ═══════════════════════════════════════════════════════════
                 HEADER — фиксированный блок с ссылками
             ═══════════════════════════════════════════════════════════ */}
@@ -342,19 +357,30 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                     </Stack>
                 </Tooltip>
 
+                <div className={s.titleSection}>
+                    {selectedWidget && (
+                        <>
+                            <h2 className={s.widgetName} title={selectedWidget.name}>
+                                {selectedWidget.name}
+                            </h2>
+                        </>
+                    )}
+                </div>
+
+
                 <span className={s.headerLink} onClick={() => setModalOpen(true)}>
                     Посмотреть таблицу
-                    <EditIcon />
+                    <EditIcon/>
                 </span>
 
                 <span className={s.headerLink} onClick={() => setWidgetModalOpen(true)}>
                     Метаданные widget
-                    <EditIcon />
+                    <EditIcon/>
                 </span>
 
                 <span className={s.headerLink} onClick={() => setAddOpen(true)}>
                     Добавить столбец
-                    <EditIcon />
+                    <EditIcon/>
                 </span>
             </div>
 

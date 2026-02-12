@@ -180,3 +180,32 @@
     background: var(--theme-hover);
   }
 }
+
+/* Добавить в WidgetColumnOfTable.module.scss */
+
+.titleSection {
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid var(--theme-border);
+  background: var(--theme-surface);
+}
+
+.widgetName {
+  margin: 0 0 4px;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--theme-text-primary);
+
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.formName {
+  display: block;
+  font-size: 13px;
+  color: var(--theme-text-secondary);
+
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
