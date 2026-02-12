@@ -347,7 +347,32 @@ export const DrillDialog: React.FC<Props> = ({
         flatColumnsInRenderOrder,
         valueIndexByKey,
         currentForm?.search_bar,
-        { debounceMs: 250 }
+        { debounceMs: 250 },
+        // Callback для серверного поиска
+        useCallback(async (searchPattern: string) => {
+            if (!currentFormId) return;
+            try {
+                const params = new URLSearchParams({
+                    limit: '80',
+                    page: '1',
+                });
+                if (searchPattern.trim()) {
+                    params.set('search_pattern', searchPattern.trim());
+                }
+
+                const body = activeFilters.length
+                    ? activeFilters.map(f => ({ ...f, value: String(f.value) }))
+                    : [];
+
+                const { data } = await api.post<FormDisplay>(
+                    `/display/${currentFormId}/main?${params}`,
+                    body
+                );
+                setLocalDisplay(data);
+            } catch (e) {
+                console.warn('[DrillDialog] server search failed:', e);
+            }
+        }, [currentFormId, activeFilters])
     );
 
     const selectedWidgetForPreflight = useMemo(() => {

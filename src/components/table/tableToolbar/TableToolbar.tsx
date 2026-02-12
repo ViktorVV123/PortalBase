@@ -36,6 +36,9 @@ type Props = {
     savingSub: any;
     showSubActions: boolean;
     showMainActions?: boolean;
+
+    // название формы
+    formName?: string;
 };
 
 export const TableToolbar = ({
@@ -59,6 +62,7 @@ export const TableToolbar = ({
                                  collapsedWidth = 170,
                                  expandedWidth = 380,
                                  showMainActions = true,
+                                 formName,
                              }: Props) => {
     const [focused, setFocused] = useState(false);
     const expanded = focused || !!value;
@@ -73,6 +77,9 @@ export const TableToolbar = ({
             <div className={cls.bar}>
                 {/* Левая группа */}
                 <div className={cls.leftGroup}>
+                    {/* Название формы */}
+
+
                     <button className={cls.iconBtn} onClick={onResetFilters} title="Сбросить фильтры">
                         <FilterOffIcon />
                     </button>
@@ -94,7 +101,14 @@ export const TableToolbar = ({
                             <div className={cls.divider} />
                         </>
                     )}
-
+                    {formName && (
+                        <>
+                            <h1 className={cls.formTitle} title={formName}>
+                                {formName}
+                            </h1>
+                            <div className={cls.divider} />
+                        </>
+                    )}
                     {/* {showSubActions && (
                         <>
                             <ButtonForm

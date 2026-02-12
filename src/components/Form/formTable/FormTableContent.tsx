@@ -267,6 +267,7 @@ export const FormTableContent: React.FC<Props> = ({ liveTree, setLiveTree, curre
                 <section className={s.rightPane}>
                     <div className={s.toolbarPane}>
                         <TableToolbar
+                            formName={currentForm?.name}
                             showSubActions={!!subDisplay && Object.keys(lastPrimary).length > 0}
                             cancelAddSub={cancelAddSub} startAddSub={startAddSub}
                             isAddingSub={subAdding.isAddingSub} submitAddSub={submitAddSub}
