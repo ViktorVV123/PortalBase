@@ -617,13 +617,13 @@ export const DrillDialog: React.FC<Props> = ({
                 {loading && <div style={{opacity: 0.7, padding: 12}}>Загрузка…</div>}
                 {!!error && <div style={{color: 'var(--theme-error)', padding: 12}}>Ошибка: {error}</div>}
 
-                {(resolvedWidgetId || resolvedTableId) && (
+               {/* {(resolvedWidgetId || resolvedTableId) && (
                     <div style={{opacity: 0.7, padding: '4px 12px', fontSize: 12, color: 'var(--theme-text-secondary)'}}>
                         Виджет: #{resolvedWidgetId ?? '—'} ·
                         Таблица: {resolvingTable ? '…' : (resolvedTableId ?? '—')}
                         {!!resolveErr && <span style={{color: 'var(--theme-error)'}}> · {resolveErr}</span>}
                     </div>
-                )}
+                )}*/}
 
                 {!localDisplay ? (
                     <div style={{opacity: 0.7, padding: 12}}>Готовлю данные…</div>

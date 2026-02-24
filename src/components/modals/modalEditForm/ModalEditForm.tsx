@@ -11,6 +11,7 @@ import {
 import DeleteIcon from "@mui/icons-material/Delete";
 import AddIcon from "@mui/icons-material/Add";
 import SaveIcon from "@mui/icons-material/Save";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import { WidgetForm, Widget, Column } from '@/shared/hooks/useWorkSpaces';
 import { api } from '@/services/api';
 
@@ -107,6 +108,17 @@ const paperSx = {
     backgroundImage: 'none',
     borderColor: 'var(--theme-border)',
 };
+
+// ═══════════════════════════════════════════════════════════
+// СИСТЕМНЫЕ ПЕРЕМЕННЫЕ (для where_conditional)
+// ═══════════════════════════════════════════════════════════
+const SYSTEM_VARIABLES = [
+
+    {
+        name: '@sysfv-pk',
+        description: 'Подставляет первичный ключ (primary_keys)',
+    },
+];
 
 type Props = {
     open: boolean;
@@ -763,6 +775,68 @@ export const ModalEditForm: React.FC<Props> = ({
                                             {savingSub ? '...' : 'Сохранить'}
                                         </Button>
                                     </Stack>
+
+                                    {/* ═══════════════════════════════════════════════════════════
+                                        ПОДСКАЗКА: Системные переменные
+                                    ═══════════════════════════════════════════════════════════ */}
+                                    <Box
+                                        sx={{
+                                            p: 1.5,
+                                            borderRadius: 1,
+                                            backgroundColor: 'var(--theme-surface)',
+                                            border: '1px solid var(--theme-border)',
+                                        }}
+                                    >
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.75 }}>
+                                            <InfoOutlinedIcon
+                                                sx={{
+                                                    fontSize: 16,
+                                                    color: 'var(--theme-primary)',
+                                                    opacity: 0.8,
+                                                }}
+                                            />
+                                            <Typography
+                                                variant="caption"
+                                                sx={{
+                                                    fontWeight: 600,
+                                                    color: 'var(--theme-text-secondary)',
+                                                    textTransform: 'uppercase',
+                                                    letterSpacing: '0.5px',
+                                                    fontSize: '10px',
+                                                }}
+                                            >
+                                                Системные переменные
+                                            </Typography>
+                                        </Box>
+
+                                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
+                                            {SYSTEM_VARIABLES.map((v) => (
+                                                <Tooltip key={v.name} title={v.description} arrow placement="top">
+                                                    <Box
+                                                        component="code"
+                                                        sx={{
+                                                            px: 1,
+                                                            py: 0.5,
+                                                            borderRadius: 0.5,
+                                                            backgroundColor: 'var(--theme-hover)',
+                                                            color: 'var(--theme-primary)',
+                                                            fontSize: '12px',
+                                                            fontFamily: 'monospace',
+                                                            cursor: 'help',
+                                                            border: '1px solid var(--theme-border)',
+                                                            transition: 'all 0.15s ease',
+                                                            '&:hover': {
+                                                                backgroundColor: 'var(--theme-selected)',
+                                                                borderColor: 'var(--theme-primary)',
+                                                            },
+                                                        }}
+                                                    >
+                                                        {v.name}
+                                                    </Box>
+                                                </Tooltip>
+                                            ))}
+                                        </Box>
+                                    </Box>
                                 </Stack>
                             </Paper>
                         )}
