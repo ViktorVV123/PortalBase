@@ -29,6 +29,7 @@ export const FormTableContent: React.FC<Props> = ({ liveTree, setLiveTree, curre
         openDrill, closeDrill, setFormDisplay, comboReloadToken, triggerComboReload,
         toggleTreeDrawer, closeTreeDrawer, resetTreeDrawer, setExpandedKeys, setChildrenCache,
         startAddSub, cancelAddSub, submitAddSub,
+        refreshData, refreshing,
     } = ctx;
 
     const { selectedFormId, selectedWidget } = config;
@@ -276,6 +277,7 @@ export const FormTableContent: React.FC<Props> = ({ liveTree, setLiveTree, curre
                             saving={mainAdding.saving} startAdd={startAdd} submitAdd={submitAdd} cancelAdd={cancelAdd}
                             showSearch={search.showSearch} value={search.q} onChange={search.setQ}
                             onResetFilters={handleResetFilters} collapsedWidth={160} expandedWidth={420}
+                            onRefresh={refreshData} refreshing={refreshing}
                         />
                     </div>
 

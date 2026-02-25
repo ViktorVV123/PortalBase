@@ -5,6 +5,8 @@ import * as cls from './TableToolbar.module.scss';
 import { ButtonForm } from '@/shared/buttonForm/ButtonForm';
 import { SearchBox } from '@/components/search/SearchBox';
 import FilterOffIcon from '@/assets/image/FilterOffIcon.svg';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import { Tooltip } from '@mui/material';
 import FontSizeControl from "@/shared/ui/FontSizeControl";
 
 
@@ -25,6 +27,10 @@ type Props = {
 
     // сброс фильтров
     onResetFilters: () => void;
+
+    // обновление данных
+    onRefresh?: () => void;
+    refreshing?: boolean;
 
     // опционально
     collapsedWidth?: number; // px
@@ -59,6 +65,8 @@ export const TableToolbar = ({
                                  showSubActions = false,
                                  onChange,
                                  onResetFilters,
+                                 onRefresh,
+                                 refreshing = false,
                                  collapsedWidth = 170,
                                  expandedWidth = 380,
                                  showMainActions = true,
@@ -78,11 +86,34 @@ export const TableToolbar = ({
                 {/* Левая группа */}
                 <div className={cls.leftGroup}>
                     {/* Название формы */}
+                    {formName && (
+                        <>
+                            <h1 className={cls.formTitle} title={formName}>
+                                {formName}
+                            </h1>
+                            <div className={cls.divider} />
+                        </>
+                    )}
 
+                    {/* Кнопка обновления данных */}
+                    {onRefresh && (
+                        <Tooltip title="Обновить данные" arrow placement="bottom">
+                            <button
+                                className={cls.iconBtn}
+                                onClick={onRefresh}
+                                disabled={refreshing}
+                            >
+                                <RefreshIcon />
+                            </button>
+                        </Tooltip>
+                    )}
 
-                    <button className={cls.iconBtn} onClick={onResetFilters} title="Сбросить фильтры">
-                        <FilterOffIcon />
-                    </button>
+                    {/* Кнопка сброса фильтров */}
+                    <Tooltip title="Сбросить фильтры" arrow placement="bottom">
+                        <button className={cls.iconBtn} onClick={onResetFilters}>
+                            <FilterOffIcon />
+                        </button>
+                    </Tooltip>
 
                     <div className={cls.divider} />
 
@@ -101,14 +132,7 @@ export const TableToolbar = ({
                             <div className={cls.divider} />
                         </>
                     )}
-                    {formName && (
-                        <>
-                            <h1 className={cls.formTitle} title={formName}>
-                                {formName}
-                            </h1>
-                            <div className={cls.divider} />
-                        </>
-                    )}
+
                     {/* {showSubActions && (
                         <>
                             <ButtonForm

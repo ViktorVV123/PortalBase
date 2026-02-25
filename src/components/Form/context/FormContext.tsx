@@ -1,12 +1,12 @@
 // src/components/Form/context/FormContext.tsx
 
-import React, { createContext, useContext } from 'react';
+import React, {createContext, useContext} from 'react';
 import type {
     FormDisplay, SubDisplay, WidgetForm, Widget, FormTreeColumn, Column, PaginationState,
 } from '@/shared/hooks/useWorkSpaces';
-import type { ExtCol } from '@/components/Form/formTable/parts/FormatByDatatype';
-import type { CellStyles } from '@/components/Form/mainTable/CellStylePopover';
-import type { StylesColumnMeta } from '@/components/Form/formTable/hooks/useHeaderPlan';
+import type {ExtCol} from '@/components/Form/formTable/parts/FormatByDatatype';
+import type {CellStyles} from '@/components/Form/mainTable/CellStylePopover';
+import type {StylesColumnMeta} from '@/components/Form/formTable/hooks/useHeaderPlan';
 
 export type DrillOpenMeta = {
     originColumnType?: 'combobox' | null;
@@ -15,14 +15,50 @@ export type DrillOpenMeta = {
     targetWriteTcId?: number;
 };
 
-export type SelectionState = { selectedKey: string | null; lastPrimary: Record<string, unknown>; activeSubOrder: number; };
-export type EditingState = { editingRowIdx: number | null; editDraft: Record<number, string>; editSaving: boolean; editStylesDraft?: Record<string, CellStyles | null>; };
+export type SelectionState = {
+    selectedKey: string | null;
+    lastPrimary: Record<string, unknown>;
+    activeSubOrder: number;
+};
+export type EditingState = {
+    editingRowIdx: number | null;
+    editDraft: Record<number, string>;
+    editSaving: boolean;
+    editStylesDraft?: Record<string, CellStyles | null>;
+};
 export type AddingState = { isAdding: boolean; draft: Record<number, string>; saving: boolean; };
-export type DrillState = { open: boolean; formId: number | null; comboboxMode: boolean; disableNestedDrill: boolean; initialPrimary?: Record<string, unknown>; targetWriteTcId?: number | null; };
-export type TreeDrawerState = { isOpen: boolean; expandedKeys: Set<string>; childrenCache: Record<string, FormTreeColumn[]>; };
-export type FormConfig = { selectedFormId: number | null; selectedWidget: Widget | null; currentForm: WidgetForm | null; formsById: Record<number, WidgetForm>; formsByWidget: Record<number, WidgetForm>; };
-export type FormData = { formDisplay: FormDisplay | null; subDisplay: SubDisplay | null; formTrees: Record<number, FormTreeColumn[]>; columns: Column[]; };
-export type LoadingStates = { formLoading: boolean; formError: string | null; subLoading: boolean; subError: string | null; };
+export type DrillState = {
+    open: boolean;
+    formId: number | null;
+    comboboxMode: boolean;
+    disableNestedDrill: boolean;
+    initialPrimary?: Record<string, unknown>;
+    targetWriteTcId?: number | null;
+};
+export type TreeDrawerState = {
+    isOpen: boolean;
+    expandedKeys: Set<string>;
+    childrenCache: Record<string, FormTreeColumn[]>;
+};
+export type FormConfig = {
+    selectedFormId: number | null;
+    selectedWidget: Widget | null;
+    currentForm: WidgetForm | null;
+    formsById: Record<number, WidgetForm>;
+    formsByWidget: Record<number, WidgetForm>;
+};
+export type FormData = {
+    formDisplay: FormDisplay | null;
+    subDisplay: SubDisplay | null;
+    formTrees: Record<number, FormTreeColumn[]>;
+    columns: Column[];
+};
+export type LoadingStates = {
+    formLoading: boolean;
+    formError: string | null;
+    subLoading: boolean;
+    subError: string | null;
+};
 export type HeaderPlanData = {
     headerPlan: Array<{ id: number; title: string; labels: string[]; cols: ExtCol[]; }>;
     flatColumnsInRenderOrder: ExtCol[];
@@ -97,7 +133,11 @@ export type FormContextValue = {
     setExpandedKeys: React.Dispatch<React.SetStateAction<Set<string>>>;
     setChildrenCache: React.Dispatch<React.SetStateAction<Record<string, FormTreeColumn[]>>>;
 
-    filters: { activeFilters: Array<{ table_column_id: number; value: string | number }>; nestedTrees: Record<string, FormTreeColumn[]>; activeExpandedKey: string | null; };
+    filters: {
+        activeFilters: Array<{ table_column_id: number; value: string | number }>;
+        nestedTrees: Record<string, FormTreeColumn[]>;
+        activeExpandedKey: string | null;
+    };
     setActiveFilters: React.Dispatch<React.SetStateAction<Array<{ table_column_id: number; value: string | number }>>>;
     setNestedTrees: React.Dispatch<React.SetStateAction<Record<string, FormTreeColumn[]>>>;
     setActiveExpandedKey: React.Dispatch<React.SetStateAction<string | null>>;
@@ -105,13 +145,27 @@ export type FormContextValue = {
     handleTreeValueClick: (table_column_id: number, value: string | number) => Promise<void>;
     handleNestedValueClick: (table_column_id: number, value: string | number) => Promise<void>;
 
-    search: { showSearch: boolean; q: string; setQ: (v: string) => void; filteredRows: Array<{ row: FormDisplay['data'][number]; idx: number }>; };
+    search: {
+        showSearch: boolean;
+        q: string;
+        setQ: (v: string) => void;
+        filteredRows: Array<{ row: FormDisplay['data'][number]; idx: number }>;
+    };
 
     loadSubDisplay: (formId: number, subOrder: number, primary?: Record<string, unknown>) => void;
-    loadFilteredFormDisplay: (formId: number, filter: { table_column_id: number; value: string | number }) => Promise<void>;
+    loadFilteredFormDisplay: (formId: number, filter: {
+        table_column_id: number;
+        value: string | number
+    }) => Promise<void>;
     reloadTree: () => Promise<void>;
     comboReloadToken: number;
     triggerComboReload: () => void;
+
+    // ═══════════════════════════════════════════════════════════
+    // НОВОЕ: Обновление данных формы
+    // ═══════════════════════════════════════════════════════════
+    refreshData: () => Promise<void>;
+    refreshing: boolean;
 };
 
 const FormContext = createContext<FormContextValue | null>(null);
@@ -122,37 +176,77 @@ export function useFormContext(): FormContextValue {
     return ctx;
 }
 
-export function useFormConfig() { return useFormContext().config; }
-export function useFormData() { const { data, setFormDisplay, setSubDisplay } = useFormContext(); return { ...data, setFormDisplay, setSubDisplay }; }
+export function useFormConfig() {
+    return useFormContext().config;
+}
+
+export function useFormData() {
+    const {data, setFormDisplay, setSubDisplay} = useFormContext();
+    return {...data, setFormDisplay, setSubDisplay};
+}
 
 export function useMainCrudContext() {
     const ctx = useFormContext();
     return {
-        adding: ctx.mainAdding, editing: ctx.mainEditing, deletingRowIdx: ctx.deletingRowIdx,
-        startAdd: ctx.startAdd, cancelAdd: ctx.cancelAdd, submitAdd: ctx.submitAdd,
-        startEdit: ctx.startEdit, cancelEdit: ctx.cancelEdit, submitEdit: ctx.submitEdit,
-        deleteRow: ctx.deleteRow, setDraft: ctx.setDraft, setEditDraft: ctx.setEditDraft, setEditStylesDraft: ctx.setEditStylesDraft,
-        showValidationErrors: ctx.showValidationErrors, setShowValidationErrors: ctx.setShowValidationErrors,
-        validationMissingFields: ctx.validationMissingFields, setValidationMissingFields: ctx.setValidationMissingFields, resetValidation: ctx.resetValidation,
+        adding: ctx.mainAdding,
+        editing: ctx.mainEditing,
+        deletingRowIdx: ctx.deletingRowIdx,
+        startAdd: ctx.startAdd,
+        cancelAdd: ctx.cancelAdd,
+        submitAdd: ctx.submitAdd,
+        startEdit: ctx.startEdit,
+        cancelEdit: ctx.cancelEdit,
+        submitEdit: ctx.submitEdit,
+        deleteRow: ctx.deleteRow,
+        setDraft: ctx.setDraft,
+        setEditDraft: ctx.setEditDraft,
+        setEditStylesDraft: ctx.setEditStylesDraft,
+        showValidationErrors: ctx.showValidationErrors,
+        setShowValidationErrors: ctx.setShowValidationErrors,
+        validationMissingFields: ctx.validationMissingFields,
+        setValidationMissingFields: ctx.setValidationMissingFields,
+        resetValidation: ctx.resetValidation,
     };
 }
 
 export function useSubCrudContext() {
     const ctx = useFormContext();
     return {
-        adding: ctx.subAdding, editing: ctx.subEditing,
-        startAddSub: ctx.startAddSub, cancelAddSub: ctx.cancelAddSub, submitAddSub: ctx.submitAddSub,
-        setDraftSub: ctx.setDraftSub, setEditDraft: ctx.setSubEditDraft, setEditingRowIdx: ctx.setSubEditingRowIdx,
-        showSubValidationErrors: ctx.showSubValidationErrors, setShowSubValidationErrors: ctx.setShowSubValidationErrors,
-        subValidationMissingFields: ctx.subValidationMissingFields, setSubValidationMissingFields: ctx.setSubValidationMissingFields, resetSubValidation: ctx.resetSubValidation,
+        adding: ctx.subAdding,
+        editing: ctx.subEditing,
+        startAddSub: ctx.startAddSub,
+        cancelAddSub: ctx.cancelAddSub,
+        submitAddSub: ctx.submitAddSub,
+        setDraftSub: ctx.setDraftSub,
+        setEditDraft: ctx.setSubEditDraft,
+        setEditingRowIdx: ctx.setSubEditingRowIdx,
+        showSubValidationErrors: ctx.showSubValidationErrors,
+        setShowSubValidationErrors: ctx.setShowSubValidationErrors,
+        subValidationMissingFields: ctx.subValidationMissingFields,
+        setSubValidationMissingFields: ctx.setSubValidationMissingFields,
+        resetSubValidation: ctx.resetSubValidation,
     };
 }
 
-export function useDrillContext() { const { drill, openDrill, closeDrill } = useFormContext(); return { drill, openDrill, closeDrill }; }
-export function usePaginationContext() { const { pagination, goToPage, loadMoreRows } = useFormContext(); return { pagination, goToPage, loadMoreRows }; }
-export function useSelectionContext() {
-    const ctx = useFormContext();
-    return { ...ctx.selection, setSelectedKey: ctx.setSelectedKey, setLastPrimary: ctx.setLastPrimary, setActiveSubOrder: ctx.setActiveSubOrder, pkToKey: ctx.pkToKey };
+export function useDrillContext() {
+    const {drill, openDrill, closeDrill} = useFormContext();
+    return {drill, openDrill, closeDrill};
 }
 
-export { FormContext };
+export function usePaginationContext() {
+    const {pagination, goToPage, loadMoreRows} = useFormContext();
+    return {pagination, goToPage, loadMoreRows};
+}
+
+export function useSelectionContext() {
+    const ctx = useFormContext();
+    return {
+        ...ctx.selection,
+        setSelectedKey: ctx.setSelectedKey,
+        setLastPrimary: ctx.setLastPrimary,
+        setActiveSubOrder: ctx.setActiveSubOrder,
+        pkToKey: ctx.pkToKey
+    };
+}
+
+export {FormContext};

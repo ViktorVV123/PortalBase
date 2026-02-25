@@ -113,6 +113,11 @@ export const FormProvider: React.FC<FormProviderProps> = ({
         setChildrenCache({});
     }, []);
 
+    // ═══════════════════════════════════════════════════════════
+    // НОВОЕ: Состояние обновления данных
+    // ═══════════════════════════════════════════════════════════
+    const [refreshing, setRefreshing] = useState(false);
+
     useEffect(() => {
         resetTreeDrawer();
     }, [selectedFormId, resetTreeDrawer]);
@@ -188,6 +193,34 @@ export const FormProvider: React.FC<FormProviderProps> = ({
         { debounceMs: 350 },
         handleServerSearch // Передаём callback для серверного поиска
     );
+
+    // ═══════════════════════════════════════════════════════════
+    // НОВОЕ: Обновление данных формы (refresh button)
+    // ═══════════════════════════════════════════════════════════
+    const refreshData = useCallback(async () => {
+        if (!selectedFormId || refreshing) return;
+
+        setRefreshing(true);
+        try {
+            // Используем текущий поисковый запрос если есть
+            const currentSearchPattern = q?.trim() || undefined;
+
+            if (activeFilters.length > 0) {
+                await loadFilteredFormDisplay(
+                    selectedFormId,
+                    activeFilters,
+                    1,
+                    currentSearchPattern
+                );
+            } else {
+                await loadFormDisplay(selectedFormId, 1, currentSearchPattern);
+            }
+        } catch (e) {
+            console.error('[FormProvider] refreshData error:', e);
+        } finally {
+            setRefreshing(false);
+        }
+    }, [selectedFormId, refreshing, q, activeFilters, loadFilteredFormDisplay, loadFormDisplay]);
 
     // ═══════════════════════════════════════════════════════════
     // Сбрасываем поиск при изменении фильтров дерева
@@ -385,6 +418,8 @@ export const FormProvider: React.FC<FormProviderProps> = ({
         reloadTree,
         comboReloadToken,
         triggerComboReload,
+        refreshData,
+        refreshing,
     }), [
         selectedFormId, selectedWidget, currentForm, formsById, formsByWidget, formDisplay, subDisplay, formTrees, columns, setFormDisplay, setSubDisplay,
         headerPlan, flatColumnsInRenderOrder, valueIndexByKey, isColReadOnly, stylesColumnMeta, formLoading, formError, subLoading, subError,
@@ -394,6 +429,7 @@ export const FormProvider: React.FC<FormProviderProps> = ({
         drill, openDrill, closeDrill, treeDrawerState, openTreeDrawer, closeTreeDrawer, toggleTreeDrawer, resetTreeDrawer, setExpandedKeys, setChildrenCache,
         activeFilters, nestedTrees, activeExpandedKey, setActiveFilters, setNestedTrees, setActiveExpandedKey,
         resetFilters, handleTreeValueClick, handleNestedValueClick, showSearch, q, setQ, filteredRows, loadSubDisplay, loadFilteredFormDisplay, reloadTree, comboReloadToken, triggerComboReload,
+        refreshData, refreshing,
     ]);
 
     useEffect(() => {
