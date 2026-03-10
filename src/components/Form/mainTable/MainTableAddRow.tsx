@@ -10,6 +10,13 @@ import {
 } from './MainTableCombo';
 import {isColumnRequired, isEmptyValue} from "@/shared/utils/requiredValidation/requiredValidation";
 
+// ═══════════════════════════════════════════════════════════
+// HELPER: Проверка readonly для колонки
+// ═══════════════════════════════════════════════════════════
+const isColReadOnlyForAdd = (col: ExtCol): boolean => {
+    // Проверяем флаг readonly из метаданных колонки
+    return !!(col as any).readonly;
+};
 
 type MainTableAddRowProps = {
     flatColumnsInRenderOrder: ExtCol[];
@@ -49,13 +56,16 @@ export const MainTableAddRow: React.FC<MainTableAddRowProps> = ({
                         const primary = pickPrimaryCombo(group);
                         const writeTcId = getWriteTcIdForComboGroup(group);
 
-                        const ro = false;
+                        // ═══════════════════════════════════════════════════════════
+                        // ИСПРАВЛЕНИЕ: Проверяем readonly для combobox группы
+                        // ═══════════════════════════════════════════════════════════
+                        const ro = isColReadOnlyForAdd(primary);
                         const value = writeTcId == null ? '' : (draft[writeTcId] ?? '');
 
-                        // Проверка на required и пустоту
+                        // Проверка на required и пустоту (только если не readonly)
                         const isReq = isColumnRequired(primary);
                         const isEmpty = isEmptyValue(value);
-                        const hasError = showValidationErrors && isReq && isEmpty;
+                        const hasError = showValidationErrors && isReq && isEmpty && !ro;
 
                         cells.push(
                             <td
@@ -69,9 +79,9 @@ export const MainTableAddRow: React.FC<MainTableAddRowProps> = ({
                                     readOnly={ro}
                                     value={value}
                                     onChange={(v) => {
-                                        if (writeTcId != null) onDraftChange(writeTcId, v);
+                                        if (writeTcId != null && !ro) onDraftChange(writeTcId, v);
                                     }}
-                                    placeholder={isReq ? `${placeholderFor(primary)} *` : placeholderFor(primary)}
+                                    placeholder={ro ? '—' : (isReq ? `${placeholderFor(primary)} *` : placeholderFor(primary))}
                                     comboReloadToken={comboReloadToken}
                                     showError={hasError}
                                 />
@@ -83,13 +93,17 @@ export const MainTableAddRow: React.FC<MainTableAddRowProps> = ({
 
                     // Обычная колонка (add)
                     const writeTcId = (col.__write_tc_id ?? col.table_column_id) ?? null;
-                    const ro = false;
+
+                    // ═══════════════════════════════════════════════════════════
+                    // ИСПРАВЛЕНИЕ: Проверяем readonly для обычной колонки
+                    // ═══════════════════════════════════════════════════════════
+                    const ro = isColReadOnlyForAdd(col);
                     const value = writeTcId == null ? '' : (draft[writeTcId] ?? '');
 
-                    // Проверка на required и пустоту
+                    // Проверка на required и пустоту (только если не readonly)
                     const isReq = isColumnRequired(col);
                     const isEmpty = isEmptyValue(value);
-                    const hasError = showValidationErrors && isReq && isEmpty;
+                    const hasError = showValidationErrors && isReq && isEmpty && !ro;
 
                     cells.push(
                         <td
@@ -103,9 +117,9 @@ export const MainTableAddRow: React.FC<MainTableAddRowProps> = ({
                                     readOnly={ro}
                                     value={value}
                                     onChange={(v) => {
-                                        if (writeTcId != null) onDraftChange(writeTcId, v);
+                                        if (writeTcId != null && !ro) onDraftChange(writeTcId, v);
                                     }}
-                                    placeholder={isReq ? `${placeholderFor(col)} *` : placeholderFor(col)}
+                                    placeholder={ro ? '—' : (isReq ? `${placeholderFor(col)} *` : placeholderFor(col))}
                                     comboReloadToken={comboReloadToken}
                                     showError={hasError}
                                 />

@@ -168,6 +168,8 @@ export const EditReferenceDialog: React.FC<Props> = ({ value, onChange, onClose,
                         <MenuItem value="timewtz">Время с тайм зоной</MenuItem>
                         <MenuItem value="time">Время</MenuItem>
                         <MenuItem value="styles">Стиль</MenuItem>
+                        <MenuItem value="orderASC">orderASC</MenuItem>
+                        <MenuItem value="orderDESC">orderDESC</MenuItem>
                     </Select>
                 </FormControl>
 
