@@ -66,6 +66,13 @@ const getMinColWidth = (col: ExtCol): number => {
     return 30;
 };
 
+// ═══════════════════════════════════════════════════════════
+// HELPER: Проверка readonly для колонки
+// ═══════════════════════════════════════════════════════════
+const isColReadOnlyForAdd = (col: ExtCol): boolean => {
+    return !!(col as any).readonly;
+};
+
 type SubformProps = {
     subDisplay: SubDisplay | null;
     handleTabClick: (order: number) => void;
@@ -289,6 +296,7 @@ type EditCellWithDrillProps = {
     onOpenDrill?: SubformProps['onOpenDrill'];
     rowPrimaryKeys?: Record<string, unknown>;
     mode: 'add' | 'edit';
+    readOnly?: boolean;
 };
 
 const EditCellWithDrill: React.FC<EditCellWithDrillProps> = ({
@@ -302,20 +310,22 @@ const EditCellWithDrill: React.FC<EditCellWithDrillProps> = ({
                                                                  onOpenDrill,
                                                                  rowPrimaryKeys,
                                                                  mode,
+                                                                 readOnly = false,
                                                              }) => {
     if (writeTcId == null) {
         return <span className={sub.ellipsis}>—</span>;
     }
 
     const isCombobox = col.type === 'combobox';
-    const hasDrill = isCombobox && col.form_id != null && !!onOpenDrill;
+    // Не показываем drill кнопку для readonly полей
+    const hasDrill = isCombobox && col.form_id != null && !!onOpenDrill && !readOnly;
 
     return (
         <div className={sub.cellEditor}>
             <InputCell
                 mode={mode}
                 col={col}
-                readOnly={false}
+                readOnly={readOnly}
                 value={value}
                 onChange={onChange}
                 placeholder={placeholder}
@@ -614,10 +624,15 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                 const primary = pickPrimaryCombo(group);
                 const writeTcId = getWriteTcIdForComboGroup(group);
 
+                // ═══════════════════════════════════════════════════════════
+                // ИСПРАВЛЕНИЕ: Проверяем readonly для combobox группы
+                // ═══════════════════════════════════════════════════════════
+                const ro = isColReadOnlyForAdd(primary);
                 const value = writeTcId == null ? '' : (draftSub[writeTcId] ?? '');
                 const isReq = isColumnRequired(primary);
                 const isEmpty = isEmptyValue(value);
-                const hasError = showValidationErrors && isReq && isEmpty;
+                // Не показываем ошибку для readonly полей
+                const hasError = showValidationErrors && isReq && isEmpty && !ro;
 
                 cells.push(
                     <td
@@ -630,14 +645,16 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                             writeTcId={writeTcId}
                             value={value}
                             onChange={(v) => {
-                                if (writeTcId != null) setDraftSub((prev) => ({ ...prev, [writeTcId]: v }));
+                                // Не меняем значение если readonly
+                                if (writeTcId != null && !ro) setDraftSub((prev) => ({ ...prev, [writeTcId]: v }));
                             }}
-                            placeholder={isReq ? `${primary.placeholder ?? primary.column_name} *` : (primary.placeholder ?? primary.column_name)}
+                            placeholder={ro ? '—' : (isReq ? `${primary.placeholder ?? primary.column_name} *` : (primary.placeholder ?? primary.column_name))}
                             comboReloadToken={comboReloadToken}
                             showError={hasError}
                             onOpenDrill={onOpenDrill}
                             rowPrimaryKeys={undefined}
                             mode="add"
+                            readOnly={ro}
                         />
                     </td>
                 );
@@ -646,10 +663,16 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
             }
 
             const writeTcId = getWriteTcId(col);
+
+            // ═══════════════════════════════════════════════════════════
+            // ИСПРАВЛЕНИЕ: Проверяем readonly для обычной колонки
+            // ═══════════════════════════════════════════════════════════
+            const ro = isColReadOnlyForAdd(col);
             const value = writeTcId == null ? '' : (draftSub[writeTcId] ?? '');
             const isReq = isColumnRequired(col);
             const isEmpty = isEmptyValue(value);
-            const hasError = showValidationErrors && isReq && isEmpty;
+            // Не показываем ошибку для readonly полей
+            const hasError = showValidationErrors && isReq && isEmpty && !ro;
 
             cells.push(
                 <td
@@ -661,14 +684,16 @@ export const SubWormTable: React.FC<SubformProps> = (props) => {
                         writeTcId={writeTcId}
                         value={value}
                         onChange={(v) => {
-                            if (writeTcId != null) setDraftSub((prev) => ({ ...prev, [writeTcId]: v }));
+                            // Не меняем значение если readonly
+                            if (writeTcId != null && !ro) setDraftSub((prev) => ({ ...prev, [writeTcId]: v }));
                         }}
-                        placeholder={isReq ? `${col.placeholder ?? col.column_name} *` : (col.placeholder ?? col.column_name)}
+                        placeholder={ro ? '—' : (isReq ? `${col.placeholder ?? col.column_name} *` : (col.placeholder ?? col.column_name))}
                         comboReloadToken={comboReloadToken}
                         showError={hasError}
                         onOpenDrill={onOpenDrill}
                         rowPrimaryKeys={undefined}
                         mode="add"
+                        readOnly={ro}
                     />
                 </td>
             );
