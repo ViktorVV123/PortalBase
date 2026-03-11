@@ -452,7 +452,8 @@ export const MainTable: React.FC<Props> = (p) => {
                             onStartGroupResize={(e) => handleStartGroupResize(e, groupIndex, g.cols)}
                         />
                     ))}
-                    <th className={s.actionsCell} >
+                    <th className={s.actionsCell}>
+                        {/* Кнопка сворачивания подзаголовков */}
                         <button
                             type="button"
                             className={s.toggleBtn}
@@ -524,6 +525,7 @@ export const MainTable: React.FC<Props> = (p) => {
                         placeholderFor={p.placeholderFor}
                         comboReloadToken={p.comboReloadToken}
                         showValidationErrors={p.showValidationErrors}
+                        onOpenDrill={p.onOpenDrill}
                     />
                 )}
 

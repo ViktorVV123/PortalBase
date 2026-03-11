@@ -1,6 +1,8 @@
 // components/Form/mainTable/MainTableAddRow.tsx
 import React from 'react';
 import * as s from '@/components/setOfTables/SetOfTables.module.scss';
+import { Tooltip, IconButton } from '@mui/material';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import type { ExtCol } from '@/components/Form/formTable/parts/FormatByDatatype';
 import { InputCell } from '@/components/Form/mainTable/InputCell';
 import {
@@ -26,6 +28,16 @@ type MainTableAddRowProps = {
     comboReloadToken?: number;
     /** Показывать ошибки валидации */
     showValidationErrors?: boolean;
+    /** Открытие DrillDialog для combobox */
+    onOpenDrill?: (
+        fid?: number | null,
+        meta?: {
+            originColumnType?: 'combobox' | null;
+            primary?: Record<string, unknown>;
+            openedFromEdit?: boolean;
+            targetWriteTcId?: number;
+        }
+    ) => void;
 };
 
 export const MainTableAddRow: React.FC<MainTableAddRowProps> = ({
@@ -35,6 +47,7 @@ export const MainTableAddRow: React.FC<MainTableAddRowProps> = ({
                                                                     placeholderFor,
                                                                     comboReloadToken,
                                                                     showValidationErrors = false,
+                                                                    onOpenDrill,
                                                                 }) => {
     const cols = flatColumnsInRenderOrder;
 
@@ -67,24 +80,54 @@ export const MainTableAddRow: React.FC<MainTableAddRowProps> = ({
                         const isEmpty = isEmptyValue(value);
                         const hasError = showValidationErrors && isReq && isEmpty && !ro;
 
+                        // Показываем drill кнопку если есть form_id и onOpenDrill и не readonly
+                        const hasDrill = primary.form_id != null && !!onOpenDrill && !ro;
+
                         cells.push(
                             <td
                                 key={`add-combo-${primary.widget_column_id}:${writeTcId ?? 'null'}`}
                                 colSpan={span}
                                 className={s.editCell}
                             >
-                                <InputCell
-                                    mode="add"
-                                    col={primary}
-                                    readOnly={ro}
-                                    value={value}
-                                    onChange={(v) => {
-                                        if (writeTcId != null && !ro) onDraftChange(writeTcId, v);
-                                    }}
-                                    placeholder={ro ? '—' : (isReq ? `${placeholderFor(primary)} *` : placeholderFor(primary))}
-                                    comboReloadToken={comboReloadToken}
-                                    showError={hasError}
-                                />
+                                <div className={s.cellEditor}>
+                                    <InputCell
+                                        mode="add"
+                                        col={primary}
+                                        readOnly={ro}
+                                        value={value}
+                                        onChange={(v) => {
+                                            if (writeTcId != null && !ro) onDraftChange(writeTcId, v);
+                                        }}
+                                        placeholder={ro ? '—' : (isReq ? `${placeholderFor(primary)} *` : placeholderFor(primary))}
+                                        comboReloadToken={comboReloadToken}
+                                        showError={hasError}
+                                    />
+
+                                    {hasDrill && (
+                                        <Tooltip title="Открыть справочник" arrow>
+                                            <IconButton
+                                                size="small"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    onOpenDrill?.(primary.form_id!, {
+                                                        originColumnType: 'combobox',
+                                                        primary: undefined,
+                                                        openedFromEdit: true,
+                                                        targetWriteTcId: writeTcId ?? undefined,
+                                                    });
+                                                }}
+                                                sx={{
+                                                    ml: 0.5,
+                                                    p: 0.5,
+                                                    color: 'var(--link, #66b0ff)',
+                                                    '&:hover': { backgroundColor: 'rgba(102, 176, 255, 0.1)' },
+                                                }}
+                                            >
+                                                <OpenInNewIcon sx={{ fontSize: 16 }} />
+                                            </IconButton>
+                                        </Tooltip>
+                                    )}
+                                </div>
                             </td>
                         );
                         i = j;
