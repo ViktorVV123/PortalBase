@@ -21,6 +21,11 @@ type SubRow = { widget_order: number; where_conditional: string; sub_widget_id: 
 type TreeRow = { column_order: number; table_column_id: number | '' };
 
 // ═══════════════════════════════════════════════════════════
+// ПАПКИ, СКРЫТЫЕ ДЛЯ ОБЫЧНЫХ ПОЛЬЗОВАТЕЛЕЙ
+// ═══════════════════════════════════════════════════════════
+const ADMIN_ONLY_FOLDERS = ['Технические'];
+
+// ═══════════════════════════════════════════════════════════
 // СТИЛИ ДЛЯ ДИАЛОГА — используем CSS переменные темы
 // ═══════════════════════════════════════════════════════════
 const dialogPaperSx = {
@@ -60,6 +65,10 @@ const textFieldSx = {
         '&.Mui-focused': {
             color: 'var(--theme-primary)',
         },
+    },
+    '& .MuiFormHelperText-root': {
+        color: 'var(--theme-text-secondary)',
+        marginLeft: 0,
     },
 };
 
@@ -145,6 +154,17 @@ export const ModalAddForm = ({ open, widget, onSuccess, onCancel }: Props) => {
 
         return () => { cancelled = true; };
     }, [open, widget.table_id]);
+
+    // ═══════════════════════════════════════════════════════════
+    // Проверка: содержит ли path скрытую папку
+    // ═══════════════════════════════════════════════════════════
+    const pathContainsAdminFolder = useMemo(() => {
+        if (!form.path.trim()) return false;
+        const segments = form.path.split('/').map(s => s.trim().toLowerCase());
+        return ADMIN_ONLY_FOLDERS.some(folder =>
+            segments.includes(folder.toLowerCase())
+        );
+    }, [form.path]);
 
     const submit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -261,6 +281,37 @@ export const ModalAddForm = ({ open, widget, onSuccess, onCancel }: Props) => {
                             value={form.path}
                             onChange={handle}
                             sx={textFieldSx}
+                            helperText={
+                                <Box component="span">
+                                    {pathContainsAdminFolder ? (
+                                        <Box component="span" sx={{
+                                            color: 'var(--theme-warning, #f0ad4e)',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: 0.5,
+                                        }}>
+                                            ⚠️ Форма будет скрыта для обычных пользователей
+                                        </Box>
+                                    ) : (
+                                        <>
+                                            Папки только для админов: {ADMIN_ONLY_FOLDERS.map((folder, idx) => (
+                                            <React.Fragment key={folder}>
+                                                {idx > 0 && ', '}
+                                                <Box component="code" sx={{
+                                                    backgroundColor: 'var(--theme-surface-elevated)',
+                                                    padding: '1px 4px',
+                                                    borderRadius: '3px',
+                                                    color: 'var(--theme-warning, #f0ad4e)',
+                                                    fontFamily: 'monospace',
+                                                }}>
+                                                    {folder}
+                                                </Box>
+                                            </React.Fragment>
+                                        ))}
+                                        </>
+                                    )}
+                                </Box>
+                            }
                         />
 
                         <Stack direction="row" alignItems="center" justifyContent="space-between">
