@@ -64,6 +64,27 @@ export const FormTableContent: React.FC<Props> = ({ liveTree, setLiveTree, curre
     }, [pagination.isLoadingMore, pagination.hasMore, loadMoreRows]);
 
     // ═══════════════════════════════════════════════════════════
+    // AUTO-FILL: подгружаем если контент не заполняет контейнер
+    // Это нужно когда данных мало и скролла физически нет
+    // ═══════════════════════════════════════════════════════════
+    useEffect(() => {
+        const el = mainScrollRef.current;
+        if (!el) return;
+        if (pagination.isLoadingMore || !pagination.hasMore) return;
+
+        // Даём время на рендер
+        const timeoutId = setTimeout(() => {
+            const { scrollHeight, clientHeight } = el;
+            // Если контент не заполняет контейнер (нет скролла) — подгружаем
+            if (scrollHeight <= clientHeight + 50) {
+                loadMoreRows();
+            }
+        }, 100);
+
+        return () => clearTimeout(timeoutId);
+    }, [pagination.isLoadingMore, pagination.hasMore, pagination.currentPage, loadMoreRows, formDisplay?.data?.length]);
+
+    // ═══════════════════════════════════════════════════════════
     // KEYBOARD NAVIGATION
     // ═══════════════════════════════════════════════════════════
 

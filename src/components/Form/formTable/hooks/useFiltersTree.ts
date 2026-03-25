@@ -1,7 +1,8 @@
-// useFiltersTree.ts — с защитой от setState после unmount
+// useFiltersTree.ts — с защитой от setState после unmount и пагинацией
 import { useCallback, useEffect, useState, useRef } from 'react';
 import { api } from '@/services/api';
 import type { FormDisplay, FormTreeColumn } from '@/shared/hooks/useWorkSpaces';
+import { MAIN_TABLE_PAGE_SIZE } from '@/shared/hooks/useWorkSpaces';
 
 export function useFiltersTree(
     selectedFormId: number | null,
@@ -29,6 +30,10 @@ export function useFiltersTree(
         };
     }, [selectedFormId]);
 
+    /**
+     * Сброс фильтров с запросом данных С ПАГИНАЦИЕЙ
+     * ВАЖНО: используем limit и page для корректной работы infinite scroll
+     */
     const resetFiltersHard = useCallback(async () => {
         if (!selectedFormId) return;
 
@@ -36,7 +41,18 @@ export function useFiltersTree(
         if (unmountedRef.current) return;
 
         try {
-            const { data } = await api.post<FormDisplay>(`/display/${selectedFormId}/main`, []);
+            // ═══════════════════════════════════════════════════════════
+            // ИСПРАВЛЕНИЕ: добавляем параметры пагинации
+            // ═══════════════════════════════════════════════════════════
+            const params = new URLSearchParams({
+                limit: String(MAIN_TABLE_PAGE_SIZE),
+                page: '1',
+            });
+
+            const { data } = await api.post<FormDisplay>(
+                `/display/${selectedFormId}/main?${params}`,
+                []
+            );
 
             // Проверка после запроса (компонент мог размонтироваться пока ждали ответ)
             if (unmountedRef.current) return;

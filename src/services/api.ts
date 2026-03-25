@@ -10,9 +10,8 @@ import axios, {
 } from 'axios';
 
 /* ───────── 1. helpers: cookie read / write ──────────────────────────────── */
-
-const getCookie = (n: string): string | undefined =>
-    decodeURIComponent(
+const getCookie = (n: string): string | undefined => {
+    const value = decodeURIComponent(
         document.cookie.replace(
             new RegExp(
                 '(?:(?:^|.*;)\\s*' +
@@ -21,7 +20,9 @@ const getCookie = (n: string): string | undefined =>
             ),
             '$1',
         ),
-    ) || undefined;
+    );
+    return value || undefined;
+};
 
 const setCookie = (n: string, v: string, days = 1) => {
     const exp = new Date(Date.now() + days * 864e5).toUTCString();
@@ -32,7 +33,119 @@ const deleteCookie = (n: string) => {
     document.cookie = `${n}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; SameSite=Strict`;
 };
 
-/* ───────── 2. первые токены из ?ldapData=… ─────────────────────────────── */
+/* ───────── 2. URL-ы и константы ────────────────────────────────────────── */
+
+const API_URL = 'https://csc-fv.pro.lukoil.com/api';
+const REFRESH_URL = `${API_URL}/refresh`;
+const IDM_URL = 'https://csc-idm.pro.lukoil.com/?env=FrmV';
+
+const isProdHost = window.location.hostname === 'csc-fv.pro.lukoil.com';
+
+// DEV токен — ТОЛЬКО для локальной разработки (на проде пустой)
+const DEV_ACCESS_TOKEN = '';
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ЛОГИРОВАНИЕ AUTH СОБЫТИЙ
+═══════════════════════════════════════════════════════════════════════════ */
+
+type AuthEventType =
+    | 'REQUEST_SENT'
+    | 'REQUEST_SUCCESS'
+    | 'REQUEST_401'
+    | 'REQUEST_ERROR'
+    | 'REFRESH_START'
+    | 'REFRESH_SUCCESS'
+    | 'REFRESH_FAIL'
+    | 'TOKENS_UPDATED'
+    | 'TOKENS_CLEARED'
+    | 'RETRY_REQUEST'
+    | 'QUEUE_ADD'
+    | 'QUEUE_PROCESS'
+    | 'SESSION_EXPIRED';
+
+type AuthEvent = {
+    id: number;
+    timestamp: string;
+    type: AuthEventType;
+    details: Record<string, any>;
+};
+
+let eventCounter = 0;
+const authHistory: AuthEvent[] = [];
+const MAX_HISTORY = 200;
+
+// Forward declaration для использования в logAuthEvent
+let memoryAccessToken = '';
+let memoryRefreshToken = '';
+
+function logAuthEvent(type: AuthEventType, details: Record<string, any> = {}) {
+    const event: AuthEvent = {
+        id: ++eventCounter,
+        timestamp: new Date().toISOString(),
+        type,
+        details: {
+            ...details,
+            _tokens: {
+                memoryAccess: memoryAccessToken ? memoryAccessToken.slice(0, 25) + '...' : '(empty)',
+                memoryRefresh: memoryRefreshToken ? memoryRefreshToken.slice(0, 25) + '...' : '(empty)',
+                cookieAccess: getCookie('accessToken')?.slice(0, 25) + '...' || '(empty)',
+                cookieRefresh: getCookie('refreshToken')?.slice(0, 25) + '...' || '(empty)',
+            },
+        },
+    };
+
+    authHistory.push(event);
+    if (authHistory.length > MAX_HISTORY) {
+        authHistory.shift();
+    }
+
+    const colors: Record<AuthEventType, string> = {
+        REQUEST_SENT: '#9E9E9E',
+        REQUEST_SUCCESS: '#4CAF50',
+        REQUEST_401: '#FF9800',
+        REQUEST_ERROR: '#f44336',
+        REFRESH_START: '#2196F3',
+        REFRESH_SUCCESS: '#4CAF50',
+        REFRESH_FAIL: '#f44336',
+        TOKENS_UPDATED: '#8BC34A',
+        TOKENS_CLEARED: '#f44336',
+        RETRY_REQUEST: '#03A9F4',
+        QUEUE_ADD: '#9C27B0',
+        QUEUE_PROCESS: '#9C27B0',
+        SESSION_EXPIRED: '#D32F2F',
+    };
+
+    const icons: Record<AuthEventType, string> = {
+        REQUEST_SENT: '📤',
+        REQUEST_SUCCESS: '✅',
+        REQUEST_401: '⚠️',
+        REQUEST_ERROR: '❌',
+        REFRESH_START: '🔄',
+        REFRESH_SUCCESS: '✅',
+        REFRESH_FAIL: '❌',
+        TOKENS_UPDATED: '🔑',
+        TOKENS_CLEARED: '🗑️',
+        RETRY_REQUEST: '🔁',
+        QUEUE_ADD: '📋',
+        QUEUE_PROCESS: '📋',
+        SESSION_EXPIRED: '🚫',
+    };
+
+    console.groupCollapsed(
+        `%c[AUTH #${event.id}] ${icons[type]} ${type}`,
+        `color: ${colors[type]}; font-weight: bold`
+    );
+    console.log('Time:', event.timestamp);
+    console.log('Details:', details);
+    console.log('Current Tokens:', event.details._tokens);
+    console.groupEnd();
+
+    return event;
+}
+
+/* ───────── 3. Читаем токены из URL (если пришли с IdM) ─────────────────── */
+
+let tokensReceivedFromUrl = false;
 
 (function readTokensFromUrl() {
     const search = new URLSearchParams(window.location.search);
@@ -43,9 +156,14 @@ const deleteCookie = (n: string) => {
         const jsonStr = atob(decodeURIComponent(encoded));
         const j = JSON.parse(jsonStr);
 
-        if (j.AccessId) setCookie('accessToken', j.AccessId);
-        if (j.RefreshId) setCookie('refreshToken', j.RefreshId);
+        if (j.AccessId && j.RefreshId) {
+            setCookie('accessToken', j.AccessId);
+            setCookie('refreshToken', j.RefreshId);
+            tokensReceivedFromUrl = true;
+            console.log('[auth] Tokens received from URL (ldapData)');
+        }
 
+        // Убираем ldapData из URL
         search.delete('ldapData');
         const newQuery = search.toString();
         const newUrl =
@@ -54,20 +172,20 @@ const deleteCookie = (n: string) => {
             window.location.hash;
         window.history.replaceState({}, '', newUrl);
     } catch (e) {
-        console.error('ldapData parse error:', e);
+        console.error('[auth] ldapData parse error:', e);
     }
 })();
 
-/* ───────── 3. токены: IN-MEMORY + cookie sync ────────────────────────────── */
+/* ───────── 4. In-memory хранилище токенов ─────────────────────────────── */
 
-// DEV токен для локальной разработки (на проде не используется)
-const DEV_ACCESS_TOKEN = '';
+memoryAccessToken = getCookie('accessToken') || '';
+memoryRefreshToken = getCookie('refreshToken') || '';
 
-// In-memory хранилище токенов — ГЛАВНЫЙ источник правды
-let memoryAccessToken = getCookie('accessToken') ?? DEV_ACCESS_TOKEN;
-let memoryRefreshToken = getCookie('refreshToken') ?? '';
+if (!isProdHost && !memoryAccessToken && DEV_ACCESS_TOKEN) {
+    memoryAccessToken = DEV_ACCESS_TOKEN;
+    console.log('[auth] Using DEV_ACCESS_TOKEN for local development');
+}
 
-// Синхронизируем in-memory → cookie
 function syncTokensToCookie() {
     if (memoryAccessToken) {
         setCookie('accessToken', memoryAccessToken);
@@ -77,28 +195,36 @@ function syncTokensToCookie() {
     }
 }
 
-// Обновляем токены (вызывается после успешного refresh)
 function updateTokens(access: string, refresh: string) {
+    const prevAccess = memoryAccessToken;
+    const prevRefresh = memoryRefreshToken;
+
     memoryAccessToken = access;
     memoryRefreshToken = refresh;
     syncTokensToCookie();
-    console.log('[auth] Tokens updated in memory and cookie');
+
+    logAuthEvent('TOKENS_UPDATED', {
+        accessChanged: prevAccess !== access,
+        refreshChanged: prevRefresh !== refresh,
+        prevAccessPrefix: prevAccess ? prevAccess.slice(0, 20) + '...' : '(empty)',
+        newAccessPrefix: access ? access.slice(0, 20) + '...' : '(empty)',
+    });
 }
 
-// Получить текущий access token (из памяти, не из cookie!)
+function clearTokens() {
+    deleteCookie('accessToken');
+    deleteCookie('refreshToken');
+    memoryAccessToken = '';
+    memoryRefreshToken = '';
+
+    logAuthEvent('TOKENS_CLEARED', {});
+}
+
 function getAccessToken(): string {
     return memoryAccessToken;
 }
 
-/* ───────── 4. URL-ы API ────────────────────────────────────────────────── */
-
-const API_URL = 'https://csc-fv.pro.lukoil.com/api';
-const REFRESH_URL = `${API_URL}/refresh`;
-const IDM_URL = 'https://csc-idm.pro.lukoil.com/?env=FrmV';
-
-/* ───────── 5. редирект на IdM ─────────────────────────────────────────── */
-
-const isProdHost = window.location.hostname === 'csc-fv.pro.lukoil.com';
+/* ───────── 5. Редирект на IdM ─────────────────────────────────────────── */
 
 let isRedirecting = false;
 
@@ -108,16 +234,10 @@ function goToIdm(): void {
         return;
     }
     isRedirecting = true;
-
-    // Очищаем токены
-    deleteCookie('accessToken');
-    deleteCookie('refreshToken');
-    memoryAccessToken = '';
-    memoryRefreshToken = '';
+    clearTokens();
 
     console.warn('[auth] Session expired. Redirecting to IdM...');
 
-    // Показываем overlay
     if (typeof window !== 'undefined' && document.body) {
         const overlay = document.createElement('div');
         overlay.style.cssText = `
@@ -135,26 +255,18 @@ function goToIdm(): void {
     }, 300);
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// НОВОЕ: Универсальная функция для обработки ситуации "сессия протухла"
-// Работает и на проде, и в dev режиме
-// ═══════════════════════════════════════════════════════════════════════════════
 function handleSessionExpired(reason: string): void {
-    console.error(`[auth] Session expired: ${reason}`);
+    logAuthEvent('SESSION_EXPIRED', {
+        reason,
+        willRedirect: isProdHost,
+    });
 
     if (isProdHost) {
-        // На проде — редирект на IdM
         goToIdm();
     } else {
-        // В dev режиме — показываем сообщение и очищаем токены
-        console.error('[auth] DEV MODE: Would redirect to IdM. Clear tokens and refresh page.');
+        console.error('[auth] DEV MODE: Session expired. Clear tokens and refresh page.');
+        clearTokens();
 
-        deleteCookie('accessToken');
-        deleteCookie('refreshToken');
-        memoryAccessToken = '';
-        memoryRefreshToken = '';
-
-        // Показываем overlay в dev режиме тоже
         if (typeof window !== 'undefined' && document.body && !document.getElementById('auth-expired-overlay')) {
             const overlay = document.createElement('div');
             overlay.id = 'auth-expired-overlay';
@@ -179,51 +291,47 @@ function handleSessionExpired(reason: string): void {
     }
 }
 
-// Начальная проверка
-if (!memoryAccessToken) {
-    handleSessionExpired('NO_ACCESS_TOKEN_ON_START');
+/* ───────── 6. Начальная проверка токенов ────────────────────────────────── */
+
+if (isProdHost && !tokensReceivedFromUrl && !memoryAccessToken) {
+    setTimeout(() => {
+        if (!memoryAccessToken && !isRedirecting) {
+            console.log('[auth] No access token on start, redirecting to IdM');
+            handleSessionExpired('NO_ACCESS_TOKEN_ON_START');
+        }
+    }, 50);
 }
 
-/* ───────── 6. Axios instance ─────────────────────────────────────────────── */
+/* ───────── 7. Axios instance ─────────────────────────────────────────────── */
 
 export const api: AxiosInstance = axios.create({
     baseURL: API_URL,
     headers: { 'Content-Type': 'application/json' },
 });
 
-/* ───────── 7. Refresh logic с защитой от race condition ─────────────────── */
+/* ───────── 8. Refresh logic с защитой от race condition ─────────────────── */
 
-// Единый промис на refresh — все ждут его завершения
 let refreshPromise: Promise<string> | null = null;
-
-// Счётчик неудачных попыток refresh подряд
 let refreshFailCount = 0;
 const MAX_REFRESH_FAILS = 2;
 
-/**
- * Выполняет refresh и возвращает НОВЫЙ accessToken.
- * Все параллельные вызовы получат один и тот же результат.
- */
 async function doRefresh(): Promise<string> {
-    // Если refresh уже идёт — ждём его результат
     if (refreshPromise) {
         console.log('[auth] Waiting for existing refresh...');
         return refreshPromise;
     }
 
-    // Создаём новый refresh
     refreshPromise = (async () => {
         const currentRefresh = memoryRefreshToken;
 
-        // ═══════════════════════════════════════════════════════════════════
-        // ИСПРАВЛЕНО: Если нет refresh token — сразу сессия протухла
-        // ═══════════════════════════════════════════════════════════════════
+        logAuthEvent('REFRESH_START', {
+            usingRefreshToken: currentRefresh ? currentRefresh.slice(0, 25) + '...' : '(empty)',
+        });
+
         if (!currentRefresh) {
-            console.error('[auth] No refresh token available');
+            logAuthEvent('REFRESH_FAIL', { reason: 'NO_REFRESH_TOKEN' });
             throw new Error('NO_REFRESH_TOKEN');
         }
-
-        console.log('[auth] Starting token refresh...');
 
         try {
             const { data } = await axios.post<{ AccessId: string; RefreshId: string }>(
@@ -236,56 +344,50 @@ async function doRefresh(): Promise<string> {
                 }
             );
 
-            if (!data.AccessId || !data.RefreshId) {
-                console.error('[auth] Invalid refresh response:', data);
+            if (!data.AccessId || !data.RefreshId ||
+                data.AccessId.length < 10 || data.RefreshId.length < 10) {
+                logAuthEvent('REFRESH_FAIL', {
+                    reason: 'INVALID_REFRESH_RESPONSE',
+                    response: data,
+                });
                 throw new Error('INVALID_REFRESH_RESPONSE');
             }
 
-            // Обновляем токены в памяти И в cookie
-            updateTokens(data.AccessId, data.RefreshId);
+            logAuthEvent('REFRESH_SUCCESS', {
+                newAccessToken: data.AccessId.slice(0, 25) + '...',
+            });
 
-            // Сбрасываем счётчик неудач
+            updateTokens(data.AccessId, data.RefreshId);
             refreshFailCount = 0;
 
-            console.log('[auth] Token refresh successful');
             return data.AccessId;
 
         } catch (error: any) {
             const status = error?.response?.status;
 
-            console.error('[auth] Refresh failed:', {
+            logAuthEvent('REFRESH_FAIL', {
                 status,
                 message: error?.message,
-                data: error?.response?.data,
             });
 
-            // ═══════════════════════════════════════════════════════════════════
-            // ИСПРАВЛЕНО: Любая ошибка refresh = refresh token протух
-            // 401, 403, 500, network error — всё означает что нужна переавторизация
-            // ═══════════════════════════════════════════════════════════════════
-            if (status === 401 || status === 403) {
+            if (status === 400 || status === 401 || status === 403) {
                 throw new Error('REFRESH_TOKEN_EXPIRED');
             }
 
-            // Для других ошибок (500, timeout, network) — тоже считаем что нужен reauth
-            // после MAX_REFRESH_FAILS попыток
             throw new Error('REFRESH_FAILED');
-
         }
     })();
 
     try {
         return await refreshPromise;
     } finally {
-        // Очищаем промис после завершения (успех или ошибка)
         refreshPromise = null;
     }
 }
 
-/* ───────── 8. Request interceptor ───────────────────────────────────────── */
+/* ───────── 9. Request interceptor ───────────────────────────────────────── */
 
 api.interceptors.request.use((cfg) => {
-    // Берём токен из ПАМЯТИ (не из cookie!) — это гарантирует актуальность
     const token = getAccessToken();
 
     if (token) {
@@ -295,19 +397,31 @@ api.interceptors.request.use((cfg) => {
         (cfg.headers as any)['access-id'] = token;
     }
 
+    logAuthEvent('REQUEST_SENT', {
+        method: cfg.method?.toUpperCase(),
+        url: cfg.url,
+        hasAccessToken: !!token,
+    });
+
     return cfg;
 });
 
-/* ───────── 9. Response interceptor с очередью retry ───────────────────── */
+/* ───────── 10. Response interceptor с очередью retry ───────────────────── */
 
-// Очередь запросов, ожидающих refresh
 type QueueItem = {
     resolve: (token: string) => void;
     reject: (error: any) => void;
+    url?: string;
 };
 let failedQueue: QueueItem[] = [];
 
 function processQueue(error: any, token: string | null = null) {
+    logAuthEvent('QUEUE_PROCESS', {
+        queueLength: failedQueue.length,
+        hasError: !!error,
+        hasNewToken: !!token,
+    });
+
     failedQueue.forEach(({ resolve, reject }) => {
         if (error) {
             reject(error);
@@ -319,12 +433,32 @@ function processQueue(error: any, token: string | null = null) {
 }
 
 api.interceptors.response.use(
-    (res: AxiosResponse) => res,
+    (res: AxiosResponse) => {
+        logAuthEvent('REQUEST_SUCCESS', {
+            method: res.config.method?.toUpperCase(),
+            url: res.config.url,
+            status: res.status,
+        });
+        return res;
+    },
 
     async (err: AxiosError) => {
         const { response, config } = err;
 
-        // Не 401 или нет конфига — просто пробрасываем
+        if (response?.status === 401) {
+            logAuthEvent('REQUEST_401', {
+                method: config?.method?.toUpperCase(),
+                url: config?.url,
+                status: 401,
+            });
+        } else if (response) {
+            logAuthEvent('REQUEST_ERROR', {
+                method: config?.method?.toUpperCase(),
+                url: config?.url,
+                status: response.status,
+            });
+        }
+
         if (!response || response.status !== 401 || !config) {
             return Promise.reject(err);
         }
@@ -334,7 +468,6 @@ api.interceptors.response.use(
             _retryCount?: number;
         };
 
-        // Защита от бесконечного retry
         const retryCount = originalRequest._retryCount ?? 0;
         if (retryCount >= 2) {
             console.error('[auth] Max retry count reached');
@@ -342,7 +475,6 @@ api.interceptors.response.use(
             return Promise.reject(err);
         }
 
-        // Если это уже retry после refresh — значит новый токен тоже не работает
         if (originalRequest._retry) {
             refreshFailCount++;
             console.error(`[auth] Retry failed (${refreshFailCount}/${MAX_REFRESH_FAILS})`);
@@ -357,53 +489,51 @@ api.interceptors.response.use(
         originalRequest._retry = true;
         originalRequest._retryCount = retryCount + 1;
 
-        // Если refresh уже идёт — встаём в очередь
         if (refreshPromise) {
-            console.log('[auth] Request queued, waiting for refresh...');
+            logAuthEvent('QUEUE_ADD', {
+                url: originalRequest.url,
+                queueLength: failedQueue.length + 1,
+            });
 
             return new Promise((resolve, reject) => {
                 failedQueue.push({
                     resolve: (newToken: string) => {
-                        // Обновляем токен в запросе и повторяем
                         if (originalRequest.headers) {
                             (originalRequest.headers as any)['access-id'] = newToken;
                         }
                         resolve(api(originalRequest));
                     },
                     reject,
+                    url: originalRequest.url,
                 });
             });
         }
 
-        // Запускаем refresh
         try {
             const newToken = await doRefresh();
 
-            // Обрабатываем очередь ожидающих запросов
             processQueue(null, newToken);
 
-            // Обновляем токен в текущем запросе
+            logAuthEvent('RETRY_REQUEST', {
+                method: originalRequest.method?.toUpperCase(),
+                url: originalRequest.url,
+            });
+
             if (originalRequest.headers) {
                 (originalRequest.headers as any)['access-id'] = newToken;
             }
 
-            // Повторяем запрос
             return api(originalRequest);
 
         } catch (refreshError: any) {
-            // Обрабатываем очередь с ошибкой
             processQueue(refreshError, null);
 
             const errorType = refreshError?.message;
 
-            // ═══════════════════════════════════════════════════════════════════
-            // ИСПРАВЛЕНО: Все ошибки refresh приводят к handleSessionExpired
-            // ═══════════════════════════════════════════════════════════════════
             const needsReauth =
                 errorType === 'NO_REFRESH_TOKEN' ||
                 errorType === 'REFRESH_TOKEN_EXPIRED' ||
-                errorType === 'INVALID_REFRESH_RESPONSE' ||
-                errorType === 'REFRESH_FAILED';
+                errorType === 'INVALID_REFRESH_RESPONSE';
 
             if (needsReauth) {
                 handleSessionExpired(errorType);
@@ -414,44 +544,87 @@ api.interceptors.response.use(
     }
 );
 
-/* ───────── 10. Exports ──────────────────────────────────────────────────── */
+/* ───────── 11. Exports ──────────────────────────────────────────────────── */
 
 export { goToIdm as forceReauth };
 
 export function hasValidTokens(): boolean {
-    return !!memoryAccessToken;
+    return !!memoryAccessToken && memoryAccessToken.length > 10;
 }
 
-// Экспортируем для использования в других местах
 export { handleSessionExpired };
 
-/* ───────── 11. Debug (только для разработки) ───────────────────────────── */
+/* ───────── 12. Debug ───────────────────────────────────────────────────── */
 
-if (!isProdHost) {
-    (window as any).__auth = {
-        getAccessToken: () => memoryAccessToken,
-        getRefreshToken: () => memoryRefreshToken,
-        setDevToken: (token: string) => {
-            memoryAccessToken = token;
-            syncTokensToCookie();
-            console.log('[auth] Dev token set');
-        },
-        setDevTokens: (access: string, refresh: string) => {
-            updateTokens(access, refresh);
-            console.log('[auth] Dev tokens set');
-        },
-        clearTokens: () => {
-            deleteCookie('accessToken');
-            deleteCookie('refreshToken');
-            memoryAccessToken = '';
-            memoryRefreshToken = '';
-            console.log('[auth] Tokens cleared');
-        },
-        getQueueLength: () => failedQueue.length,
-        isRefreshing: () => !!refreshPromise,
-        simulateExpired: () => handleSessionExpired('SIMULATED_EXPIRY'),
-    };
+(window as any).__auth = {
+    // Токены
+    getAccessToken: () => memoryAccessToken,
+    getRefreshToken: () => memoryRefreshToken,
+    getCookieAccessToken: () => getCookie('accessToken'),
+    getCookieRefreshToken: () => getCookie('refreshToken'),
 
-    console.log('[auth] Debug available: window.__auth');
-    console.log('[auth] Commands: getAccessToken(), getRefreshToken(), setDevToken(t), setDevTokens(a,r), clearTokens(), simulateExpired()');
-}
+    // Установка токенов (только dev)
+    setDevToken: (token: string) => {
+        if (isProdHost) {
+            console.warn('[auth] Cannot set tokens on prod');
+            return;
+        }
+        memoryAccessToken = token;
+        syncTokensToCookie();
+        console.log('[auth] Dev token set');
+    },
+    setDevTokens: (access: string, refresh: string) => {
+        if (isProdHost) {
+            console.warn('[auth] Cannot set tokens on prod');
+            return;
+        }
+        updateTokens(access, refresh);
+        console.log('[auth] Dev tokens set');
+    },
+
+    // Очистка
+    clearTokens: () => {
+        clearTokens();
+    },
+
+    // Состояние
+    getQueueLength: () => failedQueue.length,
+    isRefreshing: () => !!refreshPromise,
+
+    // История событий
+    getHistory: () => [...authHistory],
+    getLastEvents: (n: number = 20) => authHistory.slice(-n),
+    getAuthFlow: () => authHistory.filter(e =>
+        ['REQUEST_401', 'REFRESH_START', 'REFRESH_SUCCESS', 'REFRESH_FAIL', 'RETRY_REQUEST', 'SESSION_EXPIRED'].includes(e.type)
+    ),
+    clearHistory: () => {
+        authHistory.length = 0;
+        eventCounter = 0;
+        console.log('[auth] History cleared');
+    },
+
+    // Симуляция
+    simulateExpired: () => handleSessionExpired('SIMULATED_EXPIRY'),
+
+    // Полное состояние
+    getState: () => ({
+        memoryAccessToken: memoryAccessToken ? memoryAccessToken.slice(0, 30) + '...' : '(empty)',
+        memoryRefreshToken: memoryRefreshToken ? memoryRefreshToken.slice(0, 30) + '...' : '(empty)',
+        cookieAccessToken: getCookie('accessToken')?.slice(0, 30) + '...' || '(empty)',
+        cookieRefreshToken: getCookie('refreshToken')?.slice(0, 30) + '...' || '(empty)',
+        tokensMatch: {
+            access: memoryAccessToken === (getCookie('accessToken') || ''),
+            refresh: memoryRefreshToken === (getCookie('refreshToken') || ''),
+        },
+        isRefreshing: !!refreshPromise,
+        queueLength: failedQueue.length,
+        refreshFailCount,
+        isProdHost,
+        historyLength: authHistory.length,
+    }),
+};
+
+console.log(
+    '%c[auth] 🔧 Debug available: window.__auth',
+    'color: #9C27B0; font-weight: bold'
+);

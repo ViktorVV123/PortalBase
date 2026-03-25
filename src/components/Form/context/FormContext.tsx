@@ -232,12 +232,6 @@ export function useDrillContext() {
     const {drill, openDrill, closeDrill} = useFormContext();
     return {drill, openDrill, closeDrill};
 }
-
-export function usePaginationContext() {
-    const {pagination, goToPage, loadMoreRows} = useFormContext();
-    return {pagination, goToPage, loadMoreRows};
-}
-
 export function useSelectionContext() {
     const ctx = useFormContext();
     return {

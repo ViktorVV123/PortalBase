@@ -321,22 +321,28 @@ export const FormProvider: React.FC<FormProviderProps> = ({
     const triggerComboReload = useCallback(() => setComboReloadToken(v => v + 1), []);
 
     // ═══════════════════════════════════════════════════════════
-    // RESET FILTERS: сбрасываем также поисковый запрос
+    // RESET FILTERS: сбрасываем фильтры и загружаем данные с пагинацией
     // ═══════════════════════════════════════════════════════════
     const resetFilters = useCallback(async () => {
         if (!selectedFormId) return;
+
+        // Сбрасываем UI состояние
         setSelectedKey(null);
         setLastPrimary({});
         setSubDisplay(null);
         setActiveSubOrder(availableOrders[0] ?? 0);
         setQ(''); // Сбрасываем поисковый запрос
+        setActiveFilters([]); // Сбрасываем фильтры
+
         try {
-            await resetFiltersHard();
+            // Загружаем данные С ПАГИНАЦИЕЙ (важно!)
+            await loadFormDisplay(selectedFormId, 1);
             await reloadTree();
             resetTreeDrawer();
-        } catch {
+        } catch (e) {
+            console.error('[FormProvider] resetFilters error:', e);
         }
-    }, [selectedFormId, availableOrders, setSubDisplay, resetFiltersHard, reloadTree, resetTreeDrawer, setSelectedKey, setLastPrimary, setActiveSubOrder, setQ]);
+    }, [selectedFormId, availableOrders, setSubDisplay, loadFormDisplay, reloadTree, resetTreeDrawer, setSelectedKey, setLastPrimary, setActiveSubOrder, setQ, setActiveFilters]);
 
     const treeDrawerState = useMemo<TreeDrawerState>(() => ({
         isOpen: isTreeOpen,

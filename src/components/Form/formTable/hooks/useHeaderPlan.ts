@@ -151,8 +151,10 @@ export function useHeaderPlan(formDisplay: FormDisplay | null): HeaderPlanResult
     }, [formDisplay?.columns]);
 
     // 7) фильтруем styles из рендера
+    // 7) фильтруем служебные колонки из рендера (styles, orderASC, orderDESC)
+    const HIDDEN_TYPES = new Set(['styles', 'orderASC', 'orderDESC']);
     const normalizedWithoutStyles = useMemo(() => {
-        return normalizedWithPrimary.filter(c => c.type !== 'styles');
+        return normalizedWithPrimary.filter(c => !HIDDEN_TYPES.has(c.type ?? ''));
     }, [normalizedWithPrimary]);
 
     // 8) группировка по widget_column_id (БЕЗ styles)

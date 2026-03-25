@@ -8,6 +8,7 @@ import {TableToolbar} from '@/components/table/tableToolbar/TableToolbar';
 import {TreeFormTable} from '@/components/Form/treeForm/TreeFormTable';
 import {MainTable} from '@/components/Form/mainTable/MainTable';
 import {SubWormTable} from '@/components/Form/subForm/SubFormTable';
+import {LoadMoreIndicator} from '@/components/Form/mainTable/LoadMoreIndicator';
 
 import {useHeaderPlan} from '@/components/Form/formTable/hooks/useHeaderPlan';
 import {useFiltersTree} from '@/components/Form/formTable/hooks/useFiltersTree';
@@ -18,6 +19,18 @@ import {useTreeHandlers} from '@/components/Form/treeForm/hooks/useTreeHandlers'
 import {useMainCrud} from '@/components/Form/mainTable/hook/useMainCrud';
 
 import type {FormDisplay, SubDisplay, WidgetForm, FormTreeColumn} from '@/shared/hooks/useWorkSpaces';
+
+// ═══════════════════════════════════════════════════════════
+// КОНСТАНТЫ ПАГИНАЦИИ
+// ═══════════════════════════════════════════════════════════
+const DRILL_PAGE_SIZE = 80;
+
+type PaginationState = {
+    currentPage: number;
+    totalPages: number;
+    hasMore: boolean;
+    isLoadingMore: boolean;
+};
 
 /** тот же RowView, что и в MainTable */
 type RowView = { row: FormDisplay['data'][number]; idx: number };
@@ -148,23 +161,95 @@ export const DrillDialog: React.FC<Props> = ({
     const lastLoadedRef = useRef<number | null>(null);
     const inflightRef = useRef<boolean>(false);
 
+    // ═══════════════════════════════════════════════════════════
+    // PAGINATION STATE
+    // ═══════════════════════════════════════════════════════════
+    const [pagination, setPagination] = useState<PaginationState>({
+        currentPage: 1,
+        totalPages: 1,
+        hasMore: false,
+        isLoadingMore: false,
+    });
+
+    // Храним текущий search pattern для loadMoreRows
+    const currentSearchPatternRef = useRef<string>('');
+    // Храним активные фильтры для loadMoreRows
+    const activeFiltersRef = useRef<Array<{ table_column_id: number; value: string | number }>>([]);
+
+    const resetPagination = useCallback(() => {
+        setPagination({
+            currentPage: 1,
+            totalPages: 1,
+            hasMore: false,
+            isLoadingMore: false,
+        });
+        currentSearchPatternRef.current = '';
+    }, []);
+
+    const updatePaginationFromResponse = useCallback((data: FormDisplay, page: number) => {
+        const totalPages = data.displayed_widget?.total ?? 1;
+        const currentPage = data.displayed_widget?.page ?? page;
+        const hasMore = currentPage < totalPages;
+
+        setPagination({
+            currentPage,
+            totalPages,
+            hasMore,
+            isLoadingMore: false,
+        });
+    }, []);
+
+    // ═══════════════════════════════════════════════════════════
+    // SCROLL REF ДЛЯ INFINITE SCROLL
+    // ═══════════════════════════════════════════════════════════
+    const scrollContainerRef = useRef<HTMLDivElement>(null);
+
     const setDisplayBoth = useCallback((v: FormDisplay) => {
         setLocalDisplay(v);
     }, []);
 
-    const fetchMain = useCallback(async (fid: number) => {
+    // ═══════════════════════════════════════════════════════════
+    // FETCH MAIN С ПАГИНАЦИЕЙ
+    // ═══════════════════════════════════════════════════════════
+    const fetchMain = useCallback(async (
+        fid: number,
+        page: number = 1,
+        searchPattern?: string,
+        filters?: Array<{ table_column_id: number; value: string | number }>
+    ) => {
         if (!fid) return;
         if (inflightRef.current) return;
-        if (lastLoadedRef.current === fid && localDisplay) return;
 
         inflightRef.current = true;
         setLoading(true);
         setError(null);
+
         try {
-            const {data} = await api.post<FormDisplay | FormDisplay[]>(`/display/${fid}/main`);
+            const params = new URLSearchParams({
+                limit: String(DRILL_PAGE_SIZE),
+                page: String(page),
+            });
+            if (searchPattern?.trim()) {
+                params.set('search_pattern', searchPattern.trim());
+            }
+
+            const body = filters?.length
+                ? filters.map(f => ({ ...f, value: String(f.value) }))
+                : [];
+
+            const {data} = await api.post<FormDisplay | FormDisplay[]>(
+                `/display/${fid}/main?${params}`,
+                body
+            );
             const d = Array.isArray(data) ? data[0] : data;
-            setLocalDisplay(d ?? null);
-            lastLoadedRef.current = fid;
+
+            if (d) {
+                setLocalDisplay(d);
+                updatePaginationFromResponse(d, page);
+                lastLoadedRef.current = fid;
+            } else {
+                setLocalDisplay(null);
+            }
         } catch (e: any) {
             console.error('[DrillDialog] fetchMain error:', e);
             setError(String(e?.message ?? 'Ошибка загрузки формы'));
@@ -173,17 +258,103 @@ export const DrillDialog: React.FC<Props> = ({
             inflightRef.current = false;
             setLoading(false);
         }
-    }, [localDisplay]);
+    }, [updatePaginationFromResponse]);
+
+    // ═══════════════════════════════════════════════════════════
+    // LOAD MORE ROWS (INFINITE SCROLL)
+    // ═══════════════════════════════════════════════════════════
+    const loadMoreRows = useCallback(async () => {
+        if (!currentFormId) return;
+        if (pagination.isLoadingMore || !pagination.hasMore) return;
+
+        const nextPage = pagination.currentPage + 1;
+
+        setPagination(prev => ({ ...prev, isLoadingMore: true }));
+
+        try {
+            const params = new URLSearchParams({
+                limit: String(DRILL_PAGE_SIZE),
+                page: String(nextPage),
+            });
+
+            const searchPattern = currentSearchPatternRef.current;
+            if (searchPattern?.trim()) {
+                params.set('search_pattern', searchPattern.trim());
+            }
+
+            // Используем сохранённые фильтры
+            const filters = activeFiltersRef.current;
+            const body = filters.length
+                ? filters.map(f => ({ ...f, value: String(f.value) }))
+                : [];
+
+            const {data} = await api.post<FormDisplay>(
+                `/display/${currentFormId}/main?${params}`,
+                body
+            );
+
+            // Добавляем новые строки к существующим
+            setLocalDisplay(prev => {
+                if (!prev) return data;
+
+                const existingKeys = new Set(
+                    prev.data.map(row => JSON.stringify(row.primary_keys))
+                );
+
+                const newRows = (data.data ?? []).filter(
+                    row => !existingKeys.has(JSON.stringify(row.primary_keys))
+                );
+
+                return {
+                    ...prev,
+                    data: [...prev.data, ...newRows],
+                    displayed_widget: data.displayed_widget,
+                };
+            });
+
+            updatePaginationFromResponse(data, nextPage);
+        } catch (e) {
+            console.warn('[DrillDialog] loadMoreRows error:', e);
+            setPagination(prev => ({ ...prev, isLoadingMore: false }));
+        }
+    }, [currentFormId, pagination, updatePaginationFromResponse]);
+
+    // ═══════════════════════════════════════════════════════════
+    // INFINITE SCROLL HANDLER
+    // ═══════════════════════════════════════════════════════════
+    useEffect(() => {
+        const el = scrollContainerRef.current;
+        if (!el) return;
+
+        const handleScroll = () => {
+            if (pagination.isLoadingMore || !pagination.hasMore) return;
+
+            const { scrollTop, scrollHeight, clientHeight } = el;
+            const distanceToBottom = scrollHeight - scrollTop - clientHeight;
+
+            if (distanceToBottom < 300) {
+                loadMoreRows();
+            }
+        };
+
+        el.addEventListener('scroll', handleScroll, { passive: true });
+        return () => el.removeEventListener('scroll', handleScroll);
+    }, [pagination.isLoadingMore, pagination.hasMore, loadMoreRows]);
 
     useEffect(() => {
         if (!currentFormId) return;
         if (display && formId === currentFormId) {
             setLocalDisplay(display);
+            // Обновляем пагинацию из переданного display
+            if (display.displayed_widget) {
+                updatePaginationFromResponse(display, 1);
+            }
             lastLoadedRef.current = currentFormId;
             return;
         }
-        fetchMain(currentFormId).catch(() => {});
-    }, [currentFormId, display, formId, fetchMain]);
+        resetPagination();
+        fetchMain(currentFormId, 1).catch(() => {});
+    }, [currentFormId, display, formId, fetchMain, resetPagination, updatePaginationFromResponse]);
 
     const widFromMap = useMemo<number | null>(() => {
         if (!currentFormId) return null;
@@ -301,6 +472,11 @@ export const DrillDialog: React.FC<Props> = ({
         resetFiltersHard,
     } = useFiltersTree(currentFormId, setLocalDisplay);
 
+    // Синхронизируем activeFilters в ref для loadMoreRows
+    useEffect(() => {
+        activeFiltersRef.current = activeFilters;
+    }, [activeFilters]);
+
     const {handleNestedValueClick, handleTreeValueClick} = useTreeHandlers({
         selectedFormId: currentFormId,
         activeFilters,
@@ -351,9 +527,16 @@ export const DrillDialog: React.FC<Props> = ({
         // Callback для серверного поиска
         useCallback(async (searchPattern: string) => {
             if (!currentFormId) return;
+
+            // Сохраняем search pattern для loadMoreRows
+            currentSearchPatternRef.current = searchPattern;
+
+            // Сбрасываем пагинацию и загружаем с 1й страницы
+            resetPagination();
+
             try {
                 const params = new URLSearchParams({
-                    limit: '80',
+                    limit: String(DRILL_PAGE_SIZE),
                     page: '1',
                 });
                 if (searchPattern.trim()) {
@@ -369,10 +552,11 @@ export const DrillDialog: React.FC<Props> = ({
                     body
                 );
                 setLocalDisplay(data);
+                updatePaginationFromResponse(data, 1);
             } catch (e) {
                 console.warn('[DrillDialog] server search failed:', e);
             }
-        }, [currentFormId, activeFilters])
+        }, [currentFormId, activeFilters, resetPagination, updatePaginationFromResponse])
     );
 
     const selectedWidgetForPreflight = useMemo(() => {
@@ -415,7 +599,8 @@ export const DrillDialog: React.FC<Props> = ({
         cancelEdit();
         cancelAdd();
         setDraft({});
-    }, [currentFormId, cancelEdit, cancelAdd, setDraft]);
+        resetPagination();
+    }, [currentFormId, cancelEdit, cancelAdd, setDraft, resetPagination]);
 
     const submitAddWithMark = useCallback(async () => {
         try {
@@ -474,7 +659,8 @@ export const DrillDialog: React.FC<Props> = ({
         setSubDisplay(null);
         lastLoadedRef.current = null;
         setLocalDisplay(null);
-    }, [pushForm, setActiveFilters, setActiveExpandedKey, setSelectedKey, setLastPrimary]);
+        resetPagination();
+    }, [pushForm, setActiveFilters, setActiveExpandedKey, setSelectedKey, setLastPrimary, resetPagination]);
 
     const startAddSafe = useCallback(() => {
         if (!localDisplay) return;
@@ -494,9 +680,13 @@ export const DrillDialog: React.FC<Props> = ({
         setLastPrimary({});
         setSubDisplay(null);
         setActiveSubOrder(availableOrders[0] ?? 0);
+        resetPagination();
+        currentSearchPatternRef.current = '';
 
         try {
             await resetFiltersHard();
+            // Перезагружаем с первой страницы
+            await fetchMain(currentFormId, 1);
             if (effectiveComboboxMode && hasTreeFields) {
                 await reloadTree();
             }
@@ -514,6 +704,8 @@ export const DrillDialog: React.FC<Props> = ({
         resetFiltersHard,
         reloadTree,
         setActiveFilters,
+        resetPagination,
+        fetchMain,
     ]);
 
     if (!currentFormId) return null;
@@ -617,48 +809,68 @@ export const DrillDialog: React.FC<Props> = ({
                 {loading && <div style={{opacity: 0.7, padding: 12}}>Загрузка…</div>}
                 {!!error && <div style={{color: 'var(--theme-error)', padding: 12}}>Ошибка: {error}</div>}
 
-               {/* {(resolvedWidgetId || resolvedTableId) && (
-                    <div style={{opacity: 0.7, padding: '4px 12px', fontSize: 12, color: 'var(--theme-text-secondary)'}}>
-                        Виджет: #{resolvedWidgetId ?? '—'} ·
-                        Таблица: {resolvingTable ? '…' : (resolvedTableId ?? '—')}
-                        {!!resolveErr && <span style={{color: 'var(--theme-error)'}}> · {resolveErr}</span>}
-                    </div>
-                )}*/}
-
                 {!localDisplay ? (
                     <div style={{opacity: 0.7, padding: 12}}>Готовлю данные…</div>
                 ) : (
-                    <div className={s.contentRow}>
+                    <div className={s.contentRow} style={{ maxHeight: '70vh', minHeight: 0 }}>
                         {effectiveComboboxMode && hasTreeFields && (
-                            <TreeFormTable
-                                tree={liveTree}
-                                selectedFormId={currentFormId}
-                                handleNestedValueClick={handleNestedValueClick}
-                                handleTreeValueClick={handleTreeValueClick}
-                                expandedKeys={treeExpandedKeys}
-                                setExpandedKeys={setTreeExpandedKeys}
-                                childrenCache={treeChildrenCache}
-                                setChildrenCache={setTreeChildrenCache}
-                                onFilterMain={async (filters) => {
-                                    if (!currentFormId) return;
-                                    try {
-                                        const { data } = await api.post<FormDisplay>(
-                                            `/display/${currentFormId}/main`,
-                                            filters.map((f) => ({ ...f, value: String(f.value) }))
-                                        );
-                                        setLocalDisplay(data);
-                                        setActiveFilters(filters);
-                                        setSelectedKey(null);
-                                        setLastPrimary({});
-                                        setSubDisplay(null);
-                                    } catch (e) {
-                                        console.warn('[DrillDialog] onFilterMain failed:', e);
-                                    }
+                            <div
+                                style={{
+                                    maxHeight: '60vh',
+                                    overflowY: 'auto',
+                                    overflowX: 'hidden',
+                                    minWidth: '200px',
+                                    maxWidth: '320px',
+                                    flexShrink: 0,
+                                    borderRight: '1px solid var(--theme-border, rgba(255,255,255,0.1))',
+                                    paddingRight: '8px',
                                 }}
-                            />
+                            >
+                                <TreeFormTable
+                                    tree={liveTree}
+                                    selectedFormId={currentFormId}
+                                    handleNestedValueClick={handleNestedValueClick}
+                                    handleTreeValueClick={handleTreeValueClick}
+                                    expandedKeys={treeExpandedKeys}
+                                    setExpandedKeys={setTreeExpandedKeys}
+                                    childrenCache={treeChildrenCache}
+                                    setChildrenCache={setTreeChildrenCache}
+                                    onFilterMain={async (filters) => {
+                                        if (!currentFormId) return;
+                                        resetPagination();
+                                        try {
+                                            const params = new URLSearchParams({
+                                                limit: String(DRILL_PAGE_SIZE),
+                                                page: '1',
+                                            });
+                                            const { data } = await api.post<FormDisplay>(
+                                                `/display/${currentFormId}/main?${params}`,
+                                                filters.map((f) => ({ ...f, value: String(f.value) }))
+                                            );
+                                            setLocalDisplay(data);
+                                            updatePaginationFromResponse(data, 1);
+                                            setActiveFilters(filters);
+                                            setSelectedKey(null);
+                                            setLastPrimary({});
+                                            setSubDisplay(null);
+                                        } catch (e) {
+                                            console.warn('[DrillDialog] onFilterMain failed:', e);
+                                        }
+                                    }}
+                                />
+                            </div>
                         )}
 
-                        <div className={s.mainCol}>
+                        <div
+                            className={s.mainCol}
+                            style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                flex: 1,
+                                minHeight: 0,
+                                maxHeight: '60vh', // Ограничиваем высоту для scroll
+                            }}
+                        >
                             <TableToolbar
                                 showMainActions={showMainActions}
                                 showSubActions={
@@ -687,36 +899,54 @@ export const DrillDialog: React.FC<Props> = ({
                                 cancelAdd={cancelAdd}
                             />
 
-                            <MainTable
-                                formId={currentFormId}
-                                headerPlan={headerPlan as any}
-                                showSubHeaders={effectiveComboboxMode && hasSubWidgets ? showSubHeaders : false}
-                                onToggleSubHeaders={() =>
-                                    effectiveComboboxMode && hasSubWidgets && setShowSubHeaders(v => !v)
-                                }
-                                onOpenDrill={disableNestedDrill ? undefined : handleOpenDrill}
-                                isAdding={isAdding}
-                                draft={draft}
-                                onDraftChange={(tcId, v) => setDraft(prev => ({...prev, [tcId]: v}))}
-                                flatColumnsInRenderOrder={flatColumnsInRenderOrder}
-                                isColReadOnly={isColReadOnly}
-                                placeholderFor={(c) => c.placeholder ?? c.column_name}
-                                filteredRows={sortedFilteredRows}
-                                valueIndexByKey={valueIndexByKey}
-                                selectedKey={selectedKey}
-                                pkToKey={pkToKey}
-                                editingRowIdx={editingRowIdx}
-                                editDraft={editDraft}
-                                onEditDraftChange={(tcId, v) => setEditDraft(prev => ({...prev, [tcId]: v}))}
-                                editSaving={editSaving}
-                                onRowClick={disableNestedDrill ? handleRowClickForSelect : handleRowClick}
-                                onStartEdit={startEdit}
-                                comboReloadToken={0}
-                                onSubmitEdit={submitEditWithMark}
-                                onCancelEdit={cancelEdit}
-                                onDeleteRow={deleteRowWithMark}
-                                deletingRowIdx={deletingRowIdx}
-                            />
+                            {/* Scroll container для infinite scroll */}
+                            <div
+                                ref={scrollContainerRef}
+                                style={{
+                                    flex: 1,
+                                    overflow: 'auto',
+                                    minHeight: 0,
+                                }}
+                            >
+                                <MainTable
+                                    formId={currentFormId}
+                                    headerPlan={headerPlan as any}
+                                    showSubHeaders={effectiveComboboxMode && hasSubWidgets ? showSubHeaders : false}
+                                    onToggleSubHeaders={() =>
+                                        effectiveComboboxMode && hasSubWidgets && setShowSubHeaders(v => !v)
+                                    }
+                                    onOpenDrill={disableNestedDrill ? undefined : handleOpenDrill}
+                                    isAdding={isAdding}
+                                    draft={draft}
+                                    onDraftChange={(tcId, v) => setDraft(prev => ({...prev, [tcId]: v}))}
+                                    flatColumnsInRenderOrder={flatColumnsInRenderOrder}
+                                    isColReadOnly={isColReadOnly}
+                                    placeholderFor={(c) => c.placeholder ?? c.column_name}
+                                    filteredRows={sortedFilteredRows}
+                                    valueIndexByKey={valueIndexByKey}
+                                    selectedKey={selectedKey}
+                                    pkToKey={pkToKey}
+                                    editingRowIdx={editingRowIdx}
+                                    editDraft={editDraft}
+                                    onEditDraftChange={(tcId, v) => setEditDraft(prev => ({...prev, [tcId]: v}))}
+                                    editSaving={editSaving}
+                                    onRowClick={disableNestedDrill ? handleRowClickForSelect : handleRowClick}
+                                    onStartEdit={startEdit}
+                                    comboReloadToken={0}
+                                    onSubmitEdit={submitEditWithMark}
+                                    onCancelEdit={cancelEdit}
+                                    onDeleteRow={deleteRowWithMark}
+                                    deletingRowIdx={deletingRowIdx}
+                                />
+
+                                {/* Индикатор загрузки / конец списка */}
+                                <LoadMoreIndicator
+                                    isLoading={pagination.isLoadingMore}
+                                    hasMore={pagination.hasMore}
+                                    loadedCount={localDisplay?.data?.length ?? 0}
+                                    totalCount={pagination.totalPages * DRILL_PAGE_SIZE}
+                                />
+                            </div>
 
                             {enableSub && (
                                 <SubWormTable

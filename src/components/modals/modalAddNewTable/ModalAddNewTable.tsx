@@ -17,6 +17,73 @@ type Props = {
 };
 
 // ═══════════════════════════════════════════════════════════
+// Парсинг ошибки из бэкенда + перевод на русский
+// ═══════════════════════════════════════════════════════════
+
+/** Переводим типичные Postgres / бэкенд ошибки на понятный язык */
+function humanizeError(raw: string): string {
+    const s = raw.split('\n')[0].trim(); // берём только первую строку
+
+    if (/can'?t execute an empty query/i.test(s))
+        return 'Запрос пустой — введите SQL-выражение';
+
+    if (/syntax error at or near/i.test(s)) {
+        const m = s.match(/near\s+"([^"]+)"/i);
+        return m ? `Синтаксическая ошибка рядом с «${m[1]}»` : 'Синтаксическая ошибка в запросе';
+    }
+
+    if (/relation "([^"]+)" does not exist/i.test(s)) {
+        const m = s.match(/relation "([^"]+)"/i);
+        return m ? `Таблица «${m[1]}» не найдена` : 'Указанная таблица не найдена';
+    }
+
+    if (/column "([^"]+)" does not exist/i.test(s)) {
+        const m = s.match(/column "([^"]+)"/i);
+        return m ? `Колонка «${m[1]}» не найдена` : 'Указанная колонка не найдена';
+    }
+
+    if (/permission denied/i.test(s))
+        return 'Недостаточно прав для выполнения запроса';
+
+    if (/unterminated quoted string/i.test(s))
+        return 'Незакрытая кавычка в запросе';
+
+    if (/division by zero/i.test(s))
+        return 'Деление на ноль в запросе';
+
+    if (/duplicate key/i.test(s))
+        return 'Запись с таким ключом уже существует';
+
+    if (/connection refused|could not connect/i.test(s))
+        return 'Не удалось подключиться к базе данных';
+
+    // Если ничего не распознали — возвращаем первую строку как есть
+    return s;
+}
+
+function parseApiError(err: unknown): string {
+    const response = (err as any)?.response;
+    const status = response?.status;
+    const detail = response?.data?.detail;
+
+    // detail — объект с error_msg (новый формат)
+    if (detail && typeof detail === 'object' && !Array.isArray(detail)) {
+        const errorMsg = detail.error_msg as string | undefined;
+        if (errorMsg) return humanizeError(errorMsg);
+    }
+
+    // detail — строка
+    if (typeof detail === 'string') return detail;
+
+    // Fallback по статусу
+    if (status === 500) return 'Внутренняя ошибка сервера';
+    if (status === 422) return 'Некорректные данные';
+    if (status === 403) return 'Недостаточно прав';
+
+    return 'Не удалось создать таблицу';
+}
+
+// ═══════════════════════════════════════════════════════════
 // СТИЛИ ДЛЯ ДИАЛОГА — используем CSS переменные темы
 // ═══════════════════════════════════════════════════════════
 const dialogPaperSx = {
@@ -91,8 +158,8 @@ export const ModalAddTable = ({
                 ...form,
             });
             onSuccess(data);
-        } catch {
-            setError('Не удалось создать таблицу');
+        } catch (err) {
+            setError(parseApiError(err));
         } finally {
             setLoading(false);
         }
@@ -181,8 +248,22 @@ export const ModalAddTable = ({
                         />
 
                         {error && (
-                            <Box sx={{ color: 'var(--theme-error)' }}>
-                                {error}
+                            <Box
+                                sx={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 1,
+                                    px: 1.5,
+                                    py: 1,
+                                    borderRadius: '6px',
+                                    fontSize: '0.82rem',
+                                    backgroundColor: 'color-mix(in srgb, var(--theme-error) 10%, transparent)',
+                                    color: 'var(--theme-error)',
+                                    border: '1px solid color-mix(in srgb, var(--theme-error) 25%, transparent)',
+                                }}
+                            >
+                                <span style={{ flexShrink: 0 }}>⚠</span>
+                                <span>{error}</span>
                             </Box>
                         )}
                     </Stack>
