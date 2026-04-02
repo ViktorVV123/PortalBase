@@ -320,6 +320,40 @@ export const DrillDialog: React.FC<Props> = ({
     }, [currentFormId, pagination, updatePaginationFromResponse]);
 
     // ═══════════════════════════════════════════════════════════
+    // FIX: Scroll container height collapse
+    // Когда форма без tree_fields/sub_widgets, flex-цепочка
+    // схлопывает scroll container до height=0.
+    // Принудительно задаём высоту через ref.
+    // ═══════════════════════════════════════════════════════════
+    useEffect(() => {
+        const el = scrollContainerRef.current;
+        if (!el || !localDisplay) return;
+
+        const timers: ReturnType<typeof setTimeout>[] = [];
+
+        const fix = () => {
+            if (!el) return;
+            const rect = el.getBoundingClientRect();
+            if (rect.height < 10 && el.scrollHeight > 10) {
+                // Высота = контент, но не больше 60vh (достаточно для таблицы + add row)
+                const contentH = el.scrollHeight;
+                const maxH = Math.round(window.innerHeight * 0.6);
+                const targetH = Math.min(contentH + 40, maxH);
+                el.style.height = `${Math.max(200, targetH)}px`;
+                el.style.minHeight = '200px';
+            }
+        };
+
+        fix();
+        timers.push(setTimeout(fix, 50));
+        timers.push(setTimeout(fix, 150));
+        timers.push(setTimeout(fix, 300));
+        timers.push(setTimeout(fix, 500));
+
+        return () => timers.forEach(clearTimeout);
+    }, [localDisplay]);
+
+    // ═══════════════════════════════════════════════════════════
     // INFINITE SCROLL HANDLER
     // ═══════════════════════════════════════════════════════════
     useEffect(() => {
