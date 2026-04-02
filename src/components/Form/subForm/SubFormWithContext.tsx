@@ -191,10 +191,11 @@ export const SubFormWithContext: React.FC<Props> = ({
         if (!onOpenDrill) return;
 
         // Вызываем родительский onOpenDrill с meta
+        // Сохраняем оригинальный openedFromEdit из SubWormTable:
+        // - false = просмотр (drill навигация, кликнули на ссылку в view mode)
+        // - true = редактирование (выбор значения для combobox в edit mode)
         onOpenDrill(fid, {
             ...meta,
-            // openedFromEdit: true говорит что мы в режиме выбора значения
-            openedFromEdit: true,
         });
     }, [onOpenDrill]);
 

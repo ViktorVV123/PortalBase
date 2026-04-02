@@ -994,7 +994,7 @@ export const DrillDialog: React.FC<Props> = ({
                             {enableSub && (
                                 <SubWormTable
                                     comboReloadToken={comboReloadToken + localComboReloadToken}
-                                    onOpenDrill={disableNestedDrill ? undefined : handleOpenDrill}
+                                    onOpenDrill={handleOpenDrill}
                                     editingRowIdx={null}
                                     setEditingRowIdx={() => {}}
                                     editDraft={{}}

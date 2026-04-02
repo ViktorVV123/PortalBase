@@ -355,9 +355,27 @@ export function useMainCrud({
             if (writeTcId != null && !seen.has(writeTcId)) {
                 const isTriState = c.type === 'checkboxNull';
                 const isCheckbox = c.type === 'checkbox' || c.type === 'bool';
-                if (isTriState) init[writeTcId] = 'null';
-                else if (isCheckbox) init[writeTcId] = 'false';
-                else init[writeTcId] = String(c.default ?? '');
+                if (isTriState) {
+                    // checkboxNull: default может быть 'true'/'1'/'null'/etc
+                    if (c.default != null && c.default !== '') {
+                        const d = String(c.default).trim().toLowerCase();
+                        if (d === 'null' || d === '') init[writeTcId] = 'null';
+                        else if (['1', 'true', 't', 'yes', 'да'].includes(d)) init[writeTcId] = 'true';
+                        else init[writeTcId] = 'false';
+                    } else {
+                        init[writeTcId] = 'null';
+                    }
+                } else if (isCheckbox) {
+                    // checkbox/bool: default "1"/"true" → true, остальное → false
+                    if (c.default != null && c.default !== '') {
+                        const d = String(c.default).trim().toLowerCase();
+                        init[writeTcId] = ['1', 'true', 't', 'yes', 'да'].includes(d) ? 'true' : 'false';
+                    } else {
+                        init[writeTcId] = 'false';
+                    }
+                } else {
+                    init[writeTcId] = String(c.default ?? '');
+                }
                 seen.add(writeTcId);
             }
             i++;
