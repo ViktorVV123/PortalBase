@@ -160,6 +160,8 @@ export function useComboOptions(
     const [options, setOptions] = React.useState<ComboOption[]>([]);
     const [error, setError] = React.useState<string | null>(null);
     const [ready, setReady] = React.useState(false);
+    // Внутренний токен для принудительной перезагрузки
+    const [internalReload, setInternalReload] = React.useState(0);
 
     React.useEffect(() => {
         if (!widgetColumnId || !writeTcId) {
@@ -175,10 +177,10 @@ export function useComboOptions(
             setError(null);
 
             try {
-                // Если reloadToken > 0 — принудительно инвалидируем кэш
-                if (reloadToken > 0) {
+                // Если reloadToken > 0 или internalReload > 0 — принудительно инвалидируем кэш
+                if (reloadToken > 0 || internalReload > 0) {
                     comboCache.invalidate(widgetColumnId, writeTcId);
-                    logCombo('cache:forced-invalidate', { widgetColumnId, writeTcId, reloadToken });
+                    logCombo('cache:forced-invalidate', { widgetColumnId, writeTcId, reloadToken, internalReload });
                 }
 
                 const opts = await loadComboOptionsOnce(widgetColumnId, writeTcId);
@@ -204,9 +206,14 @@ export function useComboOptions(
         return () => {
             cancelled = true;
         };
-    }, [widgetColumnId, writeTcId, reloadToken]);
+    }, [widgetColumnId, writeTcId, reloadToken, internalReload]);
 
-    return { loading, options, error, ready };
+    // Функция для принудительной перезагрузки (когда значение не найдено)
+    const forceReload = React.useCallback(() => {
+        setInternalReload(v => v + 1);
+    }, []);
+
+    return { loading, options, error, ready, forceReload };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -347,11 +354,32 @@ export const InputCell: React.FC<InputCellProps> = ({
 
     const shouldRenderAsCombo = col.type === 'combobox';
 
-    const { options, loading, ready } = useComboOptions(
+    const { options, loading, ready, forceReload } = useComboOptions(
         col.widget_column_id,
         shouldRenderAsCombo ? writeTcId : null,
         comboReloadToken,
     );
+
+    // ═══════════════════════════════════════════════════════════
+    // FIX: Если значение не найдено в опциях — перезагружаем.
+    // Это происходит после добавления записи через DrillDialog.
+    // ═══════════════════════════════════════════════════════════
+    const retryValueRef = React.useRef<string | null>(null);
+
+    React.useEffect(() => {
+        if (!shouldRenderAsCombo || !ready || loading) return;
+        const currentValue = value ?? '';
+        if (!currentValue) return;
+        const found = options.some(o => o.id === currentValue);
+        if (found) {
+            retryValueRef.current = null;
+            return;
+        }
+        // Не делаем повторный retry для того же значения
+        if (retryValueRef.current === currentValue) return;
+        retryValueRef.current = currentValue;
+        forceReload();
+    }, [shouldRenderAsCombo, value, options, ready, loading, forceReload]);
 
     // ───── combobox ─────
     if (shouldRenderAsCombo) {

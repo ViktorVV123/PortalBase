@@ -139,7 +139,7 @@ export const ComboEditDisplay: React.FC<ComboEditDisplayProps> = ({
         });
     }
 
-    const { options, loading, ready, error } = useComboOptions(
+    const { options, loading, ready, error, forceReload } = useComboOptions(
         primary.widget_column_id,
         writeTcId,
         comboReloadToken ?? 0,

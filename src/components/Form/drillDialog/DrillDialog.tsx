@@ -135,9 +135,15 @@ export const DrillDialog: React.FC<Props> = ({
         setFormStack(prev => (prev[prev.length - 1] === fid ? prev : [...prev, fid]));
     }, []);
 
+    // Локальный токен для инвалидации combobox кэша после CRUD в DrillDialog
+    const [localComboReloadToken, setLocalComboReloadToken] = useState(0);
+    const bumpComboReload = useCallback(() => setLocalComboReloadToken(v => v + 1), []);
+
     const popForm = useCallback(() => {
         setFormStack(prev => (prev.length > 1 ? prev.slice(0, -1) : prev));
-    }, []);
+        // Инвалидируем combobox кэш — вложенная форма могла добавить/изменить записи
+        bumpComboReload();
+    }, [bumpComboReload]);
 
     const currentForm: WidgetForm | null = useMemo(
         () => (currentFormId ? (formsById[currentFormId] ?? null) : null),
@@ -640,22 +646,25 @@ export const DrillDialog: React.FC<Props> = ({
         try {
             await submitAdd();
             setHasCrudChanges(true);
+            bumpComboReload();
         } catch (e) {}
-    }, [submitAdd]);
+    }, [submitAdd, bumpComboReload]);
 
     const submitEditWithMark = useCallback(async () => {
         try {
             await submitEdit();
             setHasCrudChanges(true);
+            bumpComboReload();
         } catch (e) {}
-    }, [submitEdit]);
+    }, [submitEdit, bumpComboReload]);
 
     const deleteRowWithMark = useCallback(async (rowIdx: number) => {
         try {
             await deleteRow(rowIdx);
             setHasCrudChanges(true);
+            bumpComboReload();
         } catch (e) {}
-    }, [deleteRow]);
+    }, [deleteRow, bumpComboReload]);
 
     const {
         isAddingSub, setIsAddingSub, draftSub, setDraftSub,
@@ -966,7 +975,7 @@ export const DrillDialog: React.FC<Props> = ({
                                     editSaving={editSaving}
                                     onRowClick={disableNestedDrill ? handleRowClickForSelect : handleRowClick}
                                     onStartEdit={startEdit}
-                                    comboReloadToken={0}
+                                    comboReloadToken={localComboReloadToken}
                                     onSubmitEdit={submitEditWithMark}
                                     onCancelEdit={cancelEdit}
                                     onDeleteRow={deleteRowWithMark}
@@ -984,7 +993,7 @@ export const DrillDialog: React.FC<Props> = ({
 
                             {enableSub && (
                                 <SubWormTable
-                                    comboReloadToken={comboReloadToken}
+                                    comboReloadToken={comboReloadToken + localComboReloadToken}
                                     onOpenDrill={disableNestedDrill ? undefined : handleOpenDrill}
                                     editingRowIdx={null}
                                     setEditingRowIdx={() => {}}
