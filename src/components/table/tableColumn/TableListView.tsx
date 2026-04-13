@@ -40,7 +40,7 @@ export const TableListView: React.FC<Props> = ({selectedTable, updateTableMeta,p
             {/* ═══════════════════════════════════════════════════════════
                 Название таблицы
             ═══════════════════════════════════════════════════════════ */}
-            <div>
+           {/* <div>
                 <Typography
                     variant="h5"
                     sx={{
@@ -53,7 +53,7 @@ export const TableListView: React.FC<Props> = ({selectedTable, updateTableMeta,p
                     {selectedTable.name}
                 </Typography>
 
-            </div>
+            </div>*/}
 
             {/* ═══════════════════════════════════════════════════════════
                 Панель действий

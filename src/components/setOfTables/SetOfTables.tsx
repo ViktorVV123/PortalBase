@@ -1,6 +1,6 @@
 // src/components/setOfTables/SetOfTables.tsx
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import * as s from './SetOfTables.module.scss';
 
 import type {
@@ -68,6 +68,8 @@ type WidgetProps = {
         type: string;
         column_order: number;
     }) => Promise<WidgetColumn>;
+    widgetsByTable: Record<number, Widget[]>;
+    loadWidgetsForTable: (tableId: number, force?: boolean) => Promise<Widget[]>;
 };
 
 /** Пропсы для работы с references */
@@ -171,6 +173,8 @@ export const SetOfTables: React.FC<Props> = (props) => {
         selectedWidget,
         wColsLoading,
         wColsError,
+        handleClearWidget,
+        handleSelectWidget,
         setSelectedWidget,
         setWidgetsByTable,
         deleteColumnWidget,
@@ -178,6 +182,8 @@ export const SetOfTables: React.FC<Props> = (props) => {
         loadColumnsWidget,
         updateWidgetMeta,
         addWidgetColumn,
+        widgetsByTable,
+        loadWidgetsForTable,
 
         // References
         fetchReferences,
@@ -228,6 +234,15 @@ export const SetOfTables: React.FC<Props> = (props) => {
         referencesMap,
         liveRefsForHeader ?? undefined
     );
+
+    // ═══════════════════════════════════════════════════════════
+    // Загружаем виджеты для таблицы (для навигационной панели)
+    // ═══════════════════════════════════════════════════════════
+    useEffect(() => {
+        if (selectedTable && !selectedWidget) {
+            loadWidgetsForTable(selectedTable.id);
+        }
+    }, [selectedTable, selectedWidget, loadWidgetsForTable]);
 
     // ═══════════════════════════════════════════════════════════
     // RENDER
@@ -290,6 +305,21 @@ export const SetOfTables: React.FC<Props> = (props) => {
             ════════════════════════════════════════════════════ */}
             {!selectedFormId && selectedWidget && (
                 <>
+                    {/* Кнопка «← Таблица» для возврата к TableColumn */}
+                    {selectedTable && (
+                        <div className={s.navBar}>
+                            <button
+                                className={s.navBtn}
+                                onClick={() => handleClearWidget()}
+                                title={`Вернуться к таблице «${selectedTable.name}»`}
+                            >
+                                ← {selectedTable.name}
+                            </button>
+                            <span className={s.navSeparator}>›</span>
+                            <span className={s.navCurrent}>{selectedWidget.name}</span>
+                        </div>
+                    )}
+
                     {wColsLoading ? (
                         <div className={s.loaderArea}>
                             <CenteredLoader label="Загружаем виджет…" />
@@ -329,16 +359,39 @@ export const SetOfTables: React.FC<Props> = (props) => {
                 PRIORITY 3: TABLE COLUMNS
             ════════════════════════════════════════════════════ */}
             {!selectedFormId && !selectedWidget && selectedTable && (
-                <TableColumn
-                    publishTable={publishTable}
-                    selectedTable={selectedTable}
-                    updateTableMeta={updateTableMeta}
-                    columns={columns}
-                    tableId={selectedTable.id}
-                    deleteColumnTable={deleteColumnTable}
-                    updateTableColumn={updateTableColumn}
-                    onCreated={() => selectedTable && loadColumns(selectedTable)}
-                />
+                <>
+                    {/* Список виджетов для быстрого перехода */}
+                    {(() => {
+                        const widgets = widgetsByTable[selectedTable.id] ?? [];
+                        return widgets.length > 0 ? (
+                            <div className={s.navBar}>
+                                <span className={s.navCurrent}>{selectedTable.name}</span>
+                                <span className={s.navSeparator}>›</span>
+                                {widgets.map((w) => (
+                                    <button
+                                        key={w.id}
+                                        className={s.navBtn}
+                                        onClick={() => handleSelectWidget(w)}
+                                        title={w.description ?? w.name}
+                                    >
+                                        {w.name}
+                                    </button>
+                                ))}
+                            </div>
+                        ) : null;
+                    })()}
+
+                    <TableColumn
+                        publishTable={publishTable}
+                        selectedTable={selectedTable}
+                        updateTableMeta={updateTableMeta}
+                        columns={columns}
+                        tableId={selectedTable.id}
+                        deleteColumnTable={deleteColumnTable}
+                        updateTableColumn={updateTableColumn}
+                        onCreated={() => selectedTable && loadColumns(selectedTable)}
+                    />
+                </>
             )}
         </div>
     );

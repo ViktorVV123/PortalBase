@@ -226,6 +226,8 @@ export const Main = () => {
         loadColumnsWidget,
         updateWidgetMeta,
         addWidgetColumn,
+        widgetsByTable,
+        loadWidgetsForTable,
 
         // References
         fetchReferences,

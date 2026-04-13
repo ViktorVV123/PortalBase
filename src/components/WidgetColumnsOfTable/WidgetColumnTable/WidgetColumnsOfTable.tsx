@@ -357,7 +357,7 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                     </Stack>
                 </Tooltip>
 
-                <div className={s.titleSection}>
+               {/* <div className={s.titleSection}>
                     {selectedWidget && (
                         <>
                             <h2 className={s.widgetName} title={selectedWidget.name}>
@@ -365,7 +365,7 @@ export const WidgetColumnsOfTable: React.FC<Props> = ({
                             </h2>
                         </>
                     )}
-                </div>
+                </div>*/}
 
 
                 <span className={s.headerLink} onClick={() => setModalOpen(true)}>

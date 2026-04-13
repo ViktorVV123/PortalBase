@@ -42,7 +42,10 @@ export type FormProviderProps = {
     loadFilteredFormDisplay: (formId: number, filters: {
         table_column_id: number;
         value: string | number
-    } | Array<{ table_column_id: number; value: string | number }>, page?: number, searchPattern?: string) => Promise<void>;
+    } | Array<{
+        table_column_id: number;
+        value: string | number
+    }>, page?: number, searchPattern?: string) => Promise<void>;
     loadFormTree: (formId: number) => Promise<void>;
     // ═══════════════════════════════════════════════════════════
     // ОБНОВЛЕНО: loadFormDisplay теперь принимает searchPattern
@@ -190,7 +193,7 @@ export const FormProvider: React.FC<FormProviderProps> = ({
         flatColumnsInRenderOrder,
         valueIndexByKey,
         currentForm?.search_bar,
-        { debounceMs: 350 },
+        {debounceMs: 350},
         handleServerSearch // Передаём callback для серверного поиска
     );
 
@@ -202,7 +205,6 @@ export const FormProvider: React.FC<FormProviderProps> = ({
 
         setRefreshing(true);
         try {
-            // Используем текущий поисковый запрос если есть
             const currentSearchPattern = q?.trim() || undefined;
 
             if (activeFilters.length > 0) {
@@ -215,12 +217,21 @@ export const FormProvider: React.FC<FormProviderProps> = ({
             } else {
                 await loadFormDisplay(selectedFormId, 1, currentSearchPattern);
             }
+
+            // Обновляем SubForm если есть выбранная строка
+            if (Object.keys(lastPrimary).length > 0 && activeSubOrder != null) {
+                try {
+                    await loadSubDisplay(selectedFormId, activeSubOrder, lastPrimary);
+                } catch (e) {
+                    console.warn('[FormProvider] refreshData sub error:', e);
+                }
+            }
         } catch (e) {
             console.error('[FormProvider] refreshData error:', e);
         } finally {
             setRefreshing(false);
         }
-    }, [selectedFormId, refreshing, q, activeFilters, loadFilteredFormDisplay, loadFormDisplay]);
+    }, [selectedFormId, refreshing, q, activeFilters, loadFilteredFormDisplay, loadFormDisplay, lastPrimary, activeSubOrder, loadSubDisplay]);
 
     // ═══════════════════════════════════════════════════════════
     // Сбрасываем поиск при изменении фильтров дерева

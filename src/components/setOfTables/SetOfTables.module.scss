@@ -644,3 +644,45 @@ h2 {
     background: rgba(74, 222, 128, 0.08);
   }
 }
+
+// ═══════════════════════════════════════════════════════════
+// NAVIGATION BAR (переход между Table ↔ Widget)
+// ═══════════════════════════════════════════════════════════
+
+.navBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--theme-surface);
+  border-bottom: 1px solid var(--theme-border);
+  font-size: 13px;
+  flex-wrap: wrap;
+}
+
+.navBtn {
+  background: none;
+  border: 1px solid var(--theme-border);
+  border-radius: 4px;
+  padding: 4px 10px;
+  cursor: pointer;
+  color: var(--link-color, #64b5f6);
+  font: inherit;
+  font-size: 12px;
+  transition: all 0.15s ease;
+
+  &:hover {
+    background: var(--theme-hover);
+    border-color: var(--link-color, #64b5f6);
+  }
+}
+
+.navCurrent {
+  font-weight: 600;
+  color: var(--theme-text-primary);
+}
+
+.navSeparator {
+  color: var(--theme-text-muted);
+  font-size: 14px;
+}
