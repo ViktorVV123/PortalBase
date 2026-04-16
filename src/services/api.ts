@@ -42,7 +42,7 @@ const IDM_URL = 'https://csc-idm.pro.lukoil.com/?env=FrmV';
 const isProdHost = window.location.hostname === 'csc-fv.pro.lukoil.com';
 
 // DEV токен — ТОЛЬКО для локальной разработки (на проде пустой)
-const DEV_ACCESS_TOKEN = '1293fbce-b245-411c-abce-65aedc4a8397';
+const DEV_ACCESS_TOKEN = '14f7fe40-8c3f-4be6-9522-60839be4cc38';
 
 /* ═══════════════════════════════════════════════════════════════════════════
    ЛОГИРОВАНИЕ AUTH СОБЫТИЙ

@@ -1,5 +1,5 @@
 /* ModalAddWorkspace.tsx */
-import { ChangeEvent, useEffect, useState } from 'react';
+import {ChangeEvent, useEffect, useMemo, useState} from 'react';
 import {
     Dialog, DialogTitle, DialogContent, DialogActions,
     TextField, Button, IconButton,
@@ -181,6 +181,15 @@ export const ModalAddWorkspace = ({
         onEditConnection?.(conn);
     };
 
+    const sortedConnections = useMemo(
+        () => [...connections].sort((a, b) => {
+            const nameA = a.name ?? a.connection?.name ?? '';
+            const nameB = b.name ?? b.connection?.name ?? '';
+            return nameA.localeCompare(nameB, undefined, { sensitivity: 'base', numeric: true });
+        }),
+        [connections]
+    );
+
     return (
         <Dialog
             open={open}
@@ -226,7 +235,7 @@ export const ModalAddWorkspace = ({
                                 }}
                                 required
                             >
-                                {connections.map((c) => (
+                                {sortedConnections.map((c) => (
                                     <MenuItem
                                         key={c.id}
                                         value={c.id}

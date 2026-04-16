@@ -208,6 +208,8 @@ export const TopComponent: React.FC<Props> = (props) => {
 
     const hasWorkspaces = workSpaces.length > 0;
 
+
+
     // Показываем кнопку "Рабочие пространства" только для админов
     const showWorkspacesButton = hasWorkspaces && isAdmin === true;
 

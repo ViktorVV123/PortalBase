@@ -786,10 +786,17 @@ export function useMainCrud({
                 if (unmountedRef.current) return;
                 const status = err?.response?.status;
                 const detail = err?.response?.data?.detail ?? err?.response?.data ?? err?.message;
+                if (status === 403) {
+                    alert('❌ У вас не хватает прав на удаление этой записи'); return;
+                }
                 if (status === 404 && String(detail).includes('Delete query not found')) {
                     alert('❌ Для этой таблицы не настроен DELETE QUERY.'); return;
                 }
-                throw err;
+                if (status === 422) {
+                    alert(`❌ Не удалось удалить строку (422).\n\n${typeof detail === 'string' ? detail : JSON.stringify(detail)}`); return;
+                }
+                alert(`❌ Не удалось удалить строку: ${status ?? ''}\n\n${typeof detail === 'string' ? detail : JSON.stringify(detail)}`);
+                return;
             }
 
             if (unmountedRef.current) return;

@@ -101,7 +101,7 @@ export function useMainModals({
         setEditConnOpen(false);
         setEditingConnId(null);
         setEditingConnInitial(null);
-        loadConnections();
+        loadConnections({ force: true });
     }, [loadConnections]);
 
     return {
