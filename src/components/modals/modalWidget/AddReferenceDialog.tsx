@@ -1,7 +1,8 @@
 import React from 'react';
 import {
     Dialog, DialogTitle, DialogContent, DialogActions,
-    Button, Stack, TextField, FormControlLabel, Checkbox, Autocomplete, Box
+    Button, Stack, TextField, FormControlLabel, Checkbox, Autocomplete, Box,
+    MenuItem, FormControl, InputLabel, Select
 } from '@mui/material';
 
 export type ColumnOption = { id: number; name: string; datatype: string; disabled: boolean };
@@ -81,6 +82,23 @@ const checkboxSx = {
     },
 };
 
+const selectSx = {
+    color: 'var(--input-text)',
+    backgroundColor: 'var(--input-bg)',
+    '& .MuiOutlinedInput-notchedOutline': {
+        borderColor: 'var(--input-border)',
+    },
+    '&:hover .MuiOutlinedInput-notchedOutline': {
+        borderColor: 'var(--input-border-hover)',
+    },
+    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+        borderColor: 'var(--input-border-focus)',
+    },
+    '& .MuiSelect-icon': {
+        color: 'var(--icon-primary)',
+    },
+};
+
 export const AddReferenceDialog: React.FC<Props> = ({
                                                         value, columnOptions, formOptions, getColLabel, onChange, onOpenForms, onClose, onSave
                                                     }) => (
@@ -124,13 +142,41 @@ export const AddReferenceDialog: React.FC<Props> = ({
                     onChange={e => onChange({ ref_alias: e.target.value })}
                     sx={textFieldSx}
                 />
-                <TextField
-                    label="type"
-                    size="small"
-                    value={value.type}
-                    onChange={e => onChange({ type: e.target.value })}
-                    sx={textFieldSx}
-                />
+                <FormControl size="small" fullWidth>
+                    <InputLabel
+                        id="add-ref-type-label"
+                        sx={{
+                            color: 'var(--theme-text-secondary)',
+                            '&.Mui-focused': { color: 'var(--theme-primary)' },
+                        }}
+                    >
+                        type
+                    </InputLabel>
+                    <Select
+                        labelId="add-ref-type-label"
+                        label="type"
+                        value={value.type ?? ''}
+                        onChange={e => onChange({ type: e.target.value === '' ? '' : String(e.target.value) })}
+                        MenuProps={{ disableScrollLock: true }}
+                        sx={selectSx}
+                    >
+                        <MenuItem value="">
+                            <em>— пусто —</em>
+                        </MenuItem>
+                        <MenuItem value="combobox">combobox</MenuItem>
+                        <MenuItem value="rls">rls</MenuItem>
+                        <MenuItem value="date">Календарь</MenuItem>
+                        <MenuItem value="checkbox">Чекбокс</MenuItem>
+                        <MenuItem value="checkboxNull">Чекбокс null</MenuItem>
+                        <MenuItem value="timestampwtz">Календарь со временем и тайм зоной</MenuItem>
+                        <MenuItem value="timestamp">Календарь со временем</MenuItem>
+                        <MenuItem value="timewtz">Время с тайм зоной</MenuItem>
+                        <MenuItem value="time">Время</MenuItem>
+                        <MenuItem value="styles">Стиль</MenuItem>
+                        <MenuItem value="orderASC">orderASC</MenuItem>
+                        <MenuItem value="orderDESC">orderDESC</MenuItem>
+                    </Select>
+                </FormControl>
                 <TextField
                     label="width"
                     type="number"
