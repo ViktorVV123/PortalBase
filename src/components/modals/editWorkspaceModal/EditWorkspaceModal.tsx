@@ -1,5 +1,5 @@
 // components/modals/editWorkspaceModal/EditWorkspaceModal.tsx
-import React, { useState, useEffect } from 'react';
+import React, {useState, useEffect, useMemo} from 'react';
 import {
     Dialog,
     DialogTitle,
@@ -94,6 +94,8 @@ const selectSx = {
     },
 };
 
+
+
 export const EditWorkspaceModal: React.FC<Props> = ({
                                                         open,
                                                         onClose,
@@ -138,6 +140,14 @@ export const EditWorkspaceModal: React.FC<Props> = ({
         if (selectedConnectionId === '') return;
         onEditConnection(Number(selectedConnectionId));
     };
+    const sortedConnections = useMemo(
+        () => [...connections].sort((a, b) => {
+            const nameA = a.name ?? '';
+            const nameB = b.name ?? '';
+            return nameA.localeCompare(nameB, undefined, { sensitivity: 'base', numeric: true });
+        }),
+        [connections]
+    );
 
     return (
         <Dialog
@@ -194,7 +204,7 @@ export const EditWorkspaceModal: React.FC<Props> = ({
                             <MenuItem value="">
                                 <em>Без подключения</em>
                             </MenuItem>
-                            {connections.map((conn) => (
+                            {sortedConnections.map((conn) => (
                                 <MenuItem key={conn.id} value={String(conn.id)}>
                                     {conn.name ?? `Подключение #${conn.id}`}
                                 </MenuItem>
