@@ -20,6 +20,9 @@ export const MainTableWithContext: React.FC<Props> = ({
                                                           disableDrillWhileEditing = false,
                                                       }) => {
     const ctx = useFormContext();
+    const { data } = useFormContext();
+    const enableUpdate = (data.formDisplay?.displayed_widget as any)?.enable_update !== false;
+    const enableDelete = (data.formDisplay?.displayed_widget as any)?.enable_delete !== false;
 
     const {
         headerPlan: hp,
@@ -111,6 +114,8 @@ export const MainTableWithContext: React.FC<Props> = ({
     return (
         <>
             <MainTable
+                onStartEdit={enableUpdate ? startEdit : undefined}
+                onDeleteRow={enableDelete ? deleteRow : undefined}
                 formId={selectedFormId}
                 headerPlan={headerPlan as any}
                 showSubHeaders={showSubHeaders}
@@ -133,8 +138,6 @@ export const MainTableWithContext: React.FC<Props> = ({
                 onCancelEdit={cancelEdit}
                 editSaving={mainEditing.editSaving}
                 onRowClick={handleRowClick}
-                onStartEdit={startEdit}
-                onDeleteRow={deleteRow}
                 deletingRowIdx={deletingRowIdx}
                 disableDrillWhileEditing={disableDrillWhileEditing}
                 comboReloadToken={comboReloadToken}

@@ -59,8 +59,8 @@ type MainTableRowProps = {
     selectedKey: string | null;
     pkToKey: (pk: Record<string, unknown>) => string;
     onRowClick: (view: RowView) => void;
-    onStartEdit: (rowIdx: number) => void;
-    onDeleteRow: (rowIdx: number) => void;
+    onStartEdit?: (rowIdx: number) => void;
+    onDeleteRow?: (rowIdx: number) => void;
     deletingRowIdx: number | null;
 
     onOpenDrill?: (
@@ -171,7 +171,6 @@ export const MainTableRow: React.FC<MainTableRowProps> = (p) => {
         }
 
         if (typeof p.onStartEdit !== 'function') {
-            console.error('[MainTableRow] onStartEdit is not a function!', p.onStartEdit);
             return;
         }
 
@@ -183,7 +182,6 @@ export const MainTableRow: React.FC<MainTableRowProps> = (p) => {
             console.error('[MainTableRow] onStartEdit() threw error:', err);
         }
     };
-
     const handleDeleteClick = (e: React.MouseEvent) => {
         e.stopPropagation();
         logRow('CLICK: Delete button', { rowIdx, isRowLocked, deletingRowIdx: p.deletingRowIdx });
@@ -199,7 +197,6 @@ export const MainTableRow: React.FC<MainTableRowProps> = (p) => {
         }
 
         if (typeof p.onDeleteRow !== 'function') {
-            console.error('[MainTableRow] onDeleteRow is not a function!', p.onDeleteRow);
             return;
         }
 
@@ -521,32 +518,36 @@ export const MainTableRow: React.FC<MainTableRowProps> = (p) => {
                     })()
                 ) : (
                     <div className={s.actionsRow}>
-                        <button
-                            type="button"
-                            className={`${s.actionsBtn} ${isRowLocked ? s.actionsBtnDisabled : ''}`}
-                            onClick={handleEditClick}
-                            title={isRowLocked ? 'Редактирование запрещено (RLS)' : 'Редактировать'}
-                        >
-                            <EditIcon className={s.actionIcon} />
-                        </button>
+                        {p.onStartEdit && (
+                            <button
+                                type="button"
+                                className={`${s.actionsBtn} ${isRowLocked ? s.actionsBtnDisabled : ''}`}
+                                onClick={handleEditClick}
+                                title={isRowLocked ? 'Редактирование запрещено (RLS)' : 'Редактировать'}
+                            >
+                                <EditIcon className={s.actionIcon}/>
+                            </button>
+                        )}
 
-                        <button
-                            type="button"
-                            className={`${s.actionsBtn} ${
-                                isRowLocked || p.deletingRowIdx === rowIdx ? s.actionsBtnDisabled : ''
-                            }`}
-                            onClick={handleDeleteClick}
-                            title={isRowLocked ? 'Удаление запрещено (RLS)' : 'Удалить'}
-                        >
-                            <DeleteIcon className={s.actionIcon} />
-                        </button>
+                        {p.onDeleteRow && (
+                            <button
+                                type="button"
+                                className={`${s.actionsBtn} ${
+                                    isRowLocked || p.deletingRowIdx === rowIdx ? s.actionsBtnDisabled : ''
+                                }`}
+                                onClick={handleDeleteClick}
+                                title={isRowLocked ? 'Удаление запрещено (RLS)' : 'Удалить'}
+                            >
+                                <DeleteIcon className={s.actionIcon}/>
+                            </button>
+                        )}
 
                         <span
                             className={s.lockSlot}
                             title={isRowLocked ? 'Строка защищена политикой RLS' : undefined}
                         >
-                            {isRowLocked && <LockIcon className={s.actionIcon} />}
-                        </span>
+        {isRowLocked && <LockIcon className={s.actionIcon}/>}
+    </span>
                     </div>
                 )}
             </td>

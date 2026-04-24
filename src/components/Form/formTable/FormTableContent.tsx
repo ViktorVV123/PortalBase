@@ -32,6 +32,11 @@ export const FormTableContent: React.FC<Props> = ({ liveTree, setLiveTree, curre
         refreshData, refreshing,
     } = ctx;
 
+    // Разрешения из displayed_widget
+    const enableInsert = (data.formDisplay?.displayed_widget as any)?.enable_insert !== false;
+    const enableUpdate = (data.formDisplay?.displayed_widget as any)?.enable_update !== false;
+    const enableDelete = (data.formDisplay?.displayed_widget as any)?.enable_delete !== false;
+
     const { selectedFormId, selectedWidget } = config;
     const { formDisplay, subDisplay } = data;
     const { subLoading, subError } = loading;
@@ -296,6 +301,7 @@ export const FormTableContent: React.FC<Props> = ({ liveTree, setLiveTree, curre
                             savingSub={subAdding.savingSub} isAdding={mainAdding.isAdding}
                             selectedFormId={selectedFormId} selectedWidget={selectedWidget}
                             saving={mainAdding.saving} startAdd={startAdd} submitAdd={submitAdd} cancelAdd={cancelAdd}
+                            showMainActions={enableInsert}
                             showSearch={search.showSearch} value={search.q} onChange={search.setQ}
                             onResetFilters={handleResetFilters} collapsedWidth={160} expandedWidth={420}
                             onRefresh={refreshData} refreshing={refreshing}

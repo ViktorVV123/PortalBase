@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-    Chip, Dialog, DialogActions, DialogContent, DialogTitle,
+    Checkbox, Chip, Dialog, DialogActions, DialogContent, DialogTitle,
     FormControlLabel, Stack, Switch, TextField, Button, Box
 } from '@mui/material';
 import { Widget } from '@/shared/hooks/useWorkSpaces';
@@ -88,6 +88,9 @@ export const WidgetMetaDialog: React.FC<Props> = ({
         description: selectedWidget?.description ?? '',
         table_id: selectedWidget?.table_id ?? 0,
         published: selectedWidget?.published ?? false,
+        enable_insert: (selectedWidget as any)?.enable_insert ?? true,
+        enable_update: (selectedWidget as any)?.enable_update ?? true,
+        enable_delete: (selectedWidget as any)?.enable_delete ?? true,
     }), [selectedWidget]);
 
     const [form, setForm] = useState(init);
@@ -110,7 +113,10 @@ export const WidgetMetaDialog: React.FC<Props> = ({
                 name: form.name,
                 description: form.description,
                 table_id: form.table_id,
-            });
+                enable_insert: form.enable_insert,
+                enable_update: form.enable_update,
+                enable_delete: form.enable_delete,
+            } as any);
 
             let finalWidget = upd;
 
@@ -194,6 +200,66 @@ export const WidgetMetaDialog: React.FC<Props> = ({
                         {/*        />*/}
                         {/*    }*/}
                         {/*/>*/}
+
+                        {/* Разрешения на операции */}
+                        <Box sx={{
+                            border: '1px solid var(--theme-border)',
+                            borderRadius: 1,
+                            p: 1.5,
+                            mt: 1
+                        }}>
+                            <Box sx={{
+                                color: 'var(--theme-text-secondary)',
+                                fontSize: 12,
+                                mb: 1
+                            }}>
+                                Разрешения для формы
+                            </Box>
+                            <Stack direction="row" spacing={2}>
+                                <FormControlLabel
+                                    control={
+                                        <Checkbox
+                                            checked={!!form.enable_insert}
+                                            onChange={(e) => setForm(v => ({ ...v, enable_insert: e.target.checked }))}
+                                            sx={{
+                                                color: 'var(--checkbox-unchecked)',
+                                                '&.Mui-checked': { color: 'var(--checkbox-checked)' },
+                                            }}
+                                            size="small"
+                                        />
+                                    }
+                                    label={<Box sx={{ color: 'var(--theme-text-primary)', fontSize: 13 }}>Добавление</Box>}
+                                />
+                                <FormControlLabel
+                                    control={
+                                        <Checkbox
+                                            checked={!!form.enable_update}
+                                            onChange={(e) => setForm(v => ({ ...v, enable_update: e.target.checked }))}
+                                            sx={{
+                                                color: 'var(--checkbox-unchecked)',
+                                                '&.Mui-checked': { color: 'var(--checkbox-checked)' },
+                                            }}
+                                            size="small"
+                                        />
+                                    }
+                                    label={<Box sx={{ color: 'var(--theme-text-primary)', fontSize: 13 }}>Редактирование</Box>}
+                                />
+                                <FormControlLabel
+                                    control={
+                                        <Checkbox
+                                            checked={!!form.enable_delete}
+                                            onChange={(e) => setForm(v => ({ ...v, enable_delete: e.target.checked }))}
+                                            sx={{
+                                                color: 'var(--checkbox-unchecked)',
+                                                '&.Mui-checked': { color: 'var(--checkbox-checked)' },
+                                            }}
+                                            size="small"
+                                        />
+                                    }
+                                    label={<Box sx={{ color: 'var(--theme-text-primary)', fontSize: 13 }}>Удаление</Box>}
+                                />
+                            </Stack>
+                        </Box>
                     </Stack>
                 </DialogContent>
                 <DialogActions sx={{ pr: 3, pb: 2, gap: 1 }}>
